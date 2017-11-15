@@ -77,5 +77,17 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
     ∧ p ∈ {p1;p2}
     ∧ p' ∉ {p1;p2}
     ⇒ trans (s,Com p1 v1 p2 v2 c) alpha (s',Com p1 v1 p2 v2 c'))
-`
+`;
+
+(* Reflexive transitive closure *)
+val (trans_s_rules,trans_s_ind,trans_s_cases) = Hol_reln `
+  (∀s s' e1 e2.
+    trans (s,e1) alpha (s',e2)
+    ⇒ trans_s (s,e1) (s',e2))
+∧ (∀s s' s'' e1 e2 e3.
+    trans (s,e1) alpha (s',e2)
+    ∧ trans_s (s',e2) (s'',e3)
+  ⇒ trans_s (s,e1) (s'',e3))
+`;
+
 val _ = export_theory ()
