@@ -23,21 +23,34 @@ val receiver_def = Define`
 `;
 
 val (trans_rules,trans_ind,trans_cases) = Hol_reln `
-(∀s v1 p1 v2 p2 d c.
+
+  (* Communication *)
+  (∀s v1 p1 v2 p2 d c.
     FLOOKUP s (v1,p1) = SOME d
     ⇒ trans (s,Com p1 v1 p2 v2 c) (LCom p1 v2 p2 v2) (s |+ ((v2,p2),d),c))
+
+  (* Selection *)
 ∧ (∀s p1 b p2 c.
     trans (s,Sel p1 b p2 c) (LSel p1 v p2) (s,c))
+
+  (* Let *)
 ∧ (∀s v p f vl c.
     EVERY IS_SOME (MAP (FLOOKUP s) (MAP (λv. (v,p)) vl))
     ⇒ trans (s,Let v p f vl c) (LTau p) (s |+ ((v,p),f(MAP (THE o FLOOKUP s) (MAP (λv. (v,p)) vl))),c))
+
+  (* If (True) *)
 ∧ (∀s v p c1 c2.
     FLOOKUP s (v,p) = SOME [1w]
     ⇒ trans (s,IfThen v p c1 c2) (LTau p) (s,c1))
-(* Swapping transitions *)
+
+  (* If (False) *)
+∧ (∀s v p c1 c2.
+    FLOOKUP s (v,p) = SOME w ∧ w ≠ [1w]
+    ⇒ trans (s,IfThen v p c1 c2) (LTau p) (s,c2))
+
+  (* Swapping transitions / Structural congruence *)
 ∧ (∀s v p c1 c2 s' c1' c2'.
     trans (s,c1) alpha (s',c1')
-
     ∧ trans (s,c2) alpha (s',c2')
     ∧ p ∉ freeprocs alpha
     ⇒ trans (s,IfThen v p c1 c2) alpha (s',IfThen v p c1' c2'))
@@ -55,7 +68,8 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
     trans (s,c) alpha (s',c')
     ∧ p ∉ freeprocs alpha
     ⇒ trans (s,Let v p f vl c) alpha (s',Let v p f vl c'))
-(* Asynchrony *)
+
+  (* Asynchrony *)
 ∧ (∀s c s' c' p1 v1 p2 v2 p p'.
     trans (s,c) alpha (s',c')
     ∧ sender alpha = SOME p
