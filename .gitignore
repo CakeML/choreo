@@ -1,0 +1,29 @@
+# HOL stuff
+*Script
+*Theory.sig
+*Theory.sml
+*Theory.dat
+*.uo
+*.ui
+*.o
+.HOLMK
+.hollogs
+
+# Generated assembly
+*.S
+
+# Developer generated executables
+developers/readme_gen
+tutorial/solutions/make_ex
+
+# HOLHEAP
+*heap
+
+# Translator stuff
+*_ml.txt
+*_hol.txt
+*_thm.txt
+*_ast.txt
+
+# Emacs backup files
+*~
