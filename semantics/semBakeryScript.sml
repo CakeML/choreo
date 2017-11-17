@@ -63,14 +63,8 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
 `;
 
 (* Reflexive transitive closure *)
-val (trans_s_rules,trans_s_ind,trans_s_cases) = Hol_reln `
-  (∀s s' e1 e2.
-    trans (s,e1) alpha (s',e2)
-    ⇒ trans_s (s,e1) (s',e2))
-∧ (∀s s' s'' e1 e2 e3.
-    trans (s,e1) alpha (s',e2)
-    ∧ trans_s (s',e2) (s'',e3)
-  ⇒ trans_s (s,e1) (s'',e3))
+val trans_s_def = Define`
+  trans_s = RTC (λp q. ∃s. trans p s q)
 `;
 
 val _ = export_theory ()
