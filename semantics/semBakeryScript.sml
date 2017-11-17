@@ -1,8 +1,32 @@
 open preamble
 
-open astBakeryTheory baseSemBakeryTheory
+open astBakeryTheory
 
 val _ = new_theory "semBakery";
+
+val _ = Datatype`
+  label = LTau proc varN
+        | LCom proc varN proc varN
+        | LSel proc bool proc
+`;
+
+val freeprocs_def = Define`
+  freeprocs (LTau p n)         = {p}
+∧ freeprocs (LCom p1 v1 p2 v2) = {p1;p2}
+∧ freeprocs (LSel p1 b p2)     = {p1;p2}
+`;
+
+val sender_def = Define`
+  sender (LTau p n)         = NONE
+∧ sender (LCom p1 v1 p2 v2) = SOME p1
+∧ sender (LSel p1 b p2)     = SOME p1
+`;
+
+val receiver_def = Define`
+  receiver (LTau p n)          = NONE
+∧ receiver (LCom p1 v1 p2 v2) = SOME p2
+∧ receiver (LSel p1 b p2)     = SOME p2
+`;
 
 val (trans_rules,trans_ind,trans_cases) = Hol_reln `
 
@@ -18,18 +42,18 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
   (* Let *)
 ∧ (∀s v p f vl c.
     EVERY IS_SOME (MAP (FLOOKUP s) (MAP (λv. (v,p)) vl))
-    /\ trans (s |+ ((v,p),f(MAP (THE o FLOOKUP s) (MAP (λv. (v,p)) vl))),c) alpha (s',c')
+    ∧ trans (s |+ ((v,p),f(MAP (THE o FLOOKUP s) (MAP (λv. (v,p)) vl))),c) alpha (s',c')
     ⇒ trans (s,Let v p f vl c) alpha (s',c'))
 
   (* If (True) *)
 ∧ (∀s v p c1 c2.
     FLOOKUP s (v,p) = SOME [1w]
-    ⇒ trans (s,IfThen v p c1 c2) (LTau p) (s,c1))
+    ⇒ trans (s,IfThen v p c1 c2) (LTau p v) (s,c1))
 
   (* If (False) *)
 ∧ (∀s v p c1 c2.
     FLOOKUP s (v,p) = SOME w ∧ w ≠ [1w]
-    ⇒ trans (s,IfThen v p c1 c2) (LTau p) (s,c2))
+    ⇒ trans (s,IfThen v p c1 c2) (LTau p v) (s,c2))
 
   (* Swapping transitions / Structural congruence *)
 ∧ (∀s v p c1 c2 s' c1' c2'.

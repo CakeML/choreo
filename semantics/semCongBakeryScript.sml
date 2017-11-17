@@ -5,6 +5,30 @@ open astBakeryTheory
 (* Semantics with build-in congruence *)
 val _ = new_theory "semCongBakery";
 
+val _ = Datatype`
+  label = LTau proc
+        | LCom proc varN proc varN
+        | LSel proc bool proc
+`;
+
+val freeprocs_def = Define`
+  freeprocs (LTau p)           = {p}
+∧ freeprocs (LCom p1 v1 p2 v2) = {p1;p2}
+∧ freeprocs (LSel p1 b p2)     = {p1;p2}
+`;
+
+val sender_def = Define`
+  sender (LTau p)           = NONE
+∧ sender (LCom p1 v1 p2 v2) = SOME p1
+∧ sender (LSel p1 b p2)     = SOME p1
+`;
+
+val receiver_def = Define`
+  receiver (LTau p)           = NONE
+∧ receiver (LCom p1 v1 p2 v2) = SOME p2
+∧ receiver (LSel p1 b p2)     = SOME p2
+`;
+
 val (scong_rules, scong_ind, scong_cases) = Hol_reln `
   (* Basic congruence rules *)
   (∀c. scong c c)
@@ -74,7 +98,8 @@ val (transCong_rules,transCong_ind,transCong_cases) = Hol_reln `
   (* Let *)
 ∧ (∀s v p f vl c.
     EVERY IS_SOME (MAP (FLOOKUP s) (MAP (λv. (v,p)) vl))
-    ⇒ transCong (s,Let v p f vl c) (LTau p) (s |+ ((v,p),f(MAP (THE o FLOOKUP s) (MAP (λv. (v,p)) vl))),c))
+    ∧ transCong (s |+ ((v,p),f(MAP (THE o FLOOKUP s) (MAP (λv. (v,p)) vl))),c) alpha (s',c')
+    ⇒ transCong (s,Let v p f vl c) alpha (s',c'))
 
   (* If (True) *)
 ∧ (∀s v p c1 c2.

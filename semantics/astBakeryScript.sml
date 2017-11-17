@@ -52,10 +52,4 @@ val _ = Datatype`
         *)
 `;
 
-val _ = Datatype`
-  label = LTau proc
-        | LCom proc varN proc varN
-        | LSel proc bool proc
-`;
-
 val _ = export_theory ()
