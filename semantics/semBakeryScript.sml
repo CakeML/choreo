@@ -8,24 +8,29 @@ val _ = Datatype`
   label = LTau proc varN
         | LCom proc varN proc varN
         | LSel proc bool proc
+        | LLet varN proc (datum list -> datum) (varN list)
 `;
 
 val freeprocs_def = Define`
   freeprocs (LTau p n)         = {p}
 ∧ freeprocs (LCom p1 v1 p2 v2) = {p1;p2}
 ∧ freeprocs (LSel p1 b p2)     = {p1;p2}
+∧ freeprocs (LSel p1 b p2)     = {p1;p2}
+∧ freeprocs (LLet v p f vl)     = {p}
 `;
 
 val sender_def = Define`
   sender (LTau p n)         = NONE
 ∧ sender (LCom p1 v1 p2 v2) = SOME p1
 ∧ sender (LSel p1 b p2)     = SOME p1
+∧ sender (LLet v p f vl)     = NONE
 `;
 
 val receiver_def = Define`
   receiver (LTau p n)          = NONE
 ∧ receiver (LCom p1 v1 p2 v2) = SOME p2
 ∧ receiver (LSel p1 b p2)     = SOME p2
+∧ receiver (LLet v p f vl)     = NONE
 `;
 
 val (trans_rules,trans_ind,trans_cases) = Hol_reln `
@@ -42,8 +47,7 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
   (* Let *)
 ∧ (∀s v p f vl c.
     EVERY IS_SOME (MAP (FLOOKUP s) (MAP (λv. (v,p)) vl))
-    ∧ trans (s |+ ((v,p),f(MAP (THE o FLOOKUP s) (MAP (λv. (v,p)) vl))),c) alpha (s',c')
-    ⇒ trans (s,Let v p f vl c) alpha (s',c'))
+    ⇒ trans (s,Let v p f vl c) (LLet v p f vl) (s |+ ((v,p),f(MAP (THE o FLOOKUP s) (MAP (λv. (v,p)) vl))),c))
 
   (* If (True) *)
 ∧ (∀s v p c1 c2.
