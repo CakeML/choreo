@@ -98,9 +98,9 @@ val (transCong_rules,transCong_ind,transCong_cases) = Hol_reln `
   (* Let *)
 ∧ (∀s v p f vl c.
     EVERY IS_SOME (MAP (FLOOKUP s) (MAP (λv. (v,p)) vl))
-    ∧ transCong (s |+ ((v,p),f(MAP (THE o FLOOKUP s) (MAP (λv. (v,p)) vl))),c) alpha (s',c')
-    ⇒ transCong (s,Let v p f vl c) alpha (s',c'))
-
+    ⇒ transCong (s,Let v p f vl c)
+                (LTau p)
+                (s |+ ((v,p),f(MAP (THE o FLOOKUP s) (MAP (λv. (v,p)) vl))),c))
   (* If (True) *)
 ∧ (∀s v p c1 c2.
     FLOOKUP s (v,p) = SOME [1w]
