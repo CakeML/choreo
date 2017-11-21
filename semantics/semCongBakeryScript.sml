@@ -30,17 +30,26 @@ val receiver_def = Define`
 `;
 
 val (scong_rules, scong_ind, scong_cases) = Hol_reln `
-  (* Basic congruence rules *)
+(* Basic congruence rules *)
+
+  (* Symmetric *)
   (∀c. scong c c)
+
+  (* Reflexive *)
 ∧ (∀c1 c2.
     scong c1 c2
     ⇒ scong c2 c1)
+  (* Transitive *)
 ∧ (∀c1 c2 c3.
      scong c1 c2
      ∧ scong c2 c3
      ⇒ scong c1 c3)
 
-  (* Swapping *)
+(* Swapping rules *)
+
+(* Swapping communications and selections is only posible if the
+   processes involved in each operations are diferent (all of them)
+*)
 ∧ (∀p1 p2 p3 p4 v1 v2 v3 v4 c.
     {p1;p2} ∩ {p3;p4} = {}
     ⇒ scong (Com p1 v1 p2 v2 (Com p3 v3 p4 v4 c))
@@ -54,7 +63,27 @@ val (scong_rules, scong_ind, scong_cases) = Hol_reln `
     ⇒ scong (Sel p1 v1 p2 (Sel p3 v3 p4 c))
             (Sel p3 v3 p4 (Sel p1 v1 p2 c)))
 
-  (* If Rules *)
+(* Let swaps need to make sure no pair of process and variable is
+   shared betwen operations (this includes the arguments to the let
+   function)
+*)
+∧ (∀p1 p2 p3 v1 v2 v3 f vl c.
+    (p3,v3) ∉ {(p1,v1);(p2,v2)}
+    ∧ (p1,v1) ∉ {(p3,i)| i ∈ set vl}
+    ∧ (p2,v2) ∉ {(p3,i)| i ∈ set vl}
+    ⇒ scong (Com p1 v1 p2 v2 (Let v3 p3 f vl c))
+            (Let v3 p3 f vl (Com p1 v1 p2 v2 c)))
+∧ (∀v v' p p' f f' vl vl' c.
+    (p,v) ≠ (p',v')
+    ∧ (p,v) ∉ {(p',i) | i ∈ set vl'}
+    ∧ (p',v') ∉ {(p,i) | i ∈ set vl}
+   ⇒ scong (Let v p f vl (Let v' p' f' vl' c))
+           (Let v' p' f' vl' (Let v p f vl c)))
+∧ (∀p1 p2 p3 b v vl f c.
+    scong (Sel p1 b p2 (Let v p3 f vl c))
+          (Let v p3 f vl (Sel p1 b p2 c)))
+
+(* If Rules *)
 ∧ (∀p q e1 e2 c1 c2 c1' c2'.
     p ≠ q
     ⇒ scong (IfThen e1 p (IfThen e2 q c1 c2)  (IfThen e2 q c1' c2'))
@@ -67,6 +96,10 @@ val (scong_rules, scong_ind, scong_cases) = Hol_reln `
     p ∉ {p1;p2}
     ⇒ scong (Sel p1 b p2 (IfThen e p c1 c2))
             (IfThen e p (Sel p1 b p2 c1) (Sel p1 b p2 c2)))
+∧ (∀p1 p2 v f vl e c1 c2.
+    (p1,v) ≠ (p2,e)
+    ⇒ scong (Let v p1 f vl (IfThen e p2 c1 c2))
+            (IfThen e p2 (Let v p1 f vl c1) (Let v p1 f vl c1)))
 
   (* Structural rules *)
 ∧ (∀p e c1 c1' c2 c2'.
