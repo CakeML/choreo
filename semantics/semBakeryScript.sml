@@ -42,7 +42,7 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
 
   (* Selection *)
 ∧ (∀s p1 b p2 c.
-    trans (s,Sel p1 b p2 c) (LSel p1 v p2) (s,c))
+    trans (s,Sel p1 b p2 c) (LSel p1 b p2) (s,c))
 
   (* Let *)
 ∧ (∀s v p f vl c.
