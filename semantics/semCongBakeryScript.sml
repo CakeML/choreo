@@ -117,6 +117,8 @@ val (scong_rules, scong_ind, scong_cases) = Hol_reln `
     ⇒ scong (Sel p1 b p2 c) (Sel p1 b p2 c'))
 `;
 
+val _ = Parse.add_infix("≅",425,Parse.NONASSOC);
+val _ = Parse.overload_on("≅",``scong``);
 
 val (transCong_rules,transCong_ind,transCong_cases) = Hol_reln `
   (* Communication *)
@@ -155,9 +157,9 @@ val (transCong_rules,transCong_ind,transCong_cases) = Hol_reln `
 
   (* Congruence *)
 ∧ (∀c1 c2 c1' c2'.
-    scong c1 c1'
+    c1 ≅ c1'
     ∧ transCong (s,c1') alpha (s',c2')
-    ∧ scong c2' c2
+    ∧ c2' ≅ c2
     ⇒ transCong (s,c1) alpha (s',c2))
 `;
 
