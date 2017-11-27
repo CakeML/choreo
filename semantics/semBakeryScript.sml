@@ -33,6 +33,27 @@ val receiver_def = Define`
 ∧ receiver (LLet v p f vl)     = NONE
 `;
 
+val written_def = Define`
+  written (LTau p n)          = NONE
+∧ written (LCom p1 v1 p2 v2) = SOME(v2,p2)
+∧ written (LSel p1 b p2)     = NONE
+∧ written (LLet v p f vl)     = SOME(v,p)
+`;
+
+val read_def = Define`
+  read (LTau p n)          = {(n,p)}
+∧ read (LCom p1 v1 p2 v2) = {(v1,p1)}
+∧ read (LSel p1 b p2)     = {}
+∧ read (LLet v p f vl)     = set(MAP (λv. (v,p)) vl)
+`;
+
+(*val written_value_def = Define`
+   written_value s (LTau p n) = NONE
+∧ written_value s (LCom p1 v1 p2 v2) = FLOOKUP s (v1,p1)
+∧ written_value s (LSel p1 b p2)     = NONE
+∧ written_value s (LLet v p f vl)     = SOME(f(MAP (THE o FLOOKUP s) (MAP (λv. (v,p)) vl)))
+`*)
+
 val (trans_rules,trans_ind,trans_cases) = Hol_reln `
 
   (* Communication *)
@@ -91,6 +112,11 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
     ∧ p' ∉ {p1;p2}
     ⇒ trans (s,Com p1 v1 p2 v2 c) alpha (s',Com p1 v1 p2 v2 c'))
 `;
+
+val _ = zip ["trans_com","trans_sel","trans_let","trans_if_true","trans_if_false",
+              "trans_if_swap","trans_com_swap","trans_sel_swap","trans_let_swap",
+              "trans_asynch"]
+            (CONJUNCTS trans_rules) |> map save_thm;
 
 (* Reflexive transitive closure *)
 val trans_s_def = Define`
