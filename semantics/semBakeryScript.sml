@@ -106,20 +106,17 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
     ⇒ trans (s,Let v p f vl c) (alpha,l) (s',Let v p f vl c'))
 
   (* Asynchrony *)
-∧ (∀s c s' c' p1 v1 p2 v2 p p' l alpha.
+∧ (∀s c s' c' p1 v1 p2 v2 l alpha.
     trans (s,c) (alpha,l) (s',c')
-    ∧ sender alpha = SOME p
-    ∧ receiver alpha = SOME p'
-    ∧ p ∈ {p1;p2}
-    ∧ p' ∉ {p1;p2}
+    ∧ p1 ∈ freeprocs alpha
+    ∧ written alpha ≠ SOME (v1,p1)
+    ∧ p2 ∉ freeprocs alpha
     ⇒ trans (s,Com p1 v1 p2 v2 c) (alpha,LCom p1 v1 p2 v2::l) (s',Com p1 v1 p2 v2 c'))
 
-∧ (∀s c s' c' p1 b p2 p p' l alpha.
+∧ (∀s c s' c' p1 b p2 l alpha.
     trans (s,c) (alpha,l) (s',c')
-    ∧ sender alpha = SOME p
-    ∧ receiver alpha = SOME p'
-    ∧ p ∈ {p1;p2}
-    ∧ p' ∉ {p1;p2}
+    ∧ p1 ∈ freeprocs alpha
+    ∧ p2 ∉ freeprocs alpha
     ⇒ trans (s,Sel p1 b p2 c) (alpha,LSel p1 b p2::l) (s',Sel p1 b p2 c'))
 
 `;
