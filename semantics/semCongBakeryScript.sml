@@ -155,6 +155,14 @@ val (transCong_rules,transCong_ind,transCong_cases) = Hol_reln `
     ∧ p' ∉ {p1;p2}
     ⇒ transCong (s,Com p1 v1 p2 v2 c) alpha (s',Com p1 v1 p2 v2 c'))
 
+∧ (∀s c s' c' p1 b p2 p p'.
+    transCong (s,c) alpha (s',c')
+    ∧ sender alpha = SOME p
+    ∧ receiver alpha = SOME p'
+    ∧ p ∈ {p1;p2}
+    ∧ p' ∉ {p1;p2}
+    ⇒ transCong (s,Sel p1 b p2 c) alpha (s',Sel p1 b p2 c'))
+
   (* Congruence *)
 ∧ (∀c1 c2 c1' c2'.
     c1 ≅ c1'

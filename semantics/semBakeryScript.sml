@@ -111,11 +111,20 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
     ∧ p ∈ {p1;p2}
     ∧ p' ∉ {p1;p2}
     ⇒ trans (s,Com p1 v1 p2 v2 c) (alpha,LCom p1 v1 p2 v2::l) (s',Com p1 v1 p2 v2 c'))
+
+∧ (∀s c s' c' p1 b p2 p p' l.
+    trans (s,c) (alpha,l) (s',c')
+    ∧ sender alpha = SOME p
+    ∧ receiver alpha = SOME p'
+    ∧ p ∈ {p1;p2}
+    ∧ p' ∉ {p1;p2}
+    ⇒ trans (s,Sel p1 b p2 c) (alpha,LSel p1 b p2::l) (s',Sel p1 b p2 c'))
+
 `;
 
 val _ = zip ["trans_com","trans_sel","trans_let","trans_if_true","trans_if_false",
               "trans_if_swap","trans_com_swap","trans_sel_swap","trans_let_swap",
-              "trans_asynch"]
+              "trans_com_asynch","trans_sel_async"]
             (CONJUNCTS trans_rules) |> map save_thm;
 
 (* Reflexive transitive closure *)
