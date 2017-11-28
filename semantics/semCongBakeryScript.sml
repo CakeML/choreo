@@ -187,4 +187,10 @@ val (transCong_rules,transCong_ind,transCong_cases) = Hol_reln `
     ⇒ transCong (s,c1) alpha (s',c2))
 `;
 
+val _ = zip ["transCong_com", "transCong_sel", "transCong_let"
+             , "transCong_if_true", "transCong_if_false"
+             , "transCong_com_asynch", "transCong_sel_async"
+             , "transCong_cong"]
+            (CONJUNCTS transCong_rules) |> map save_thm;
+
 val _ = export_theory ()
