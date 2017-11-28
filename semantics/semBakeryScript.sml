@@ -75,7 +75,7 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
   (* If (True) *)
 ∧ (∀s v p c1 c2.
     FLOOKUP s (v,p) = SOME [1w]
-    ⇒ trans (s,IfThen v p c1 c2) (LTau p v,l) (s,c1))
+    ⇒ trans (s,IfThen v p c1 c2) (LTau p v,[]) (s,c1))
 
   (* If (False) *)
 ∧ (∀s v p c1 c2.
@@ -83,28 +83,28 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
     ⇒ trans (s,IfThen v p c1 c2) (LTau p v,[]) (s,c2))
 
   (* Swapping transitions / Structural congruence *)
-∧ (∀s v p c1 c2 s' c1' c2' l.
+∧ (∀s v p c1 c2 s' c1' c2' l alpha.
     trans (s,c1) (alpha,l) (s',c1')
     ∧ trans (s,c2) (alpha,l) (s',c2')
     ∧ p ∉ freeprocs alpha
     ⇒ trans (s,IfThen v p c1 c2) (alpha,l) (s',IfThen v p c1' c2'))
-∧ (∀s c s' c' p1 v1 p2 v2 l.
+∧ (∀s c s' c' p1 v1 p2 v2 l alpha.
     trans (s,c) (alpha,l) (s',c')
     ∧ p1 ∉ freeprocs alpha
     ∧ p2 ∉ freeprocs alpha
     ⇒ trans (s,Com p1 v1 p2 v2 c) (alpha,l) (s',Com p1 v1 p2 v2 c'))
-∧ (∀s c s' c' p1 b p2 l.
+∧ (∀s c s' c' p1 b p2 l alpha.
     trans (s,c) (alpha,l) (s',c')
     ∧ p1 ∉ freeprocs alpha
     ∧ p2 ∉ freeprocs alpha
     ⇒ trans (s,Sel p1 b p2 c) (alpha,l) (s',Sel p1 b p2 c'))
-∧ (∀s c s' c' p v f vl l.
+∧ (∀s c s' c' p v f vl l alpha.
     trans (s,c) (alpha,l) (s',c')
     ∧ p ∉ freeprocs alpha
     ⇒ trans (s,Let v p f vl c) (alpha,l) (s',Let v p f vl c'))
 
   (* Asynchrony *)
-∧ (∀s c s' c' p1 v1 p2 v2 p p' l.
+∧ (∀s c s' c' p1 v1 p2 v2 p p' l alpha.
     trans (s,c) (alpha,l) (s',c')
     ∧ sender alpha = SOME p
     ∧ receiver alpha = SOME p'
@@ -112,7 +112,7 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
     ∧ p' ∉ {p1;p2}
     ⇒ trans (s,Com p1 v1 p2 v2 c) (alpha,LCom p1 v1 p2 v2::l) (s',Com p1 v1 p2 v2 c'))
 
-∧ (∀s c s' c' p1 b p2 p p' l.
+∧ (∀s c s' c' p1 b p2 p p' l alpha.
     trans (s,c) (alpha,l) (s',c')
     ∧ sender alpha = SOME p
     ∧ receiver alpha = SOME p'
