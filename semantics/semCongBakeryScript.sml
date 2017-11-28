@@ -120,6 +120,16 @@ val (scong_rules, scong_ind, scong_cases) = Hol_reln `
 val _ = Parse.add_infix("≅",425,Parse.NONASSOC);
 val _ = Parse.overload_on("≅",``scong``);
 
+val _ = zip ["scong_sym", "scong_refl", "scong_trans"
+            , "scong__com_swap", "scong_com_sel_swap"
+            , "scong_sel_swap", "scong_com_let_swap"
+            , "scong_let_swap", "scong_sel_let_swap"
+            , "scong_if_swap", "scong_com_if_swap"
+            , "scong_sel_if_swap", "scong_let_if_swap"
+            , "scong_if", "scong_let", "scong_com"
+            , "scong_sel"]
+            (CONJUNCTS scong_rules) |> map save_thm;
+
 val (transCong_rules,transCong_ind,transCong_cases) = Hol_reln `
   (* Communication *)
   (∀s v1 p1 v2 p2 d c.
