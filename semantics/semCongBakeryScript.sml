@@ -123,12 +123,12 @@ val _ = Parse.overload_on("≅",``scong``);
 val (transCong_rules,transCong_ind,transCong_cases) = Hol_reln `
   (* Communication *)
   (∀s v1 p1 v2 p2 d c.
-    FLOOKUP s (v1,p1) = SOME d
+    FLOOKUP s (v1,p1) = SOME d /\ p1 ≠ p2
     ⇒ transCong (s,Com p1 v1 p2 v2 c) (LCom p1 v1 p2 v2) (s |+ ((v2,p2),d),c))
 
   (* Selection *)
 ∧ (∀s p1 b p2 c.
-    transCong (s,Sel p1 b p2 c) (LSel p1 b p2) (s,c))
+    p1 ≠ p2 ==> transCong (s,Sel p1 b p2 c) (LSel p1 b p2) (s,c))
 
   (* Let *)
 ∧ (∀s v p f vl c.
