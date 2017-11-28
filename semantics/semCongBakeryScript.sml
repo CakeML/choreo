@@ -99,7 +99,7 @@ val (scong_rules, scong_ind, scong_cases) = Hol_reln `
 ∧ (∀p1 p2 v f vl e c1 c2.
     (p1,v) ≠ (p2,e)
     ⇒ scong (Let v p1 f vl (IfThen e p2 c1 c2))
-            (IfThen e p2 (Let v p1 f vl c1) (Let v p1 f vl c1)))
+            (IfThen e p2 (Let v p1 f vl c1) (Let v p1 f vl c2)))
 
   (* Structural rules *)
 ∧ (∀p e c1 c1' c2 c2'.
