@@ -6,27 +6,34 @@ open astBakeryTheory
 val _ = new_theory "semCongBakery";
 
 val _ = Datatype`
-  label = LTau proc
+  label = LTau proc (varN option)
         | LCom proc varN proc varN
         | LSel proc bool proc
 `;
 
 val freeprocs_def = Define`
-  freeprocs (LTau p)           = {p}
+  freeprocs (LTau p v)          = {p}
 ∧ freeprocs (LCom p1 v1 p2 v2) = {p1;p2}
 ∧ freeprocs (LSel p1 b p2)     = {p1;p2}
 `;
 
 val sender_def = Define`
-  sender (LTau p)           = NONE
+  sender (LTau p v)          = NONE
 ∧ sender (LCom p1 v1 p2 v2) = SOME p1
 ∧ sender (LSel p1 b p2)     = SOME p1
 `;
 
 val receiver_def = Define`
-  receiver (LTau p)           = NONE
+  receiver (LTau p v)          = NONE
 ∧ receiver (LCom p1 v1 p2 v2) = SOME p2
 ∧ receiver (LSel p1 b p2)     = SOME p2
+`;
+
+val written_def = Define`
+  written (LTau p NONE)       = NONE
+∧ written (LTau p (SOME v))  = SOME(v,p)
+∧ written (LCom p1 v1 p2 v2) = SOME(v2,p2)
+∧ written (LSel p1 b p2)     = NONE
 `;
 
 val (scong_rules, scong_ind, scong_cases) = Hol_reln `
@@ -146,37 +153,34 @@ val (transCong_rules,transCong_ind,transCong_cases) = Hol_reln `
 ∧ (∀s v p f vl c.
     EVERY IS_SOME (MAP (FLOOKUP s) (MAP (λv. (v,p)) vl))
     ⇒ transCong (s,Let v p f vl c)
-                (LTau p)
+                (LTau p (SOME v))
                 (s |+ ((v,p),f(MAP (THE o FLOOKUP s) (MAP (λv. (v,p)) vl))),c))
   (* If (True) *)
 ∧ (∀s v p c1 c2.
     FLOOKUP s (v,p) = SOME [1w]
-    ⇒ transCong (s,IfThen v p c1 c2) (LTau p) (s,c1))
+    ⇒ transCong (s,IfThen v p c1 c2) (LTau p NONE) (s,c1))
 
   (* If (False) *)
 ∧ (∀s v p c1 c2.
     FLOOKUP s (v,p) = SOME w ∧ w ≠ [1w]
-    ⇒ transCong (s,IfThen v p c1 c2) (LTau p) (s,c2))
+    ⇒ transCong (s,IfThen v p c1 c2) (LTau p NONE) (s,c2))
 
   (* Asynchrony *)
-∧ (∀s c s' c' p1 v1 p2 v2 p p'.
+∧ (∀s c s' c' p1 v1 p2 v2 alpha.
     transCong (s,c) alpha (s',c')
-    ∧ sender alpha = SOME p
-    ∧ receiver alpha = SOME p'
-    ∧ p ∈ {p1;p2}
-    ∧ p' ∉ {p1;p2}
+    ∧ p1 ∈ freeprocs alpha
+    ∧ written alpha ≠ SOME (v1,p1)
+    ∧ p2 ∉ freeprocs alpha
     ⇒ transCong (s,Com p1 v1 p2 v2 c) alpha (s',Com p1 v1 p2 v2 c'))
 
-∧ (∀s c s' c' p1 b p2 p p'.
+∧ (∀s c s' c' p1 b p2 alpha.
     transCong (s,c) alpha (s',c')
-    ∧ sender alpha = SOME p
-    ∧ receiver alpha = SOME p'
-    ∧ p ∈ {p1;p2}
-    ∧ p' ∉ {p1;p2}
+    ∧ p1 ∈ freeprocs alpha
+    ∧ p2 ∉ freeprocs alpha
     ⇒ transCong (s,Sel p1 b p2 c) alpha (s',Sel p1 b p2 c'))
 
   (* Congruence *)
-∧ (∀c1 c2 c1' c2'.
+∧ (∀c1 c2 c1' c2' alpha.
     c1 ≅ c1'
     ∧ transCong (s,c1') alpha (s',c2')
     ∧ c2' ≅ c2
