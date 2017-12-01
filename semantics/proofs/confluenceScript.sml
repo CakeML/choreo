@@ -179,7 +179,7 @@ val semantics_add_irrelevant_state = Q.store_thm("semantics_add_irrelevant_state
      >> metis_tac[trans_let_swap])
   >> (* Asynch *)
     fs[freeprocs_def] >> fs[FUPDATE_COMMUTES]
-    >> (match_mp_tac trans_com_asynch ORELSE match_mp_tac trans_sel_async)
+    >> (match_mp_tac trans_com_async ORELSE match_mp_tac trans_sel_async)
     >> fs[]);
 
 val semantics_add_irrelevant_state_tup = Q.store_thm("semantics_add_irrelevant_state_tup",
@@ -238,7 +238,7 @@ val semantics_add_irrelevant_state2 = Q.store_thm("semantics_add_irrelevant_stat
      >> metis_tac[trans_let_swap])
   >> (* Asynch *)
     fs[written_def,read_def] >> fs[FUPDATE_COMMUTES]
-    >> (match_mp_tac trans_com_asynch ORELSE match_mp_tac trans_sel_async)
+    >> (match_mp_tac trans_com_async ORELSE match_mp_tac trans_sel_async)
     >> fs[]);
 
 val semantics_add_irrelevant_state3 = Q.store_thm("semantics_add_irrelevant_state3",
@@ -292,7 +292,7 @@ val semantics_add_irrelevant_state3 = Q.store_thm("semantics_add_irrelevant_stat
      >> metis_tac[trans_let_swap])
   >> (* Asynch *)
     fs[written_def,read_def] >> fs[FUPDATE_COMMUTES]
-    >> (match_mp_tac trans_com_asynch ORELSE match_mp_tac trans_sel_async)
+    >> (match_mp_tac trans_com_async ORELSE match_mp_tac trans_sel_async)
     >> fs[]);
 
 val semantics_add_irrelevant_state4 = Q.store_thm("semantics_add_irrelevant_state4",
@@ -408,7 +408,7 @@ val trans_add_relevant_state_com = Q.store_thm("trans_add_relevant_state_com",
   >- (* Let-swap*)
     metis_tac[trans_let_swap]
   >> (* Asynch *)
-    (match_mp_tac trans_com_asynch ORELSE match_mp_tac trans_sel_async) >> fs[]);
+    (match_mp_tac trans_com_async ORELSE match_mp_tac trans_sel_async) >> fs[]);
 
 val concurrent_events_write_neq = Q.store_thm("concurrent_events_write_neq",
   `!sc alpha beta l l' sc' sc''.
@@ -460,7 +460,7 @@ val some_write_update_state = Q.store_thm("some_write_update_state",
   >> ho_match_mp_tac trans_strongind
   >> rpt strip_tac >> fs[] >> rveq >> fs[written_def] >> metis_tac[]);
 
-val same_label_same_asynchs = Q.store_thm("same_label_same_asynchs",
+val same_label_same_asyncs = Q.store_thm("same_label_same_asyncs",
   `!s c alpha l s' l' sc' sc''.
     trans (s,c) (alpha,l) sc' /\ trans (s',c) (alpha,l') sc'' ==> l = l'
   `,
@@ -479,7 +479,7 @@ val same_label_same_asynchs = Q.store_thm("same_label_same_asynchs",
   >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
   >> metis_tac[]);
 
-val trans_asynch_imp = Q.store_thm("trans_asynch_imp",
+val trans_async_imp = Q.store_thm("trans_async_imp",
   `!sc alpha beta l sc'.
     trans sc (alpha,l) sc' ==> EVERY (λbeta. (∃p. sender beta = SOME p ∧ p ∈ freeprocs alpha) ∧ (∃q. receiver beta = SOME q ∧ q ∉ freeprocs alpha)) l
   `,
@@ -518,24 +518,24 @@ val asynch_trans_filter_labels = Q.store_thm("asynch_trans_filter_labels",
      EVERY_ASSUM (fn thm => if is_forall (concl thm) then NO_TAC else ALL_TAC)
      >> qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
      >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
-     >> imp_res_tac same_label_same_asynchs >> rveq
+     >> imp_res_tac same_label_same_asyncs >> rveq
      >> fs[remove1_def]
      >> match_mp_tac EQ_SYM
-     >> imp_res_tac trans_asynch_imp >> pop_assum mp_tac
+     >> imp_res_tac trans_async_imp >> pop_assum mp_tac
      >> rpt(qpat_x_assum `_ ∉ _` mp_tac)
      >> rpt(pop_assum kall_tac)
      >> Induct_on `l'` >> rpt strip_tac >> fs[remove1_def] >> rw[] >> fs[sender_def,receiver_def])
   >> TRY (* If *)
     (qpat_x_assum `trans (_, IfThen _ _ _ _) _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
      >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
-     >> imp_res_tac same_label_same_asynchs >> rveq
+     >> imp_res_tac same_label_same_asyncs >> rveq
      >> fs[remove1_def]
      >> qpat_x_assum `trans (_, IfThen _ _ _ _) _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
      >> fs[] >> fs[freeprocs_def,sender_def,receiver_def] >> metis_tac[])
   >> TRY (* Com *)
     (qpat_x_assum `trans (_, Com _ _ _ _ _) _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
      >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
-     >> imp_res_tac same_label_same_asynchs >> rveq
+     >> imp_res_tac same_label_same_asyncs >> rveq
      >> fs[remove1_def]
      >> qpat_x_assum `trans (_, Com _ _ _ _ _) _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
      >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
@@ -543,7 +543,7 @@ val asynch_trans_filter_labels = Q.store_thm("asynch_trans_filter_labels",
   >> TRY (* Sel *)
     (qpat_x_assum `trans (_, Sel _ _ _ _) _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
      >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
-     >> imp_res_tac same_label_same_asynchs >> rveq
+     >> imp_res_tac same_label_same_asyncs >> rveq
      >> fs[remove1_def]
      >> qpat_x_assum `trans (_, Sel _ _ _ _) _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
      >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
@@ -551,7 +551,7 @@ val asynch_trans_filter_labels = Q.store_thm("asynch_trans_filter_labels",
     >> TRY
     (qpat_x_assum `trans (_, Let _ _ _ _ _) _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
      >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
-     >> imp_res_tac same_label_same_asynchs >> rveq
+     >> imp_res_tac same_label_same_asyncs >> rveq
      >> fs[remove1_def]
      >> qpat_x_assum `trans (_, Let _ _ _ _ _) _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
      >> fs[] >> fs[freeprocs_def,sender_def,receiver_def] >> metis_tac[]));  
@@ -677,7 +677,7 @@ val semantics_locally_confluent = Q.store_thm("semantics_locally_confluent",
         >> match_mp_tac trans_com
         >> metis_tac[lookup_fresh_after_trans,FST])
     >> first_x_assum drule >> disch_then drule >> strip_tac
-    >> Cases_on `sc'''` >> metis_tac[lookup_fresh_after_trans,FST,trans_com_swap,trans_com_asynch])
+    >> Cases_on `sc'''` >> metis_tac[lookup_fresh_after_trans,FST,trans_com_swap,trans_com_async])
   >- (* Sel-swap *)
    (qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
     >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
@@ -721,7 +721,7 @@ val semantics_locally_confluent = Q.store_thm("semantics_locally_confluent",
         >> match_mp_tac trans_com
         >> metis_tac[lookup_unwritten_after_trans,FST])
     >> first_x_assum drule >> disch_then drule >> strip_tac
-    >> Cases_on `sc'''` >> metis_tac[lookup_fresh_after_trans,FST,trans_com_swap,trans_com_asynch])
+    >> Cases_on `sc'''` >> metis_tac[lookup_fresh_after_trans,FST,trans_com_swap,trans_com_async])
   >- (* Sel-asynch *)
    (qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
     >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
