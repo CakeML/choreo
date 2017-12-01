@@ -2,7 +2,7 @@ open preamble
 
 open semBakeryTheory
 
-val _ = new_theory "confluenceScript";
+val _ = new_theory "confluence";
 
 (* TODO: move to somewhere nicer *)
 val free_variables_def = Define `

@@ -1,6 +1,6 @@
 open preamble astBakeryTheory;
 
-val _ = new_theory "bigstepSemScript";
+val _ = new_theory "bigstepSem";
 
 val evaluate_def = Define `
   (evaluate s Nil = SOME s) ∧
