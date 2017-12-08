@@ -63,14 +63,14 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
     p1 ≠ p2
     ⇒ trans conf (NEndpoint p2 s e)
              (LExtChoice p1 true p2)
-             (NEndpoint p2 (s with queue := SNOC (p1,[1w]) s.queue) e))
+             (NEndpoint p2 (s with queue := SNOC (p1,[6w;1w]) s.queue) e))
 
   (* Enqueue-Choice-R *)
 ∧ (∀conf s p1 p2 e.
     p1 ≠ p2
     ⇒ trans conf (NEndpoint p2 s e)
              (LExtChoice p1 false p2)
-             (NEndpoint p2 (s with queue := SNOC (p1,[0w]) s.queue) e))
+             (NEndpoint p2 (s with queue := SNOC (p1,[2w;0w]) s.queue) e))
 
   (* Com-Choice-L *)
 ∧ (∀conf n1 n2 p1 p2 b n1' n2'.
@@ -106,7 +106,7 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
 
   (* ExtChoice-L *)
 ∧ (∀conf s p1 p2 e1 e2 q1 q2.
-    s.queue = q1 ++ [(p1,[1w])] ++ q2
+    s.queue = q1 ++ [(p1,[6w;1w])] ++ q2
     ∧ p1 ≠ p2
     ∧ EVERY (λ(p,_). p ≠ p1) q1 
     ⇒ trans conf (NEndpoint p2 s (ExtChoice p1 e1 e2))
@@ -115,7 +115,7 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
 
   (* ExtChoice-R *)
 ∧ (∀conf s p1 p2 e1 e2 q1 q2.
-    s.queue = q1 ++ [(p1,[0w])] ++ q2
+    s.queue = q1 ++ [(p1,[6w;0w])] ++ q2
     ∧ p1 ≠ p2
     ∧ EVERY (λ(p,_). p ≠ p1) q1 
     ⇒ trans conf (NEndpoint p2 s (ExtChoice p1 e1 e2))

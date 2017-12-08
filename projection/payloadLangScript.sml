@@ -1,5 +1,5 @@
 open preamble astBakeryTheory (* todo: shouldn't have to depend on astBakery *)
-
+     endpointLangTheory (*for state*)
 val _ = new_theory "payloadLang";
 
 val _ = Datatype`
@@ -11,7 +11,6 @@ endpoint = Nil
          | IfThen varN endpoint endpoint
          | Let varN (datum list -> datum) (varN list) endpoint`
 
-val _ = Datatype `state = <| bindings : varN |-> datum; queue : (proc # datum) list  |>`;
 val _ = Datatype `config = <| payload_size : num  |>`;
 
 val _ = Datatype`
