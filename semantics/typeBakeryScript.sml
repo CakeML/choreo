@@ -87,7 +87,7 @@ val (chortype_rules,chortype_ind,chortype_cases) = Hol_reln `
   (* If *)
 ∧ (∀v p c1 c2 g.
     chortype c1 g
-    ∧ chortype c1 g
+    ∧ chortype c2 g
     ⇒ chortype (IfThen v p c1 c2) g)
 `;
 
