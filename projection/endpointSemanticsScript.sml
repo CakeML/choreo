@@ -79,7 +79,8 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
     ∧ EVERY (λ(p,_). p ≠ p1) q1 
     ⇒ trans (NEndpoint p2 s (Receive p1 v e))
              LTau
-             (NEndpoint p2 (s with bindings := s.bindings |+ (v,d)) e))
+             (NEndpoint p2 (s with <|queue := q1 ++ q2;
+                                     bindings := s.bindings |+ (v,d)|>) e))
 
   (* ExtChoice-L *)
 ∧ (∀s p1 p2 e1 e2 q1 q2.
@@ -88,7 +89,7 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
     ∧ EVERY (λ(p,_). p ≠ p1) q1 
     ⇒ trans (NEndpoint p2 s (ExtChoice p1 e1 e2))
              LTau
-             (NEndpoint p2 s e1))
+             (NEndpoint p2 (s with queue := q1 ++ q2) e1))
 
   (* ExtChoice-R *)
 ∧ (∀s p1 p2 e1 e2 q1 q2.
@@ -97,7 +98,7 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
     ∧ EVERY (λ(p,_). p ≠ p1) q1 
     ⇒ trans (NEndpoint p2 s (ExtChoice p1 e1 e2))
              LTau
-             (NEndpoint p2 s e2))
+             (NEndpoint p2 (s with queue := q1 ++ q2) e2))
 
   (* If-L *)
 ∧ (∀s v p e1 e2.
@@ -140,5 +141,8 @@ val _ = zip ["trans_send","trans_enqueue","trans_com_l","trans_com_r","trans_int
               "trans_dequeue","trans_ext_choice_l","trans_ext_choice_r",
               "trans_if_true","trans_if_false","trans_let","trans_par_l","trans_par_r"]
             (CONJUNCTS trans_rules) |> map save_thm;
+
+val reduction_def = Define `
+  reduction p q = trans p LTau q`
 
 val _ = export_theory ()

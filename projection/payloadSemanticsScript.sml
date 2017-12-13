@@ -62,15 +62,15 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
 ∧ (∀conf s p1 p2 e.
     p1 ≠ p2
     ⇒ trans conf (NEndpoint p2 s e)
-             (LExtChoice p1 true p2)
+             (LExtChoice p1 T p2)
              (NEndpoint p2 (s with queue := SNOC (p1,[6w;1w]) s.queue) e))
 
   (* Enqueue-Choice-R *)
 ∧ (∀conf s p1 p2 e.
     p1 ≠ p2
     ⇒ trans conf (NEndpoint p2 s e)
-             (LExtChoice p1 false p2)
-             (NEndpoint p2 (s with queue := SNOC (p1,[2w;0w]) s.queue) e))
+             (LExtChoice p1 F p2)
+             (NEndpoint p2 (s with queue := SNOC (p1,[6w;0w]) s.queue) e))
 
   (* Com-Choice-L *)
 ∧ (∀conf n1 n2 p1 p2 b n1' n2'.
@@ -93,7 +93,8 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
     ∧ EVERY (λ(p,_). p ≠ p1) q1 
     ⇒ trans conf (NEndpoint p2 s (Receive p1 v ds e))
              LTau
-             (NEndpoint p2 (s with bindings := s.bindings |+ (v,FLAT(SNOC d ds))) e))
+             (NEndpoint p2 (s with <|queue := q1 ++ q2;
+                                     bindings := s.bindings |+ (v,FLAT(SNOC d ds))|>) e))
 
   (* Dequeue-intermediate-payload *)
 ∧ (∀conf s v p1 p2 e q1 q2 d ds.
@@ -102,7 +103,7 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
     ∧ EVERY (λ(p,_). p ≠ p1) q1 
     ⇒ trans conf (NEndpoint p2 s (Receive p1 v ds e))
              LTau
-             (NEndpoint p2 s (Receive p1 v (SNOC d ds) e)))
+             (NEndpoint p2 (s with queue := q1 ++ q2) (Receive p1 v (SNOC d ds) e)))
 
   (* ExtChoice-L *)
 ∧ (∀conf s p1 p2 e1 e2 q1 q2.
@@ -111,7 +112,7 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
     ∧ EVERY (λ(p,_). p ≠ p1) q1 
     ⇒ trans conf (NEndpoint p2 s (ExtChoice p1 e1 e2))
              LTau
-             (NEndpoint p2 s e1))
+             (NEndpoint p2 (s with queue := q1 ++ q2) e1))
 
   (* ExtChoice-R *)
 ∧ (∀conf s p1 p2 e1 e2 q1 q2.
@@ -120,7 +121,7 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
     ∧ EVERY (λ(p,_). p ≠ p1) q1 
     ⇒ trans conf (NEndpoint p2 s (ExtChoice p1 e1 e2))
              LTau
-             (NEndpoint p2 s e2))
+             (NEndpoint p2 (s with queue := q1 ++ q2) e2))
 
   (* If-L *)
 ∧ (∀conf s v p e1 e2.
@@ -160,10 +161,13 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
 
  val _ = zip ["trans_send_var","trans_send_last_payload","trans_send_intermediate_payload",
               "trans_enqueue","trans_com_l","trans_com_r","trans_int_choice",
-              "enqueue_choice_l","enqueue_choice_r","com_choice_l","com_choice_r",
+              "trans_enqueue_choice_l","trans_enqueue_choice_r","trans_com_choice_l","trans_com_choice_r",
               "trans_dequeue_last_payload","trans_dequeue_intermediate_payload",
               "trans_ext_choice_l","trans_ext_choice_r",
               "trans_if_true","trans_if_false","trans_let","trans_par_l","trans_par_r"]
             (CONJUNCTS trans_rules) |> map save_thm;
+
+val reduction_def = Define `
+  reduction conf p q = trans conf p LTau q`
 
 val _ = export_theory ()
