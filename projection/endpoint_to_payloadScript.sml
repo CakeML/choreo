@@ -24,7 +24,6 @@ val compile_message_def = tDefine "compile_message" `
 
 val compile_queue_def = Define `
    compile_queue conf [] = []
-∧ compile_queue conf ((p,[])::q) = ARB
 ∧ (compile_queue conf ((p,d)::q) =
     MAP (λd. (p,d)) (compile_message conf d) ++ compile_queue conf q)
 `

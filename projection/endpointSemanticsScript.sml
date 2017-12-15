@@ -125,14 +125,14 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
 ∧ (∀n1 n1' n2 alpha.
     trans n1 alpha n1'
     ⇒ trans (NPar n1 n2)
-             LTau
+             alpha
              (NPar n1' n2))
 
   (* Par-R *)
 ∧ (∀n1 n2 n2' alpha.
-    trans n1 alpha n1'
+    trans n2 alpha n2'
     ⇒ trans (NPar n1 n2)
-             LTau
+             alpha
              (NPar n1 n2'))
 `
 
