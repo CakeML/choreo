@@ -48,14 +48,14 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
 ∧ (∀s p1 p2 e.
     p1 ≠ p2
     ⇒ trans (NEndpoint p2 s e)
-             (LExtChoice p1 true p2)
+             (LExtChoice p1 T p2)
              (NEndpoint p2 (s with queue := SNOC (p1,[1w]) s.queue) e))
 
   (* Enqueue-Choice-R *)
 ∧ (∀s p1 p2 e.
     p1 ≠ p2
     ⇒ trans (NEndpoint p2 s e)
-             (LExtChoice p1 false p2)
+             (LExtChoice p1 F p2)
              (NEndpoint p2 (s with queue := SNOC (p1,[0w]) s.queue) e))
 
   (* Com-Choice-L *)
@@ -68,8 +68,8 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
   (* Com-Choice-R *)
 ∧ (∀n1 n2 p1 p2 d n1' n2'.
     p1 ≠ p2
-    ∧ trans n1 (LReceive p1 d p2) n1'
-    ∧ trans n2 (LSend p1 d p2) n2'
+    ∧ trans n1 (LExtChoice p1 d p2) n1'
+    ∧ trans n2 (LIntChoice p1 d p2) n2'
     ⇒ trans (NPar n1 n2) LTau (NPar n1' n2'))
 
   (* Dequeue (aka Receive) *)
