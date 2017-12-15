@@ -473,7 +473,7 @@ val qcong_trans_eq = Q.store_thm("qcong_trans_eq",
       >> imp_res_tac trans_par_r
       >> metis_tac[qcong_rules])
   >- (qpat_x_assum `trans _ (NPar _ _) _ _` (assume_tac
-                                    o REWRITE_RULE [Once payloadSemanticsTheory.trans_cases])
+                                             o REWRITE_RULE [Once payloadSemanticsTheory.trans_cases])
       >> fs[] >> rveq
       >> EVERY_ASSUM imp_res_tac
       >> imp_res_tac trans_com_l
@@ -489,5 +489,26 @@ val qcong_trans_pres = Q.store_thm("qcong_trans_pres",
      qcong p1 q1 ∧ trans conf p1 alpha p2
      ⇒ ∃q2. trans conf q1 alpha q2 ∧ qcong p2 q2`,
   metis_tac[qcong_trans_eq])
+
+val reduction_par_l = Q.store_thm("reduction_par_l",
+  `∀p q r conf. (reduction conf)^* p q ==> (reduction conf)^* (NPar p r) (NPar q r)`,
+  rpt gen_tac
+  >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`q`,`p`]
+  >> ho_match_mp_tac RTC_INDUCT
+  >> rpt strip_tac
+  >- simp[RTC_REFL]
+  >> match_mp_tac (RTC_RULES |> SPEC_ALL |> CONJUNCT2)
+  >> metis_tac[reduction_def,trans_par_l]);
+
+val reduction_par_r = Q.store_thm("reduction_par_r",
+  `∀p q r conf. (reduction conf)^* p q ==> (reduction conf)^* (NPar r p) (NPar r q)`,
+  rpt gen_tac
+  >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`q`,`p`]
+  >> ho_match_mp_tac RTC_INDUCT
+  >> rpt strip_tac
+  >- simp[RTC_REFL]
+  >> match_mp_tac (RTC_RULES |> SPEC_ALL |> CONJUNCT2)
+  >> metis_tac[reduction_def,trans_par_r]);
+
 
 val _ = export_theory ()
