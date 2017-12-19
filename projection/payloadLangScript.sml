@@ -4,7 +4,7 @@ val _ = new_theory "payloadLang";
 
 val _ = Datatype`
 endpoint = Nil
-         | Send proc (varN + datum) endpoint
+         | Send proc varN num endpoint
          | Receive proc varN (datum list) endpoint
          | IntChoice bool proc endpoint
          | ExtChoice proc endpoint endpoint

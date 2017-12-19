@@ -5,10 +5,10 @@ val _ = new_theory "payloadProps"
 val (qcong_rules, qcong_ind, qcong_cases) = Hol_reln `
 (* Basic congruence rules *)
 
-  (* Symmetric *)
+  (* Reflexive *)
   (∀n. qcong n n)
 
-  (* Reflexive *)
+  (* Symmetric *)
 ∧ (∀n1 n2.
     qcong n1 n2
     ⇒ qcong n2 n1)
@@ -155,6 +155,11 @@ val trans_ext_choice_r' = Q.store_thm("trans_ext_choice_r'",
 
 val qcong_sym_eq = Q.store_thm("qcong_sym_eq",
 `∀p q. qcong p q = qcong q p`,metis_tac[qcong_sym]);
+
+val trans_IMP_weak_trans = Q.store_thm("trans_IMP_weak_trans",
+  `∀conf p alpha q. trans conf p alpha q ==> weak_trans conf p alpha q`,
+  rw[weak_trans_def,weak_tau_trans_def]
+  >> metis_tac[RTC_REFL,RTC_SINGLE,reduction_def]);
 
 val qcong_trans_eq = Q.store_thm("qcong_trans_eq",
   `∀p1 q1 .
@@ -510,5 +515,22 @@ val reduction_par_r = Q.store_thm("reduction_par_r",
   >> match_mp_tac (RTC_RULES |> SPEC_ALL |> CONJUNCT2)
   >> metis_tac[reduction_def,trans_par_r]);
 
+val trans_nil_false = Q.store_thm("trans_nil_false",
+  `∀conf alpha n. trans conf NNil alpha n = F`,
+  rpt strip_tac
+  >> PURE_ONCE_REWRITE_TAC[trans_cases]
+  >> fs[]);
+
+val reduction_nil = Q.store_thm("reduction_nil",
+  `∀conf n. (reduction conf)^* NNil n ==> n = NNil`,
+  rpt strip_tac
+  >> qpat_abbrev_tac `a1 = NNil`
+  >> pop_assum (assume_tac o REWRITE_RULE[markerTheory.Abbrev_def])
+  >> simp[]
+  >> rpt(last_x_assum mp_tac)
+  >> PURE_ONCE_REWRITE_TAC [AND_IMP_INTRO]
+  >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`n`,`a1`]
+  >> ho_match_mp_tac RTC_lifts_invariants
+  >> simp[payloadSemanticsTheory.reduction_def,trans_nil_false]);
 
 val _ = export_theory ()

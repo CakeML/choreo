@@ -12,25 +12,21 @@ val _ = Datatype `
 
 val (trans_rules,trans_ind,trans_cases) = Hol_reln `
 
-  (* Send-var *)
-  (∀conf s v d p1 p2 e.
-    FLOOKUP s.bindings v = SOME d
-    ∧ p1 ≠ p2
-    ⇒ trans conf (NEndpoint p1 s (Send p2 (INL v) e)) (LTau) (NEndpoint p1 s (Send p2 (INR d) e)))
-
   (* Send-last-payload *)
-∧ (∀conf s d p1 p2 e.
-    LENGTH d <= conf.payload_size
+  (∀conf s v n d p1 p2 e.
+    FLOOKUP s.bindings v = SOME d
+    ∧ LENGTH d - n <= conf.payload_size
     ∧ p1 ≠ p2
-    ⇒ trans conf (NEndpoint p1 s (Send p2 (INR d) e)) (LSend p1 (6w::d) p2) (NEndpoint p1 s e))
+    ⇒ trans conf (NEndpoint p1 s (Send p2 v n e)) (LSend p1 (6w::DROP n d) p2) (NEndpoint p1 s e))
 
   (* Send-intermediate-payload *)
-∧ (∀conf s d p1 p2 e.
-    LENGTH d > conf.payload_size
+∧ (∀conf s v n d p1 p2 e.
+    FLOOKUP s.bindings v = SOME d
+    ∧ LENGTH d - n > conf.payload_size
     ∧ p1 ≠ p2
-    ⇒ trans conf (NEndpoint p1 s (Send p2 (INR d) e))
-                  (LSend p1 (2w::TAKE conf.payload_size d) p2)
-                  (NEndpoint p1 s (Send p2 (INR (DROP conf.payload_size d)) e)))
+    ⇒ trans conf (NEndpoint p1 s (Send p2 v n e))
+                  (LSend p1 (2w::TAKE conf.payload_size (DROP n d)) p2)
+                  (NEndpoint p1 s (Send p2 v (n + conf.payload_size) e)))
 
   (* Enqueue *)
 ∧ (∀conf s d p1 p2 e.
@@ -159,7 +155,7 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
              (NPar n1 n2'))
 `
 
- val _ = zip ["trans_send_var","trans_send_last_payload","trans_send_intermediate_payload",
+ val _ = zip ["trans_send_last_payload","trans_send_intermediate_payload",
               "trans_enqueue","trans_com_l","trans_com_r","trans_int_choice",
               "trans_enqueue_choice_l","trans_enqueue_choice_r","trans_com_choice_l","trans_com_choice_r",
               "trans_dequeue_last_payload","trans_dequeue_intermediate_payload",
@@ -169,5 +165,13 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
 
 val reduction_def = Define `
   reduction conf p q = trans conf p LTau q`
+
+val weak_tau_trans_def = Define `
+  weak_tau_trans conf p alpha q =
+    ?p' q'. (reduction conf)^* p p' /\ trans conf p' alpha q' /\ (reduction conf)^* q' q`
+
+val weak_trans_def = Define `
+  weak_trans conf p alpha q =
+    if alpha = LTau then (reduction conf)^* p q else weak_tau_trans conf p alpha q`
 
 val _ = export_theory ()
