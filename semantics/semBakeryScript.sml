@@ -54,6 +54,35 @@ val read_def = Define`
 ∧ written_value s (LLet v p f vl)     = SOME(f(MAP (THE o FLOOKUP s) (MAP (λv. (v,p)) vl)))
 `*)
 
+val (lcong_rules,lcong_ind,lcong_cases) = Hol_reln `
+(* Congruence rules for lists of asyncronous operations *)
+
+  (* Symmetric *)
+  (∀l. lcong l l)
+
+  (* Reflexive *)
+∧ (∀l1 l2.
+    lcong l1 l2
+    ⇒ lcong l2 l1)
+  (* Transitive *)
+∧ (∀l1 l2 l3.
+     lcong l1 l2
+     ∧ lcong l2 l3
+     ⇒ lcong l1 l3)
+
+  (* Reorder *)
+∧ (∀h t t1 t2.
+    DISJOINT (freeprocs t1) (freeprocs t2)
+    ⇒ lcong (h ++ [t1;t2] ++ t) (h ++ [t2;t1] ++ t))
+`;
+
+val _ = Parse.add_infix("τ≅",425,Parse.NONASSOC);
+val _ = Parse.overload_on("τ≅",``lcong``);
+
+val [lcong_sym,lcong_refl,lcong_trans,lcong_reord] =
+    zip ["lcong_sym","lcong_refl","lcong_trans","lcong_reord"]
+        (CONJUNCTS lcong_rules) |> map save_thm;
+
 val (trans_rules,trans_ind,trans_cases) = Hol_reln `
 
   (* Communication *)
@@ -85,9 +114,10 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
     ⇒ trans (s,IfThen v p c1 c2) (LTau p v,[]) (s,c2))
 
   (* Swapping transitions / Structural congruence *)
-∧ (∀s v p c1 c2 s' c1' c2' l alpha.
+∧ (∀s v p c1 c2 s' c1' c2' l l' alpha.
     trans (s,c1) (alpha,l) (s',c1')
-    ∧ trans (s,c2) (alpha,l) (s',c2')
+    ∧ trans (s,c2) (alpha,l') (s',c2')
+    ∧ l τ≅ l'
     ∧ p ∉ freeprocs alpha
     ⇒ trans (s,IfThen v p c1 c2) (alpha,l) (s',IfThen v p c1' c2'))
 ∧ (∀s c s' c' p1 v1 p2 v2 l alpha.
