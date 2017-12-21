@@ -190,4 +190,11 @@ val _ = zip ["transCong_com", "transCong_sel", "transCong_let"
              , "transCong_cong"]
             (CONJUNCTS transCong_rules) |> map save_thm;
 
+val transCong_pairind = save_thm("transCong_pairind",
+  theorem"transCong_strongind"
+  |> Q.SPEC `λa0 a1 a2. P (FST a0) (SND a0) a1 (FST a2) (SND a2)`
+  |> SIMP_RULE std_ss [FORALL_PROD]
+  |> Q.GEN `P`
+);
+
 val _ = export_theory ()
