@@ -186,6 +186,99 @@ val valid_action_def = Define`
                             ∧ p2 ∉ freeprocs alpha))
 `;
 
+(* Two list in a lcong relationship have the same length *)
+val lcong_length = Q.store_thm("lcong_length",
+  `∀l l'. l τ≅ l' ⇒ LENGTH l = LENGTH l'`,
+  ho_match_mp_tac (theorem"lcong_strongind")
+  \\ rw []
+);
+
+(* An empty list can't be in an lcong relationship with a non empty list *)
+val not_nil_lcong_cons = Q.store_thm("not_nil_lcong_cons",
+  `∀h l. ¬ ([] τ≅ h :: l)`,
+  rw [] >> CCONTR_TAC  >> rw []
+  \\ IMP_RES_TAC lcong_length
+  \\ fs [LENGTH]
+);
+
+(* `lrm l e` removes the first appearance of element `e` in `l` *)
+val lrm_def = Define `
+  lrm [] e      = []
+∧ lrm (x::ls) e = (if x = e
+                 then ls
+                 else x :: lrm ls e)
+`
+(* `lrm` conditionaly distributes over the first argument (`l`) of an
+   append if the element you are trying to remove is in `l`
+*)
+val lrm_mem_append = Q.store_thm("lrm_mem_append",
+  `∀l e r. MEM e l ⇒ lrm (l ++ r) e = lrm l e ++ r`,
+  induct_on `l` >> rw [MEM,lrm_def]
+);
+
+(* `lrm` conditionaly distributes over the second argument (`r`) of an
+   append if the element (`e`) you are trying to remove is not in the
+   first argument (`l`). Note that this does not imply that `e` is in
+   `r`
+*)
+val lrm_not_mem_append = Q.store_thm("lrm_not_mem_append",
+  `∀l e r. ¬ MEM e l ⇒ lrm (l ++ r) e = l ++ lrm r e`,
+  induct_on `l` >> rw [MEM,lrm_def]
+);
+
+(* Applying `lrm` at both sides of an lcong preserves the relation *)
+val lcong_lrm = Q.store_thm("lcong_lrm",
+  `∀e l l'. l τ≅ l' ⇒ lrm l e τ≅ lrm l' e`,
+  GEN_TAC
+  \\ ho_match_mp_tac (theorem"lcong_strongind")
+  \\ rw [lcong_rules]
+  \\ IMP_RES_TAC lcong_trans
+  \\ Cases_on `MEM e (h ++ [t1; t2])`
+  >- (`MEM e (h ++ [t2; t1])` by fs [MEM_PERM,PERM_APPEND_IFF,PERM_SWAP_AT_FRONT]
+     \\ rw [lrm_mem_append]
+     \\ Cases_on `MEM e h`
+     \\ rw [lrm_mem_append,lcong_rules,lrm_not_mem_append]
+     \\ rw [lrm_def,lcong_rules])
+  >- (`¬MEM e (h ++ [t2; t1])` by fs [MEM_PERM,PERM_APPEND_IFF,PERM_SWAP_AT_FRONT]
+     \\ rw [lrm_not_mem_append,lcong_rules])
+);
+
+(* [] can only be related in `lcong` with  (itself) [] *)
+val lcong_nil_simp = Q.store_thm("lcong_nil_simp",
+  `∀l. (l τ≅ [] ⇔ l = []) ∧ ([] τ≅ l ⇔ l = [])`,
+  Cases_on `l`
+  >- rw [lcong_rules]
+  >- (fs [] >> metis_tac [not_nil_lcong_cons,lcong_refl])
+);
+
+(* Prepending and element (`h`) preserves `lcong` *)
+val lcong_cons = Q.store_thm("lcong_cons",
+  `∀h l l'. lcong l l' ⇒ lcong (h :: l) (h :: l')`,
+  GEN_TAC
+  \\ ho_match_mp_tac (fetch "-" "lcong_strongind")
+  \\ rw [lcong_rules]
+  \\ metis_tac [lcong_rules,GSYM APPEND |> CONJUNCT2]
+);
+
+(* Removing the identical heads preserves `lcong` *)
+val cons_lcong = Q.store_thm("cons_lcong",
+  `∀h l l'. h :: l τ≅ h :: l' ⇒ l τ≅ l'`,
+  rw []
+  \\ IMP_RES_TAC lcong_lrm
+  \\ pop_assum (ASSUME_TAC o Q.SPEC `h`)
+  \\ fs [lrm_def]
+);
+
+(* An slightly more specific case of `lcong_lrm` *)
+val lcong_cons_simp = Q.store_thm("lcong_cons_simp",
+  `∀h l h' l'. h ≠ h' ∧ h :: l τ≅ h' :: l'
+    ⇒ l τ≅ h' :: lrm l' h`,
+  rw []
+  \\ IMP_RES_TAC lcong_lrm
+  \\ pop_assum (ASSUME_TAC o Q.SPEC `h`)
+  \\ rfs [lrm_def]
+);
+
 (* Any valid transition ensures the relationship between the
    transition tag `t` and the head of the asyncronous transitions list
    `h` is a valid_action
@@ -202,7 +295,6 @@ val trans_valid_action = Q.store_thm("trans_valid_action",
      suffices_by (metis_tac [])
   \\ ho_match_mp_tac trans_pairind
   \\ rw [trans_rules,valid_action_def]
-  \\ rfs [freeprocs_def, sender_def, receiver_def]
 );
 
 (* Any valid trasition with a non-empty list of asyncronous trasitions
@@ -220,7 +312,7 @@ val trans_async_some_trans = Q.store_thm("trans_async_some_trans",
         ⇒ ∃s1 c1 s1' c1'. trans (s1,c1) (t,l) (s1',c1')`
      suffices_by (metis_tac [])
   \\ ho_match_mp_tac trans_pairind
-  \\ rw [trans_rules]
+  \\ rw [trans_rules,not_nil_lcong_cons]
   \\ metis_tac []
 );
 
