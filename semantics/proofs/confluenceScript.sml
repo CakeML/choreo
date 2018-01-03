@@ -38,7 +38,7 @@ val no_undefined_vars_trans_pres = Q.store_thm("no_undefined_vars_trans_pres",
   `!sc alpha sc'. no_undefined_vars sc /\ trans sc alpha sc' ==> no_undefined_vars sc'`,
   rpt gen_tac >> disch_then(MAP_EVERY assume_tac o CONJUNCTS)
   >> qpat_x_assum `no_undefined_vars _` mp_tac
-  >> qpat_x_assum `trans _ _ _` mp_tac  
+  >> qpat_x_assum `trans _ _ _` mp_tac
   >> MAP_EVERY (W(curry Q.SPEC_TAC)) (rev [`sc`,`alpha`,`sc'`])
   >> ho_match_mp_tac trans_strongind
   >> rpt strip_tac
@@ -80,31 +80,31 @@ val semantics_deterministic = Q.store_thm("semantics_deterministic",
       >> ntac 2 (first_x_assum drule)
       >> rpt strip_tac
       >> fs[])
-  >- (* Com-swap *)     
+  >- (* Com-swap *)
      (qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
       >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
       >> first_x_assum drule
       >> rpt strip_tac
       >> fs[])
-  >- (* Sel-swap *)     
+  >- (* Sel-swap *)
      (qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
       >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
       >> first_x_assum drule
       >> rpt strip_tac
       >> fs[])
-  >- (* Let-swap *)     
+  >- (* Let-swap *)
      (qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
       >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
       >> first_x_assum drule
       >> rpt strip_tac
       >> fs[])
-  >- (* Asynch *)     
+  >- (* Asynch *)
      (qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
       >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
       >> first_x_assum drule
       >> rpt strip_tac
       >> fs[])
-  >> (* Asynch *)     
+  >> (* Asynch *)
      qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
       >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
       >> first_x_assum drule
@@ -202,7 +202,7 @@ val semantics_add_irrelevant_state2 = Q.store_thm("semantics_add_irrelevant_stat
   >> rpt strip_tac
   >> rpt(qpat_x_assum `Abbrev _` (mp_tac o PURE_ONCE_REWRITE_RULE [markerTheory.Abbrev_def]))
   >> qpat_x_assum `_ ∉ _` mp_tac
-  >> qpat_x_assum `_ ≠ _` mp_tac  
+  >> qpat_x_assum `_ ≠ _` mp_tac
   >> MAP_EVERY (W(curry Q.SPEC_TAC)) (rev [`s`,`c`,`s'`,`c'`,`v`,`d`,`p`])
   >> pop_assum mp_tac
   >> MAP_EVERY (W(curry Q.SPEC_TAC)) (rev [`sc`,`alpha`,`sc'`])
@@ -252,7 +252,7 @@ val semantics_add_irrelevant_state3 = Q.store_thm("semantics_add_irrelevant_stat
   >> rpt strip_tac
   >> rpt(qpat_x_assum `Abbrev _` (mp_tac o PURE_ONCE_REWRITE_RULE [markerTheory.Abbrev_def]))
   >> qpat_x_assum `_ ∉ _` mp_tac
-  >> qpat_x_assum `_ = _` mp_tac  
+  >> qpat_x_assum `_ = _` mp_tac
   >> MAP_EVERY (W(curry Q.SPEC_TAC)) (rev [`s`,`c`,`s'`,`c'`,`v`,`d`,`p`])
   >> pop_assum mp_tac
   >> MAP_EVERY (W(curry Q.SPEC_TAC)) (rev [`sc`,`alpha`,`sc'`])
@@ -308,7 +308,7 @@ val semantics_add_irrelevant_state4_tup = Q.store_thm("semantics_add_irrelevant_
   metis_tac[semantics_add_irrelevant_state4,FST])
 
 
-                                                     
+
 val lookup_fresh_after_trans = Q.store_thm("lookup_fresh_after_trans",
   `!s c alpha s' c' p v. trans (s,c) alpha (s',c') /\ p ∉ freeprocs(FST alpha) ==>
    FLOOKUP s' (v,p) = FLOOKUP s (v,p)
@@ -369,7 +369,7 @@ val lookup_unwritten_after_trans_tup = Q.store_thm("lookup_unwritten_after_trans
   `!s c alpha l s' c' p v. trans (s,c) (alpha,l) (s',c') /\ written alpha ≠ SOME(v,p) ==>
    FLOOKUP s' (v,p) = FLOOKUP s (v,p)
 `, metis_tac[lookup_unwritten_after_trans,FST]);
-  
+
 val sender_receiver_freeprocs = Q.store_thm("sender_receiver_freeprocs",
   `!alpha p p'. sender alpha = SOME p /\ receiver alpha = SOME p' ==> (freeprocs alpha = {p;p'})`,
   Induct >> fs[sender_def,receiver_def,freeprocs_def])
@@ -741,5 +741,5 @@ val semantics_locally_confluent = Q.store_thm("semantics_locally_confluent",
         >> match_mp_tac trans_sel >> fs[])
     >> first_x_assum drule >> disch_then drule >> strip_tac
     >> Cases_on `sc'''` >> metis_tac[trans_sel_swap,trans_sel_async]));
-  
+
 val _ = export_theory ()
