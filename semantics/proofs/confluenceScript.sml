@@ -481,8 +481,11 @@ val same_label_same_asyncs = Q.store_thm("same_label_same_asyncs",
 
 val asynch_trans_filter_labels = Q.store_thm("asynch_trans_filter_labels",
   `!sc alpha beta l l' l'' sc' sc'' sc'''.
-    trans sc (alpha,l) sc' /\ trans sc' (beta,l'') sc''' /\ trans sc (beta,l') sc'' /\ alpha ≠ beta ==> l'' = remove1 alpha l'
-  `,
+    trans sc (alpha,l) sc'
+     /\ trans sc' (beta,l'') sc'''
+     /\ trans sc (beta,l') sc''
+     /\ alpha ≠ beta
+     ==> l'' τ≅ lrm l' alpha`,
   rpt gen_tac
   >> qpat_abbrev_tac `al = (alpha,l)`
   >> rpt strip_tac
@@ -494,47 +497,63 @@ val asynch_trans_filter_labels = Q.store_thm("asynch_trans_filter_labels",
   >> ho_match_mp_tac trans_strongind
   >> rpt strip_tac >> fs[] >> rveq
   >> TRY
+    ((* Base If cases *)
+     EVERY_ASSUM (fn thm => if is_forall (concl thm) then NO_TAC else ALL_TAC)
+     >> qpat_assum `trans (_,IfThen _ _ _ _) _ _` kall_tac
+     >> qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+     >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
+     >> imp_res_tac same_label_same_asyncs >> rveq
+     >> last_x_assum (ASSUME_TAC o MATCH_MP trans_valid_actions)
+     >> IMP_RES_TAC valid_actions_not_ltau
+     >> match_mp_tac lcong_refl
+     >> rw [mem_lrm_id,lcong_sym])
+  >> TRY
     ((* Base cases *)
      EVERY_ASSUM (fn thm => if is_forall (concl thm) then NO_TAC else ALL_TAC)
      >> qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
      >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
      >> imp_res_tac same_label_same_asyncs >> rveq
-     >> fs[remove1_def]
-     >> match_mp_tac EQ_SYM
-     >> imp_res_tac trans_async_imp >> pop_assum mp_tac
+     >> fs[lrm_def,lcong_sym]
+     >> match_mp_tac lcong_refl
+     >> imp_res_tac trans_valid_actions >> pop_assum mp_tac
      >> rpt(qpat_x_assum `_ ∉ _` mp_tac)
      >> rpt(pop_assum kall_tac)
-     >> Induct_on `l'` >> rpt strip_tac >> fs[remove1_def] >> rw[] >> fs[sender_def,receiver_def])
+     >> Induct_on `l'` >> rpt strip_tac
+                       >> fs[lrm_def,valid_actions_def,valid_action_def]
+                       >> rw[lcong_sym]
+                       >> fs[sender_def,receiver_def,lcong_cons])
   >> TRY (* If *)
     (qpat_x_assum `trans (_, IfThen _ _ _ _) _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
      >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
      >> imp_res_tac same_label_same_asyncs >> rveq
-     >> fs[remove1_def]
+     >> fs[lrm_def]
      >> qpat_x_assum `trans (_, IfThen _ _ _ _) _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
-     >> fs[] >> fs[freeprocs_def,sender_def,receiver_def] >> metis_tac[])
+     >> fs[] >> fs[freeprocs_def,sender_def,receiver_def] >> metis_tac[lcong_rules])
   >> TRY (* Com *)
     (qpat_x_assum `trans (_, Com _ _ _ _ _) _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
      >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
      >> imp_res_tac same_label_same_asyncs >> rveq
-     >> fs[remove1_def]
+     >> fs[lrm_def]
      >> qpat_x_assum `trans (_, Com _ _ _ _ _) _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
      >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
-     >> rw[] >> fs[freeprocs_def] >> metis_tac[])
+     >> rw[] >> fs[freeprocs_def] >> metis_tac[lcong_cons,lcong_rules])
   >> TRY (* Sel *)
     (qpat_x_assum `trans (_, Sel _ _ _ _) _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
      >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
      >> imp_res_tac same_label_same_asyncs >> rveq
-     >> fs[remove1_def]
+     >> fs[lrm_def]
      >> qpat_x_assum `trans (_, Sel _ _ _ _) _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
      >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
-     >> rw[] >> fs[freeprocs_def] >> metis_tac[])
+     >> rw[] >> fs[freeprocs_def] >> metis_tac[lcong_cons,lcong_rules])
     >> TRY
     (qpat_x_assum `trans (_, Let _ _ _ _ _) _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
      >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
      >> imp_res_tac same_label_same_asyncs >> rveq
-     >> fs[remove1_def]
+     >> fs[lrm_def]
      >> qpat_x_assum `trans (_, Let _ _ _ _ _) _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
-     >> fs[] >> fs[freeprocs_def,sender_def,receiver_def] >> metis_tac[]));  
+     >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
+     >> metis_tac[lcong_cons,lcong_rules])
+);
 
 val semantics_locally_confluent = Q.store_thm("semantics_locally_confluent",
   `!sc alpha beta l l' sc' sc''.
