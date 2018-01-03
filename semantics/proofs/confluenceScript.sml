@@ -634,13 +634,21 @@ val semantics_locally_confluent = Q.store_thm("semantics_locally_confluent",
     >- metis_tac[trans_if_true,lookup_fresh_after_trans,FST]
     >- metis_tac[trans_if_false,lookup_fresh_after_trans,FST]
     (* TODO: proof script depends on generated names *)
-    >> `l'' = remove1 alpha l'` by(metis_tac[asynch_trans_filter_labels])
-    >> `l''' = remove1 beta l` by(metis_tac[asynch_trans_filter_labels])
-    >> `l'''' = remove1 alpha l'` by(metis_tac[asynch_trans_filter_labels])
-    >> `l''''' = remove1 beta l` by(metis_tac[asynch_trans_filter_labels])
+    >> `l''''''  τ≅ lrm l'' alpha`  by(metis_tac[asynch_trans_filter_labels])
+    >> `l''''    τ≅ lrm l''' alpha` by(metis_tac[asynch_trans_filter_labels])
+    >> `l''''''' τ≅ lrm l beta`     by(metis_tac[asynch_trans_filter_labels])
+    >> `l'''''   τ≅ lrm l' beta`    by(metis_tac[asynch_trans_filter_labels])
     >> rveq
     >> Cases_on `sc'''`
     >> Cases_on `sc''''`
+    >> sg `l'''''' τ≅ l''''`
+    >- (last_x_assum (ASSUME_TAC o Q.SPEC `alpha` o MATCH_MP lcong_lrm)
+       \\ last_x_assum (ASSUME_TAC o Q.SPEC `alpha` o MATCH_MP lcong_lrm)
+       \\metis_tac [lcong_rules])
+    >> sg `l''''''' τ≅ l'''''`
+    >- (last_x_assum (ASSUME_TAC o Q.SPEC `beta` o MATCH_MP lcong_lrm)
+       \\ last_x_assum (ASSUME_TAC o Q.SPEC `beta` o MATCH_MP lcong_lrm)
+       \\metis_tac [lcong_rules])
     >> Cases_on `written alpha`
     >- (imp_res_tac no_written_same_state >> rfs[] >> rveq
         >> metis_tac [trans_if_swap])
@@ -660,8 +668,8 @@ val semantics_locally_confluent = Q.store_thm("semantics_locally_confluent",
     >> rveq
     >> `d'' = d` by metis_tac[FUPDATE_COMMUTES,FUPD_SAME_KEY_UNWIND,FST,SND]
     >> rveq
-    >> CONV_TAC SWAP_EXISTS_CONV >> qexists_tac `remove1 alpha l'`
-    >> CONV_TAC SWAP_EXISTS_CONV >> qexists_tac `remove1 beta l`
+    >> CONV_TAC SWAP_EXISTS_CONV >> qexists_tac `l''''''`
+    >> CONV_TAC SWAP_EXISTS_CONV >> qexists_tac `l'''''''`
     >> rename1 `(s |+ ((v1,p1),d1) |+ ((v2,p2),d2),_)`
     >> metis_tac[trans_if_swap,FUPDATE_COMMUTES])
   >- (* Com-swap *)
