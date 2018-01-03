@@ -479,11 +479,6 @@ val same_label_same_asyncs = Q.store_thm("same_label_same_asyncs",
   >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
   >> metis_tac[]);
 
-val remove1_def = Define `
-  (remove1 x [] = []) /\
-  (remove1 x (f::r) = if  f= x then r else f::remove1 x r)
-`
-
 val asynch_trans_filter_labels = Q.store_thm("asynch_trans_filter_labels",
   `!sc alpha beta l l' l'' sc' sc'' sc'''.
     trans sc (alpha,l) sc' /\ trans sc' (beta,l'') sc''' /\ trans sc (beta,l') sc'' /\ alpha ≠ beta ==> l'' = remove1 alpha l'
