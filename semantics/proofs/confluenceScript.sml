@@ -479,21 +479,6 @@ val same_label_same_asyncs = Q.store_thm("same_label_same_asyncs",
   >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
   >> metis_tac[]);
 
-val trans_async_imp = Q.store_thm("trans_async_imp",
-  `!sc alpha beta l sc'.
-    trans sc (alpha,l) sc' ==> EVERY (λbeta. (∃p. sender beta = SOME p ∧ p ∈ freeprocs alpha) ∧ (∃q. receiver beta = SOME q ∧ q ∉ freeprocs alpha)) l
-  `,
-  rpt gen_tac
-  >> qpat_abbrev_tac `al = (alpha,l)`
-  >> rpt strip_tac
-  >> qpat_x_assum `Abbrev _` (mp_tac o PURE_ONCE_REWRITE_RULE [markerTheory.Abbrev_def])
-  >> MAP_EVERY (W(curry Q.SPEC_TAC)) (rev [`alpha`,`l`])
-  >> pop_assum mp_tac
-  >> MAP_EVERY (W(curry Q.SPEC_TAC)) (rev [`sc`,`al`,`sc'`])
-  >> ho_match_mp_tac trans_strongind
-  >> rpt strip_tac >> fs[] >> rveq
-  >> fs[EVERY_DEF,freeprocs_def,sender_def,receiver_def]);
-
 val remove1_def = Define `
   (remove1 x [] = []) /\
   (remove1 x (f::r) = if  f= x then r else f::remove1 x r)
