@@ -207,7 +207,14 @@ val lrm_def = Define `
 ∧ lrm (x::ls) e = (if x = e
                  then ls
                  else x :: lrm ls e)
-`
+`;
+
+(* If an element `e` is not in `l` then `lrm e l` is redundant *)
+val mem_lrm_id = Q.store_thm("mem_lrm_id",
+  `¬ MEM e l ⇒ lrm l e = l`,
+  Induct_on `l` >> rw [lrm_def,MEM]
+);
+
 (* `lrm` conditionaly distributes over the first argument (`l`) of an
    append if the element you are trying to remove is in `l`
 *)
@@ -335,6 +342,16 @@ val trans_valid_actions = Q.store_thm("trans_valid_actions",
   \\ IMP_RES_TAC trans_async_some_trans
   \\ `valid_actions t l` by metis_tac []
   \\ fs [valid_actions_def]
+);
+
+(* In a list of valid actions (`h`) there are no LTau actions *)
+val valid_actions_not_ltau = Q.store_thm("valid_actions_not_ltau",
+  `∀t h p v. valid_actions t h ⇒ ¬ MEM (LTau p v) h`,
+  rw []
+  \\ CCONTR_TAC
+  \\ fs [valid_actions_def,EVERY_MEM]
+  \\ RES_TAC
+  \\ fs [valid_action_def]
 );
 
 (* Reflexive transitive closure *)
