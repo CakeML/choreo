@@ -2,7 +2,7 @@ open preamble
 
 open semBakeryTheory semCongBakeryTheory astBakeryTheory
 
-val _ = new_theory "semProof";
+val _ = new_theory "congProof";
 
 (* semBakery$label to semCongBakery$label conversion *)
 val toCong_def = Define`
