@@ -47,12 +47,15 @@ val read_def = Define`
 ∧ read (LLet v p f vl)     = set(MAP (λv. (v,p)) vl)
 `;
 
-(*val written_value_def = Define`
-   written_value s (LTau p n) = NONE
-∧ written_value s (LCom p1 v1 p2 v2) = FLOOKUP s (v1,p1)
-∧ written_value s (LSel p1 b p2)     = NONE
-∧ written_value s (LLet v p f vl)     = SOME(f(MAP (THE o FLOOKUP s) (MAP (λv. (v,p)) vl)))
-`*)
+
+(* The set of all processes in a choreography *)
+val procsOf_def = Define`
+  procsOf  Nil             = {}
+∧ procsOf (IfThen _ p l r) = {p} ∪ procsOf l ∪ procsOf r
+∧ procsOf (Com p _ q _ c)  = {p;q} ∪ procsOf c
+∧ procsOf (Sel p _ q c)    = {p;q} ∪ procsOf c
+∧ procsOf (Let _ p _ _ c)  = {p} ∪ procsOf c
+`;
 
 val (lcong_rules,lcong_ind,lcong_cases) = Hol_reln `
 (* Congruence rules for lists of asyncronous operations *)
