@@ -92,8 +92,9 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
              (NEndpoint p2 (s with queue := q1 ++ q2) e1))
 
   (* ExtChoice-R *)
-∧ (∀s p1 p2 e1 e2 q1 q2.
-    s.queue = q1 ++ [(p1,[0w])] ++ q2
+∧ (∀s p1 p2 e1 e2 q1 d q2.
+    s.queue = q1 ++ [(p1,d)] ++ q2
+    ∧ d ≠ [1w]
     ∧ p1 ≠ p2
     ∧ EVERY (λ(p,_). p ≠ p1) q1 
     ⇒ trans (NEndpoint p2 s (ExtChoice p1 e1 e2))
@@ -137,12 +138,20 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
 `
 
 val _ = zip ["trans_send","trans_enqueue","trans_com_l","trans_com_r","trans_int_choice",
-              "enqueue_choice_l","enqueue_choice_r","com_choice_l","com_choice_r",
+              "trans_enqueue_choice_l","trans_enqueue_choice_r","trans_com_choice_l","trans_com_choice_r",
               "trans_dequeue","trans_ext_choice_l","trans_ext_choice_r",
               "trans_if_true","trans_if_false","trans_let","trans_par_l","trans_par_r"]
             (CONJUNCTS trans_rules) |> map save_thm;
 
 val reduction_def = Define `
   reduction p q = trans p LTau q`
+
+val weak_tau_trans_def = Define `
+  weak_tau_trans p alpha q =
+    ?p' q'. reduction^* p p' /\ trans p' alpha q' /\ reduction^* q' q`
+
+val weak_trans_def = Define `
+  weak_trans p alpha q =
+    if alpha = LTau then reduction^* p q else weak_tau_trans p alpha q`
 
 val _ = export_theory ()

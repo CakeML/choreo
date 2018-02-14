@@ -6,8 +6,8 @@ val compile_endpoint_def = Define `
    (compile_endpoint endpointLang$Nil = payloadLang$Nil)
 ∧ (compile_endpoint (Send p v e) = Send p v 0 (compile_endpoint e))
 ∧ (compile_endpoint (Receive p v e) = Receive p v [] (compile_endpoint e))
-∧ (compile_endpoint (IntChoice b p e) = IntChoice b p (compile_endpoint e))
-∧ (compile_endpoint (ExtChoice p e1 e2) = ExtChoice p (compile_endpoint e1) (compile_endpoint e2))
+∧ (compile_endpoint (IntChoice b p e) = ARB)
+∧ (compile_endpoint (ExtChoice p e1 e2) = ARB)
 ∧ (compile_endpoint (IfThen v e1 e2) = IfThen v (compile_endpoint e1) (compile_endpoint e2))
 ∧ (compile_endpoint (Let v f vl e) = Let v f vl (compile_endpoint e))`
 

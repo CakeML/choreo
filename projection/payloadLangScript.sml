@@ -6,8 +6,8 @@ val _ = Datatype`
 endpoint = Nil
          | Send proc varN num endpoint
          | Receive proc varN (datum list) endpoint
-         | IntChoice bool proc endpoint
-         | ExtChoice proc endpoint endpoint
+(*         | IntChoice bool proc endpoint
+         | ExtChoice proc endpoint endpoint*)
          | IfThen varN endpoint endpoint
          | Let varN (datum list -> datum) (varN list) endpoint`
 
@@ -23,8 +23,6 @@ val var_names_endpoint_def = Define `
    (var_names_endpoint Nil = [])
 /\ (var_names_endpoint (Send p v n e) = v::var_names_endpoint e)
 /\ (var_names_endpoint (Receive p v d e) = v::var_names_endpoint e)
-/\ (var_names_endpoint (IntChoice b p e) = var_names_endpoint e)
-/\ (var_names_endpoint (ExtChoice p e1 e2) = var_names_endpoint e1 ++ var_names_endpoint e2)
 /\ (var_names_endpoint (IfThen v e1 e2) = v::var_names_endpoint e1 ++ var_names_endpoint e2)
 /\ (var_names_endpoint (Let v f vl e) = v::vl ++ var_names_endpoint e)
 `
@@ -33,8 +31,6 @@ val free_var_names_endpoint_def = Define `
    (free_var_names_endpoint Nil = [])
 /\ (free_var_names_endpoint (Send p v n e) = v::free_var_names_endpoint e)
 /\ (free_var_names_endpoint (Receive p v d e) = FILTER ($≠ v) (free_var_names_endpoint e))
-/\ (free_var_names_endpoint (IntChoice b p e) = free_var_names_endpoint e)
-/\ (free_var_names_endpoint (ExtChoice p e1 e2) = free_var_names_endpoint e1 ++ free_var_names_endpoint e2)
 /\ (free_var_names_endpoint (IfThen v e1 e2) = v::free_var_names_endpoint e1 ++ free_var_names_endpoint e2)
 /\ (free_var_names_endpoint (Let v f vl e) = vl ++ FILTER ($≠ v) (free_var_names_endpoint e))
 `
