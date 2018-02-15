@@ -103,6 +103,22 @@ val reduction_par_r = Q.store_thm("reduction_par_r",
   >> match_mp_tac (RTC_RULES |> SPEC_ALL |> CONJUNCT2)
   >> metis_tac[reduction_def,trans_par_r]);
 
+val weak_trans_par_l = Q.store_thm("weak_trans_par_l",
+  `∀p alpha q r. weak_trans p alpha q ==> weak_trans (NPar p r) alpha (NPar q r)`,
+  rpt strip_tac >> fs[weak_trans_def] >> every_case_tac >> fs[weak_tau_trans_def]
+  >> imp_res_tac reduction_par_l
+  >> imp_res_tac trans_par_l
+  >> rpt(first_x_assum (qspec_then `r` assume_tac))
+  >> metis_tac[]);
+
+val weak_trans_par_r = Q.store_thm("weak_trans_par_r",
+  `∀p alpha q r. weak_trans p alpha q ==> weak_trans (NPar r p) alpha (NPar r q)`,
+  rpt strip_tac >> fs[weak_trans_def] >> every_case_tac >> fs[weak_tau_trans_def]
+  >> imp_res_tac reduction_par_r
+  >> imp_res_tac trans_par_r
+  >> rpt(first_x_assum (qspec_then `r` assume_tac))
+  >> metis_tac[]);
+
 val trans_nil_false = Q.store_thm("trans_nil_false",
   `∀conf alpha n. trans NNil alpha n = F`,
   rpt strip_tac
