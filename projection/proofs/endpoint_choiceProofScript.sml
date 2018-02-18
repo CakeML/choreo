@@ -1,3 +1,29 @@
+(* Semantics preservation and semantics reflection for the compilation step that
+   implements internal/external choice using send/receive.
+
+   For semantics reflection, the proof idea is as follows: the relation choice_rel
+   relates endpointLang networks to compiled endpointLang networks, and also relates
+   all intermediate states that the compiled network can reach to the closest
+   preceding source network. In order to show (weak) semantics reflection it suffices to
+   show:
+
+   1) That choice_rel is closed under all reductions originating from a compiled network.
+        (choice_rel_reduction_pres)
+   2) That for any network on the RHS of choice_rel, there is a reduction sequence that
+      takes us to the compilation of some reachable source network (up-to differences in
+      unused local state).
+        (choice_rel_exit)
+
+   In order to obtain a tractable induction hypothesis for 2), we define the function
+   closing_distance, which counts the number of reductions necessary to escape from
+   choice_rel. We prove that for any networks related by choice_rel, there are reductions
+   from the source and target that decrease the closing distance by one (closing_distance_SUC_IMP);
+   unless the closing distance is zero, in which case we have already reached the compilation
+   of a network (closing_distance_zero_IMP).
+
+   This proof structure greatly simplifies the inductive argument about semantics reflection by
+   allowing us to concentrate on only one reduction at a time.
+ *)
 open preamble endpointLangTheory endpointSemanticsTheory endpointPropsTheory endpoint_choiceTheory
 
 val _ = new_theory "endpoint_choiceProof";
@@ -67,17 +93,6 @@ val add_queue_def = Define `
   ∧ (add_queue p1 qe p2 (NPar n1 n2) = NPar (add_queue p1 qe p2 n1) (add_queue p1 qe p2 n2))
 `
 
-(* TODO: move *)
-val junkcong_add_junk'' = Q.store_thm("junkcong_add_junk''",
-  `∀p s q e v fvs d.
-     v ∈ fvs ∧ ¬MEM v (free_var_names_endpoint e) ⇒
-     junkcong fvs (NEndpoint p (s with queue := q) e)
-     (NEndpoint p (s with <|bindings := s.bindings |+ (v,d); queue := q|>) e)`,
-  rpt strip_tac
-  >> qpat_abbrev_tac `a1 = s with queue := q`
-  >> `s.bindings = a1.bindings` by(unabbrev_all_tac >> simp[])
-  >> fs[junkcong_add_junk]);
-
 val junkcong_add_queue = Q.store_thm("junkcong_add_queue",
   `!fvs n1 n2 p1 qe p2. junkcong fvs n1 n2
                         ==> junkcong fvs (add_queue p1 qe p2 n1) (add_queue p1 qe p2 n2)`,
@@ -88,20 +103,10 @@ val junkcong_add_queue = Q.store_thm("junkcong_add_queue",
   >- simp[junkcong_sym]
   >- metis_tac[junkcong_trans]
   >- (rw[add_queue_def]
-      >> MAP_FIRST match_mp_tac [SIMP_RULE (srw_ss()) [] junkcong_add_junk'',
+      >> MAP_FIRST match_mp_tac [SIMP_RULE (srw_ss()) [] junkcong_add_junk''',
                                  junkcong_add_junk]
       >> rw[])
   >- rw[add_queue_def,junkcong_par]);
-
-val free_names_are_names_endpoint = Q.store_thm("free_names_are_names_endpoint",
-  `!e v. MEM v (free_var_names_endpoint e) ==> MEM v (var_names_endpoint e)`,
-  Induct >> rpt strip_tac
-  >> fs[var_names_endpoint_def,free_var_names_endpoint_def,MEM_FILTER]);
-
-val free_names_are_names = Q.store_thm("free_names_are_names",
-  `!n v. MEM v (free_var_names_network n) ==> MEM v (var_names_network n)`,
-  Induct >> rpt strip_tac
-  >> fs[var_names_network_def,free_var_names_network_def,free_names_are_names_endpoint]);
 
 val junkcong_add_state_free_vars = Q.store_thm("junkcong_add_state_free_vars",
   `!n v fv p d. ~MEM v (free_var_names_network n) ∧
@@ -286,19 +291,6 @@ val compile_network_preservation_ext_choice_F = Q.store_thm("compile_network_pre
       >> rfs[endpoints_def,ALL_DISTINCT_APPEND]
       >> match_mp_tac trans_par_r >> first_x_assum ACCEPT_TAC));
 
-val trans_var_names_mono = Q.store_thm("trans_var_names_mono",
-  `!n1 alpha n2 fv.
-    trans n1 alpha n2
-    ∧ MEM fv (var_names_network n2) ==> MEM fv (var_names_network n1)`,
-  rpt strip_tac
-  >> qpat_x_assum `MEM _ _` mp_tac
-  >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`fv`]
-  >> pop_assum mp_tac
-  >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`n2`,`alpha`,`n1`]
-  >> ho_match_mp_tac trans_strongind
-  >> rpt strip_tac
-  >> fs[var_names_network_def,var_names_endpoint_def]);
-
 val MEM_free_vars_compile_endpoint = Q.store_thm("MEM_free_vars_compile_endpoint",
   `!p fv. ~MEM fv (var_names_endpoint p) ==>
           MEM fv (free_var_names_endpoint (compile_endpoint fv p)) = MEM fv (free_var_names_endpoint p)`,
@@ -461,7 +453,7 @@ val compile_network_preservation = Q.store_thm("compile_network_preservation",
           >> match_mp_tac RTC_SINGLE
           >> fs[reduction_def] >> match_mp_tac trans_if_true
           >> fs[FLOOKUP_UPDATE])
-      >- (match_mp_tac junkcong_add_junk''
+      >- (match_mp_tac junkcong_add_junk'''
           >> fs[free_var_names_endpoint_def,var_names_network_def,var_names_endpoint_def]
           >> metis_tac[MEM_free_vars_compile_endpoint,free_names_are_names_endpoint]))
   >- (* extchoice-r *)
@@ -480,7 +472,7 @@ val compile_network_preservation = Q.store_thm("compile_network_preservation",
           >> match_mp_tac RTC_SINGLE
           >> fs[reduction_def] >> match_mp_tac trans_if_false
           >> fs[FLOOKUP_UPDATE])
-      >- (match_mp_tac junkcong_add_junk''
+      >- (match_mp_tac junkcong_add_junk'''
           >> fs[free_var_names_endpoint_def,var_names_network_def,var_names_endpoint_def]
           >> metis_tac[MEM_free_vars_compile_endpoint,free_names_are_names_endpoint]))
   >- (* trans_if_true *)
@@ -530,69 +522,6 @@ val compile_network_preservation = Q.store_thm("compile_network_preservation",
       >> fs[junkcong_refl])
   );
 
-val partners_endpoint_def = Define `
-   (partners_endpoint Nil = [])
-∧ (partners_endpoint (Send p v e) = p::(partners_endpoint e))
-∧ (partners_endpoint (Receive p v e) = p::(partners_endpoint e))
-∧ (partners_endpoint (IntChoice b p e) =
-    p::(partners_endpoint e))
-∧ (partners_endpoint (ExtChoice p e1 e2) =
-    p::((partners_endpoint e1) ++ (partners_endpoint e2)))
-∧ (partners_endpoint (IfThen v e1 e2) = (partners_endpoint e1) ++ (partners_endpoint e2))
-∧ (partners_endpoint (Let v f vl e) = partners_endpoint e)`
-
-val partners_network_def = Define `
-   (partners_network NNil = [])
-∧ (partners_network (NPar n1 n2) = (partners_network n1 ++ partners_network n2))
-∧ (partners_network (NEndpoint p s e) = (partners_endpoint e))`
-
-val closed_under_def = Define `
-  closed_under s n = (set(partners_network n) ⊆ s)`
-
-val closed_network_def = Define `
-  closed_network n = closed_under (set(MAP FST (endpoints n))) n`
-
-val endpoint_ok_def = Define `
-  endpoint_ok (n,s,e) = ~MEM n (partners_endpoint e)`
-
-(* todo: move *)
-val weak_trans_refl = Q.store_thm("weak_trans_refl",
-  `!n. weak_trans n LTau n`,
-  rw[weak_trans_def]);
-
-(* todo: move *)
-val trans_ext_choice_F_receive = Q.store_thm("trans_ext_choice_F_receive",
-  `!e1 e2 p1 p2. trans e1 (LReceive p1 [0w] p2) e2 =
-           trans e1 (LExtChoice p1 F p2) e2
-  `,
-  `!e1 alpha e2. trans e1 alpha e2 ==>
-     !p1 p2. alpha = LReceive p1 [0w] p2 ==> trans e1 (LExtChoice p1 F p2) e2`
-  by(ho_match_mp_tac trans_ind
-     >> rpt strip_tac >> fs[] >> rveq >> fs[]
-     >> MAP_FIRST match_mp_tac (CONJUNCTS trans_rules) >> fs[])
-  >> `!e1 alpha e2. trans e1 alpha e2 ==>
-       !p1 p2. alpha = LExtChoice p1 F p2 ==> trans e1 (LReceive p1 [0w] p2) e2`
-    by(ho_match_mp_tac trans_ind
-       >> rpt strip_tac >> fs[] >> rveq >> fs[]
-       >> MAP_FIRST match_mp_tac (CONJUNCTS trans_rules) >> fs[])
-  >> rw[EQ_IMP_THM]);
-
-val trans_ext_choice_T_receive = Q.store_thm("trans_ext_choice_T_receive",
-  `!e1 e2 p1 p2. trans e1 (LReceive p1 [1w] p2) e2 =
-           trans e1 (LExtChoice p1 T p2) e2
-  `,
-  `!e1 alpha e2. trans e1 alpha e2 ==>
-     !p1 p2. alpha = LReceive p1 [1w] p2 ==> trans e1 (LExtChoice p1 T p2) e2`
-  by(ho_match_mp_tac trans_ind
-     >> rpt strip_tac >> fs[] >> rveq >> fs[]
-     >> MAP_FIRST match_mp_tac (CONJUNCTS trans_rules) >> fs[])
-  >> `!e1 alpha e2. trans e1 alpha e2 ==>
-       !p1 p2. alpha = LExtChoice p1 T p2 ==> trans e1 (LReceive p1 [1w] p2) e2`
-    by(ho_match_mp_tac trans_ind
-       >> rpt strip_tac >> fs[] >> rveq >> fs[]
-       >> MAP_FIRST match_mp_tac (CONJUNCTS trans_rules) >> fs[])
-  >> rw[EQ_IMP_THM]);
-                                            
 val (choice_rel_rules,choice_rel_ind,choice_rel_cases) = Hol_reln `
   (* choice_rel_eq_junk *)
   (∀fv n1 n2.
@@ -628,16 +557,7 @@ val (choice_rel_rules,choice_rel_ind,choice_rel_cases) = Hol_reln `
                     (NEndpoint p2 (s with <|bindings := s.bindings |+ (fv,d);
                                             queue := q1 ++ q2|>)
                                   (IfThen fv (compile_endpoint fv e1) (compile_endpoint fv e2))))
-  (* choice_rel_ext_choice_false *)
-(*∧ (∀fv e1 e2 p1 s p2.
-     ¬MEM fv (var_names_endpoint e1) ∧ ¬MEM fv (var_names_endpoint e2)
-     ∧ s.queue = q1 ++ [(p1,d)] ++ q2
-     ∧ EVERY (λ(p,_). p ≠ p1) q1 ∧ p1 ≠ p2
-     ==> choice_rel fv
-                    (NEndpoint p2 s (ExtChoice p1 e1 e2))
-                    (NEndpoint p2 (s with <|bindings := s.bindings |+ (fv,[0w]);
-                                            queue := q1 ++ q2|>)
-                                  (IfThen fv (compile_endpoint fv e1) (compile_endpoint fv e2))))*)`
+  `;
 
 val [choice_rel_eq_junk,
      choice_rel_par,
@@ -673,25 +593,7 @@ val choice_rel_endpoint_eq_junk_receive = Q.store_thm("choice_rel_endpoint_eq_ju
   >> match_mp_tac choice_rel_endpoint_eq_junk
   >> rw[var_names_endpoint_def,compile_endpoint_def]);
 
-val junkcong_has_fv_eq = Q.store_thm("junkcong_has_fv_eq",
-  `!fv e l s e2. junkcong {fv} (NEndpoint l s e) e2
-   /\ MEM fv (free_var_names_endpoint e)
-   ==> NEndpoint l s e = e2`,
-  `!fvs e1 e2. junkcong fvs e1 e2
-   ==> (!fv e l s. e1 = NEndpoint l s e /\ fvs = {fv} /\ MEM fv (free_var_names_endpoint e)
-                        ==> NEndpoint l s e = e2) /\
-       (!fv e l s. e2 = NEndpoint l s e /\ fvs = {fv} /\ MEM fv (free_var_names_endpoint e)
-                        ==> e1 = NEndpoint l s e)
-  ` suffices_by metis_tac[]
-  >> ho_match_mp_tac junkcong_strongind
-  >> rpt strip_tac
-  >> fs[] >> rveq >> fs[]);
-
 val bool2w_def = Define `bool2w T = 1w /\ bool2w F = 0w`
-
-val RTC_SANDWICH = Q.store_thm("RTC_SANDWICH",
-  `!R a b c d. R^* a b /\ R b c /\ R^* c d ==> R^* a d`,
-  metis_tac[RTC_RTC,RTC_SINGLE])
 
 val closing_distance_def = Define `
   (closing_distance fv (NPar n1 n2) (NPar n3 n4)
@@ -709,48 +611,7 @@ val closing_distance_def = Define `
                    ∧ EVERY (λ(p',_). p' ≠ p) q1
                    ∧ s2 = s1 with <|bindings := s1.bindings |+ (fv,d); queue := q1 ++ q2|>
                    then
-     1
-(*   else if ?p e3 e4 q1 q2. e1 = ExtChoice p e3 e4 ∧ e2 = IfThen fv (compile_endpoint fv e3)
-                                                                (compile_endpoint fv e4)
-                   ∧ s1.queue = q1 ++ [(p,[6w;0w])] ++ q2
-                   ∧ EVERY (λ(p',_). p' ≠ p) q1
-                   ∧ s2 = s1 with <|bindings := s1.bindings |+ (fv,[0w]); queue := q1 ++ q2|>
-                   then
-     1*) else 0) ∧ closing_distance _ _ _ = 0`
-
-val junkcong_endpoint_rel_endpoint = Q.store_thm("junkcong_endpoint_rel_endpoint",
-  `!fvs p1 s1 e1 n2.
-   junkcong fvs (NEndpoint p1 s1 e1) n2 ==> ?s2. n2 = NEndpoint p1 s2 e1`,
-  `!fvs n1 n2.
-    junkcong fvs n1 n2
-    ==> (!p1 s1 e1. n1 = NEndpoint p1 s1 e1 ==> ?s2. n2 = NEndpoint p1 s2 e1)
-        /\ !p2 s2 e2. n2 = NEndpoint p2 s2 e2 ==> ?s1. n1 = NEndpoint p2 s1 e2`
-    suffices_by metis_tac[]
-  >> ho_match_mp_tac junkcong_strongind
-  >> rpt strip_tac >> fs[]);
-
-val junkcong_nil_rel_nil = Q.store_thm("junkcong_nil_rel_nil",
-  `!fvs n2.
-   junkcong fvs NNil n2 ==> n2 = NNil`,
-  `!fvs n1 n2.
-    junkcong fvs n1 n2
-    ==> (n1 = NNil <=> n2 = NNil)`
-    suffices_by metis_tac[]
-  >> ho_match_mp_tac junkcong_strongind
-  >> rpt strip_tac >> fs[]);
-
-
-val junkcong_par_rel_par = Q.store_thm("junkcong_par_rel_par",
-  `!fvs n1 n2 n3.
-   junkcong fvs (NPar n1 n2) n3 ==> ?n4 n5. n3 = NPar n4 n5 /\ junkcong fvs n1 n4 /\ junkcong fvs n2 n5`,
-  `!fvs n1 n2.
-    junkcong fvs n1 n2
-    ==> (!n3 n4. n1 = NPar n3 n4 ==> ?n5 n6. n2 = NPar n5 n6 /\ junkcong fvs n3 n5 /\ junkcong fvs n4 n6)
-        /\ (!n3 n4. n2 = NPar n3 n4 ==> ?n5 n6. n1 = NPar n5 n6 /\ junkcong fvs n5 n3 /\ junkcong fvs n6 n4)`
-    suffices_by metis_tac[]
-  >> ho_match_mp_tac junkcong_strongind
-  >> rpt strip_tac >> fs[junkcong_refl,junkcong_sym]
-  >> rfs[] >> fs[] >> metis_tac[junkcong_trans]);
+     1 else 0) ∧ closing_distance _ _ _ = 0`
 
 val closing_distance_zero_IMP = Q.store_thm("closing_distance_zero_IMP",
   `!fv n1 n2. choice_rel fv n1 n2 /\ closing_distance fv n1 n2 = 0
@@ -830,49 +691,10 @@ val decompile_label_def = Define `
     else LSend p1 l p2)
   ∧ decompile_label fv n alpha = alpha`
 
-(* TODO: move*)
-val junkcong_endpoints = Q.store_thm("junkcong_endpoints",
-  `!fvs n1 n2. junkcong fvs n1 n2 ==> MAP FST (endpoints n1) = MAP FST (endpoints n2)`,
-  ho_match_mp_tac junkcong_ind
-  >> rpt strip_tac >> fs[endpoints_def]);
-
 val choice_rel_endpoints = Q.store_thm("choice_rel_endpoints",
   `!fv n1 n2. choice_rel fv n1 n2 ==> MAP FST (endpoints n1) = MAP FST (endpoints n2)`,
   ho_match_mp_tac choice_rel_ind
   >> rpt strip_tac >> imp_res_tac junkcong_endpoints >> fs[endpoints_def,compile_network_endpoints]);
-
-val INDEX_FIND_normalize = Q.store_thm("INDEX_FIND_normalize",
-  `!l n. OPTION_MAP SND (INDEX_FIND n f l) = OPTION_MAP SND (INDEX_FIND 0 f l)`,
-  Induct_on `l` >> rpt strip_tac >> rw[INDEX_FIND_def]);
-
-val INDEX_FIND_normalize' = Q.store_thm("INDEX_FIND_normalize'",
-  `!l n. (INDEX_FIND n f l = NONE) = (INDEX_FIND 0 f l = NONE)`,
-  Induct_on `l` >> rpt strip_tac >> rw[INDEX_FIND_def]);
-
-val INDEX_FIND_normalize'' = Q.store_thm("INDEX_FIND_normalize''",
-  `!n f l z. (INDEX_FIND (SUC n) f l = SOME z) = (FST z > 0 /\ INDEX_FIND n f l = SOME (FST z - 1, SND z))`,
-  Induct_on `l` >> rpt strip_tac
-  >> rw[INDEX_FIND_def,EQ_IMP_THM]
-  >> fs[] >> Cases_on `z` >> fs[]);
-
-val FIND_APPEND = Q.store_thm("FIND_APPEND",
-  `FIND f (l1 ++ l2) =
-   case FIND f l1 of NONE => FIND f l2
-      | SOME e => SOME e`,
-  Induct_on `l1` >> fs[FIND_def,INDEX_FIND_def]
-  >> rw[INDEX_FIND_normalize]);
-
-val FIND_NOT_MEM = Q.store_thm("FIND_NOT_MEM",
-  `!e l. FIND ($= e) l = NONE <=> ¬MEM e l`,
-  Induct_on `l` >> rw[FIND_def,INDEX_FIND_def] >> fs[FIND_def,INDEX_FIND_normalize']);
-
-val FIND_o_NOT_MEM = Q.store_thm("FIND_o_NOT_MEM",
-  `!e f l. FIND ($= e o f) l = NONE <=> ¬MEM e (MAP f l)`,
-  Induct_on `l` >> rw[FIND_def,INDEX_FIND_def] >> fs[FIND_def,INDEX_FIND_normalize']);
-
-val FIND_o_MEM = Q.store_thm("FIND_o_MEM",
-  `!e f l. FIND ($= e o f) l <> NONE <=> MEM e (MAP f l)`,
-  Induct_on `l` >> rw[FIND_def,INDEX_FIND_def] >> fs[FIND_def,INDEX_FIND_normalize']);
 
 val sends_fv_compile_endpoint = Q.prove(
   `¬MEM fv (var_names_endpoint e) ==> (sends_fv fv (compile_endpoint fv e) = F)`,
@@ -1017,7 +839,6 @@ val sender_receiver_distinct_choice = Q.store_thm("sender_receiver_distinct_choi
   >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`n2`,`a1`,`n1`]
   >> ho_match_mp_tac trans_strongind
   >> rpt strip_tac >> fs[]);
-
 
 val com_add_queue = Q.store_thm("com_add_queue",
   `!n1 p1 d p2 n2.
@@ -1190,7 +1011,7 @@ val closing_distance_SUC_IMP = Q.store_thm("closing_distance_SUC_IMP",
          >> `!b q. <|bindings := b; queue := q|> = (s with queue := q) with bindings := b`
            by simp[endpointLangTheory.state_component_equality]
          >> pop_assum (fn thm => PURE_ONCE_REWRITE_TAC [thm])
-         >> match_mp_tac junkcong_add_junk'' >> fs[]
+         >> match_mp_tac junkcong_add_junk''' >> fs[]
          >> metis_tac[compile_endpoint_support,free_names_are_names_endpoint])
      >> conj_tac
      >- (fs[closing_distance_def]
@@ -1200,30 +1021,12 @@ val closing_distance_SUC_IMP = Q.store_thm("closing_distance_SUC_IMP",
          >> `!b q. <|bindings := b; queue := q|> = (s with queue := q) with bindings := b`
            by simp[endpointLangTheory.state_component_equality]
          >> pop_assum (fn thm => PURE_ONCE_REWRITE_TAC [thm])
-         >> match_mp_tac junkcong_add_junk'' >> fs[]
+         >> match_mp_tac junkcong_add_junk''' >> fs[]
          >> metis_tac[compile_endpoint_support,free_names_are_names_endpoint])
      >> conj_tac
      >- (fs[decompile_label_def,trans_ext_choice_l,trans_ext_choice_r])
      >> TRY(match_mp_tac trans_if_true >> fs[FLOOKUP_UPDATE] >> NO_TAC)
      >> match_mp_tac trans_if_false >> fs[FLOOKUP_UPDATE])));
-
-val closed_under_junkcong = Q.store_thm("closed_under_junkcong",
-  `!fvs n1 n2 e. junkcong fvs n1 n2 /\ set (MAP FST (endpoints n1)) ⊆ e ==> closed_under e n1 = closed_under e n2`,
-  Induct_on `n1`
-  >> rpt strip_tac
-  >> imp_res_tac junkcong_endpoint_rel_endpoint
-  >> imp_res_tac junkcong_par_rel_par
-  >> imp_res_tac junkcong_nil_rel_nil
-  >> fs[closed_network_def] >> rveq >> fs[closed_under_def,partners_network_def,endpoints_def]
-  >> metis_tac[]);
-
-val closed_network_junkcong = Q.store_thm("closed_network_junkcong",
-  `!fvs n1 n2 e. junkcong fvs n1 n2 ==> closed_network n1 = closed_network n2`,
-  rpt strip_tac >> drule closed_under_junkcong
-  >> disch_then(qspec_then `set (MAP FST (endpoints n1))` mp_tac)
-  >> impl_tac >- MATCH_ACCEPT_TAC SUBSET_REFL
-  >> simp[closed_network_def] >> imp_res_tac junkcong_endpoints
-  >> rw[]);
 
 val partners_compile_endpoint = Q.store_thm("partners_compile_endpoint",
   `!fv e. partners_endpoint(compile_endpoint fv e) = partners_endpoint e`,
@@ -1310,33 +1113,6 @@ val closing_distance_add_queue = Q.store_thm("closing_distance_add_queue",
       >> fs[APPEND_EQ_APPEND_MID] >> rveq >> fs[] >> rveq >> fs[]
       >> fs[EXISTS_MEM,EVERY_MEM] >> rfs[]));
 
-val closed_under_receiver_mem = Q.store_thm("closed_under_receiver_mem",
-  `!n1 p1 d p2 n2 e.
-     trans n1 (LSend p1 d p2) n2 /\ closed_under e n1
-      /\ set (MAP FST (endpoints n1)) ⊆ e
-     ==> p2 ∈ e
-  `,
-  rpt strip_tac
-  >> ntac 2 (pop_assum mp_tac)
-  >> qmatch_asmsub_abbrev_tac `trans _ a1 _`
-  >> pop_assum (mp_tac o PURE_ONCE_REWRITE_RULE [markerTheory.Abbrev_def])
-  >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`p1`,`p2`,`d`,`e`]
-  >> pop_assum mp_tac
-  >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`n2`,`a1`,`n1`]
-  >> ho_match_mp_tac trans_strongind
-  >> rpt strip_tac >> fs[] >> rveq
-  >> fs[endpoints_def,closed_under_def,partners_endpoint_def,partners_network_def]);
-
-val closed_network_receiver_mem = Q.store_thm("closed_network_receiver_mem",
-  `!n1 p1 d p2 n2 e.
-     trans n1 (LSend p1 d p2) n2 /\ closed_network n1
-     ==> MEM p2 (MAP FST (endpoints n1))
-  `,
-  rpt strip_tac
-  >> fs[closed_network_def]
-  >> imp_res_tac closed_under_receiver_mem
-  >> fs[]);
-
 val closing_distance_SUC_IMP_tau = Q.store_thm("closing_distance_SUC_IMP_tau",
 `!fv n1 n2 n. choice_rel fv n1 n2 /\ closing_distance fv n1 n2 = SUC n
               /\ ALL_DISTINCT (MAP FST (endpoints n1))
@@ -1367,26 +1143,6 @@ val closing_distance_SUC_IMP_tau = Q.store_thm("closing_distance_SUC_IMP_tau",
   >> fs[closing_distance_add_queue,choice_rel_add_queue]
   >> fs[trans_ext_choice_F_receive]);
 
-val FIND_MEM = Q.store_thm("FIND_MEM",
-  `!f l z. FIND f l = SOME z
-   ==> MEM z l /\ f z`,
-  Induct_on `l` >> rpt strip_tac
-  >> fs[FIND_def,INDEX_FIND_def] >> every_case_tac
-  >> rveq >> fs[INDEX_FIND_normalize'' |> Q.SPEC `0` |> REWRITE_RULE [GSYM ONE]]
-  >> metis_tac[FST,SND]);
-
-val var_names_endpoint_in_network = Q.store_thm("var_names_endpoint_in_network",
-  `!fv e n. MEM fv (var_names_endpoint (SND(SND(e))))
-            /\ MEM e (endpoints n) ==> MEM fv (var_names_network n)`,
-  Induct_on `n` >> rpt strip_tac >> fs[var_names_network_def,endpoints_def]
-  >> metis_tac[]);
-
-val free_var_names_endpoint_in_network = Q.store_thm("free_var_names_endpoint_in_network",
-  `!fv e n. MEM fv (free_var_names_endpoint (SND(SND(e))))
-            /\ MEM e (endpoints n) ==> MEM fv (free_var_names_network n)`,
-  Induct_on `n` >> rpt strip_tac >> fs[free_var_names_network_def,endpoints_def]
-  >> metis_tac[]);
-
 val decompile_label_id = Q.store_thm("decompile_label_id",
   `!fv n alpha. ¬MEM fv (free_var_names_network n)
    ==> decompile_label fv n alpha = alpha`,
@@ -1402,13 +1158,6 @@ val decompile_label_id2 = Q.store_thm("decompile_label_id2",
   `!fv n alpha. ¬MEM fv (var_names_network n)
    ==> decompile_label fv n alpha = alpha`,
   metis_tac[decompile_label_id,free_names_are_names]);
-
-val endpoint_names_reduction = Q.store_thm("endpoint_names_reduction",
-  `!n1 n2. reduction^* n1 n2 ==> MAP FST (endpoints n2) = MAP FST (endpoints n1)`,
-  PURE_ONCE_REWRITE_TAC[EQ_SYM_EQ]
-  >> ho_match_mp_tac RTC_lifts_reflexive_transitive_relations
-  >> rpt strip_tac >> fs[reduction_def] >> imp_res_tac endpoint_names_trans
-  >> fs[reflexive_def,transitive_def]);
   
 val decompile_label_par_l = Q.store_thm("decompile_label_par_l",
   `!n1 n2 n3 n4 fv alpha. weak_trans n1 (decompile_label fv n2 alpha) n3
@@ -1462,35 +1211,10 @@ val decompile_label_par_r_trans = Q.store_thm("decompile_label_par_r_trans",
       ==> weak_trans n1 (decompile_label fv (NPar n4 n2) alpha) n3`,
   metis_tac [decompile_label_par_r]);
 
-val junkcong_var_names = Q.store_thm("junkcong_var_names",
-  `!fvs n1 n2. junkcong fvs n1 n2 ==> var_names_network n1 = var_names_network n2`,
-  ho_match_mp_tac junkcong_ind >> rpt strip_tac
-  >> fs[var_names_network_def]);
-
-val junkcong_free_var_names = Q.store_thm("junkcong_free_var_names",
-  `!fvs n1 n2. junkcong fvs n1 n2 ==> free_var_names_network n1 = free_var_names_network n2`,
-  ho_match_mp_tac junkcong_ind >> rpt strip_tac
-  >> fs[free_var_names_network_def]);
-
 val reduction_par = Q.store_thm("reduction_par",
   `!p1 p2 q1 q2. reduction^* p1 p2 /\ reduction^* q1 q2
                  ==> reduction^* (NPar p1 q1) (NPar p2 q2)`,
  metis_tac[reduction_par_l, reduction_par_r, RTC_RTC]);
-
-val trans_endpoints_ok = Q.store_thm("trans_endpoints_ok",
-  `!n1 alpha n2. trans n1 alpha n2
-                 ==> EVERY endpoint_ok (endpoints n1)
-                 ==> EVERY endpoint_ok (endpoints n2)`,
-  ho_match_mp_tac trans_ind
-  >> rpt strip_tac
-  >> fs[endpoints_def,endpoint_ok_def,partners_endpoint_def]);
-
-val reduction_endpoints_ok = Q.store_thm("reduction_endpoints_ok",
-  `!n1 n2. reduction^* n1 n2 /\ EVERY endpoint_ok (endpoints n1)
-                 ==> EVERY endpoint_ok (endpoints n2)`,
-  PURE_ONCE_REWRITE_TAC [CONJ_SYM]
-  >> ho_match_mp_tac RTC_lifts_invariants
-  >> metis_tac[trans_endpoints_ok,reduction_def]);
 
 val choice_rel_trans_pres = Q.prove(
   `!fv n1 n2.
@@ -1808,14 +1532,14 @@ val choice_rel_trans_pres = Q.prove(
           >> conj_tac
           >- metis_tac[trans_IMP_weak_trans, trans_ext_choice_l]
           >- (match_mp_tac choice_rel_endpoint_eq_junk >> simp[]
-              >> match_mp_tac (junkcong_add_junk'' |> SIMP_RULE (srw_ss()) [])
+              >> match_mp_tac (junkcong_add_junk''' |> SIMP_RULE (srw_ss()) [])
               >> simp[]
               >> metis_tac[MEM_free_vars_compile_endpoint,free_names_are_names_endpoint]))
       >- (qexists_tac `NEndpoint p2 (s with queue := q1 ++ q2) e2`
           >> conj_tac
           >- metis_tac[trans_IMP_weak_trans, trans_ext_choice_r]
           >- (match_mp_tac choice_rel_endpoint_eq_junk >> simp[]
-              >> match_mp_tac (junkcong_add_junk'' |> SIMP_RULE (srw_ss()) [])
+              >> match_mp_tac (junkcong_add_junk''' |> SIMP_RULE (srw_ss()) [])
               >> simp[]
               >> metis_tac[MEM_free_vars_compile_endpoint,free_names_are_names_endpoint]))));
 
@@ -1856,27 +1580,6 @@ val choice_rel_reduction_pres = Q.store_thm("choice_rel_reduction_pres",
   >> fs[GSYM reduction_def]
   >> imp_res_tac RTC_RTC
   >> asm_exists_tac >> rw[]);
-
-val closed_under_trans = Q.store_thm("closed_under_trans",
-  `!n1 alpha n2 e. trans n1 alpha n2 /\ closed_under e n1 ==> closed_under e n2`,
-  simp[GSYM AND_IMP_INTRO,RIGHT_FORALL_IMP_THM]
-  >> ho_match_mp_tac trans_ind
-  >> rpt strip_tac >> fs[closed_under_def,partners_network_def,partners_endpoint_def]);
-
-val closed_network_trans = Q.store_thm("closed_network_trans",
-  `!n1 alpha n2. trans n1 alpha n2 /\ closed_network n1 ==> closed_network n2`,
-  rpt strip_tac
-  >> fs[closed_network_def]
-  >> imp_res_tac endpoint_names_trans
-  >> fs[]
-  >> imp_res_tac closed_under_trans);
-
-val closed_network_reduction = Q.store_thm("closed_network_reduction",
-  `!n1 n2. reduction^* n1 n2 /\ closed_network n1 ==> closed_network n2`,
-  simp[Once CONJ_SYM]
-  >> ho_match_mp_tac RTC_lifts_invariants
-  >> simp[Once CONJ_SYM, reduction_def]
-  >> MATCH_ACCEPT_TAC closed_network_trans);
 
 val choice_rel_exit = Q.store_thm("choice_rel_exit",
   `!fv n1 n2.
