@@ -49,15 +49,6 @@ val projectS_def = Define`
   projectS p s = MAP_KEYS (λx. FST x) (DRESTRICT s (λx. SND x = p))
 `;
 
-(*Crates a network of projections from a choreography *)
-val compile_network_def = Define`
-  compile_network s c =
-       let mkState = (λp. <| bindings := (projectS p s); queue := [] |>);
-           mkEP = (λp. project p c);
-           mkProcs = SET_TO_LIST (procsOf c);
-           listNetwork = MAP (λp. NEndpoint p (mkState p) (mkEP p)) mkProcs
-       in FOLDL (λx nt. if x = NNil then nt else NPar nt x) NNil listNetwork
-`;
 (* The domain of a state `s` projected to a process `p` is the set of
    all variable names associated with `p` in the domain of `s`
 *)
@@ -118,5 +109,22 @@ val projectS_fupdate = Q.store_thm("projectS_fupdate",
   \\ first_x_assum (ASSUME_TAC o Q.SPEC `d`)
   \\ rfs [DRESTRICT_DEF,ETA_THM]
 );
+
+val projectQ_def = Define`
+  projectQ p q = case FLOOKUP q p of
+                    | SOME x => x
+                   | NONE   => []
+`;
+
+(*Crates a network of projections from a choreography *)
+val compile_network_def = Define`
+  compile_network s c []      q = NNil
+∧ compile_network s c (p::lp) q =
+       let mkState = (λp. <| bindings := projectS p s;
+                             queue    := projectQ p q |>);
+           mkEP    = (λp. project p c);
+           mkNEP   = (λp. NEndpoint p (mkState p) (mkEP p))
+       in NPar (mkNEP p) (compile_network s c lp q)`
+;
 
 val _ = export_theory ()
