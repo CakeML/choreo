@@ -46,10 +46,7 @@ val project_def = Define `
    state `var |-> val`
 *)
 val projectS_def = Define`
-  projectS p s =
-    let state_of_p = FILTER (λx. SND (FST x) = p) (fmap_to_alist s);
-        v_to_vl    = MAP (λx. (FST (FST x), SND x)) state_of_p;
-    in alist_to_fmap v_to_vl
+  projectS p s = MAP_KEYS (λx. FST x) (DRESTRICT s (λx. SND x = p))
 `;
 
 (*Crates a network of projections from a choreography *)
