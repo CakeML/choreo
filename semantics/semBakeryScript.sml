@@ -57,6 +57,13 @@ val nub'_def = tDefine "nub'" `
 \\ Q.EXISTS_TAC `LENGTH xs`
 \\ rw [LENGTH_FILTER_LEQ]);
 
+val all_distinct_nub' = Q.store_thm("all_distinct_nub'",
+  `∀l. ALL_DISTINCT (nub' l)`,
+  rw [ALL_DISTINCT,nub'_def]
+  \\ Induct_on `l`
+  \\ rw [ALL_DISTINCT,nub'_def,FILTER_ALL_DISTINCT,MEM_FILTER]
+);
+
 
 (* The set of all processes in a choreography *)
 val procsOf_def = Define`
@@ -66,6 +73,12 @@ val procsOf_def = Define`
 ∧ procsOf (Sel p _ q c)    = nub' ([p;q] ++ procsOf c)
 ∧ procsOf (Let _ p _ _ c)  = nub' ([p] ++ procsOf c)
 `;
+
+val procsOf_all_distinct = Q.store_thm("procsOf_all_distinct",
+  `∀c. ALL_DISTINCT (procsOf c)`,
+  Induct_on `c` >> rw [procsOf_def,ALL_DISTINCT,all_distinct_nub']
+);
+
 
 val (lcong_rules,lcong_ind,lcong_cases) = Hol_reln `
 (* Congruence rules for lists of asyncronous operations *)
