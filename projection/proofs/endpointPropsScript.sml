@@ -697,7 +697,7 @@ val closed_network_junkcong = Q.store_thm("closed_network_junkcong",
   >> simp[closed_network_def] >> imp_res_tac junkcong_endpoints
   >> rw[]);
 
-enval closed_under_receiver_mem = Q.store_thm("closed_under_receiver_mem",
+val closed_under_receiver_mem = Q.store_thm("closed_under_receiver_mem",
   `!n1 p1 d p2 n2 e.
      trans n1 (LSend p1 d p2) n2 /\ closed_under e n1
       /\ set (MAP FST (endpoints n1)) ⊆ e
