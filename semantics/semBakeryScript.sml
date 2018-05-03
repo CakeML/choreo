@@ -47,14 +47,24 @@ val read_def = Define`
 ∧ read (LLet v p f vl)     = set(MAP (λv. (v,p)) vl)
 `;
 
+(* On ListTheory.sml *)
+val nub'_def = tDefine "nub'" `
+  nub' []      = []
+∧ nub' (x::xs) = x :: FILTER ($≠ x) (nub' xs)`
+(WF_REL_TAC `measure LENGTH`
+\\ rw [LENGTH]
+\\ ho_match_mp_tac LESS_EQ_LESS_TRANS
+\\ Q.EXISTS_TAC `LENGTH xs`
+\\ rw [LENGTH_FILTER_LEQ]);
+
 
 (* The set of all processes in a choreography *)
 val procsOf_def = Define`
-  procsOf  Nil             = {}
-∧ procsOf (IfThen _ p l r) = {p} ∪ procsOf l ∪ procsOf r
-∧ procsOf (Com p _ q _ c)  = {p;q} ∪ procsOf c
-∧ procsOf (Sel p _ q c)    = {p;q} ∪ procsOf c
-∧ procsOf (Let _ p _ _ c)  = {p} ∪ procsOf c
+  procsOf  Nil             = []
+∧ procsOf (IfThen _ p l r) = nub' ([p] ++ procsOf l ++ procsOf r)
+∧ procsOf (Com p _ q _ c)  = nub' ([p;q] ++ procsOf c)
+∧ procsOf (Sel p _ q c)    = nub' ([p;q] ++ procsOf c)
+∧ procsOf (Let _ p _ _ c)  = nub' ([p] ++ procsOf c)
 `;
 
 val (lcong_rules,lcong_ind,lcong_cases) = Hol_reln `
