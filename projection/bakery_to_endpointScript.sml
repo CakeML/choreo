@@ -16,9 +16,9 @@ val project_def = Define `
     if proc = p1 /\ proc = p2 then
       Let v2 HD [v1] (project proc c) (*TODO: does it make sense to compile self-communication to let? *)
     else if proc = p1 then
-      Send p1 v1 (project proc c)
+      Send p2 v1 (project proc c)
     else if proc = p2 then
-      Receive p2 v2 (project proc c)
+      Receive p1 v2 (project proc c)
     else
       project proc c)
 /\ (project proc (Let v p1 f vs c) =
