@@ -127,4 +127,53 @@ val compile_network_def = Define`
        in NPar (mkNEP p) (compile_network s c lp q)`
 ;
 
+(* TODO: Comments! *)
+val cn_ignore_com = Q.store_thm("cn_ignore_com",
+  `∀p1 v1 p2 v2 s c' pl q.
+    ¬MEM p1 pl ∧ ¬MEM p2 pl
+    ⇒ compile_network s (Com p1 v1 p2 v2 c') pl q = compile_network s c' pl q`,
+  Induct_on `pl`
+  \\ rw [compile_network_def,project_def,projectS_def]
+);
+
+(* TODO: Comments! *)
+val cn_ignore_sel = Q.store_thm("cn_ignore_sel",
+  `∀p1 b p2 s c' pl q.
+    ¬MEM p1 pl ∧ ¬MEM p2 pl
+    ⇒ compile_network s (Sel p1 b p2 c') pl q = compile_network s c' pl q`,
+  Induct_on `pl`
+  \\ rw [ compile_network_def,project_def,projectS_def
+        , projectQ_def,FLOOKUP_UPDATE]
+);
+
+(* TODO: Comments! *)
+val cn_ignore_let = Q.store_thm("cn_ignore_let",
+  `∀p s v f vl c pl q.
+    ¬MEM p pl
+    ⇒ compile_network s (Let v p f vl c) pl q = compile_network s c pl q`,
+  Induct_on `pl`
+  \\ rw [ compile_network_def,project_def,projectS_def
+        , projectQ_def,FLOOKUP_UPDATE]
+);
+
+(* TODO: Comments! *)
+val cn_ignore_queue_update = Q.store_thm("cn_ignore_queue_update",
+  `∀p s c pl q q'.
+    ¬MEM p pl
+    ⇒ compile_network s c pl (q |+ (p,q')) = compile_network s c pl q`,
+  Induct_on `pl`
+  \\ rw [ compile_network_def,project_def,projectS_def
+        , projectQ_def,FLOOKUP_UPDATE]
+);
+
+(* TODO: Comments! *)
+val cn_ignore_state_update = Q.store_thm("cn_ignore_state_update",
+  `∀p v d s c pl q.
+    ¬MEM p pl
+    ⇒ compile_network (s |+ ((v,p),d)) c pl q = compile_network s c pl q`,
+  Induct_on `pl`
+  \\ rw [ compile_network_def,project_def,projectS_def
+        , projectQ_def,FLOOKUP_UPDATE]
+);
+
 val _ = export_theory ()
