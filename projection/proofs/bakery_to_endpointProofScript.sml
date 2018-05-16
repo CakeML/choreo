@@ -67,9 +67,20 @@ val trans_let_gen = Q.store_thm("trans_let_gen",
 
 val compile_network_preservation = Q.store_thm("compile_network_preservation",
   `∀s c α τ s' c'. trans (s,c) (α,τ) (s',c')
-    ⇒ ∃q. reduction^* (compile_network s  c  (procsOf c) FEMPTY)
-                      (compile_network s' c' (procsOf c) q)`,
-  cheat
+    ⇒ ∃s'' c''. trans_s (s',c') (s'',c'')
+       ∧ reduction^* (compile_network s   c   (procsOf c))
+                     (compile_network s'' c'' (procsOf c))`,
+  ho_match_mp_tac trans_pairind
+  \\ rw [  compile_network_gen_def
+        , procsOf_def
+        , procsOf_all_distinct
+        , nub'_def
+        , reduction_def
+        , project_def
+        , FILTER_FILTER
+        , FOLDL
+        , fupdate_projectS]
+  \\ cheat
 );
 
 val _ = export_theory ()
