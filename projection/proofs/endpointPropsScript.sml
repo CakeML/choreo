@@ -7,6 +7,10 @@ val RTC_SANDWICH = Q.store_thm("RTC_SANDWICH",
   `!R a b c d. R^* a b /\ R b c /\ R^* c d ==> R^* a d`,
   metis_tac[RTC_RTC,RTC_SINGLE])
 
+val RTC_SPLIT = Q.store_thm("RTC_SPLIT",
+  `∀R x y z. R^* x z ∧ R^* z y ⇒ R^* x y`,
+  metis_tac[RTC_RTC,RTC_SINGLE])
+
 val INDEX_FIND_normalize = Q.store_thm("INDEX_FIND_normalize",
   `!l n. OPTION_MAP SND (INDEX_FIND n f l) = OPTION_MAP SND (INDEX_FIND 0 f l)`,
   Induct_on `l` >> rpt strip_tac >> rw[INDEX_FIND_def]);
