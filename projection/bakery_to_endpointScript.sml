@@ -10,35 +10,46 @@ val split_sel_def = Define `
       split_sel proc c)
 /\ (split_sel proc _ = NONE)`
 
+val mapRPair_def = Define `
+  mapRPair f p = (FST p,f (SND p))
+`;
+
+val mapRPP_def = Define `
+  mapRPP f p1 p2 = (FST p1 ∧ FST p2,f (SND p1) (SND p2))
+`;
+
+val _ = Parse.add_infix("<Γ>",425,Parse.NONASSOC);
+val _ = Parse.overload_on("<Γ>",``mapRPair``);
+val _ = export_rewrites ["mapRPair_def","mapRPP_def"];
+
 val project_def = Define `
-   (project proc Nil = Nil)
-/\ (project proc (Com p1 v1 p2 v2 c) =
-    if proc = p1 /\ proc = p2 then
-      Let v2 HD [v1] (project proc c) (*TODO: does it make sense to compile self-communication to let? *)
+   project proc Nil = (T,Nil)
+∧ (project proc (Com p1 v1 p2 v2 c) =
+    if proc = p1 ∧ proc = p2 then
+      Let v2 HD [v1] <Γ> project proc c (*TODO: does it make sense to compile self-communication to let? *)
     else if proc = p1 then
-      Send p2 v1 (project proc c)
+      Send p2 v1 <Γ> project proc c
     else if proc = p2 then
-      Receive p1 v2 (project proc c)
+      Receive p1 v2 <Γ> project proc c
     else
       project proc c)
-/\ (project proc (Let v p1 f vs c) =
+∧ (project proc (Let v p1 f vs c) =
     if proc = p1 then
-      Let v f vs (project proc c)
+      Let v f vs <Γ> project proc c
     else
       project proc c)
-/\ (project proc (IfThen v p1 c1 c2) =
+∧ (project proc (IfThen v p1 c1 c2) =
     if proc = p1 then
-      IfThen v (project proc c1) (project proc c2)
+      mapRPP (IfThen v) (project proc c2) (project proc c1)
     else
       case (split_sel proc c1,split_sel proc c2) of
         | (SOME(T,c1'),SOME(F,c2')) =>
-            ExtChoice p1 (project proc c1) (project proc c2)
+            mapRPP (ExtChoice p1) (project proc c1) (project proc c2)
         | (NONE,NONE) => project proc c1
-        | _ => Nil (* shouldn't happen *)
-   )
-/\ (project proc (Sel p1 b p2 c) =
+        | _ => (F,Nil)) (* shouldn't happen *)
+∧ (project proc (Sel p1 b p2 c) =
     if proc = p1 then
-      IntChoice b p2 (project proc c)
+      IntChoice b p2 <Γ> project proc c
     else
       project proc c)`
 
@@ -110,70 +121,63 @@ val projectS_fupdate = Q.store_thm("projectS_fupdate",
   \\ rfs [DRESTRICT_DEF,ETA_THM]
 );
 
-val projectQ_def = Define`
-  projectQ p q = case FLOOKUP q p of
-                    | SOME x => x
-                   | NONE   => []
+val compile_network_gen_def = Define`
+  compile_network_gen s c []  = (T,NNil)
+∧ compile_network_gen s c (p::lp) =
+       let mkState = (λp. <| bindings := projectS p s;
+                             queue    := [] |>);
+           mkEP    = (λp. project p c);
+           mkNEP   = (λp. NEndpoint p (mkState p) <Γ> mkEP p)
+       in  mapRPP NPar (mkNEP p)  (compile_network_gen s c lp)
 `;
 
-(*Crates a network of projections from a choreography *)
-val compile_network_def = Define`
-  compile_network s c []      q = NNil
-∧ compile_network s c (p::lp) q =
-       let mkState = (λp. <| bindings := projectS p s;
-                             queue    := projectQ p q |>);
-           mkEP    = (λp. project p c);
-           mkNEP   = (λp. NEndpoint p (mkState p) (mkEP p))
-       in NPar (mkNEP p) (compile_network s c lp q)`
-;
+val _ = overload_on("compile_network",
+  ``(λs c l. SND (compile_network_gen s c l))``
+);
+
+val _ = overload_on("compile_network_ok",
+  ``(λs c l. FST (compile_network_gen s c l))``
+);
 
 (* TODO: Comments! *)
 val cn_ignore_com = Q.store_thm("cn_ignore_com",
-  `∀p1 v1 p2 v2 s c' pl q.
+  `∀p1 v1 p2 v2 s c' pl.
     ¬MEM p1 pl ∧ ¬MEM p2 pl
-    ⇒ compile_network s (Com p1 v1 p2 v2 c') pl q = compile_network s c' pl q`,
+    ⇒ compile_network s (Com p1 v1 p2 v2 c') pl = compile_network s c' pl`,
   Induct_on `pl`
-  \\ rw [compile_network_def,project_def,projectS_def]
+  \\ rw [ compile_network_gen_def
+        , project_def,projectS_def]
 );
 
 (* TODO: Comments! *)
 val cn_ignore_sel = Q.store_thm("cn_ignore_sel",
-  `∀p1 b p2 s c' pl q.
+  `∀p1 b p2 s c' pl.
     ¬MEM p1 pl ∧ ¬MEM p2 pl
-    ⇒ compile_network s (Sel p1 b p2 c') pl q = compile_network s c' pl q`,
+    ⇒ compile_network s (Sel p1 b p2 c') pl = compile_network s c' pl`,
   Induct_on `pl`
-  \\ rw [ compile_network_def,project_def,projectS_def
-        , projectQ_def,FLOOKUP_UPDATE]
+  \\ rw [ project_def,projectS_def
+        , compile_network_gen_def
+        , FLOOKUP_UPDATE]
 );
 
 (* TODO: Comments! *)
 val cn_ignore_let = Q.store_thm("cn_ignore_let",
-  `∀p s v f vl c pl q.
+  `∀p s v f vl c pl.
     ¬MEM p pl
-    ⇒ compile_network s (Let v p f vl c) pl q = compile_network s c pl q`,
+    ⇒ compile_network s (Let v p f vl c) pl = compile_network s c pl`,
   Induct_on `pl`
-  \\ rw [ compile_network_def,project_def,projectS_def
-        , projectQ_def,FLOOKUP_UPDATE]
-);
-
-(* TODO: Comments! *)
-val cn_ignore_queue_update = Q.store_thm("cn_ignore_queue_update",
-  `∀p s c pl q q'.
-    ¬MEM p pl
-    ⇒ compile_network s c pl (q |+ (p,q')) = compile_network s c pl q`,
-  Induct_on `pl`
-  \\ rw [ compile_network_def,project_def,projectS_def
-        , projectQ_def,FLOOKUP_UPDATE]
+  \\ rw [ compile_network_gen_def,project_def,projectS_def
+        , FLOOKUP_UPDATE]
 );
 
 (* TODO: Comments! *)
 val cn_ignore_state_update = Q.store_thm("cn_ignore_state_update",
-  `∀p v d s c pl q.
+  `∀p v d s c pl.
     ¬MEM p pl
-    ⇒ compile_network (s |+ ((v,p),d)) c pl q = compile_network s c pl q`,
+    ⇒ compile_network (s |+ ((v,p),d)) c pl = compile_network s c pl`,
   Induct_on `pl`
-  \\ rw [ compile_network_def,project_def,projectS_def
-        , projectQ_def,FLOOKUP_UPDATE]
+  \\ rw [ compile_network_gen_def,project_def,projectS_def
+        , FLOOKUP_UPDATE]
 );
 
 val _ = export_theory ()
