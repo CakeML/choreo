@@ -50,8 +50,13 @@ val project_def = Define `
 ∧ (project proc (Sel p1 b p2 c) =
     if proc = p1 then
       IntChoice b p2 <Γ> project proc c
-    else
-      project proc c)`
+    else if proc = p2 then
+      if b then
+        (λx. ExtChoice p1 x Nil) <Γ> project proc c
+      else
+        ExtChoice p1 Nil <Γ> project proc c
+   else
+     project proc c)`
 
 (* Project a global state `(proc,var) |-> val` into a single process
    state `var |-> val`
