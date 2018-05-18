@@ -26,7 +26,7 @@ val project_def = Define `
    project proc Nil = (T,Nil)
 ∧ (project proc (Com p1 v1 p2 v2 c) =
     if proc = p1 ∧ proc = p2 then
-      Let v2 HD [v1] <Γ> project proc c (*TODO: does it make sense to compile self-communication to let? *)
+      (F,Nil)
     else if proc = p1 then
       Send p2 v1 <Γ> project proc c
     else if proc = p2 then
@@ -48,7 +48,9 @@ val project_def = Define `
         | (NONE,NONE) => project proc c1
         | _ => (F,Nil)) (* shouldn't happen *)
 ∧ (project proc (Sel p1 b p2 c) =
-    if proc = p1 then
+    if proc = p1 ∧ proc = p2 then
+      (F,Nil)
+    else if proc = p1 then
       IntChoice b p2 <Γ> project proc c
     else if proc = p2 then
       if b then
