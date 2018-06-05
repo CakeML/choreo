@@ -3,12 +3,15 @@ open preamble semBakeryTheory endpointLangTheory
 val _ = new_theory "bakery_to_endpoint";
 
 val split_sel_def = Define `
-   (split_sel proc (Sel p1 b p2 c) =
-    if proc = p2 then
-      SOME(b,c)
-    else
-      split_sel proc c)
-/\ (split_sel proc _ = NONE)`
+  (split_sel proc p (Sel p1 b p2 c) =
+   if proc = p2  then
+     if p1 = p then
+       SOME(b,c)
+     else NONE
+   else if proc ≠ p1 then
+     split_sel proc p c
+   else NONE)
+∧ (split_sel proc _ _ = NONE)`
 
 val mapRPair_def = Define `
   mapRPair f p = (FST p,f (SND p))
@@ -22,7 +25,15 @@ val _ = Parse.add_infix("<Γ>",425,Parse.NONASSOC);
 val _ = Parse.overload_on("<Γ>",``mapRPair``);
 val _ = export_rewrites ["mapRPair_def","mapRPP_def"];
 
-val project_def = Define `
+val chor_size_def = Define`
+  chor_size Nil                = (1 : num)
+∧ chor_size (Com _ _ _ _ c)    = 1 + chor_size c
+∧ chor_size (Sel _ _ _ c)      = 1 + chor_size c
+∧ chor_size (Let _ _ _ _ c)    = 1 + chor_size c
+∧ chor_size (IfThen _ _ c1 c2) = 1 + chor_size c1 + chor_size c2
+`;
+
+val project_def = tDefine "project" `
    project proc Nil = (T,Nil)
 ∧ (project proc (Com p1 v1 p2 v2 c) =
     if proc = p1 ∧ proc = p2 then
@@ -40,12 +51,16 @@ val project_def = Define `
       project proc c)
 ∧ (project proc (IfThen v p1 c1 c2) =
     if proc = p1 then
-      mapRPP (IfThen v) (project proc c2) (project proc c1)
+      mapRPP (IfThen v) (project proc c1) (project proc c2)
     else
-      case (split_sel proc c1,split_sel proc c2) of
+      case (split_sel proc p1 c1,split_sel proc p1 c2) of
         | (SOME(T,c1'),SOME(F,c2')) =>
-            mapRPP (ExtChoice p1) (project proc c1) (project proc c2)
-        | (NONE,NONE) => project proc c1
+           mapRPP (ExtChoice p1) (project proc c1') (project proc c2')
+        | (NONE,NONE) =>
+          if project proc c1 = project proc c2 then
+            project proc c1
+          else
+            (F,Nil)
         | _ => (F,Nil)) (* shouldn't happen *)
 ∧ (project proc (Sel p1 b p2 c) =
     if proc = p1 ∧ proc = p2 then
@@ -59,6 +74,15 @@ val project_def = Define `
         ExtChoice p1 Nil <Γ> project proc c
    else
      project proc c)`
+(WF_REL_TAC `measure (chor_size o SND)`
+\\ rw [chor_size_def]
+>- (`chor_size p_2 ≤ chor_size c1`suffices_by rw []
+   \\ Induct_on `c1` >> fs [split_sel_def,chor_size_def]
+   \\ rw [] >> fs [])
+>- (`chor_size p_2' ≤ chor_size c2`suffices_by rw []
+   \\ Induct_on `c2` >> fs [split_sel_def,chor_size_def]
+   \\ rw [] >> fs []))
+;
 
 (* Project a global state `(proc,var) |-> val` into a single process
    state `var |-> val`
