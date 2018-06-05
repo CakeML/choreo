@@ -170,6 +170,14 @@ val _ = overload_on("compile_network_ok",
   ``(λs c l. FST (compile_network_gen s c l))``
 );
 
+val _ = overload_on("project'",
+  ``(λp c. SND (project p c))``
+);
+
+val _ = overload_on("project_ok",
+  ``(λp c. FST (project p c))``
+);
+
 (* TODO: Comments! *)
 val cn_ignore_com = Q.store_thm("cn_ignore_com",
   `∀p1 v1 p2 v2 s c' pl.
