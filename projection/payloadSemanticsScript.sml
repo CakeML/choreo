@@ -15,7 +15,7 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
     FLOOKUP s.bindings v = SOME d
     ∧ LENGTH d - n <= conf.payload_size
     ∧ p1 ≠ p2
-    ⇒ trans conf (NEndpoint p1 s (Send p2 v n e)) (LSend p1 (6w::DROP n d) p2) (NEndpoint p1 s e))
+    ⇒ trans conf (NEndpoint p1 s (Send p2 v n e)) (LSend p1 (pad conf (DROP n d)) p2) (NEndpoint p1 s e))
 
   (* Send-intermediate-payload *)
 ∧ (∀conf s v n d p1 p2 e.
@@ -23,7 +23,7 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
     ∧ LENGTH d - n > conf.payload_size
     ∧ p1 ≠ p2
     ⇒ trans conf (NEndpoint p1 s (Send p2 v n e))
-                  (LSend p1 (2w::TAKE conf.payload_size (DROP n d)) p2)
+                  (LSend p1 (pad conf (DROP n d)) p2)
                   (NEndpoint p1 s (Send p2 v (n + conf.payload_size) e)))
 
   (* Enqueue *)
@@ -49,22 +49,24 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
 
   (* Dequeue-last-payload *)
 ∧ (∀conf s v p1 p2 e q1 q2 d ds.
-    s.queue = q1 ++ [(p1,6w::d)] ++ q2
+    s.queue = q1 ++ [(p1,d)] ++ q2
     ∧ p1 ≠ p2
     ∧ EVERY (λ(p,_). p ≠ p1) q1 
+    ∧ final d
     ⇒ trans conf (NEndpoint p2 s (Receive p1 v ds e))
              LTau
              (NEndpoint p2 (s with <|queue := q1 ++ q2;
-                                     bindings := s.bindings |+ (v,FLAT(SNOC d ds))|>) e))
+                                     bindings := s.bindings |+ (v,FLAT(SNOC (unpad d) ds))|>) e))
 
   (* Dequeue-intermediate-payload *)
 ∧ (∀conf s v p1 p2 e q1 q2 d ds.
-    s.queue = q1 ++ [(p1,2w::d)] ++ q2
+    s.queue = q1 ++ [(p1,d)] ++ q2
     ∧ p1 ≠ p2
     ∧ EVERY (λ(p,_). p ≠ p1) q1 
+    ∧ intermediate d
     ⇒ trans conf (NEndpoint p2 s (Receive p1 v ds e))
              LTau
-             (NEndpoint p2 (s with queue := q1 ++ q2) (Receive p1 v (SNOC d ds) e)))
+             (NEndpoint p2 (s with queue := q1 ++ q2) (Receive p1 v (SNOC (unpad d) ds) e)))
 
   (* If-L *)
 ∧ (∀conf s v p e1 e2.

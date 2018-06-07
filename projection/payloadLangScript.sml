@@ -6,8 +6,6 @@ val _ = Datatype`
 endpoint = Nil
          | Send proc varN num endpoint
          | Receive proc varN (datum list) endpoint
-(*         | IntChoice bool proc endpoint
-         | ExtChoice proc endpoint endpoint*)
          | IfThen varN endpoint endpoint
          | Let varN (datum list -> datum) (varN list) endpoint`
 
@@ -44,5 +42,37 @@ val free_var_names_network_def = Define `
    (free_var_names_network NNil = [])
 /\ (free_var_names_network (NEndpoint p s e) = free_var_names_endpoint e)
 /\ (free_var_names_network (NPar n1 n2) = free_var_names_network n1 ++ free_var_names_network n2)`
+
+val final_def = Define `
+  final (w::d) = (w = 7w:word8 \/ w = 6w:word8)
+  /\ final _ = F
+`
+
+val intermediate_def = Define `
+  intermediate (w::d) = (w = 2w:word8)
+  /\ intermediate _ = F
+`
+
+val pad_def = Define `
+  pad conf d =
+  if LENGTH d = conf.payload_size then       
+    7w::d
+  else if LENGTH d < conf.payload_size then
+    6w::REPLICATE ((conf.payload_size - LENGTH d) - 1) (0w:word8) ++ [1w] ++ d
+  else
+    2w::TAKE conf.payload_size d
+`
+
+val unpad_def = Define `
+  (unpad (w::d) =
+    if w = 7w \/ w = 2w then d     
+    else if w = 6w then
+      case SPLITP ($= 1w) d of
+        (_,_::d) => d
+      | _ => []
+    else []
+  )
+  /\ (unpad _ = [])
+  `
 
 val _ = export_theory ()

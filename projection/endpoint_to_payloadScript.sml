@@ -6,21 +6,22 @@ val compile_endpoint_def = Define `
    (compile_endpoint endpointLang$Nil = payloadLang$Nil)
 ∧ (compile_endpoint (Send p v e) = Send p v 0 (compile_endpoint e))
 ∧ (compile_endpoint (Receive p v e) = Receive p v [] (compile_endpoint e))
-∧ (compile_endpoint (IntChoice b p e) = ARB)
-∧ (compile_endpoint (ExtChoice p e1 e2) = ARB)
+∧ (compile_endpoint (IntChoice b p e) = Nil)
+∧ (compile_endpoint (ExtChoice p e1 e2) = Nil)
 ∧ (compile_endpoint (IfThen v e1 e2) = IfThen v (compile_endpoint e1) (compile_endpoint e2))
 ∧ (compile_endpoint (Let v f vl e) = Let v f vl (compile_endpoint e))`
 
 val compile_message_def = tDefine "compile_message" `
   compile_message conf d =
    if conf.payload_size = 0 then [] (*for termination, shouldn't happen*)
-   else if LENGTH d <= conf.payload_size then
-     [6w::d]
    else
-     (2w::TAKE conf.payload_size d) :: compile_message conf (DROP conf.payload_size d)`
+     if final(pad conf d) then
+       [pad conf d]
+     else pad conf d :: compile_message conf (DROP conf.payload_size d)`
   (wf_rel_tac `inv_image ($<) (λ(conf,d). if conf.payload_size = 0 then 0 else LENGTH d)`
    >> rpt strip_tac
-   >> fs[LENGTH_DROP])
+   >> fs[LENGTH_DROP,final_def,pad_def]
+   >> every_case_tac >> fs[final_def]);
 
 val compile_queue_def = Define `
    compile_queue conf [] = []
