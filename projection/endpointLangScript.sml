@@ -49,4 +49,18 @@ val free_var_names_network_def = Define `
 /\ (free_var_names_network (NEndpoint p s e) = free_var_names_endpoint e)
 /\ (free_var_names_network (NPar n1 n2) = free_var_names_network n1 ++ free_var_names_network n2)`
 
+val choice_free_endpoint_def = Define `
+   (choice_free_endpoint endpointLang$Nil = T)
+∧ (choice_free_endpoint (Send p v e) = choice_free_endpoint e)
+∧ (choice_free_endpoint (Receive p v e) = choice_free_endpoint e)
+∧ (choice_free_endpoint (IntChoice b p e) = F)
+∧ (choice_free_endpoint (ExtChoice p e1 e2) = F)
+∧ (choice_free_endpoint (IfThen v e1 e2) = (choice_free_endpoint e1 ∧ choice_free_endpoint e2))
+∧ (choice_free_endpoint (Let v f vl e) = choice_free_endpoint e)`
+
+val choice_free_network_def = Define `
+   (choice_free_network endpointLang$NNil = T)
+∧ (choice_free_network (NPar n1 n2) = (choice_free_network n1 ∧ choice_free_network n2))
+∧ (choice_free_network (NEndpoint p s e) = choice_free_endpoint e)`
+
 val _ = export_theory ()
