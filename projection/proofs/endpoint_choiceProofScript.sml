@@ -21,8 +21,9 @@
    unless the closing distance is zero, in which case we have already reached the compilation
    of a network (closing_distance_zero_IMP).
 
-   This proof structure greatly simplifies the inductive argument about semantics reflection by
-   allowing us to concentrate on only one reduction at a time.
+   The main proof for 2) is by induction on the closing distance. This proof structure greatly
+   simplifies inductive arguments about semantics reflection, by allowing us to concentrate on
+   only one reduction at a time.
  *)
 open preamble endpointLangTheory endpointSemanticsTheory endpointPropsTheory endpoint_choiceTheory
 
@@ -184,7 +185,7 @@ val compile_network_preservation_int_choice_T = Q.store_thm(
       >> rfs[endpoints_def,ALL_DISTINCT_APPEND]
       >> imp_res_tac sender_is_endpoint
       >> imp_res_tac endpoint_names_trans >> fs[compile_network_endpoints]
-      >> rfs[] >> first_x_assum(qspec_then `q1` (drule o CONTRAPOS))
+      >> rfs[] >> first_x_assum(qspec_then `q1` (drule o PURE_REWRITE_RULE[NOT_CLAUSES] o CONTRAPOS))
       >> strip_tac
       >> fs[compile_network_endpoints,not_MEM_add_state]
       >> metis_tac[trans_par_r]));
@@ -232,7 +233,7 @@ val compile_network_preservation_int_choice_F = Q.store_thm(
       >> rfs[endpoints_def,ALL_DISTINCT_APPEND]
       >> imp_res_tac sender_is_endpoint
       >> imp_res_tac endpoint_names_trans >> fs[compile_network_endpoints]
-      >> rfs[] >> first_x_assum(qspec_then `q1` (drule o CONTRAPOS))
+      >> rfs[] >> first_x_assum(qspec_then `q1` (drule o PURE_REWRITE_RULE[NOT_CLAUSES] o CONTRAPOS))
       >> strip_tac
       >> fs[compile_network_endpoints,not_MEM_add_state]
       >> metis_tac[trans_par_r]));
@@ -811,7 +812,7 @@ val receive_add_queue = Q.store_thm("receive_add_queue",
   Induct_on `n1` >> rpt strip_tac
   >> fs[endpoints_def,ALL_DISTINCT_APPEND,add_queue_def]
   >> rpt(first_x_assum drule >> strip_tac)
-  >> rpt(first_x_assum (drule o CONTRAPOS o SPEC_ALL)) >> rpt strip_tac
+  >> rpt(first_x_assum (drule o PURE_REWRITE_RULE [NOT_CLAUSES] o CONTRAPOS o SPEC_ALL)) >> rpt strip_tac
   >> fs[add_queue_fresh]
   >> MAP_FIRST match_mp_tac (CONJUNCTS trans_rules)
   >> rveq >> fs[]);
@@ -857,7 +858,7 @@ val com_add_queue = Q.store_thm("com_add_queue",
   >> rpt strip_tac
   >> fs[add_queue_def,endpoints_def,ALL_DISTINCT_APPEND] >> rveq
   >> rpt(first_x_assum drule >> strip_tac)
-  >> rpt(first_x_assum (drule o CONTRAPOS o SPEC_ALL)) >> rpt strip_tac
+  >> rpt(first_x_assum (drule o PURE_REWRITE_RULE [NOT_CLAUSES] o CONTRAPOS o SPEC_ALL)) >> rpt strip_tac
   >> fs[add_queue_fresh,trans_par_r,trans_par_l]
   >> imp_res_tac (GSYM endpoint_names_trans)
   >> fs[add_queue_fresh]
@@ -882,7 +883,7 @@ val com_choice_add_queue = Q.store_thm("com_choice_add_queue",
   >> rpt strip_tac
   >> fs[add_queue_def,endpoints_def,ALL_DISTINCT_APPEND] >> rveq
   >> rpt(first_x_assum drule >> strip_tac)
-  >> rpt(first_x_assum (drule o CONTRAPOS o SPEC_ALL)) >> rpt strip_tac
+  >> rpt(first_x_assum (drule o PURE_REWRITE_RULE [NOT_CLAUSES] o CONTRAPOS o SPEC_ALL)) >> rpt strip_tac
   >> fs[add_queue_fresh,trans_par_r,trans_par_l]
   >> imp_res_tac (GSYM endpoint_names_trans)
   >> fs[add_queue_fresh]
@@ -1158,7 +1159,7 @@ val decompile_label_id2 = Q.store_thm("decompile_label_id2",
   `!fv n alpha. ¬MEM fv (var_names_network n)
    ==> decompile_label fv n alpha = alpha`,
   metis_tac[decompile_label_id,free_names_are_names]);
-  
+
 val decompile_label_par_l = Q.store_thm("decompile_label_par_l",
   `!n1 n2 n3 n4 fv alpha. weak_trans n1 (decompile_label fv n2 alpha) n3
    /\ MAP FST (endpoints n1) = MAP FST (endpoints n2)
