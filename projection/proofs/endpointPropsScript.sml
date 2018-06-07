@@ -793,4 +793,26 @@ val closed_network_reduction = Q.store_thm("closed_network_reduction",
   >> simp[Once CONJ_SYM, reduction_def]
   >> MATCH_ACCEPT_TAC closed_network_trans);
 
+val choice_free_network_no_choice = Q.store_thm("choice_free_network_no_choice",
+  `!n1 n2 p1 b p2. trans n1 (LIntChoice p1 b p2) n2 /\ choice_free_network n1 ==> F`,
+  rpt GEN_TAC
+  >> qmatch_goalsub_abbrev_tac `trans _ a1 _`
+  >> rpt strip_tac
+  >> pop_assum mp_tac
+  >> qpat_x_assum `Abbrev _` (mp_tac o REWRITE_RULE[markerTheory.Abbrev_def])
+  >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`p2`,`b`,`p1`]
+  >> pop_assum mp_tac
+  >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`n2`,`a1`,`n1`]
+  >> ho_match_mp_tac trans_ind >> rw[choice_free_network_def,choice_free_endpoint_def]);
+
+val choice_free_trans_pres = Q.store_thm("choice_free_trans_pres",
+  `!n1 alpha n2. trans n1 alpha n2 /\ choice_free_network n1 ==> choice_free_network n2`,
+  simp[GSYM AND_IMP_INTRO,RIGHT_FORALL_IMP_THM]
+   >> ho_match_mp_tac trans_ind >> rw[choice_free_network_def,choice_free_endpoint_def]);
+
+val choice_free_reduction = Q.store_thm("choice_free_reduction",
+  `!n1 n2. reduction^* n1 n2 /\ choice_free_network n1 ==> choice_free_network n2`,
+  simp[Once CONJ_SYM] >> ho_match_mp_tac RTC_lifts_invariants
+  >> metis_tac[choice_free_trans_pres,reduction_def]);
+
 val _ = export_theory ()
