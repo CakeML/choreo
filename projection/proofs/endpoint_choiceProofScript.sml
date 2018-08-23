@@ -829,18 +829,6 @@ val sender_receiver_distinct = Q.store_thm("sender_receiver_distinct",
   >> ho_match_mp_tac trans_strongind
   >> rpt strip_tac >> fs[]);
 
-val sender_receiver_distinct_choice = Q.store_thm("sender_receiver_distinct_choice",
-  `!n1 p1 b p2 n2.
-     trans n1 (LIntChoice p1 b p2) n2 ==> p1 ≠ p2`,
-  rpt strip_tac >> pop_assum mp_tac
-  >> qmatch_asmsub_abbrev_tac `trans _ a1 _`
-  >> pop_assum (mp_tac o PURE_ONCE_REWRITE_RULE [markerTheory.Abbrev_def])
-  >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`p1`,`b`,`p2`]
-  >> pop_assum mp_tac
-  >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`n2`,`a1`,`n1`]
-  >> ho_match_mp_tac trans_strongind
-  >> rpt strip_tac >> fs[]);
-
 val com_add_queue = Q.store_thm("com_add_queue",
   `!n1 p1 d p2 n2.
     trans n1 (LSend p1 d p2) n2 /\ MEM p2 (MAP FST (endpoints n1))

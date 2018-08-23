@@ -368,7 +368,7 @@ val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
                  >> pop_assum(fn thm => FULL_SIMP_TAC bool_ss [Once thm])
                  >> imp_res_tac trans_dequeue
                  >> first_x_assum(qspec_then `v'` assume_tac)
-                 >> rveq                     
+                 >> rveq
                  >> fs[Once FUPDATE_COMMUTES])
              >- (IF_CASES_TAC
                  >- metis_tac[junkcong_rules]
@@ -436,7 +436,7 @@ val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
                  >> simp[])
              >- (Cases_on `v = a3` >> fs[Once FUPDATE_COMMUTES]
                  >> fs[free_var_names_endpoint_def,MEM_FILTER]
-                 >> metis_tac[junkcong_rules,junkcong_add_junk']))      
+                 >> metis_tac[junkcong_rules,junkcong_add_junk']))
       >> TRY(qmatch_goalsub_abbrev_tac `junkcong fvs
                                                 (NEndpoint a1
                                                            <|bindings := a2 |+ (v,d);
@@ -550,7 +550,7 @@ val junkcong_trans_pres = Q.store_thm("junkcong_trans_pres",
      junkcong fv p1 q1 ∧ trans p1 alpha p2
      ⇒ ∃q2. trans q1 alpha q2 ∧ junkcong fv p2 q2`,
   metis_tac[junkcong_trans_eq])
-                                     
+
 val list_trans_def = Define `
     (list_trans p [] q = (p = q))
  /\ (list_trans p (alpha::l) q = ?p'. trans p alpha p' /\ list_trans p' l q)`
@@ -814,5 +814,30 @@ val choice_free_reduction = Q.store_thm("choice_free_reduction",
   `!n1 n2. reduction^* n1 n2 /\ choice_free_network n1 ==> choice_free_network n2`,
   simp[Once CONJ_SYM] >> ho_match_mp_tac RTC_lifts_invariants
   >> metis_tac[choice_free_trans_pres,reduction_def]);
+
+val sender_receiver_distinct_choice = Q.store_thm("sender_receiver_distinct_choice",
+  `!n1 p1 b p2 n2.
+     trans n1 (LIntChoice p1 b p2) n2 ==> p1 ≠ p2`,
+  rpt strip_tac >> pop_assum mp_tac
+  >> qmatch_asmsub_abbrev_tac `trans _ a1 _`
+  >> pop_assum (mp_tac o PURE_ONCE_REWRITE_RULE [markerTheory.Abbrev_def])
+  >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`p1`,`b`,`p2`]
+  >> pop_assum mp_tac
+  >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`n2`,`a1`,`n1`]
+  >> ho_match_mp_tac trans_strongind
+  >> rpt strip_tac >> fs[]);
+
+val sender_receiver_distinct = Q.store_thm("sender_receiver_distinct",
+  `!n1 p1 d p2 n2.
+     trans n1 (LSend p1 d p2) n2 ==> p1 ≠ p2`,
+  rpt strip_tac >> pop_assum mp_tac
+  >> qmatch_asmsub_abbrev_tac `trans _ a1 _`
+  >> pop_assum (mp_tac o PURE_ONCE_REWRITE_RULE [markerTheory.Abbrev_def])
+  >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`p1`,`d`,`p2`]
+  >> pop_assum mp_tac
+  >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`n2`,`a1`,`n1`]
+  >> ho_match_mp_tac trans_strongind
+  >> rpt strip_tac >> fs[]);
+
 
 val _ = export_theory ()
