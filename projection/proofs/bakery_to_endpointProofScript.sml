@@ -1,6 +1,6 @@
 open preamble endpointLangTheory bakery_to_endpointTheory
               endpointSemanticsTheory endpointPropsTheory
-              semBakeryTheory;
+              endpointCongTheory semBakeryTheory;
 
 val _ = new_theory "bakery_to_endpointProof";
 
@@ -63,6 +63,128 @@ val trans_let_gen = Q.store_thm("trans_let_gen",
              LTau
              (NEndpoint p s' e)`,
   rw [endpointSemanticsTheory.trans_let]
+);
+
+val cut_sel_upto_def = Define`
+  cut_sel_upto p (Sel p1 b p2 c) =
+    (if p = p1 then
+       cut_sel_upto p c
+     else
+       Sel p1 b p2 c)
+∧ cut_sel_upto p c = c
+`;
+
+val compile_network_eq_all_project = Q.store_thm("compile_network_eq_all_project",
+  `∀c c' s l. compile_network_ok s c l
+    ∧ (∀p. MEM p l ⇒ project' p c = project' p c')
+    ⇒ compile_network s c l = compile_network s c' l`,
+  Induct_on `l`
+  \\ rw [compile_network_gen_def,project_def]
+);
+
+val compile_network_ok_project_ok = Q.store_thm("compile_network_ok_project_ok",
+  `∀s c l p.
+    compile_network_ok s c l
+    ∧ MEM p l
+    ⇒ project_ok p c`,
+  Induct_on `l`
+  \\ rw [compile_network_gen_def,project_def]
+  \\ metis_tac []
+);
+
+val project_if_l_eq = Q.store_thm("project_if_l_eq",
+  `∀s v p q h c1 c2 l.
+    project_ok q (IfThen v p c1 c2)
+    ∧ p ≠ q
+    ∧ (∀b t c'. c1 ≠ Sel p b t c')
+    ⇒ project' q (IfThen v p c1 c2) = project' q c1`,
+  Cases_on `c1`
+  \\ rw [project_def,cut_sel_upto_def,split_sel_def]
+  \\ fs [project_def,cut_sel_upto_def,split_sel_def]
+  \\ TRY (qpat_x_assum `(_,_) = project _ _` (ASSUME_TAC o GSYM))
+  \\ rfs []
+  \\ fs []
+  \\ TRY (qpat_x_assum `(_,_) = project _ _` (ASSUME_TAC o GSYM))
+  \\ every_case_tac
+  \\ rw []
+);
+
+val project_if_r_eq = Q.store_thm("project_if_r_eq",
+  `∀s v p q h c1 c2 l.
+    project_ok q (IfThen v p c1 c2)
+    ∧ p ≠ q
+    ∧ (∀b t c'. c2 ≠ Sel p b t c')
+    ⇒ project' q (IfThen v p c1 c2) = project' q c2`,
+  Cases_on `c2`
+  \\ rw [project_def,cut_sel_upto_def,split_sel_def]
+  \\ fs [project_def,cut_sel_upto_def,split_sel_def]
+  \\ TRY (qpat_x_assum `(_,_) = project _ _` (ASSUME_TAC o GSYM))
+  \\ rfs []
+  \\ fs []
+  \\ TRY (qpat_x_assum `(_,_) = project _ _` (ASSUME_TAC o GSYM))
+  \\ every_case_tac
+  \\ rw []
+);
+
+val compile_network_if_l_eq = Q.store_thm("compile_network_if_l_eq",
+  `∀s v p c1 c2 l.
+    compile_network_ok s (IfThen v p c1 c2) l
+    ∧ ¬MEM p l
+    ∧ (∀b q c'. c1 ≠ Sel p b q c')
+    ⇒ compile_network s (IfThen v p c1 c2) l = compile_network s c1 l`,
+  rw []
+  \\ ho_match_mp_tac compile_network_eq_all_project
+  \\ rw []
+  \\ imp_res_tac compile_network_ok_project_ok
+  \\ ho_match_mp_tac project_if_l_eq
+  \\ rw []
+  \\ Cases_on `p = p'`
+  \\ fs []
+);
+
+val compile_network_if_r_eq = Q.store_thm("compile_network_if_r_eq",
+  `∀s v p c1 c2 l.
+    compile_network_ok s (IfThen v p c1 c2) l
+    ∧ ¬MEM p l
+    ∧ (∀b p2 c'. c2 ≠ Sel p b p2 c')
+    ⇒ compile_network s (IfThen v p c1 c2) l = compile_network s c2 l`,
+  rw []
+  \\ ho_match_mp_tac compile_network_eq_all_project
+  \\ rw []
+  \\ imp_res_tac compile_network_ok_project_ok
+  \\ ho_match_mp_tac project_if_r_eq
+  \\ rw []
+  \\ Cases_on `p = p'`
+  \\ fs []
+);
+
+val FST_endpoints_compile_network = Q.store_thm("FST_endpoints_compile_network",
+  `∀s c l. MAP FST (endpoints (compile_network s c l)) = l`,
+  Induct_on `l`
+  \\ rw [endpoints_def,compile_network_gen_def]
+);
+
+val preSel_def = Define`
+  preSel p (Sel p1 b p2 c) =
+    (if p1 = p
+     then (b,p2)::preSel p c
+     else [])
+∧ preSel _ _ = []
+`;
+
+val projPre_def = Define`
+  projPre p ((b,q)::l) ep = IntChoice b q (projPre p l ep)
+∧ projPre p [] ep = ep
+`
+
+val prefix_project_eq = Q.store_thm("prefix_project_eq",
+  `∀p c. project_ok p c
+    ⇒ project' p c = projPre p (preSel p c) (project' p (cut_sel_upto p c))`,
+  Induct_on `c`
+  \\ rw []
+  \\ TRY (Cases_on `p = l0`)
+  \\ rw [project_def,preSel_def,cut_sel_upto_def,projPre_def]
+  \\ fs [project_def]
 );
 
 val compile_network_preservation = Q.store_thm("compile_network_preservation",
