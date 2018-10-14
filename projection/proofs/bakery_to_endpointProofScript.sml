@@ -188,12 +188,19 @@ val prefix_project_eq = Q.store_thm("prefix_project_eq",
 );
 
 val compile_network_preservation = Q.store_thm("compile_network_preservation",
-  `∀s c α τ s' c'. trans (s,c) (α,τ) (s',c')
+  `∀s c α τ s' c'. compile_network_ok s c (procsOf c)
+    ∧ trans (s,c) (α,τ) (s',c')
     ⇒ ∃s'' c''. trans_s (s',c') (s'',c'')
        ∧ reduction^* (compile_network s   c   (procsOf c))
                      (compile_network s'' c'' (procsOf c))`,
-  ho_match_mp_tac trans_pairind
-  \\ rw [  compile_network_gen_def
+  `∀s c α τ s' c'. trans (s,c) (α,τ) (s',c')
+    ⇒ (compile_network_ok s c (procsOf c)
+    ⇒ ∃s'' c''. trans_s (s',c') (s'',c'')
+       ∧ reduction^* (compile_network s   c   (procsOf c))
+                     (compile_network s'' c'' (procsOf c)))`
+  suffices_by metis_tac []
+  \\ ho_match_mp_tac trans_pairind
+  \\ rw [ compile_network_gen_def
         , procsOf_def
         , procsOf_all_distinct
         , nub'_def
@@ -338,6 +345,7 @@ val compile_network_preservation = Q.store_thm("compile_network_preservation",
      \\ ho_match_mp_tac trans_par_l
      \\ ho_match_mp_tac trans_let_gen
      \\ UNABBREV_ALL_TAC
+     \\ pop_assum (K ALL_TAC)
      \\ rw []
      >- (Induct_on `vl` \\ rw [lookup_projectS'])
      >- (rw [projectS_fupdate] >> rpt AP_TERM_TAC
