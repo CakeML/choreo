@@ -382,6 +382,64 @@ val MEM_presel_MEM_procsOf = Q.store_thm("MEM_presel_MEM_procsOf",
   >> fs[project_def,preSel_def]
   >> rpt(PURE_FULL_CASE_TAC >> fs[]) >> metis_tac[]);
 
+val network_consume_LExtChoice = Q.store_thm("network_consume_LExtChoice",
+  `∀psl qf s c l p.
+       ¬MEM p l ∧ ¬MEM p (MAP SND psl) ∧ ALL_DISTINCT l ∧
+       (∀x. MEM x (MAP SND psl) ⇒ MEM x l) ⇒
+       list_trans
+         (FOLDR NPar NNil
+            (MAP
+               (λproc.
+                    NEndpoint proc
+                      <|bindings := projectS proc s; queue := qf proc|>
+                      (project' proc c)) l))
+         (MAP (λ(b,q). LExtChoice p b q) psl)
+         (FOLDR NPar NNil
+            (MAP
+               (λproc.
+                    NEndpoint proc
+                      <|bindings := projectS proc s;
+                      queue := qf proc ⧺ preSel_to_queue proc p psl|>
+                      (project' proc c)) l))`,
+  Induct
+  >- (rw[list_trans_def,preSel_to_queue_def])
+  \\ rw[list_trans_def]
+  \\ rw[preSel_to_queue_def]
+  \\ `MEM (SND h) l` by simp[]
+  \\ Cases_on `h` >> simp[]
+  \\ rename1 `LExtChoice p1 b p2`
+  \\ qexists_tac
+       `FOLDR NPar NNil
+              (MAP
+                (λproc.
+                  NEndpoint proc
+                    <|bindings := projectS proc s; queue :=
+                      qf proc ++ if proc = p2 then [(p1, if b then [1w] else [0w])] else [] |>
+                    (project' proc c)) l)`
+  \\ conj_tac
+  >- (pop_assum(strip_assume_tac o REWRITE_RULE [MEM_SPLIT])
+      \\ simp[] \\ match_mp_tac trans_fold_par'
+      \\ conj_tac
+      >- (match_mp_tac trans_enqueue_choice_gen >> fs[])
+      \\ fs[]
+      \\ rw[MAP_EQ_f]
+      \\ rw[] \\ fs[ALL_DISTINCT_APPEND] \\ metis_tac[])
+  \\ fs[]
+  \\ first_x_assum(qspec_then `\proc. qf proc ⧺
+                   if proc = p2 then [(p1,if b then [1w] else [0w])] else []` mp_tac)
+  \\ disch_then(mp_tac o CONV_RULE(RESORT_FORALL_CONV List.rev))
+  \\ disch_then(qspecl_then [`p1`,`l`] mp_tac)
+  \\ rpt(disch_then drule)
+  \\ Ho_Rewrite.PURE_REWRITE_TAC [GSYM PULL_FORALL]
+  \\ impl_tac >- rw[]
+  \\ disch_then(qspecl_then [`c`,`s`] mp_tac)
+  \\ qmatch_goalsub_abbrev_tac `list_trans (FOLDR _ _ a1) _ (FOLDR _ _ a2)
+                                 ==> list_trans (FOLDR _ _ a3) _ (FOLDR _ _ a4)`
+  \\ `a1 = a3 /\ a2 = a4` suffices_by simp[]
+  \\ unabbrev_all_tac
+  \\ rw[MAP_EQ_f] \\ rw[preSel_to_queue_def]
+);
+
 val compile_network_preservation = Q.store_thm("compile_network_preservation",
   `∀s c α τ s' c'. compile_network_ok s c (procsOf c)
     ∧ trans (s,c) (α,τ) (s',c')
@@ -624,45 +682,7 @@ val compile_network_preservation = Q.store_thm("compile_network_preservation",
          \\ qhdtm_x_assum `ALL_DISTINCT` mp_tac
          \\ rpt(qpat_x_assum `¬_` mp_tac) \\ rpt(pop_assum kall_tac)
          \\ rename1 `MAP SND psl`
-         \\ MAP_EVERY (W(curry Q.SPEC_TAC))
-                      [`p`,`l`,`v`,`p`,`c'`,`c2`,`s`,`qf`,`psl`]
-         \\ Induct
-         >- (rw[list_trans_def,preSel_to_queue_def])
-         \\ rw[list_trans_def]
-         \\ rw[preSel_to_queue_def]
-         \\ `MEM (SND h) l` by simp[]
-         \\ Cases_on `h` >> simp[]
-         \\ rename1 `LExtChoice p1 b p2`
-         \\ qexists_tac
-              `FOLDR NPar NNil
-                     (MAP
-                       (λproc.
-                         NEndpoint proc
-                           <|bindings := projectS proc s; queue :=
-                             qf proc ++ if proc = p2 then [(p1, if b then [1w] else [0w])] else [] |>
-                           (project' proc (IfThen v p1 c' c2))) l)`
-         \\ conj_tac
-         >- (pop_assum(strip_assume_tac o REWRITE_RULE [MEM_SPLIT])
-             \\ simp[] \\ match_mp_tac trans_fold_par'
-             \\ conj_tac
-             >- (match_mp_tac trans_enqueue_choice_gen >> fs[])
-             \\ fs[]
-             \\ rw[MAP_EQ_f]
-             \\ rw[] \\ fs[ALL_DISTINCT_APPEND] \\ metis_tac[])
-         \\ fs[]
-         \\ first_x_assum(qspec_then `\proc. qf proc ⧺
-                          if proc = p2 then [(p1,if b then [1w] else [0w])] else []` mp_tac)
-         \\ disch_then(mp_tac o CONV_RULE(RESORT_FORALL_CONV List.rev))
-         \\ disch_then(qspecl_then [`p1`,`l`] mp_tac)
-         \\ rpt(disch_then drule)
-         \\ Ho_Rewrite.PURE_REWRITE_TAC [GSYM PULL_FORALL]
-         \\ impl_tac >- rw[]
-         \\ disch_then(qspecl_then [`v`,`c'`,`c2`,`s`] mp_tac)
-         \\ qmatch_goalsub_abbrev_tac `list_trans (FOLDR _ _ a1) _ (FOLDR _ _ a2)
-                                        ==> list_trans (FOLDR _ _ a3) _ (FOLDR _ _ a4)`
-         \\ `a1 = a3 /\ a2 = a4` suffices_by simp[]
-         \\ unabbrev_all_tac
-         \\ rw[MAP_EQ_f] \\ rw[preSel_to_queue_def])
+         \\ rw [network_consume_LExtChoice])
      \\ `?pn. pn = LENGTH(preSel p c')` by simp[]
      \\ `!proc. MEM proc l ==> project_ok proc (if K T proc then IfThen v p c' c2 else c')`
         by(rw[] >> imp_res_tac compile_network_ok_project_ok)
