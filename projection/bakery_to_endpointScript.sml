@@ -4,12 +4,10 @@ val _ = new_theory "bakery_to_endpoint";
 
 val split_sel_def = Define `
   (split_sel proc p (Sel p1 b p2 c) =
-   if proc = p2  then
-     if p1 = p then
+   if p1 = p then
+     if proc = p2 then
        SOME(b,c)
-     else NONE
-   else if proc ≠ p1 then
-     split_sel proc p c
+     else split_sel proc p c
    else NONE)
 ∧ (split_sel proc _ _ = NONE)`
 
