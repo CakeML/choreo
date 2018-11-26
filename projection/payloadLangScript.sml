@@ -1,5 +1,6 @@
 open preamble astBakeryTheory (* todo: shouldn't have to depend on astBakery *)
      endpointLangTheory (*for state*)
+     astTheory (* for CakeML syntax-related types in the conf *)
 val _ = new_theory "payloadLang";
 
 val _ = Datatype`
@@ -9,7 +10,14 @@ endpoint = Nil
          | IfThen varN endpoint endpoint
          | Let varN (datum list -> datum) (varN list) endpoint`
 
-val _ = Datatype `config = <| payload_size : num  |>`;
+val _ = Datatype `config = <| payload_size : num;
+                              length : (modN,varN) id;
+                              null : (modN,varN) id;
+                              take : (modN,varN) id;
+                              drop : (modN,varN) id;
+                              toList : (modN,varN) id;
+                              fromList : (modN,varN) id;
+                              |>`;
 
 val _ = Datatype`
 network = NNil
