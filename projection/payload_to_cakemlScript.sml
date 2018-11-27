@@ -25,7 +25,7 @@ val padv_def = Define
      (Let NONE (App Aw8update [Var(Short "y");Lit(IntLit 0);Lit(Word8 7w)])      
        (Let
          (SOME "z")
-         (App Opapp [Var conf.fromList;App Opapp [Var conf.take; Var(Short"x"); payload_size conf]])
+         (App Opapp [Var conf.fromList;App Opapp [App Opapp [Var conf.take; Var(Short"x")]; payload_size conf]])
          (Let NONE
            (App CopyAw8Aw8 [Var(Short "z"); Lit(IntLit 0); payload_size conf;
                             Var(Short "y"); Lit(IntLit 1)])
@@ -51,9 +51,10 @@ val padv_def = Define
                     Lit(IntLit 0);
                     App Aw8length [Var(Short "z")];
                     Var(Short "y");
-                    App (Opn Minus)
-                        [payload_size conf;
-                         App (Opn Plus) [App Aw8length [Var(Short "z")];Lit(IntLit 1)]
+                    App (Opn Plus)
+                        [Lit(IntLit 1);
+                         App (Opn Minus)
+                             [payload_size conf;App Aw8length [Var(Short "z")]]
                         ]
                    ]
               )
@@ -65,7 +66,7 @@ val padv_def = Define
       (Let NONE (App Aw8update [Var(Short "y");Lit(IntLit 0);Lit(Word8 2w)])
        (Let
          (SOME "z")
-         (App Opapp [Var conf.fromList;App Opapp [Var conf.take; Var(Short"x"); payload_size conf]])
+         (App Opapp [Var conf.fromList;App Opapp [App Opapp [Var conf.take; Var(Short"x")]; payload_size conf]])
          (Let NONE
            (App CopyAw8Aw8 [Var(Short "z"); Lit(IntLit 0); payload_size conf;
                             Var(Short "y"); Lit(IntLit 1)])
