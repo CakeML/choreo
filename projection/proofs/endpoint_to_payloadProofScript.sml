@@ -1,4 +1,5 @@
 open preamble endpointLangTheory payloadLangTheory endpoint_to_payloadTheory
+              endpointPropsTheory              
               payloadSemanticsTheory endpointSemanticsTheory payloadPropsTheory;
 
 val _ = new_theory "endpoint_to_payloadProof";
@@ -35,34 +36,55 @@ val list_trans_par_r = Q.store_thm("list_trans_par_r",
   >> fs[list_trans_def] >> metis_tac[payloadSemanticsTheory.trans_par_r])
 
 val compile_message_preservation_send = Q.store_thm("compile_message_preservation_send",
-  `∀conf d p1 p2 e s.
-    conf.payload_size > 0
+`∀conf n d v p1 p2 e s.
+    FLOOKUP s.bindings v = SOME d
+    ∧ conf.payload_size > 0
     ∧ p1 ≠ p2
     ==> list_trans conf
         (NEndpoint p1 s
-         (Send p2 (INR d) e))
+         (Send p2 v n e))
+        (MAP (λm. LSend p1 m p2) (compile_message conf (DROP n d)))
+        (NEndpoint p1 s e)
+  `,
+  ntac 3 GEN_TAC
+  >> qpat_abbrev_tac `a1 = DROP n d`
+  >> pop_assum(mp_tac o REWRITE_RULE [markerTheory.Abbrev_def])
+  >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`d`,`n`,`a1`,`conf`]
+  >> recInduct compile_message_ind
+  >> rpt strip_tac
+  >> PURE_ONCE_REWRITE_TAC [compile_message_def]
+  >> rveq >> fs[]
+  >> IF_CASES_TAC
+  >- (simp[list_trans_def] >> match_mp_tac trans_send_last_payload >> fs[final_pad_LENGTH])
+  >- (fs[list_trans_def,NOT_LESS_EQUAL,intermediate_pad_LENGTH,pad_not_final]
+      >> drule(trans_send_intermediate_payload|>REWRITE_RULE[GREATER_DEF])
+      >> disch_then(qspecl_then [`conf`,`n`] mp_tac)
+      >> simp[]
+      >> disch_then drule
+      >> disch_then(qspecl_then [`e`] assume_tac)
+      >> asm_exists_tac
+      >> fs[DROP_DROP]));
+
+val compile_message_preservation_send0 = Q.store_thm("compile_message_preservation_send0",
+`∀conf d v p1 p2 e s.
+    FLOOKUP s.bindings v = SOME d
+    ∧ conf.payload_size > 0
+    ∧ p1 ≠ p2
+    ==> list_trans conf
+        (NEndpoint p1 s
+         (Send p2 v 0 e))
         (MAP (λm. LSend p1 m p2) (compile_message conf d))
         (NEndpoint p1 s e)
   `,
-  recInduct compile_message_ind
-  >> rpt strip_tac
-  >> PURE_ONCE_REWRITE_TAC [compile_message_def]
-  >> simp[]
-  >> IF_CASES_TAC
-  >- (simp[list_trans_def] >> match_mp_tac trans_send_last_payload >> simp[])
-  >- (fs[list_trans_def,NOT_LESS_EQUAL]
-      >> drule(trans_send_intermediate_payload|>REWRITE_RULE[GREATER_DEF])
-      >> disch_then drule
-      >> disch_then(qspecl_then [`s`,`e`] assume_tac)
-      >> asm_exists_tac
-      >> simp[]))
+  rpt strip_tac >> imp_res_tac compile_message_preservation_send
+  >> first_x_assum(qspec_then `0` mp_tac) >> fs[]);
 
 val compile_network_preservation_send = Q.store_thm("compile_network_preservation_send",
   `∀p1 p2 q1 d q2 conf.
     conf.payload_size > 0
     ∧ trans p1 (LSend q1 d q2) p2
     ==> list_trans conf (compile_network conf p1)
-                        (LTau::MAP (λm. LSend q1 m q2) (compile_message conf d))
+                        (MAP (λm. LSend q1 m q2) (compile_message conf d))
                         (compile_network conf p2)
   `,
   rpt strip_tac
@@ -77,11 +99,7 @@ val compile_network_preservation_send = Q.store_thm("compile_network_preservatio
   >> fs[] >> rveq
   >- ((* trans_send *)
       simp[compile_network_def,compile_endpoint_def,list_trans_def]
-      >> qexists_tac `NEndpoint p1 (s with queue := compile_queue conf s.queue)
-                      (Send p2 (INR d) (compile_endpoint e))`
-      >> conj_tac
-      >- (match_mp_tac trans_send_var >> simp[])
-      >- (match_mp_tac compile_message_preservation_send >> simp[]))
+      >> match_mp_tac compile_message_preservation_send0 >> simp[])
   >- ((* trans_par_l *)
       first_x_assum drule >> simp[compile_network_def] >> MATCH_ACCEPT_TAC list_trans_par_l)
   >- ((* trans_par_r *)
@@ -105,12 +123,12 @@ val compile_message_preservation_enqueue = Q.store_thm("compile_message_preserva
   >- (simp[list_trans_def] >> drule payloadSemanticsTheory.trans_enqueue >> simp[SNOC_APPEND]
       >> disch_then(qspecl_then [`conf`,`s with queue := q`] mp_tac)
       >> simp[])
-  >- (fs[list_trans_def,NOT_LESS_EQUAL]
+  >- (fs[list_trans_def,NOT_LESS_EQUAL,pad_not_final]
       >> drule payloadPropsTheory.trans_enqueue'
-      >> disch_then (qspecl_then [`conf`,`s`,`2w::TAKE conf.payload_size d`,`e`,`q`] assume_tac)
+      >> disch_then (qspecl_then [`conf`,`s`,`pad conf d`,`e`,`q`] assume_tac)
       >> asm_exists_tac >> simp[]
       >> first_x_assum drule
-      >> disch_then (qspec_then `q ++ [(p1,2w::TAKE conf.payload_size d)]` assume_tac)
+      >> disch_then (qspec_then `q ++ [(p1,pad conf d)]` assume_tac)
       >> full_simp_tac std_ss [GSYM APPEND_ASSOC,APPEND,SNOC_APPEND]));
 
 val compile_network_preservation_receive = Q.store_thm("compile_network_preservation_receive",
@@ -179,72 +197,6 @@ val compile_network_preservation_com_r = Q.store_thm("compile_network_preservati
   >> asm_exists_tac
   >> simp[] >> metis_tac[])
 
-val compile_network_preservation_int_choice = Q.store_thm("compile_network_preservation_int_choice",
-  `∀p1 p2 q1 b q2 conf.
-    trans p1 (LIntChoice q1 b q2) p2
-    ==> trans conf (compile_network conf p1) (LIntChoice q1 b q2) (compile_network conf p2)
-  `,
-  rpt strip_tac
-  >> qmatch_asmsub_abbrev_tac `trans _ alpha _`
-  >> pop_assum (mp_tac o PURE_ONCE_REWRITE_RULE [markerTheory.Abbrev_def])
-  >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`q1`,`b`,`q2`,`conf`]
-  >> pop_assum mp_tac
-  >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`p2`,`alpha`,`p1`]
-  >> ho_match_mp_tac trans_ind
-  >> rpt strip_tac
-  >> fs[] >> rveq
-  >- ((* trans_int_choice *)
-      simp[compile_network_def,compile_endpoint_def]
-      >> match_mp_tac payloadSemanticsTheory.trans_int_choice
-      >> rw[])
-  >- ((* trans_par_l *)
-      simp[compile_network_def]
-      >> metis_tac[payloadSemanticsTheory.trans_par_l])
-  >- ((* trans_par_r *)
-      simp[compile_network_def]
-      >> metis_tac[payloadSemanticsTheory.trans_par_r]));
-
-val compile_network_preservation_ext_choice = Q.store_thm("compile_network_preservation_ext_choice",
-  `∀p1 p2 q1 b q2 conf.
-    conf.payload_size > 0 /\ trans p1 (LExtChoice q1 b q2) p2
-    ==> trans conf (compile_network conf p1) (LExtChoice q1 b q2) (compile_network conf p2)
-  `,
-  rpt strip_tac
-  >> qpat_x_assum `_.payload_size > _` mp_tac
-  >> qmatch_asmsub_abbrev_tac `trans _ alpha _`
-  >> pop_assum (mp_tac o PURE_ONCE_REWRITE_RULE [markerTheory.Abbrev_def])
-  >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`q1`,`b`,`q2`,`conf`]
-  >> pop_assum mp_tac
-  >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`p2`,`alpha`,`p1`]
-  >> ho_match_mp_tac trans_ind
-  >> rpt strip_tac
-  >> fs[] >> rveq
-  >- ((* trans_enqueue_choice_l *)
-     simp[compile_network_def,compile_endpoint_def,SNOC_APPEND,compile_queue_append,
-          compile_queue_def]
-     >> PURE_ONCE_REWRITE_TAC [compile_message_def]
-     >> fs[] >> fs[GSYM SNOC_APPEND]
-     >> match_mp_tac trans_enqueue_choice_l' >> rw[])
-  >- ((* trans_enqueue_choice_r *)
-     simp[compile_network_def,compile_endpoint_def,SNOC_APPEND,compile_queue_append,
-          compile_queue_def]
-     >> PURE_ONCE_REWRITE_TAC [compile_message_def]
-     >> fs[] >> fs[GSYM SNOC_APPEND]
-     >> match_mp_tac trans_enqueue_choice_r' >> rw[])
-  >- ((* trans_par_l *)
-      simp[compile_network_def]
-      >> metis_tac[payloadSemanticsTheory.trans_par_l])
-  >- ((* trans_par_r *)
-      simp[compile_network_def]
-      >> metis_tac[payloadSemanticsTheory.trans_par_r]));
-
-val MAP_TL_compile_message = Q.store_thm("MAP_TL_compile_message",
-  `!conf d. conf.payload_size > 0 ==> FLAT(MAP TL (compile_message conf d)) = d`,
-  recInduct compile_message_ind
-  >> rpt strip_tac
-  >> PURE_ONCE_REWRITE_TAC [compile_message_def]
-  >> rw[])
-  
 val compile_message_preservation_dequeue = Q.store_thm("compile_message_preservation_dequeue",
   `!conf d ds p1 p2 q1 q2 e s v.
    p1 ≠ p2 /\ conf.payload_size > 0 /\ EVERY (λ(p,_). p ≠ p1) q1
@@ -265,9 +217,9 @@ val compile_message_preservation_dequeue = Q.store_thm("compile_message_preserva
   >- (match_mp_tac RTC_SINGLE
       >> simp[payloadSemanticsTheory.reduction_def]
       >> drule trans_dequeue_last_payload'
-      >> disch_then drule >> simp[SNOC_APPEND])
+      >> rpt(disch_then drule) >> simp[SNOC_APPEND,unpad_pad,final_pad_TAKE])
   >- (match_mp_tac (RTC_RULES |> SPEC_ALL |> CONJUNCT2)
-      >> fs[] >> first_x_assum drule >> disch_then drule
+      >> fs[pad_not_final] >> first_x_assum drule >> disch_then drule
       >> disch_then(qspecl_then [`ds ++ [TAKE conf.payload_size d]`,
                     `q2`,`e`,`s`,`v`] assume_tac)
       >> PURE_ONCE_REWRITE_TAC [CONJ_SYM]
@@ -275,16 +227,19 @@ val compile_message_preservation_dequeue = Q.store_thm("compile_message_preserva
       >> asm_exists_tac >> simp[]
       >> simp[payloadSemanticsTheory.reduction_def]
       >> drule trans_dequeue_intermediate_payload'
-      >> disch_then drule >> FULL_SIMP_TAC std_ss [GSYM APPEND_ASSOC,APPEND,SNOC_APPEND]));
+      >> rpt(disch_then drule) >> FULL_SIMP_TAC std_ss [GSYM APPEND_ASSOC,APPEND,SNOC_APPEND,
+                                                        unpad_pad]));
 
 val compile_network_preservation_trans = Q.store_thm("compile_network_preservation_trans",
   `∀p1 p2 conf.
     conf.payload_size > 0
+    ∧ choice_free_network p1
     ∧ reduction p1 p2
     ==> (reduction conf)^* (compile_network conf p1) (compile_network conf p2)
   `,
   rpt strip_tac
   >> qpat_x_assum `conf.payload_size > 0` mp_tac
+  >> qpat_x_assum `choice_free_network _` mp_tac      
   >> fs[endpointSemanticsTheory.reduction_def,payloadSemanticsTheory.reduction_def]
   >> qmatch_asmsub_abbrev_tac `trans _ alpha _`
   >> pop_assum (mp_tac o PURE_ONCE_REWRITE_RULE [markerTheory.Abbrev_def])
@@ -295,38 +250,18 @@ val compile_network_preservation_trans = Q.store_thm("compile_network_preservati
   >> rpt strip_tac >> fs[] >> rveq
   >- ((* trans_com_l *)
       MAP_EVERY imp_res_tac [compile_network_preservation_send,
-                             compile_network_preservation_receive]
-      >> fs[list_trans_def]
-      >> match_mp_tac (RTC_RULES |> SPEC_ALL |> CONJUNCT2)
-      >> PURE_ONCE_REWRITE_TAC [CONJ_SYM]
-      >> imp_res_tac compile_network_preservation_com_l
-      >> simp[compile_network_def] >> asm_exists_tac
-      >> simp[payloadSemanticsTheory.reduction_def]
-      >> match_mp_tac payloadSemanticsTheory.trans_par_l
-      >> simp[])
+                             compile_network_preservation_receive,
+                             compile_network_preservation_com_l]
+      >> simp[compile_network_def])
   >- ((* trans_com_r *)
       MAP_EVERY imp_res_tac [compile_network_preservation_send,
-                             compile_network_preservation_receive]
-      >> fs[list_trans_def]
-      >> match_mp_tac (RTC_RULES |> SPEC_ALL |> CONJUNCT2)
-      >> PURE_ONCE_REWRITE_TAC [CONJ_SYM]
-      >> imp_res_tac compile_network_preservation_com_r
-      >> simp[compile_network_def] >> asm_exists_tac
-      >> simp[payloadSemanticsTheory.reduction_def]
-      >> match_mp_tac payloadSemanticsTheory.trans_par_r
-      >> simp[])
-  >- ((* trans_com_choice_l *)
-      MAP_EVERY imp_res_tac [compile_network_preservation_ext_choice,
-                             compile_network_preservation_int_choice]
-      >> match_mp_tac RTC_SINGLE >> simp[payloadSemanticsTheory.reduction_def]
-      >> simp[compile_network_def]
-      >> metis_tac[payloadSemanticsTheory.trans_com_choice_l])
-  >- ((* trans_com_choice_r *)
-      MAP_EVERY imp_res_tac [compile_network_preservation_ext_choice,
-                             compile_network_preservation_int_choice]
-      >> match_mp_tac RTC_SINGLE >> simp[payloadSemanticsTheory.reduction_def]
-      >> simp[compile_network_def]
-      >> metis_tac[payloadSemanticsTheory.trans_com_choice_r])
+                             compile_network_preservation_receive,
+                             compile_network_preservation_com_r]
+      >> simp[compile_network_def])
+  >- ((*trans_com_choice_l*)
+      fs[choice_free_network_def] >> metis_tac[choice_free_network_no_choice])
+  >- ((*trans_com_choice_r*)
+      fs[choice_free_network_def] >> metis_tac[choice_free_network_no_choice])
   >- ((* trans_dequeue *)
        simp[compile_network_def,compile_endpoint_def,compile_queue_def,compile_queue_append]
        >> drule compile_message_preservation_dequeue
@@ -335,25 +270,9 @@ val compile_network_preservation_trans = Q.store_thm("compile_network_preservati
        >> disch_then(qspecl_then [`d`,`[]`] mp_tac)
        >> simp[])
   >- ((* trans_ext_choice_l *)
-      fs[compile_network_def,compile_queue_def,compile_endpoint_def,compile_queue_append]
-      >> PURE_ONCE_REWRITE_TAC[compile_message_def]
-      >> fs[]
-      >> drule compile_queue_lift_ineq
-      >> disch_then (qspec_then `conf` assume_tac)
-      >> match_mp_tac RTC_SUBSET
-      >> simp[payloadSemanticsTheory.reduction_def]
-      >> match_mp_tac trans_ext_choice_l'
-      >> simp[])
+      fs[choice_free_network_def,choice_free_endpoint_def])
   >- ((* trans_ext_choice_r *)
-      fs[compile_network_def,compile_queue_def,compile_endpoint_def,compile_queue_append]
-      >> PURE_ONCE_REWRITE_TAC[compile_message_def]
-      >> fs[]
-      >> drule compile_queue_lift_ineq
-      >> disch_then (qspec_then `conf` assume_tac)
-      >> match_mp_tac RTC_SUBSET
-      >> simp[payloadSemanticsTheory.reduction_def]
-      >> match_mp_tac trans_ext_choice_r'
-      >> simp[])
+      fs[choice_free_network_def,choice_free_endpoint_def])
   >- ((* trans_if_true *)
       fs[compile_network_def,compile_queue_def,compile_endpoint_def]
       >> match_mp_tac RTC_SUBSET
@@ -373,20 +292,97 @@ val compile_network_preservation_trans = Q.store_thm("compile_network_preservati
           by(fs[EVERY_MAP])
       >> drule payloadSemanticsTheory.trans_let >> fs[payloadSemanticsTheory.reduction_def])
   >- ((* trans_par_l *)
-      fs[compile_network_def] >> first_x_assum drule
+      fs[compile_network_def,choice_free_network_def] >> first_x_assum drule
       >> MATCH_ACCEPT_TAC payloadPropsTheory.reduction_par_l)
   >- ((* trans_par_r *)
-      fs[compile_network_def] >> first_x_assum drule
+      fs[compile_network_def,choice_free_network_def] >> first_x_assum drule
+      >> MATCH_ACCEPT_TAC payloadPropsTheory.reduction_par_r));
+
+val compile_network_preservation_trans = Q.store_thm("compile_network_preservation_trans",
+  `∀p1 p2 conf.
+    conf.payload_size > 0
+    ∧ choice_free_network p1
+    ∧ reduction p1 p2
+    ==> (reduction conf)^* (compile_network conf p1) (compile_network conf p2)
+  `,
+  rpt strip_tac
+  >> qpat_x_assum `conf.payload_size > 0` mp_tac
+  >> qpat_x_assum `choice_free_network _` mp_tac      
+  >> fs[endpointSemanticsTheory.reduction_def,payloadSemanticsTheory.reduction_def]
+  >> qmatch_asmsub_abbrev_tac `trans _ alpha _`
+  >> pop_assum (mp_tac o PURE_ONCE_REWRITE_RULE [markerTheory.Abbrev_def])
+  >> (W(curry Q.SPEC_TAC)) `conf`
+  >> pop_assum mp_tac
+  >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`p2`,`alpha`,`p1`]
+  >> ho_match_mp_tac endpointSemanticsTheory.trans_strongind
+  >> rpt strip_tac >> fs[] >> rveq
+  >- ((* trans_com_l *)
+      MAP_EVERY imp_res_tac [compile_network_preservation_send,
+                             compile_network_preservation_receive,
+                             compile_network_preservation_com_l]
+      >> simp[compile_network_def])
+  >- ((* trans_com_r *)
+      MAP_EVERY imp_res_tac [compile_network_preservation_send,
+                             compile_network_preservation_receive,
+                             compile_network_preservation_com_r]
+      >> simp[compile_network_def])
+  >- ((*trans_com_choice_l*)
+      fs[choice_free_network_def] >> metis_tac[choice_free_network_no_choice])
+  >- ((*trans_com_choice_r*)
+      fs[choice_free_network_def] >> metis_tac[choice_free_network_no_choice])
+  >- ((* trans_dequeue *)
+       simp[compile_network_def,compile_endpoint_def,compile_queue_def,compile_queue_append]
+       >> drule compile_message_preservation_dequeue
+       >> drule compile_queue_lift_ineq >> disch_then(qspec_then `conf` assume_tac)
+       >> disch_then drule >> disch_then drule
+       >> disch_then(qspecl_then [`d`,`[]`] mp_tac)
+       >> simp[])
+  >- ((* trans_ext_choice_l *)
+      fs[choice_free_network_def,choice_free_endpoint_def])
+  >- ((* trans_ext_choice_r *)
+      fs[choice_free_network_def,choice_free_endpoint_def])
+  >- ((* trans_if_true *)
+      fs[compile_network_def,compile_queue_def,compile_endpoint_def]
+      >> match_mp_tac RTC_SUBSET
+      >> simp[payloadSemanticsTheory.reduction_def]
+      >> match_mp_tac payloadSemanticsTheory.trans_if_true
+      >> simp[])
+  >- ((* trans_if_false *)
+      fs[compile_network_def,compile_queue_def,compile_endpoint_def]
+      >> match_mp_tac RTC_SUBSET
+      >> simp[payloadSemanticsTheory.reduction_def]
+      >> match_mp_tac payloadSemanticsTheory.trans_if_false
+      >> simp[])
+  >- ((* trans_let *)
+      fs[compile_network_def,compile_queue_def,compile_endpoint_def]
+      >> match_mp_tac RTC_SUBSET
+      >> `EVERY IS_SOME (MAP (FLOOKUP ((s with queue:=compile_queue conf s.queue) .bindings)) vl)`
+          by(fs[EVERY_MAP])
+      >> drule payloadSemanticsTheory.trans_let >> fs[payloadSemanticsTheory.reduction_def])
+  >- ((* trans_par_l *)
+      fs[compile_network_def,choice_free_network_def] >> first_x_assum drule
+      >> MATCH_ACCEPT_TAC payloadPropsTheory.reduction_par_l)
+  >- ((* trans_par_r *)
+      fs[compile_network_def,choice_free_network_def] >> first_x_assum drule
       >> MATCH_ACCEPT_TAC payloadPropsTheory.reduction_par_r));
 
 val compile_network_preservation = Q.store_thm("compile_network_preservation",
-  `∀p1 p2 conf.
+  `∀conf p1 p2.
     conf.payload_size > 0
-    ∧ reduction^* p1 p2
+    ∧ reduction^* p1 p2 ∧ choice_free_network p1
     ==> (reduction conf)^* (compile_network conf p1) (compile_network conf p2)
   `,
-  metis_tac[compile_network_preservation_trans,RTC_lifts_reflexive_transitive_relations,
-            RTC_TRANSITIVE,RTC_REFLEXIVE]);
+  strip_tac >> simp[GSYM AND_IMP_INTRO,RIGHT_FORALL_IMP_THM]
+  >> strip_tac
+  >> ho_match_mp_tac RTC_INDUCT
+  >> rpt strip_tac
+  >- simp[]
+  >> fs[reduction_def]
+  >> imp_res_tac choice_free_trans_pres
+  >> first_x_assum drule >> strip_tac
+  >> fs[GSYM reduction_def]
+  >> drule compile_network_preservation_trans >> simp[Once CONJ_SYM]
+  >> rpt(disch_then drule) >> strip_tac >> metis_tac[RTC_RTC]);
 
 val compile_network_reflection = Q.store_thm("compile_network_reflection",
   `∀p1 p2 conf.
