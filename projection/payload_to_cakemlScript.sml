@@ -117,7 +117,7 @@ val find_one_def = Define
 
 (* True iff x is a W8array containing a message tagged as final. *)
 val finalv_def = Define
-  `final x =
+  `finalv x =
    Log Or
        (App Equality [Lit (Word8 7w); App Aw8sub [Var(Short x); Lit(IntLit 0)]])
        (App Equality [Lit (Word8 2w); App Aw8sub [Var(Short x); Lit(IntLit 0)]])`
@@ -127,7 +127,7 @@ val unpadv_def = Define
   `unpadv conf = 
    Fun "x"
    (Let (SOME "n")
-     (If (final "x")
+     (If (finalv "x")
         (Lit(IntLit 1))
         (Letrec find_one (App Opapp [Var(Short "find_one"); Lit(IntLit 1)]))
      )
@@ -161,7 +161,7 @@ val unpadv_def = Define
 val receiveloop_def = Define `receiveloop conf src =
   [("receiveloop","u",
     (Let NONE (App (FFI "receive") [Lit(StrLit src); Var(Short "buff")])
-       (If (final "buff")
+       (If (finalv "buff")
           (Con (SOME conf.cons)
                [App Opapp [unpadv conf;Var(Short "buff")];
                 Con(SOME conf.nil) []])
