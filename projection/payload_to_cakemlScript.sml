@@ -1,4 +1,5 @@
 open preamble payloadLangTheory astTheory
+     
 
 val _ = new_theory "payload_to_cakeml";
 
@@ -83,29 +84,46 @@ val unpadv_def = Define
   `unpadv conf = (ARB:exp)
 `
 
-val sendloop_def =
-  Define `sendloop conf =
-   Letrec
+val sendloop_def = Define `sendloop conf dest = 
    [("sendloop","x",
-     If (App Opapp [Var conf.null;Var(Short "x")])
-        (Con NONE [])
-        (Let (SOME "y")
-          (App Opapp [Var conf.take;Var (Short "x");payload_size conf])
-          ARB
-        )
-    )]
-  `
+     Let (SOME "y")
+       (App Opapp [padv conf;Var(Short "x")])
+       (Let NONE
+         (App (FFI "send") [Lit(StrLit dest); Var (Short "y")])
+         (If
+           (App (Opb Leq) [App Opapp [Var conf.length; Var(Short "x")];
+                           payload_size conf]
+           )
+           (Con NONE [])
+           (Let (SOME "x") (App Opapp [App Opapp [Var conf.drop; Var (Short "x")];
+                                       payload_size conf])
+                (App Opapp [Var(Short "sendloop"); Var(Short "x")])
+           )
+         )
+       )
+    )]`
 
 val compile_endpoint_def = Define `
    (compile_endpoint conf vs payloadLang$Nil = Con NONE [])
-∧  (compile_endpoint conf vs (Send p v n e) = ARB)
+∧ (compile_endpoint conf vs (Send p v n e) =
+    let vv = Var(Short v) in
+      If (App (Opb Leq) [App Opapp [Var conf.length; vv]; Lit(IntLit(&n))])
+         (compile_endpoint conf vs e)
+         (Let NONE
+           (Letrec
+              (sendloop conf (MAP (CHR o w2n) p))
+              (App Opapp [Var(Short "sendloop");vv])
+           )
+           (compile_endpoint conf vs e)
+         )
+  )
 ∧ (compile_endpoint conf vs (Receive p v l  e) = ARB)
 ∧ (compile_endpoint conf vs (IfThen v e1 e2) =
    let vn = LENGTH(letfuns e1) in
      If (Var(Short v))
         (compile_endpoint conf (TAKE vn vs) e1)
         (compile_endpoint conf (DROP vn vs) e2))
-∧ (compile_endpoint (hv::vs) conf (payloadLang$Let v f vl e) =
+∧ (compile_endpoint conf (hv::vs) (payloadLang$Let v f vl e) =
    ast$Let (SOME v)
        (App Opapp (hv::MAP (Var o Short) vl))
        (compile_endpoint conf vs e))`

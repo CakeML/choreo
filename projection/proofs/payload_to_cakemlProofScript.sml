@@ -1,6 +1,9 @@
-open preamble payloadLangTheory payload_to_cakemlTheory
+open preamble
+     endpoint_to_payloadTheory (* for compile_message only*)
+     payloadLangTheory payload_to_cakemlTheory
      evaluateTheory terminationTheory ml_translatorTheory evaluatePropsTheory
-     semanticPrimitivesTheory;
+     semanticPrimitivesTheory
+     payloadPropsTheory;
 
 val _ = new_theory "payload_to_cakemlProof";
 
@@ -59,7 +62,7 @@ val LUPDATE_REPLICATE = Q.store_thm("LUPDATE_REPLICATE",
   Induct >> Cases >> rw[LUPDATE_def] >> simp[ADD1]);
 
 val padv_correct = Q.store_thm("padv_correct",`
-  !env conf l lv le s0 s1 s2 refs.
+  !env conf l lv le s1 s2 refs.
   env_asm env conf /\
   LIST_TYPE ^WORD8 l lv /\
   evaluate$evaluate s1 env [le] = (s2 with refs := s1.refs ++ refs, Rval [lv])
@@ -364,5 +367,193 @@ val padv_correct = Q.store_thm("padv_correct",`
           semanticPrimitivesTheory.state_component_equality,LUPDATE_APPEND,
           REWRITE_RULE [ADD1] REPLICATE,LUPDATE_def,TAKE_TAKE] >>
      rw[pad_def,DROP_NIL] >> intLib.COOPER_TAC));
+
+val ffi_accepts_rel_def = Define `
+  ffi_accepts_rel stpred pred oracle =
+  !st s conf bytes.
+    stpred st.ffi_state /\ st.oracle = oracle /\ pred s conf bytes ==>
+    ?ffi. st.oracle s st.ffi_state conf bytes = Oracle_return ffi bytes /\
+          stpred ffi`
+
+val send_events_def = Define `
+  send_events conf dest d =
+  MAP (λm. IO_event "send" dest (ZIP (m,m)))(compile_message conf d)`
+
+val update_state_def = Define `
+  (update_state st oracle [] = st) /\
+  (update_state st oracle (IO_event s c b::es) =
+   update_state (@st'. oracle s st c (MAP FST b) = Oracle_return st' (MAP SND b))
+                oracle es)`
+
+val LUPDATE_SAME' = Q.prove(
+  `n < LENGTH ls /\ EL n ls = a ==> LUPDATE a n ls = ls`,
+  metis_tac[LUPDATE_SAME]);
+
+val sendloop_correct = Q.store_thm("sendloop_correct",`
+  !conf l env env' lv le s refs stpred dest.
+  env_asm env' conf /\
+  conf.payload_size <> 0 /\
+  LIST_TYPE ^WORD8 l lv /\
+  nsLookup env.v (Short "sendloop") = SOME(Recclosure env' (sendloop conf (MAP (CHR o w2n) dest)) "sendloop") /\
+  nsLookup env.v (Short "x") = SOME lv /\
+  stpred s.ffi.ffi_state /\
+  ffi_accepts_rel
+    stpred
+    (λs c bytes. s = "send" /\ c = dest /\ LENGTH bytes = SUC conf.payload_size)
+    s.ffi.oracle
+  ==>
+  ?ck1 ck2 refs' num lv'.
+  evaluate$evaluate (s with clock:= ck1) env [App Opapp [Var (Short "sendloop"); Var(Short "x")]] =
+                    (s with
+                       <|clock := ck2; refs := APPEND s.refs refs';
+                         ffi:= s.ffi with
+                         <|io_events := s.ffi.io_events ++ send_events conf dest l;
+                           ffi_state := update_state s.ffi.ffi_state s.ffi.oracle (send_events conf dest l)
+                          |>
+                        |>, Rval [Conv NONE []])
+  `,
+  ho_match_mp_tac compile_message_ind >> rpt strip_tac >>
+  ntac 4 (simp[Once evaluate_def]) >>
+  simp[do_opapp_def] >>
+  ntac 2 (simp[Once sendloop_def]) >>
+  simp[find_recfun_def] >>
+  Q.REFINE_EXISTS_TAC `extra + 1` >>
+  simp[dec_clock_def] >>
+  simp[Once evaluate_def] >>
+  qmatch_goalsub_abbrev_tac `evaluate _ env1` >>
+  `env_asm env1 conf`
+    by fs[Abbr `env1`,env_asm_def,build_rec_env_def,sendloop_def,has_v_def,in_module_def] >>
+  drule(INST_TYPE [alpha |-> beta] padv_correct) >> disch_then drule >>
+  disch_then(qspecl_then [`Var(Short "x")`,`s`,`s`,`[]`] mp_tac) >>
+  impl_tac >- simp[evaluate_def,Abbr `env1`,semanticPrimitivesTheory.state_component_equality] >>
+  strip_tac >>
+  qmatch_asmsub_abbrev_tac `clock_fupd (K ack1)` >>
+  Q.REFINE_EXISTS_TAC `extra + ack1` >>
+  dxrule evaluate_add_to_clock >>
+  simp[] >> disch_then kall_tac >>
+  ntac 4 (simp[Once evaluate_def]) >>  
+  simp[ml_progTheory.nsLookup_nsBind_compute,namespaceTheory.nsOptBind_def,
+       do_app_def,ffiTheory.call_FFI_def] >>
+  simp[Once evaluate_def] >>
+  qhdtm_assum `ffi_accepts_rel` (mp_tac o REWRITE_RULE [ffi_accepts_rel_def]) >>
+  disch_then drule >> simp[] >>
+  disch_then(qspec_then `pad conf l` mp_tac) >>
+  impl_keep_tac >- rw[pad_def] >>
+  strip_tac >>
+  simp[IMPLODE_EXPLODE_I,MAP_MAP_o,o_DEF,
+       SIMP_RULE std_ss [o_DEF] n2w_ORD_CHR_w2n] >>
+  fs[store_assign_def,store_lookup_def,store_v_same_type_def,
+     LUPDATE_SAME'] >>
+  simp[payload_size_def] >>
+  ntac 8 (simp[Once evaluate_def]) >>
+  simp[do_app_def,ml_progTheory.nsLookup_nsBind_compute,
+       namespaceTheory.nsOptBind_def] >>
+  qmatch_goalsub_abbrev_tac `evaluate _ env2` >>
+  `env_asm env2 conf`
+    by fs[Abbr `env2`,env_asm_def,build_rec_env_def,sendloop_def,has_v_def,in_module_def] >>
+  first_assum (strip_assume_tac o REWRITE_RULE[env_asm_def]) >>
+  qunabbrev_tac `env2` >>
+  fs[has_v_def] >>
+  qpat_assum `(LIST_TYPE ^WORD8 --> NUM) LENGTH _` (mp_tac o REWRITE_RULE[ml_translatorTheory.Arrow_def,ml_translatorTheory.AppReturns_def,ml_progTheory.eval_rel_def]) >>
+  simp[] >> disch_then drule >>
+  qmatch_goalsub_abbrev_tac `refs_fupd (K a1)` >>
+  disch_then(qspec_then `a1` strip_assume_tac) >>
+  qunabbrev_tac `a1` >>
+  Q.REFINE_EXISTS_TAC `extra + 1` >>
+  simp[dec_clock_def] >>
+    qmatch_goalsub_abbrev_tac `ffi_fupd (K a1)` >>
+  Q.ISPEC_THEN `s with ffi := a1` dxrule evaluate_empty_state_norel >>
+  qunabbrev_tac `a1` >>
+  strip_tac >>
+  rename1 `ack2 + _` >>
+  qmatch_asmsub_abbrev_tac `clock_fupd (K ack3)` >>
+  Q.REFINE_EXISTS_TAC `extra + ack3` >>
+  dxrule evaluate_add_to_clock >>
+  simp[SimpL ``$==>``] >>
+  disch_then(qspec_then `ack2` mp_tac) >>
+  strip_tac >>
+  dxrule evaluate_add_to_clock >>
+  simp[] >>
+  disch_then kall_tac >>
+  fs[NUM_def,INT_def] >>
+  PURE_REWRITE_TAC [ADD_ASSOC] >>
+  qpat_abbrev_tac `ack4 = ack2 + _` >> pop_assum kall_tac >>
+  simp[do_if_def,opb_lookup_def] >>
+  IF_CASES_TAC >- (* base case of induction: LENGTH l <= conf.payload_size *)
+    (simp[Once evaluate_def,do_con_check_def,build_conv_def,semanticPrimitivesTheory.state_component_equality,ffiTheory.ffi_state_component_equality] >>
+     fs[pad_def] >> every_case_tac >>
+     simp[send_events_def,Once compile_message_def,final_def,pad_def,update_state_def] >>
+     simp[Once compile_message_def,pad_def,final_def]) >>
+  (* Inductive case: L *)
+  simp[] >>
+  ntac 8 (simp[Once evaluate_def]) >>
+  qpat_assum `(LIST_TYPE WORD --> NUM --> LIST_TYPE WORD) (combin$C DROP) _` (mp_tac o REWRITE_RULE[ml_translatorTheory.Arrow_def,ml_translatorTheory.AppReturns_def,ml_progTheory.eval_rel_def]) >>
+  simp[] >> disch_then drule >>
+  qmatch_goalsub_abbrev_tac `refs_fupd (K a1)` >>     
+  disch_then(qspec_then `a1` strip_assume_tac) >>
+  qunabbrev_tac `a1` >>
+  Q.REFINE_EXISTS_TAC `extra + 1` >>
+  simp[dec_clock_def] >>
+  qmatch_goalsub_abbrev_tac `ffi_fupd (K a1)` >>
+  Q.ISPEC_THEN `s with ffi := a1` dxrule evaluate_empty_state_norel >>
+  qunabbrev_tac `a1` >>
+  strip_tac >>  
+  qmatch_asmsub_abbrev_tac `clock_fupd (K ack5)` >>
+  Q.REFINE_EXISTS_TAC `extra + ack5` >>
+  dxrule evaluate_add_to_clock >>
+  simp[SimpL ``$==>``] >>
+  disch_then(qspec_then `ack4` mp_tac) >>
+  strip_tac >>
+  dxrule evaluate_add_to_clock >>
+  simp[] >> disch_then kall_tac >>
+  first_x_assum(qspecl_then [`conf.payload_size`,`Litv (IntLit (&conf.payload_size))`] mp_tac) >>
+  impl_tac >- simp[NUM_def,INT_def] >>
+  qmatch_goalsub_abbrev_tac `refs_fupd (K a1)` >>
+  disch_then(qspec_then `a1` strip_assume_tac) >>
+  qunabbrev_tac `a1` >>
+  qmatch_goalsub_abbrev_tac `ffi_fupd (K a1)` >>
+  Q.ISPEC_THEN `s with ffi := a1` dxrule evaluate_empty_state_norel >>
+  qunabbrev_tac `a1` >>
+  strip_tac >>
+  Q.REFINE_EXISTS_TAC `extra + 1` >>
+  simp[dec_clock_def] >>
+  PURE_REWRITE_TAC [ADD_ASSOC] >>
+  qpat_abbrev_tac `ack6 = ack4 + _` >> pop_assum kall_tac >>
+  qmatch_asmsub_abbrev_tac `clock_fupd (K ack7)` >>
+  Q.REFINE_EXISTS_TAC `extra + ack7` >>
+  dxrule evaluate_add_to_clock >>
+  simp[SimpL ``$==>``] >>
+  disch_then(qspec_then `ack6` mp_tac) >>
+  strip_tac >>
+  dxrule evaluate_add_to_clock >>
+  simp[] >>
+  disch_then kall_tac >>
+  PURE_REWRITE_TAC [ADD_ASSOC] >>
+  qpat_abbrev_tac `ack8 = ack6 + _` >> pop_assum kall_tac >>
+  fs[send_events_def,final_pad_LENGTH] >>
+  qmatch_goalsub_abbrev_tac `evaluate _ env2` >>  
+  qpat_x_assum `env_asm env' conf` assume_tac >>
+  last_x_assum drule >> disch_then drule >>
+  disch_then(qspec_then `env2` mp_tac) >>
+  qmatch_goalsub_abbrev_tac `ffi_fupd (K a1)` >>
+  qmatch_goalsub_abbrev_tac `refs_fupd (K a2)` >>
+  disch_then(qspec_then `s with <|ffi := a1; refs := a2 |>` mp_tac) >>
+  disch_then(qspecl_then [`stpred`,`dest`] mp_tac) >>
+  qunabbrev_tac `a1` >> qunabbrev_tac `a2` >>
+  impl_tac >-
+    (unabbrev_all_tac >>
+     simp[sendloop_def,build_rec_env_def,o_DEF,namespaceTheory.nsOptBind_def]) >>
+  simp[] >> strip_tac >>
+  qmatch_asmsub_abbrev_tac `clock_fupd (K ack9)` >>
+  Q.REFINE_EXISTS_TAC `extra + ack9` >>
+  dxrule evaluate_add_to_clock >>
+  simp[SimpL ``$==>``] >>
+  disch_then(qspec_then `ack8` mp_tac) >>
+  strip_tac >>
+  dxrule evaluate_add_to_clock >>
+  simp[] >> disch_then kall_tac >>
+  simp[semanticPrimitivesTheory.state_component_equality,ffiTheory.ffi_state_component_equality] >>
+  conj_tac >> CONV_TAC(RHS_CONV(PURE_ONCE_REWRITE_CONV [compile_message_def])) >>
+  simp[final_pad_LENGTH,update_state_def]);
 
 val _ = export_theory ();
