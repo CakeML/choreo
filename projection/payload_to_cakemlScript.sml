@@ -80,10 +80,6 @@ val padv_def = Define
    )
 `
 
-val unpadv_def = Define
-  `unpadv conf = (ARB:exp)
-`
-
 val sendloop_def = Define `sendloop conf dest = 
    [("sendloop","x",
      Let (SOME "y")
@@ -103,6 +99,67 @@ val sendloop_def = Define `sendloop conf dest =
        )
     )]`
 
+val find_one_def = Define
+  `find_one =
+   [("find_one","n",
+     If (App Equality [Lit (Word8 1w); App Aw8sub [Var(Short "x"); Var(Short "n")]])
+       (Var (Short "n"))
+       (App Opapp [Var(Short "find_one"); App (Opn Plus) [Var(Short "n"); Lit(IntLit 1)]])
+   )]`
+
+val finalv_def = Define
+  `final x =
+   Log Or
+       (App Equality [Lit (Word8 7w); App Aw8sub [Var(Short x); Lit(IntLit 0)]])
+       (App Equality [Lit (Word8 2w); App Aw8sub [Var(Short x); Lit(IntLit 0)]])`
+
+val unpadv_def = Define
+  `unpadv conf = 
+   Fun "x"
+   (Let (SOME "n")
+     (If (final "x")
+        (Lit(IntLit 1))
+        (Letrec find_one (App Opapp [Var(Short "find_one"); Lit(IntLit 1)]))
+     )
+     (Let (SOME "y")
+          (App Aw8alloc
+               [App (Opn Minus)
+                    [App Aw8length [Var (Short "x")];
+                     Var(Short "n")];
+                Lit(Word8 0w)
+               ]
+          )
+          (Let NONE
+               (App CopyAw8Aw8
+                    [Var(Short "x");
+                     Var(Short "n");
+                     App Aw8length [Var (Short "y")];
+                     Lit(IntLit 0)
+                    ]
+               )
+               (App Opapp [Var conf.toList; Var(Short "y")]
+               )
+          )
+     )
+     )
+  `
+
+val receiveloop_def = Define `receiveloop conf src =
+  [("receiveloop","u",
+    (Let NONE (App (FFI "receive") [Lit(StrLit src); Var(Short "buff")])
+       (If (final "buff")
+          (Con (SOME conf.cons)
+               [App Opapp [unpadv conf;Var(Short "buff")];
+                Con(SOME conf.nil) []])
+          (Con(SOME conf.cons)
+               [App Opapp [unpadv conf;Var(Short "buff")];
+                App Opapp [Var(Short "receiveloop");Var(Short "u")]
+               ]
+          )
+       )
+    )
+  )]`
+
 val compile_endpoint_def = Define `
    (compile_endpoint conf vs payloadLang$Nil = Con NONE [])
 ∧ (compile_endpoint conf vs (Send p v n e) =
@@ -117,7 +174,20 @@ val compile_endpoint_def = Define `
            (compile_endpoint conf vs e)
          )
   )
-∧ (compile_endpoint conf vs (Receive p v l  e) = ARB)
+∧ (compile_endpoint conf vs (Receive p v l e) =
+    Let (SOME v)
+        (Let (SOME "buff") (App Aw8alloc [buffer_size conf;Lit(Word8 0w)])
+             (Letrec
+                (receiveloop conf (MAP (CHR o w2n) p))
+                (App Opapp
+                     [Var conf.concat;
+                      App Opapp [Var(Short "receiveloop"); Con NONE []]
+                     ]
+                )
+             )
+        )
+        (compile_endpoint conf vs e)
+   )
 ∧ (compile_endpoint conf vs (IfThen v e1 e2) =
    let vn = LENGTH(letfuns e1) in
      If (Var(Short v))
