@@ -3,6 +3,9 @@ open preamble payloadLangTheory astTheory
 
 val _ = new_theory "payload_to_cakeml";
 
+(* List of all functions used to compute let-expressions by an
+   endpoint, in order of occurence
+ *)
 val letfuns_def = Define `
    (letfuns payloadLang$Nil = [])
 ∧ (letfuns (Send p v n e) = letfuns e)
@@ -16,7 +19,7 @@ val buffer_size_def = Define
 val payload_size_def = Define
   `payload_size conf = Lit(IntLit(&conf.payload_size))`
 
-(* TODO: let length x *)
+(* CakeML deep embedding of message padding function *)
 val padv_def = Define
   `padv conf =
    Fun "x"
@@ -80,6 +83,9 @@ val padv_def = Define
    )
 `
 
+(* This loop encodes the payloadLang Send prefix,
+   with a one-to-one correspondence between #(send)
+   FFI calls and LSend labels. *)
 val sendloop_def = Define `sendloop conf dest = 
    [("sendloop","x",
      Let (SOME "y")
@@ -99,6 +105,8 @@ val sendloop_def = Define `sendloop conf dest =
        )
     )]`
 
+(* Find the first occurence of 1 in a W8array x, which
+   is assumed to be in scope. *)
 val find_one_def = Define
   `find_one =
    [("find_one","n",
@@ -107,12 +115,14 @@ val find_one_def = Define
        (App Opapp [Var(Short "find_one"); App (Opn Plus) [Var(Short "n"); Lit(IntLit 1)]])
    )]`
 
+(* True iff x is a W8array containing a message tagged as final. *)
 val finalv_def = Define
   `final x =
    Log Or
        (App Equality [Lit (Word8 7w); App Aw8sub [Var(Short x); Lit(IntLit 0)]])
        (App Equality [Lit (Word8 2w); App Aw8sub [Var(Short x); Lit(IntLit 0)]])`
 
+(* CakeML deep embedding of the unpad function. *)
 val unpadv_def = Define
   `unpadv conf = 
    Fun "x"
@@ -144,6 +154,10 @@ val unpadv_def = Define
      )
   `
 
+(* This loop encodes the payloadLang Receive prefix,
+   with a one-to-one correspondence between #(receive)
+   FFI calls and LReceive labels. A buffer named buff
+   of length conf.payload_size is assumed to be in scope *)
 val receiveloop_def = Define `receiveloop conf src =
   [("receiveloop","u",
     (Let NONE (App (FFI "receive") [Lit(StrLit src); Var(Short "buff")])
@@ -160,6 +174,20 @@ val receiveloop_def = Define `receiveloop conf src =
     )
   )]`
 
+(* compile_endpoint conf vs e
+
+   (Static parts of) the compilation of endoint e to CakeML.
+
+   In particular, does not compile the functions used in let expressions.
+   Instead, assumes that the i:th element of vs is a CakeML expression
+   whose value refines the i:th element of letfuns(e).
+   It is expected that these will be obtained by translating the letfuns.
+         
+   The compilation depends on some functions from the CakeML basis library,
+   mostly for routine list operations. In order to avoid this directory
+   having to depend on basis, we assume that, eg., conf.append is the name
+   of a function that refines APPEND.
+ *)
 val compile_endpoint_def = Define `
    (compile_endpoint conf vs payloadLang$Nil = Con NONE [])
 ∧ (compile_endpoint conf vs (Send p v n e) =
