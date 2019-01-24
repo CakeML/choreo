@@ -1,4 +1,4 @@
-open preamble payloadLangTheory astTheory
+open preamble payloadLangTheory astTheory;
      
 
 val _ = new_theory "payload_to_cakeml";
@@ -6,22 +6,22 @@ val _ = new_theory "payload_to_cakeml";
 (* List of all functions used to compute let-expressions by an
    endpoint, in order of occurence
  *)
-val letfuns_def = Define `
+val letfuns_def = Define ‘
    (letfuns payloadLang$Nil = [])
 ∧ (letfuns (Send p v n e) = letfuns e)
 ∧ (letfuns (Receive p v l e) = letfuns e)
 ∧ (letfuns (IfThen v e1 e2) = letfuns e1 ++ letfuns e2)
-∧ (letfuns (Let v f vl e) = f::letfuns e)`
+∧ (letfuns (Let v f vl e) = f::letfuns e)’;
 
 val buffer_size_def = Define
-  `buffer_size conf = Lit(IntLit(&(conf.payload_size + 1)))`
+  ‘buffer_size conf = Lit(IntLit(&(conf.payload_size + 1)))’;
 
 val payload_size_def = Define
-  `payload_size conf = Lit(IntLit(&conf.payload_size))`
+  ‘payload_size conf = Lit(IntLit(&conf.payload_size))’;
 
 (* CakeML deep embedding of message padding function *)
 val padv_def = Define
-  `padv conf =
+  ‘padv conf =
    Fun "x"
    (Let (SOME "y")
     (App Aw8alloc [buffer_size conf;Lit(Word8 0w)])
@@ -81,12 +81,12 @@ val padv_def = Define
      )
     )
    )
-`
+’;
 
 (* This loop encodes the payloadLang Send prefix,
    with a one-to-one correspondence between #(send)
    FFI calls and LSend labels. *)
-val sendloop_def = Define `sendloop conf dest = 
+val sendloop_def = Define ‘sendloop conf dest = 
    [("sendloop","x",
      Let (SOME "y")
        (App Opapp [padv conf;Var(Short "x")])
@@ -103,28 +103,28 @@ val sendloop_def = Define `sendloop conf dest =
            )
          )
        )
-    )]`
+    )]’;
 
 (* Find the first occurence of 1 in a W8array x, which
    is assumed to be in scope. *)
 val find_one_def = Define
-  `find_one =
+  ‘find_one =
    [("find_one","n",
      If (App Equality [Lit (Word8 1w); App Aw8sub [Var(Short "x"); Var(Short "n")]])
        (Var (Short "n"))
        (App Opapp [Var(Short "find_one"); App (Opn Plus) [Var(Short "n"); Lit(IntLit 1)]])
-   )]`
+   )]’;
 
 (* True iff x is a W8array containing a message tagged as final. *)
 val finalv_def = Define
-  `finalv x =
+  ‘finalv x =
    Log Or
        (App Equality [Lit (Word8 7w); App Aw8sub [Var(Short x); Lit(IntLit 0)]])
-       (App Equality [Lit (Word8 2w); App Aw8sub [Var(Short x); Lit(IntLit 0)]])`
+       (App Equality [Lit (Word8 2w); App Aw8sub [Var(Short x); Lit(IntLit 0)]])’;
 
 (* CakeML deep embedding of the unpad function. *)
 val unpadv_def = Define
-  `unpadv conf = 
+  ‘unpadv conf = 
    Fun "x"
    (Let (SOME "n")
      (If (finalv "x")
@@ -152,13 +152,13 @@ val unpadv_def = Define
           )
      )
      )
-  `
+  ’;
 
 (* This loop encodes the payloadLang Receive prefix,
    with a one-to-one correspondence between #(receive)
    FFI calls and LReceive labels. A buffer named buff
    of length conf.payload_size is assumed to be in scope *)
-val receiveloop_def = Define `receiveloop conf src =
+val receiveloop_def = Define ‘receiveloop conf src =
   [("receiveloop","u",
     (Let NONE (App (FFI "receive") [Lit(StrLit src); Var(Short "buff")])
        (If (finalv "buff")
@@ -172,7 +172,7 @@ val receiveloop_def = Define `receiveloop conf src =
           )
        )
     )
-  )]`
+  )]’;
 
 (* compile_endpoint conf vs e
 
@@ -188,7 +188,7 @@ val receiveloop_def = Define `receiveloop conf src =
    having to depend on basis, we assume that, eg., conf.append is the name
    of a function that refines APPEND.
  *)
-val compile_endpoint_def = Define `
+val compile_endpoint_def = Define ‘
    (compile_endpoint conf vs payloadLang$Nil = Con NONE [])
 ∧ (compile_endpoint conf vs (Send p v n e) =
     let vv = Var(Short v) in
@@ -224,6 +224,6 @@ val compile_endpoint_def = Define `
 ∧ (compile_endpoint conf (hv::vs) (payloadLang$Let v f vl e) =
    ast$Let (SOME v)
        (App Opapp (hv::MAP (Var o Short) vl))
-       (compile_endpoint conf vs e))`
+       (compile_endpoint conf vs e))’;
 
 val _ = export_theory ();
