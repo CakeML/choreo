@@ -19,6 +19,19 @@ val buffer_size_def = Define
 val payload_size_def = Define
   ‘payload_size conf = Lit(IntLit(&conf.payload_size))’;
 
+(* Simple helper functions to convert HOL datums and list of datum to CakeML AST *)
+val convDatum_def = Define
+  ‘
+  (convDatum conf []    = Con (SOME conf.nil) []) ∧
+  (convDatum conf (x::xs) = Con (SOME conf.cons) [Lit (Word8 x); convDatum conf xs]) 
+  ’;
+
+val convDatumList_def = Define
+  ‘
+  (convDatumList conf []    = Con (SOME conf.nil) []) ∧
+  (convDatumList conf (x::xs) = Con (SOME conf.cons) [convDatum conf x; convDatumList conf xs]) 
+  ’;
+
 (* CakeML deep embedding of message padding function *)
 val padv_def = Define
   ‘padv conf =
@@ -197,7 +210,9 @@ val compile_endpoint_def = Define ‘
          (Let NONE
            (Letrec
               (sendloop conf (MAP (CHR o w2n) p))
-              (App Opapp [Var(Short "sendloop");vv])
+              (App Opapp [Var(Short "sendloop");
+                          App Opapp [Var conf.drop; vv; Lit(IntLit(&n))]
+              ])
            )
            (compile_endpoint conf vs e)
          )
@@ -209,7 +224,9 @@ val compile_endpoint_def = Define ‘
                 (receiveloop conf (MAP (CHR o w2n) p))
                 (App Opapp
                      [Var conf.concat;
-                      App Opapp [Var(Short "receiveloop"); Con NONE []]
+                      App Opapp [Var(Short "receiveloop");
+                      convDatumList conf l
+                      ]
                      ]
                 )
              )
