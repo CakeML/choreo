@@ -3,6 +3,7 @@ open preamble
      payloadLangTheory payload_to_cakemlTheory
      evaluateTheory terminationTheory ml_translatorTheory evaluatePropsTheory
      semanticPrimitivesTheory
+     ffiTheory
      payloadPropsTheory;
 
 val _ = new_theory "payload_to_cakemlProof";
@@ -560,5 +561,113 @@ Theorem sendloop_correct
   conj_tac >> CONV_TAC(RHS_CONV(PURE_ONCE_REWRITE_CONV [compile_message_def])) >>
   simp[final_pad_LENGTH,update_state_def]
   );
+
+val DATUM = “LIST_TYPE ^WORD8”;
+
+(* ASSUMPTIONS ABOUT CURRENTLY UNIMPLEMENTED COMPILER FEATURES *)
+
+(* enc_ok (v sem_env) -> string list -> LIST_TYPE (LIST_TYPE DATUM -> DATUM) -> Boolv_def *)
+
+val enc_ok_def =
+    Define
+    ‘
+    (enc_ok _ _ [] [] = T) ∧
+    (enc_ok conf ckEnv (f::fs) (n::ns) =
+       ((∃cl.
+            (SOME cl = nsLookup (ckEnv.v) (getLetID conf n)) ∧
+            (LIST_TYPE ^(DATUM) --> ^DATUM) f cl
+         ) ∧
+        enc_ok conf ckEnv fs ns
+        )
+    ) ∧
+    (enc_ok _ _ _ _ = F)
+    ’;
+
+(* UNDERSTANDING WHAT VARIABLES AND CONFIG MEAN IN CAKEML LAND - CONSISTENCY OF SEMANTIC ENVIRONMENT *)
+
+(* Check the semantic environment contains all the variable bindings in
+   the payload state and also matches all the config assumptions        *)
+
+val sem_env_cor_def =
+    Define
+    ‘
+    sem_env_cor conf pySt ckEnv =
+       ((∀ n v v'.  (FLOOKUP pySt.bindings n = SOME v) ∧
+                    (nsLookup (ckEnv.v) (Short n) = SOME v')
+                    ⇒ ^(DATUM) v v'
+         ) ∧
+        env_asm ckEnv conf
+        )
+    ’;
+
+(* UNDERSTANDING WHAT LABELS MEAN IN CAKEML LAND - CONSISTENCY OF STATE *)
+
+(* Check a label and IOEvent have equivalent meaning *)
+
+val lab_ioevent_equiv_def =
+    Define
+    ‘
+    (lab_ioevent_equiv (LSend _ datum dest) (IO_event ffiStr imutArg mutIOPairLst) =
+       ((ffiStr  = "send") ∧
+        (imutArg = dest) ∧
+        (LENGTH mutIOPairLst = LENGTH datum) ∧
+        (∃L. mutIOPairLst = ZIP (datum,L))
+        )
+    ) ∧
+    (lab_ioevent_equiv (LReceive src datum _) (IO_event ffiStr imutArg mutIOPairLst) =
+       ((ffiStr  = "receive") ∧
+        (imutArg = src) ∧
+        (LENGTH mutIOPairLst = LENGTH datum) ∧
+        (∃L. mutIOPairLst = ZIP (L,datum))
+        )
+    ) ∧
+    (lab_ioevent_equiv LTau _ = F)   
+    ’;
+
+(* Check the cakeML state has progressed correctly with respect to a label *)
+
+val ffi_prog_cons_def =
+    Define
+    ‘
+    ffi_prog_cons st1 lab st2 =
+        ∃ ffiStr imutArg mutIOPairLst.
+            let
+                (fSt1  = st1.ffi_state);
+                (fSt2  = st2.ffi_state);
+                (ioEvn = IO_event ffiStr imutArg mutIOPairLst);
+                (inMut = MAP FST mutIOPairLst);
+                (otMut = MAP SND mutIOPairLst)
+            in
+                lab_ioevent_equiv lab ioEvn ∧
+                (call_FFI fSt1 ffiStr imutArg inMut = FFI_return fSt2 otMut) ∧
+                (fSt2.io_events = fSt1.io_events ++ [ioEvn])
+    ’;
+
+(* THE MAIN GOAL *)
+
+Theorem
+    ‘
+    ∀conf p sp sp' ep ep' L.
+        trans conf (NEndpoint p sp ep) L (NEndpoint p sp' ep')
+        ⇒  (∃C. ∀se sc vs se' sc' vs'.
+                enc_ok conf se  (letfuns ep)  vs  ∧
+                enc_ok conf se' (letfuns ep') vs' ∧
+                sem_env_cor conf sp  se  ∧
+                sem_env_cor conf sp' se' ∧
+                ffi_prog_cons (sc.ffi) L (sc'.ffi)   ∧
+                sc'.clock < C            
+                ⇒  (let
+                        (eval1 = evaluate sc se [compile_endpoint conf vs  ep]);
+                        (eval2 = evaluate sc se [compile_endpoint conf vs' ep'])
+                    in
+                        (∃s s' res.
+                            (eval1 = (s, res)) ∧
+                            (eval2 = (s', res)) ∧
+                            (s.ffi.io_events = s'.ffi.io_events) 
+                        )
+                    )
+            )
+    ’
+   (cheat);
 
 val _ = export_theory ();
