@@ -645,7 +645,7 @@ val ffi_prog_cons_def =
 
 (* THE MAIN GOAL *)
 
-Theorem
+Theorem payload_cakeml_projection
     ‘
     ∀conf p sp sp' ep ep' L.
         trans conf (NEndpoint p sp ep) L (NEndpoint p sp' ep')
