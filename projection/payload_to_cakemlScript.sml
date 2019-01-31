@@ -13,6 +13,9 @@ val letfuns_def = Define ‘
 ∧ (letfuns (IfThen v e1 e2) = letfuns e1 ++ letfuns e2)
 ∧ (letfuns (Let v f vl e) = f::letfuns e)’;
 
+val getLetID_def = Define ‘
+  getLetID conf letStr = Long conf.letModule (Short letStr)’;
+
 val buffer_size_def = Define
   ‘buffer_size conf = Lit(IntLit(&(conf.payload_size + 1)))’;
 
@@ -240,7 +243,7 @@ val compile_endpoint_def = Define ‘
         (compile_endpoint conf (DROP vn vs) e2))
 ∧ (compile_endpoint conf (hv::vs) (payloadLang$Let v f vl e) =
    ast$Let (SOME v)
-       (App Opapp (hv::MAP (Var o Short) vl))
+       (App Opapp ((Var o (getLetID conf)) hv::MAP (Var o Short) vl))
        (compile_endpoint conf vs e))’;
 
 val _ = export_theory ();

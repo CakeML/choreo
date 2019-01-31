@@ -19,7 +19,8 @@ val _ = Datatype `config = <| payload_size : num;
                               fromList : (modN,varN) id;
                               concat : (modN,varN) id;
                               cons : (modN,conN) id;
-                              nil : (modN,conN) id;                              
+                              nil : (modN,conN) id;
+                              letModule : modN;                              
                               |>`;
 
 val _ = Datatype`
