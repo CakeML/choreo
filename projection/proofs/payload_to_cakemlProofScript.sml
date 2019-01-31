@@ -592,9 +592,9 @@ val sem_env_cor_def =
     Define
     ‘
     sem_env_cor conf pySt ckEnv =
-       ((∀ n v v'.  (FLOOKUP pySt.bindings n = SOME v) ∧
-                    (nsLookup (ckEnv.v) (Short n) = SOME v')
-                    ⇒ ^(DATUM) v v'
+       ((∀ n v. (FLOOKUP pySt.bindings n = SOME v)
+                 ⇒ (∃v'. (nsLookup (ckEnv.v) (Short n) = SOME v') ∧
+                         ^(DATUM) v v')
          ) ∧
         env_asm ckEnv conf
         )
