@@ -4,7 +4,9 @@ open preamble
      evaluateTheory terminationTheory ml_translatorTheory evaluatePropsTheory
      semanticPrimitivesTheory
      ffiTheory
-     payloadPropsTheory;
+     payloadPropsTheory
+     payloadSemanticsTheory
+     astBakeryTheory;
 
 val _ = new_theory "payload_to_cakemlProof";
 
@@ -602,70 +604,103 @@ val sem_env_cor_def =
 
 (* UNDERSTANDING WHAT LABELS MEAN IN CAKEML LAND - CONSISTENCY OF STATE *)
 
-(* Check a label and IOEvent have equivalent meaning *)
+(* MODEL OF FFI *)
+val _ = type_abbrev("message" , “: proc # datum”);
 
-val lab_ioevent_equiv_def =
+val _ = Datatype‘
+  comms_state = <| sent_messages    : message list ;
+                   receive_messages : message llist
+                 |>
+’;
+
+val ffi_send_def =
     Define
     ‘
-    (lab_ioevent_equiv (LSend _ datum dest) (IO_event ffiStr imutArg mutIOPairLst) =
-       ((ffiStr  = "send") ∧
-        (imutArg = dest) ∧
-        (LENGTH mutIOPairLst = LENGTH datum) ∧
-        (∃L. mutIOPairLst = ZIP (datum,L))
-        )
-    ) ∧
-    (lab_ioevent_equiv (LReceive src datum _) (IO_event ffiStr imutArg mutIOPairLst) =
-       ((ffiStr  = "receive") ∧
-        (imutArg = src) ∧
-        (LENGTH mutIOPairLst = LENGTH datum) ∧
-        (∃L. mutIOPairLst = ZIP (L,datum))
-        )
-    ) ∧
-    (lab_ioevent_equiv LTau _ = F)   
+        ffi_send net_state dest data =
+            Oracle_return (net_state with <|sent_messages := (dest,data)::net_state.sent_messages|>) data
     ’;
 
-(* Check the cakeML state has progressed correctly with respect to a label *)
-
-val ffi_prog_cons_def =
+val ffi_receive_def =
     Define
     ‘
-    ffi_prog_cons st1 lab st2 =
-        ∃ ffiStr imutArg mutIOPairLst.
+        ffi_receive net_state src _ =
             let
-                (fSt1  = st1.ffi_state);
-                (fSt2  = st2.ffi_state);
-                (ioEvn = IO_event ffiStr imutArg mutIOPairLst);
-                (inMut = MAP FST mutIOPairLst);
-                (otMut = MAP SND mutIOPairLst)
+                comb_check = (λ(q1,d,q2). EVERY (λ(p,_). p ≠ src) q1 ∧ 
+                                          net_state.receive_messages = LAPPEND (fromList q1) ((src,d):::q2))
             in
-                lab_ioevent_equiv lab ioEvn ∧
-                (call_FFI fSt1 ffiStr imutArg inMut = FFI_return fSt2 otMut) ∧
-                (fSt2.io_events = fSt1.io_events ++ [ioEvn])
+                if
+                    ∃tup. comb_check tup
+                then
+                    let
+                        (q1,d,q2) = @tup. comb_check tup
+                    in
+                        Oracle_return (net_state with <| receive_messages := LAPPEND (fromList q1) q2 |>) d
+                else
+                    Oracle_final FFI_diverged
     ’;
 
-(* THE MAIN GOAL *)
+val comms_ffi_oracle_def = Define
+‘
+  comms_ffi_oracle name =
+    if name = "send" then
+        ffi_send
+    else
+        if name = "receive" then
+            ffi_receive
+        else
+            (λ _ _ _. Oracle_final FFI_failed)
+’;
+
+(* CHECK OF FFI STATE AND PAYLOAD STATE CONSISTENCY WITH LABELS *)
+val ffi_stat_prog_cons_def =
+    Define
+    ‘
+    ffi_stat_prog_cons pySt1 ffiSt1 lab pySt2 ffiSt2 =
+        let
+            chk_pst =  (λpySt ffiSt.
+                            ∃futMess.
+                                ffiSt.receive_messages = LAPPEND (fromList pySt.queue) futMess);
+            get_fut =  (λpySt ffiSt.
+                            @futMess.
+                                ffiSt.receive_messages = LAPPEND (fromList pySt.queue) futMess)
+        in
+            (chk_pst pySt1 ffiSt1) ∧
+            (chk_pst pySt2 ffiSt2) ∧
+            (get_fut pySt1 ffiSt1 = get_fut pySt2 ffiSt2) ∧
+            (case lab of
+                    LSend _ data dest   => (ffiSt2.sent_messages = (dest,data)::ffiSt1.sent_messages)
+                |   _                   => (ffiSt2.sent_messages = ffiSt1.sent_messages)
+            )
+    ’;
+
+val stat_prog_cor_def =
+    Define
+    ‘
+    stat_prog_cor pySt1 ckSt1 lab pySt2 ckSt2 =
+        (ffi_stat_prog_cons pySt1 (ckSt1.ffi.ffi_state) lab pySt2 (ckSt2.ffi.ffi_state) ∧
+        (ckSt1.ffi.oracle = comms_ffi_oracle) ∧
+        (ckSt2.ffi.oracle = comms_ffi_oracle) ∧
+        (ckSt2.clock ≤ ckSt1.clock))
+    ’;
+
+
 
 Theorem payload_cakeml_projection
     ‘
     ∀conf p sp sp' ep ep' L.
         trans conf (NEndpoint p sp ep) L (NEndpoint p sp' ep')
-        ⇒  (∃C. ∀se sc vs se' sc' vs'.
-                enc_ok conf se  (letfuns ep)  vs  ∧
-                enc_ok conf se' (letfuns ep') vs' ∧
-                sem_env_cor conf sp  se  ∧
-                sem_env_cor conf sp' se' ∧
-                ffi_prog_cons (sc.ffi) L (sc'.ffi)   ∧
-                sc'.clock < C            
-                ⇒  (let
-                        (eval1 = evaluate sc se [compile_endpoint conf vs  ep]);
-                        (eval2 = evaluate sc se [compile_endpoint conf vs' ep'])
-                    in
-                        (∃s s' res.
-                            (eval1 = (s, res)) ∧
-                            (eval2 = (s', res)) ∧
-                            (s.ffi.io_events = s'.ffi.io_events) 
+        ⇒  (∃minClock. ∀se sc vs se' sc' vs'.
+                    (enc_ok conf se  (letfuns ep)  vs)  ∧
+                    (enc_ok conf se' (letfuns ep') vs') ∧
+                    (sem_env_cor conf sp  se)  ∧
+                    (sem_env_cor conf sp' se') ∧
+                    (stat_prog_cor sp sc L sp' sc') ∧
+                    (minClock < sc'.clock)
+                    ⇒  (∃s s' res.
+                            (evaluate sc se [compile_endpoint conf vs  ep]  = (s, res)) ∧
+                            (evaluate sc se [compile_endpoint conf vs' ep'] = (s',res)) ∧
+                            (s.ffi.ffi_state = s'.ffi.ffi_state) 
                         )
-                    )
             )
     ’
    (cheat);
