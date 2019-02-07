@@ -604,7 +604,7 @@ val sem_env_cor_def =
 
 (* UNDERSTANDING WHAT LABELS MEAN IN CAKEML LAND - CONSISTENCY OF STATE *)
 
-(* MODEL OF FFI *)
+(* MODEL OF OUTSIDE WORLD (FFI)*)
 val _ = type_abbrev("message" , “: proc # datum”);
 
 val _ = Datatype‘
@@ -617,26 +617,25 @@ val ffi_send_def =
     Define
     ‘
         ffi_send net_state dest data =
-            Oracle_return (net_state with <|sent_messages := (dest,data)::net_state.sent_messages|>) data
+            Oracle_return (net_state with sent_messages updated_by (CONS (dest,data))) data
+    ’;
+
+val find_first_def =
+    Define
+    ‘
+    find_first P ll =
+        case $OLEAST (λn. ∃x. (LNTH n ll = SOME x) ∧ P x) of
+                SOME n => SOME (THE (LTAKE n ll), THE (LNTH n ll), THE (LDROP (SUC n) ll))
+            |   NONE   => NONE
     ’;
 
 val ffi_receive_def =
     Define
     ‘
         ffi_receive net_state src _ =
-            let
-                comb_check = (λ(q1,d,q2). EVERY (λ(p,_). p ≠ src) q1 ∧ 
-                                          net_state.receive_messages = LAPPEND (fromList q1) ((src,d):::q2))
-            in
-                if
-                    ∃tup. comb_check tup
-                then
-                    let
-                        (q1,d,q2) = @tup. comb_check tup
-                    in
-                        Oracle_return (net_state with <| receive_messages := LAPPEND (fromList q1) q2 |>) d
-                else
-                    Oracle_final FFI_diverged
+            case find_first (λ(p,_). p = src) net_state.receive_messages of
+                    SOME (q1,(p,d),q2)  => Oracle_return (net_state with receive_messages := LAPPEND (fromList q1) q2) d
+                |   NONE                => Oracle_final FFI_diverged
     ’;
 
 val comms_ffi_oracle_def = Define
@@ -644,28 +643,29 @@ val comms_ffi_oracle_def = Define
   comms_ffi_oracle name =
     if name = "send" then
         ffi_send
+    else if name = "receive" then
+        ffi_receive
     else
-        if name = "receive" then
-            ffi_receive
-        else
-            (λ _ _ _. Oracle_final FFI_failed)
+        (λ _ _ _. Oracle_final FFI_failed)
 ’;
 
 (* CHECK OF FFI STATE AND PAYLOAD STATE CONSISTENCY WITH LABELS *)
+val check_ffi_past_def =
+    Define
+    ‘
+    check_ffi_past pySt ffiSt = (LTAKE (LENGTH pySt.queue) ffiSt.receive_messages = SOME pySt.queue)
+    ’;
+
 val ffi_stat_prog_cons_def =
     Define
     ‘
     ffi_stat_prog_cons pySt1 ffiSt1 lab pySt2 ffiSt2 =
         let
-            chk_pst =  (λpySt ffiSt.
-                            ∃futMess.
-                                ffiSt.receive_messages = LAPPEND (fromList pySt.queue) futMess);
             get_fut =  (λpySt ffiSt.
-                            @futMess.
-                                ffiSt.receive_messages = LAPPEND (fromList pySt.queue) futMess)
+                            LDROP (LENGTH pySt.queue) ffiSt.receive_messages)
         in
-            (chk_pst pySt1 ffiSt1) ∧
-            (chk_pst pySt2 ffiSt2) ∧
+            (check_ffi_past pySt1 ffiSt1) ∧
+            (check_ffi_past pySt2 ffiSt2) ∧
             (get_fut pySt1 ffiSt1 = get_fut pySt2 ffiSt2) ∧
             (case lab of
                     LSend _ data dest   => (ffiSt2.sent_messages = (dest,data)::ffiSt1.sent_messages)
@@ -679,8 +679,7 @@ val stat_prog_cor_def =
     stat_prog_cor pySt1 ckSt1 lab pySt2 ckSt2 =
         (ffi_stat_prog_cons pySt1 (ckSt1.ffi.ffi_state) lab pySt2 (ckSt2.ffi.ffi_state) ∧
         (ckSt1.ffi.oracle = comms_ffi_oracle) ∧
-        (ckSt2.ffi.oracle = comms_ffi_oracle) ∧
-        (ckSt2.clock ≤ ckSt1.clock))
+        (ckSt2.ffi.oracle = comms_ffi_oracle))
     ’;
 
 
@@ -689,13 +688,14 @@ Theorem payload_cakeml_projection
     ‘
     ∀conf p sp sp' ep ep' L.
         trans conf (NEndpoint p sp ep) L (NEndpoint p sp' ep')
-        ⇒  (∃minClock. ∀se sc vs se' sc' vs'.
+        ⇒  (∀se vs se' vs'. ∃minClock. ∀sc sc'.
                     (enc_ok conf se  (letfuns ep)  vs)  ∧
                     (enc_ok conf se' (letfuns ep') vs') ∧
                     (sem_env_cor conf sp  se)  ∧
                     (sem_env_cor conf sp' se') ∧
                     (stat_prog_cor sp sc L sp' sc') ∧
-                    (minClock < sc'.clock)
+                    (minClock ≤ sc.clock) ∧
+                    (minClock ≤ sc'.clock)
                     ⇒  (∃s s' res.
                             (evaluate sc se [compile_endpoint conf vs  ep]  = (s, res)) ∧
                             (evaluate sc se [compile_endpoint conf vs' ep'] = (s',res)) ∧
