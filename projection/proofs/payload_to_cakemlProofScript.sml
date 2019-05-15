@@ -10,6 +10,7 @@ open preamble
 
 val _ = new_theory "payload_to_cakemlProof";
 
+(*
 val pres_ref_def = Define
   ‘
   pres_ref cl =
@@ -21,12 +22,12 @@ val pres_ref_def = Define
           (mc > sc.clock ⇔ ∃es. evaluate sc env [exp] = (es, Rerr (Rabort Rtimeout_error)))
         )
   ’;
+*)
 
 val has_v_def = Define
   ‘has_v env n cfty f =
    (∃v. nsLookup env n = SOME v
-        ∧ cfty f v
-        ∧ pres_ref v)
+        ∧ cfty f v)
   ’;
 
 val WORD8 = “WORD:word8 -> v -> bool”;
@@ -624,12 +625,46 @@ val check_ffi_past_def =
     check_ffi_past pySt ffiSt = (LTAKE (LENGTH pySt.queue) ffiSt.receive_messages = SOME pySt.queue)
     ’;
 
+val TLDROP_def =
+  Define
+  ‘
+  TLDROP n ll = case LDROP n ll of
+                    SOME x => x
+                |   NONE   => LNIL
+  ’;
+
+Theorem TAKE_NONE_DROP_NONE:
+  ∀n ll. LTAKE n ll = NONE ⇔ LDROP n ll = NONE
+Proof
+  Induct_on ‘n’
+  >> simp[]
+  >> Cases_on ‘ll’
+  >> simp[]
+QED
+
+Theorem LTAKE_TLDROP_THM:
+  ∀ll1 ll2 n l. (LTAKE n ll1 = SOME l) ∧
+                (LTAKE n ll2 = SOME l) ∧
+                (TLDROP n ll1 = TLDROP n ll2) ⇒
+                ll1 = ll2
+Proof
+  rw[LNTH_EQ] >>
+  rename [‘LNTH m ll1 = LNTH m ll2’] >>
+  Cases_on ‘m < n’
+  >- metis_tac[LTAKE_LNTH_EL] >>
+  fs[TLDROP_def] >>
+  ‘LENGTH l = n’
+    by metis_tac[LTAKE_LENGTH] >>
+  rpt (dxrule_then strip_assume_tac LTAKE_IMP_LDROP) >>
+  qpat_assum ‘LAPPEND _ _ = ll2’ (fn x => SUBST1_TAC (GSYM x)) >>
+  qpat_assum ‘LAPPEND _ _ = ll1’ (fn x => SUBST1_TAC (GSYM x)) >>
+  fs[LNTH_LAPPEND]
+QED
+
 val get_ffi_future_def =
     Define
     ‘
-    get_ffi_future pySt ffiSt = case (LDROP (LENGTH pySt.queue) ffiSt.receive_messages) of
-                                        SOME x => x
-                                    |   NONE   => LNIL
+    get_ffi_future pySt ffiSt = TLDROP (LENGTH pySt.queue) ffiSt.receive_messages
     ’;
 
 val ffi_stat_prog_cons_def =
@@ -657,6 +692,28 @@ val stat_prog_cor_def =
         (ckSt1.ffi.oracle = comms_ffi_oracle) ∧
         (ckSt2.ffi.oracle = comms_ffi_oracle))
     ’;
+
+Theorem payload_cakeml_proj_irrelrefs:
+  ∀sc sc' se se' vs vs' ep sc1 res conf.
+    env_asm se conf ∧
+    env_asm se' conf ∧
+    enc_ok conf se (letfuns ep) vs ∧
+    enc_ok conf se' (letfuns ep) vs' ∧
+    stat_prog_cor sp sc LTau sp sc' ∧
+    evaluate sc  se  [compile_endpoint conf vs ep]  = (sc1, res)
+    ⇒
+    ∃sc1'. evaluate sc' se'  [compile_endpoint conf vs' ep]  = (sc1', res) ∧
+           sc1.ffi.ffi_state = sc1'.ffi.ffi_state
+Proof
+  Induct_on ‘ep’ >>
+  simp[compile_endpoint_def]
+  >- (simp[evaluate_def,do_con_check_def,build_conv_def] >>
+      simp[stat_prog_cor_def,ffi_stat_prog_cons_def,check_ffi_past_def,get_ffi_future_def] >>
+      rw[comms_state_component_equality] >>
+      metis_tac[LTAKE_TLDROP_THM])
+  >- (rw[evaluate_def,env_asm_def] >>
+      rw[do_if_def]
+QED
 
 Theorem payload_cakeml_proj_irrelrefs:
   ∀sc0 se conf vs ep sc1 res.
@@ -762,6 +819,8 @@ Proof
         ‘sc.ffi.ffi_state.receive_messages = sc'.ffi.ffi_state.receive_messages’
             suffices_by rw[comms_state_component_equality] >>
         (* Essentially split the lists and abbreviate to allow for proof *)
+        fs[check_ffi_past_def,get_ffi_future_def] >>
+        fs[TLDROP_def] >>
         rw[LNTH_EQ] >>
         fs[check_ffi_past_def] >>
         qabbrev_tac ‘LQ = LENGTH sp.queue’ >>
@@ -794,6 +853,7 @@ Proof
             suffices_by rw[] >>
         (* We can now squeeze out an assumption to get the info we need *)
         fs[get_ffi_future_def] >>
+        fs[TLDROP_def] >>
         Cases_on ‘LDROP LQ OR’ >>
         fs[] >>
         Cases_on ‘LDROP (SUC LQ) NR’
@@ -858,10 +918,33 @@ Proof
                 fs[has_v_def] >>
                 rename [‘(_ --> _) LENGTH lengthc’] >>
                 fs[Arrow_def, AppReturns_def] >>
-                cheat)
-                (*
                 pop_assum (drule_then assume_tac) >>
+                pop_assum (qspec_then ‘sc.refs’ strip_assume_tac) >>
                 rw[evaluate_def] >>
+                Q.REFINE_EXISTS_TAC ‘SUC mc’ >>
+                simp[dec_clock_def] >>
+                drule_then assume_tac evaluate_empty_state_IMP >>
+                fs[eval_rel_def] >>
+                rename [‘evaluate (sc with clock := ck1) _ _ = (sc with <|clock := ck2; refs := _ |>, _)’] >>
+                Q.REFINE_EXISTS_TAC ‘mc + ck1’ >>
+                ‘∀mc.
+                  (evaluate (sc with clock := mc + ck1) env [exp] =
+                    (sc with <|clock := mc + ck2; refs := sc.refs ++ refs'|>, Rval [u]))’
+                  by (strip_tac >>
+                      qabbrev_tac ‘es = (sc with clock := ck1)’ >>
+                      qabbrev_tac ‘es' = sc with <|clock := ck2; refs := sc.refs ++ refs'|>’ >>
+                      ‘evaluate (es with clock := es.clock + mc) env [exp]
+                        = (es' with clock := es'.clock + mc,Rval [u])’
+                        suffices_by  rw[Abbr ‘es’, Abbr ‘es'’] >>
+                      ‘evaluate es env [exp] = (es', Rval [u])’
+                        suffices_by rw[evaluate_add_to_clock] >>
+                      simp[]) >>
+                simp[] >>
+                fs[NUM_def,INT_def] >>
+                rw[do_app_def, do_if_def,opb_lookup_def]
+                >- (fs[letfuns_def] >>
+
+
                 ‘∃env exp. do_opapp [lengthc;dc] = SOME (env,exp)’
                     by metis_tac[] >>
                 ‘∃u. NUM (LENGTH d) u’
@@ -898,7 +981,7 @@ Proof
                 simp[dec_clock_def] >>
                 fs[eval_rel_def] >>
                 pop_assum (qspec_then ‘sc’ strip_assume_tac) >>
-                Q.REFINE_EXISTS_TAC ‘mc + ck1’ >>
+                Q.REFINE_EXISTS_TAC ‘mc + ck1'’ >>
                 ‘∀mc.
                   (evaluate (sc with clock := mc + ck1) env [exp] =
                     (sc with <|clock := mc + ck2; refs := sc.refs ++ refs'|>, Rval [u]))’
