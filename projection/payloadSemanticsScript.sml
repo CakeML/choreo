@@ -121,4 +121,10 @@ val weak_trans_def = Define `
   weak_trans conf p alpha q =
     if alpha = LTau then (reduction conf)^* p q else weak_tau_trans conf p alpha q`
 
+val sender_def = Define `
+  sender LTau = NONE /\
+  (sender (LReceive p d q) = SOME p) /\
+  (sender (LSend p d q) = SOME p)
+  `
+
 val _ = export_theory ()

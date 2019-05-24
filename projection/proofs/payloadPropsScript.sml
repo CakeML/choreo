@@ -472,6 +472,23 @@ val trans_dequeue_intermediate_payload' = Q.store_thm("trans_dequeue_intermediat
   >> match_mp_tac (trans_dequeue_intermediate_payload)
   >> simp[]);
 
+val trans_let' = Q.store_thm("trans_let'",
+  `∀conf s v p f vl e q.
+         EVERY IS_SOME (MAP (FLOOKUP s.bindings) vl) ⇒
+         trans conf (NEndpoint p (s with queue:= q) (Let v f vl e)) LTau
+           (NEndpoint p
+              (<|bindings := s.bindings |+ (v,f (MAP (THE ∘ FLOOKUP s.bindings) vl));
+                 queue:= q
+                 |>) e)`,
+  rpt strip_tac
+  >> qmatch_goalsub_abbrev_tac `trans _ (NEndpoint _ s1 _) _ (NEndpoint _ s2 _)`
+  >> `s2 = s1 with bindings := s1.bindings |+ (v,f (MAP (THE ∘ FLOOKUP s1.bindings) vl))`
+     by(unabbrev_all_tac >> simp[])
+  >> pop_assum (fn thm => PURE_ONCE_REWRITE_TAC [thm])  
+  >> unabbrev_all_tac
+  >> match_mp_tac trans_let
+  >> simp[]);
+
 val qcong_sym_eq = Q.store_thm("qcong_sym_eq",
 `∀p q. qcong p q = qcong q p`,metis_tac[qcong_sym]);
 
@@ -928,5 +945,175 @@ val add_queue_def = Define `
      )
   ∧ (add_queue p1 qe p2 (NPar n1 n2) = NPar (add_queue p1 qe p2 n1) (add_queue p1 qe p2 n2))
 `
+
+Theorem trans_same_sender_determ:
+  trans conf p1 (LSend q2 d1 q1) p2
+  /\ trans conf p1 (LSend q2 d2 q3) p3
+  /\ ALL_DISTINCT(MAP FST(endpoints p1))
+  ==> q1 = q3 /\ d1 = d2 /\ p2 = p3
+Proof
+  qmatch_goalsub_abbrev_tac `trans _ _ alpha`
+  >> rpt(disch_then strip_assume_tac)
+  >> pop_assum mp_tac
+  >> qhdtm_x_assum `Abbrev` (mp_tac o REWRITE_RULE[markerTheory.Abbrev_def])
+  >> rpt(pop_assum mp_tac)
+  >> MAP_EVERY qid_spec_tac [`q2`,`d2`,`q1`,`d1`,`p3`,`q3`,`p2`,`alpha`,`p1`,`conf`]
+  >> Ho_Rewrite.PURE_REWRITE_TAC[GSYM PULL_FORALL]
+  >> ho_match_mp_tac trans_strongind
+  >> rpt conj_tac >> rpt(gen_tac ORELSE disch_then strip_assume_tac)
+  >> fs[] >> rveq
+  >> qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+  >> fs[] >> rveq >> fs[] >> rveq >> fs[endpoints_def,ALL_DISTINCT_APPEND]
+  >> metis_tac[sender_is_endpoint]
+QED
+
+Theorem trans_same_receiver_determ:
+  trans conf p1 (LReceive s d r) p2
+  /\ trans conf p1 (LReceive s d r) p3
+  /\ ALL_DISTINCT(MAP FST(endpoints p1))
+  ==> p2 = p3
+Proof
+  qmatch_goalsub_abbrev_tac `trans _ _ alpha`
+  >> rpt(disch_then strip_assume_tac)
+  >> pop_assum mp_tac
+  >> qhdtm_x_assum `Abbrev` (mp_tac o REWRITE_RULE[markerTheory.Abbrev_def])
+  >> rpt(pop_assum mp_tac)
+  >> MAP_EVERY qid_spec_tac [`p3`,`s`,`d`,`r`,`p2`,`alpha`,`p1`,`conf`]
+  >> Ho_Rewrite.PURE_REWRITE_TAC[GSYM PULL_FORALL]
+  >> ho_match_mp_tac trans_strongind
+  >> rpt conj_tac >> rpt(gen_tac ORELSE disch_then strip_assume_tac)
+  >> fs[] >> rveq
+  >> qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+  >> fs[] >> rveq >> fs[] >> rveq >> fs[endpoints_def,ALL_DISTINCT_APPEND]
+  >> metis_tac[receiver_is_endpoint]
+QED
+
+Theorem trans_no_selfloop:
+  !conf p1 alpha p2.
+  trans conf p1 alpha p2 /\ conf.payload_size > 0
+  ==> p1 <> p2
+Proof
+  PURE_REWRITE_TAC[GSYM AND_IMP_INTRO] >>
+  ho_match_mp_tac trans_ind >> rw[] >> fs[endpointLangTheory.state_component_equality] >>
+  TRY(disj2_tac) >> spose_not_then strip_assume_tac >>
+  qmatch_asmsub_abbrev_tac `a1 = a2` >>
+  `endpoint_size a1 = endpoint_size a2` by simp[] >>
+  pop_assum mp_tac >> unabbrev_all_tac >> rpt(pop_assum kall_tac) >>
+  simp[endpoint_size_def]
+QED
+
+Theorem trans_different_sender:
+  trans conf p1 (LSend s1 d1 r1) p2
+  /\ trans conf p1 (LSend s2 d2 r2) p3
+  /\ conf.payload_size > 0
+  /\ s1 <> s2
+  ==> p2 <> p3
+Proof
+  qmatch_goalsub_abbrev_tac `trans _ _ alpha`
+  >> rpt(disch_then strip_assume_tac)
+  >> pop_assum mp_tac
+  >> qhdtm_x_assum `Abbrev` (mp_tac o REWRITE_RULE[markerTheory.Abbrev_def])
+  >> rpt(pop_assum mp_tac)
+  >> MAP_EVERY qid_spec_tac [`r2`,`r1`,`d2`,`s2`,`d1`,`p3`,`s1`,`p2`,`alpha`,`p1`,`conf`]
+  >> Ho_Rewrite.PURE_REWRITE_TAC[GSYM PULL_FORALL]
+  >> ho_match_mp_tac trans_strongind
+  >> rpt conj_tac >> rpt(gen_tac ORELSE disch_then strip_assume_tac)
+  >> fs[] >> rveq
+  >> qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+  >> fs[] >> rveq >> fs[] >> rveq >> fs[endpoints_def,ALL_DISTINCT_APPEND]
+  >> metis_tac[sender_is_endpoint,trans_no_selfloop]
+QED
+
+(* TODO: remove? strictly weaker than trans_distinct_residual *)
+Theorem trans_send_receive_distinct:
+  trans conf p1 (LSend s1 d1 r1) p2
+  /\ trans conf p1 (LReceive s2 d2 r2) p3
+  /\ conf.payload_size > 0 (* not strictly needed *)
+  ==> p2 <> p3
+Proof
+  qmatch_goalsub_abbrev_tac `trans _ _ alpha`
+  >> rpt(disch_then strip_assume_tac)
+  >> pop_assum mp_tac
+  >> qhdtm_x_assum `Abbrev` (mp_tac o REWRITE_RULE[markerTheory.Abbrev_def])
+  >> rpt(pop_assum mp_tac)
+  >> MAP_EVERY qid_spec_tac [`r2`,`r1`,`d2`,`s2`,`d1`,`p3`,`s1`,`p2`,`alpha`,`p1`,`conf`]
+  >> Ho_Rewrite.PURE_REWRITE_TAC[GSYM PULL_FORALL]
+  >> ho_match_mp_tac trans_strongind
+  >> rpt conj_tac >> rpt(gen_tac ORELSE disch_then strip_assume_tac)
+  >> fs[] >> rveq
+  >> qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+  >> fs[] >> rveq >> fs[] >> rveq >> fs[endpoints_def,ALL_DISTINCT_APPEND]
+  >> fs[endpointLangTheory.state_component_equality]
+  >> metis_tac[sender_is_endpoint,trans_no_selfloop]
+QED
+
+Theorem trans_distinct_residual:
+  !conf p1 alpha p2 beta p3.
+  trans conf p1 alpha p2
+  /\ trans conf p1 beta p3
+  /\ alpha <> beta
+  /\ conf.payload_size > 0
+  ==> p2 <> p3
+Proof
+  Ho_Rewrite.PURE_REWRITE_TAC[GSYM PULL_FORALL,GSYM AND_IMP_INTRO] >>
+  ho_match_mp_tac trans_strongind >> rpt strip_tac >>
+  fs[] >> rveq
+  >- (* Send-last-payload *)
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >> fs[endpointLangTheory.state_component_equality])
+  >- (* Send-intermediate-payload *)
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >> fs[endpointLangTheory.state_component_equality])
+  >- (* Enqueue *)
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >> fs[endpointLangTheory.state_component_equality] >>
+      qmatch_asmsub_abbrev_tac `a1:endpoint = a2` >>
+      `endpoint_size a1 = endpoint_size a2` by simp[] >>
+      unabbrev_all_tac >> pop_assum mp_tac >> rpt(pop_assum kall_tac) >>
+      simp[endpoint_size_def])
+  >- (* Com-L *)
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >> fs[] >>
+      Cases_on `beta` >> fs[] >> metis_tac[trans_no_selfloop])
+  >- (* Com-R *)
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >> fs[] >>
+      Cases_on `beta` >> fs[] >> metis_tac[trans_no_selfloop])
+  >- (* Dequeue-last-payload *)
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >> fs[endpointLangTheory.state_component_equality] >>
+      qmatch_asmsub_abbrev_tac `a1:endpoint = a2` >>
+      `endpoint_size a1 = endpoint_size a2` by simp[] >>
+      unabbrev_all_tac >> pop_assum mp_tac >> rpt(pop_assum kall_tac) >>
+      simp[endpoint_size_def])
+  >- (* Dequeue-intermediate-payload *)
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >> fs[endpointLangTheory.state_component_equality] >>
+      qmatch_asmsub_abbrev_tac `a1:endpoint = a2` >>
+      `endpoint_size a1 = endpoint_size a2` by simp[] >>
+      unabbrev_all_tac >> pop_assum mp_tac >> rpt(pop_assum kall_tac) >>
+      simp[endpoint_size_def])
+  >- (* If-L *)
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >> fs[endpointLangTheory.state_component_equality])
+  >- (* If-R *)
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >> fs[endpointLangTheory.state_component_equality])
+  >- (* Let *)
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >> fs[endpointLangTheory.state_component_equality])
+  >- (* Par-L *)
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >> fs[] >> metis_tac[trans_no_selfloop])
+  >- (* Par-R *)
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >> fs[] >> metis_tac[trans_no_selfloop])
+QED
+
+Theorem intermediate_final_IMP:
+  !d. intermediate d /\ final d ==> F
+Proof
+  Cases >> rpt strip_tac >> fs[intermediate_def,final_def] >> rveq >> fs[]
+QED
 
 val _ = export_theory ();
