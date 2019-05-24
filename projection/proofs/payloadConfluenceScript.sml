@@ -740,6 +740,111 @@ Proof
           rpt(first_x_assum(qspec_then `n1` assume_tac)) >>
           ntac 2 (asm_exists_tac >> simp[]) >>
           metis_tac[qcong_rules]))
-QED  
-  
+QED
+
+(* TODO: move? *)
+Theorem REPLICATE_SUC_SNOC:
+  REPLICATE (SUC m) e = REPLICATE m e ++ [e]
+Proof
+  simp[REPLICATE_GENLIST] >>
+  match_mp_tac LIST_EQ >>
+  rw[EL_CONS_IF] >>
+  rw[EL_APPEND_EQN] >>
+  `x - m = 0` by intLib.COOPER_TAC >>
+  simp[]
+QED
+
+Theorem payload_confluence_contract:
+  ∀m conf p1 p2 p3.
+   trans conf p1 LTau p2 /\
+   list_trans conf p1 (REPLICATE m LTau) p3 /\
+   ALL_DISTINCT (MAP FST (endpoints p1)) /\
+   conf.payload_size > 0
+   ==>
+   (?n p4. list_trans conf p2 (REPLICATE n LTau) p4 /\
+        n <= m /\
+        qcong p3 p4) \/
+   (?n p4 p5. list_trans conf p2 (REPLICATE n LTau) p4 /\
+        trans conf p3 LTau p5 /\
+        n <= m /\
+        qcong p4 p5)
+Proof
+  Induct >> rpt strip_tac
+  >- (fs[list_trans_def] >> rveq >>
+      disj2_tac >> asm_exists_tac >> simp[qcong_refl])
+  >> FULL_SIMP_TAC bool_ss [REPLICATE_SUC_SNOC]
+  >> fs[list_trans_append,list_trans_def]
+  >> first_x_assum drule_all
+  >> strip_tac
+  >- (drule qcong_trans_pres >>
+      disch_then drule >> strip_tac >>
+      `list_trans conf p2 (REPLICATE (SUC n) LTau) q2`
+        by(PURE_REWRITE_TAC[REPLICATE_SUC_SNOC] >>
+           rw[list_trans_append,list_trans_def] >>
+           metis_tac[]) >>
+      disj1_tac >>
+      asm_exists_tac >> simp[])
+  >- (Cases_on `p3 = p5`
+      >- (rveq >>
+          disj1_tac >> asm_exists_tac >>
+          simp[qcong_sym]) >>
+      disj2_tac >>
+      imp_res_tac endpoint_names_trans >>
+      imp_res_tac endpoint_names_list_trans >>      
+      dxrule payload_local_confluence_tau >>
+      disch_then dxrule >>
+      impl_tac >- simp[] >>
+      strip_tac >>
+      qhdtm_x_assum `qcong` mp_tac >>
+      drule_all(qcong_trans_pres |> PURE_ONCE_REWRITE_RULE [qcong_sym_eq]) >>
+      rpt strip_tac >>
+      `list_trans conf p2 (REPLICATE (SUC n) LTau) q2`
+        by(PURE_ONCE_REWRITE_TAC [REPLICATE_SUC_SNOC] >>
+           rw[list_trans_def,list_trans_append] >> metis_tac[]) >>
+      asm_exists_tac >> simp[] >>
+      asm_exists_tac >> simp[] >>
+      metis_tac[qcong_trans])
+QED
+
+Theorem payload_confluence_weak_contract:
+  ∀n m conf p1 p2 p3.
+   list_trans conf p1 (REPLICATE n LTau) p2 /\
+   list_trans conf p1 (REPLICATE m LTau) p3 /\
+   ALL_DISTINCT (MAP FST (endpoints p1)) /\
+   conf.payload_size > 0
+   ==>
+   (?n' m' p4 p5. list_trans conf p2 (REPLICATE n' LTau) p4 /\
+        list_trans conf p3 (REPLICATE m' LTau) p5 /\
+        n' <= m /\ m' <= n /\
+        qcong p4 p5)
+Proof
+  Induct >> rpt strip_tac
+  >- (fs[list_trans_def] >> rveq >>
+      asm_exists_tac >> simp[qcong_refl])
+  >> FULL_SIMP_TAC bool_ss [REPLICATE_SUC_SNOC]
+  >> fs[list_trans_append,list_trans_def]
+  >> first_x_assum drule_all
+  >> strip_tac
+  >> drule payload_confluence_contract
+  >> disch_then drule
+  >> impl_tac
+  >- (imp_res_tac endpoint_names_trans >>
+      imp_res_tac endpoint_names_list_trans >>
+      fs[])
+  >> strip_tac
+  >- (asm_exists_tac >> simp[] >> asm_exists_tac >> simp[] >> metis_tac[qcong_rules])
+  >> qhdtm_x_assum `qcong` mp_tac
+  >> drule qcong_trans_pres  
+  >> disch_then drule
+  >> strip_tac
+  >> `list_trans conf p3 (REPLICATE (SUC m') LTau) q2` (* TODO: (mild) generated names *)
+        by(PURE_REWRITE_TAC[REPLICATE_SUC_SNOC] >>
+           rw[list_trans_append,list_trans_def] >>
+           metis_tac[])
+  >> strip_tac
+  >> asm_exists_tac >> simp[]
+  >> asm_exists_tac >> simp[]
+  >> metis_tac[qcong_rules]
+QED
+
 val _ = export_theory();

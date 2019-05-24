@@ -911,6 +911,12 @@ val endpoint_names_trans = Q.store_thm("endpoint_names_trans",
   `!conf n1 alpha n2. trans conf n1 alpha n2 ==> MAP FST (endpoints n2) = MAP FST(endpoints n1)`,
   ho_match_mp_tac trans_strongind >> rpt strip_tac >> fs[endpoints_def]);
 
+val endpoint_names_trans = Q.store_thm("endpoint_names_list_trans",
+  `!conf n1 alpha n2. list_trans conf n1 alpha n2 ==> MAP FST (endpoints n2) = MAP FST(endpoints n1)`,
+  Induct_on `alpha` >> rw[list_trans_def] >>
+  metis_tac[
+  ho_match_mp_tac trans_strongind >> rpt strip_tac >> fs[endpoints_def]);
+
 val sender_is_endpoint = Q.store_thm("sender_is_endpoint",
  `∀p1 p2 q1 d q2 conf.
   trans conf p1 (LSend q1 d q2) p2 ==> MEM q1 (MAP FST (endpoints p1))`,
