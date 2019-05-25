@@ -1,6 +1,7 @@
 open preamble endpointLangTheory payloadLangTheory endpoint_to_payloadTheory
               endpointPropsTheory              
-              payloadSemanticsTheory endpointSemanticsTheory payloadPropsTheory;
+              payloadSemanticsTheory endpointSemanticsTheory payloadPropsTheory
+              payloadConfluenceTheory;
 
 val _ = new_theory "endpoint_to_payloadProof";
 
@@ -16,10 +17,6 @@ val compile_queue_lift_ineq = Q.store_thm("compile_queue_lift_ineq",
   >> rpt strip_tac
   >> fs[compile_queue_def]
   >> simp[EVERY_MAP]);
-
-val list_trans_def = Define `
-    (list_trans conf p [] q = (p = q))
- /\ (list_trans conf p (alpha::l) q = ?p'. trans conf p alpha p' /\ list_trans conf p' l q)`
 
 val list_trans_par_l = Q.store_thm("list_trans_par_l",
   `∀conf p alpha q r. list_trans conf p alpha q ==> list_trans conf (NPar p r) alpha (NPar q r)`,
@@ -384,13 +381,97 @@ val compile_network_preservation = Q.store_thm("compile_network_preservation",
   >> drule compile_network_preservation_trans >> simp[Once CONJ_SYM]
   >> rpt(disch_then drule) >> strip_tac >> metis_tac[RTC_RTC]);
 
+val compile_network_reflection_single = Q.store_thm("compile_network_reflection_single",
+  `∀p1 p2 conf.
+    conf.payload_size > 0
+    ∧ reduction conf (compile_network conf p1) p2
+    ∧ ALL_DISTINCT (MAP FST (endpoints p1))
+    ∧ choice_free_network p1
+    ==> ∃p3 p4. (reduction conf)^* p2 p3
+             ∧ reduction p1 p4
+             ∧ p3 = compile_network conf p4`,
+  cheat);
+
+Theorem reduction_list_trans:
+  (reduction conf)^* p q = ?n. list_trans conf p (REPLICATE n LTau) q
+Proof
+  simp[EQ_IMP_THM] >>
+  conj_tac
+  >- (MAP_EVERY qid_spec_tac [`q`,`p`] >>
+      ho_match_mp_tac RTC_INDUCT >>
+      rw[]
+      >- (qexists_tac `0` >> simp[list_trans_def])
+      >- (fs[payloadSemanticsTheory.reduction_def] >>
+          qexists_tac `SUC n` >>
+          simp[list_trans_def] >>
+          asm_exists_tac >> simp[]))
+  >- (rpt strip_tac >> pop_assum mp_tac >>
+      MAP_EVERY qid_spec_tac [`q`,`p`,`n`] >>
+      Induct >>
+      rw[list_trans_def] >>
+      fs[GSYM payloadSemanticsTheory.reduction_def] >>
+      metis_tac[RTC_RULES])
+QED
+
+Theorem compile_network_endpoints:
+  MAP FST(endpoints(compile_network conf p1)) = MAP FST (endpoints p1)
+Proof
+  Induct_on `p1` >>
+  rw[payloadPropsTheory.endpoints_def,endpointPropsTheory.endpoints_def,
+     compile_network_def]
+QED
+
 val compile_network_reflection = Q.store_thm("compile_network_reflection",
   `∀p1 p2 conf.
     conf.payload_size > 0
     ∧ (reduction conf)^* (compile_network conf p1) p2
+    ∧ ALL_DISTINCT (MAP FST (endpoints p1))
+    ∧ choice_free_network p1
     ==> ∃p3 p4. (reduction conf)^* p2 p3
              ∧ reduction^* p1 p4
              ∧ qcong p3 (compile_network conf p4)`,
-  cheat);
+  simp[reduction_list_trans,PULL_EXISTS] >>
+  CONV_TAC(RESORT_FORALL_CONV rev) >>
+  ho_match_mp_tac COMPLETE_INDUCTION >>
+  Cases
+  >- (rw[list_trans_def] >>
+      CONV_TAC(RESORT_EXISTS_CONV rev) >>
+      qexists_tac `0` >> rw[list_trans_def] >>
+      metis_tac[qcong_refl,RTC_REFL])
+  >- (rw[list_trans_def,GSYM payloadSemanticsTheory.reduction_def] >>
+      drule_all(compile_network_reflection_single
+                |> REWRITE_RULE[PULL_EXISTS,reduction_list_trans]) >>
+      strip_tac >>
+      rveq >>
+      dxrule payload_confluence_weak_contract >>
+      disch_then dxrule >>
+      impl_tac
+      >- (metis_tac[endpoint_names_trans,payloadSemanticsTheory.reduction_def,
+                    compile_network_endpoints]) >>
+      strip_tac >>
+      rename1 `list_trans _ (compile_network _ _) (REPLICATE stepcount _) _` >>
+      first_x_assum(qspec_then `stepcount` mp_tac ) >>
+      impl_tac >- simp[] >>
+      disch_then drule >>
+      disch_then drule >>
+      impl_tac >- (conj_tac >-
+                     (metis_tac[reduction_def,endpointPropsTheory.endpoint_names_trans,
+                                endpoint_names_list_trans]) >>
+                   fs[reduction_def] >>
+                   imp_res_tac choice_free_trans_pres) >>
+      strip_tac >>
+      qhdtm_x_assum `qcong` mp_tac >>
+      drule_all_then strip_assume_tac qcong_list_trans_pres >>
+      strip_tac >>
+      rename1 `list_trans conf p2 (REPLICATE sc1 _) r` >>
+      rename1 `list_trans conf r (REPLICATE sc2 _) t` >>
+      `list_trans conf p2 (REPLICATE (sc1 + sc2) LTau) t`
+        by(simp[GSYM REPLICATE_APPEND,list_trans_append] >>
+           metis_tac[]) >>
+      asm_exists_tac >>
+      drule_all_then assume_tac (RTC_RULES |> SPEC_ALL |> CONJUNCT2) >>
+      simp[] >> asm_exists_tac >>
+      metis_tac[qcong_rules])
+  );
 
 val _ = export_theory ()

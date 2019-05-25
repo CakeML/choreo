@@ -911,11 +911,10 @@ val endpoint_names_trans = Q.store_thm("endpoint_names_trans",
   `!conf n1 alpha n2. trans conf n1 alpha n2 ==> MAP FST (endpoints n2) = MAP FST(endpoints n1)`,
   ho_match_mp_tac trans_strongind >> rpt strip_tac >> fs[endpoints_def]);
 
-val endpoint_names_trans = Q.store_thm("endpoint_names_list_trans",
+val endpoint_names_list_trans = Q.store_thm("endpoint_names_list_trans",
   `!conf n1 alpha n2. list_trans conf n1 alpha n2 ==> MAP FST (endpoints n2) = MAP FST(endpoints n1)`,
   Induct_on `alpha` >> rw[list_trans_def] >>
-  metis_tac[
-  ho_match_mp_tac trans_strongind >> rpt strip_tac >> fs[endpoints_def]);
+  metis_tac[endpoint_names_trans]);
 
 val sender_is_endpoint = Q.store_thm("sender_is_endpoint",
  `∀p1 p2 q1 d q2 conf.
@@ -1120,6 +1119,16 @@ Theorem intermediate_final_IMP:
   !d. intermediate d /\ final d ==> F
 Proof
   Cases >> rpt strip_tac >> fs[intermediate_def,final_def] >> rveq >> fs[]
+QED
+
+Theorem qcong_list_trans_pres:
+  !conf p l q p'. list_trans conf p l q /\ qcong p p'
+  ==> ?q'. list_trans conf p' l q' /\ qcong q q'
+Proof
+  Induct_on `l` >>
+  rw[list_trans_def] >> simp[] >>
+  dxrule_all_then strip_assume_tac qcong_trans_pres >>
+  metis_tac[]
 QED
 
 val _ = export_theory ();
