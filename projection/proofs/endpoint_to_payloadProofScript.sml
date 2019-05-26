@@ -437,6 +437,124 @@ Proof
   >> rw[]
 QED
 
+val compile_network_reflection_single_send = Q.store_thm("compile_network_reflection_single_send",
+  `∀p1 p2 conf s d r.
+    conf.payload_size > 0
+    ∧ trans conf (compile_network conf p1) (LSend s d r) p2
+    ==> ∃p3 od ds.
+      HD(compile_message conf od) = d /\
+      trans p1 (LSend s od r) p3 /\
+      list_trans conf p2 (MAP (λd. LSend s d r) (TL(compile_message conf od)))
+                 (compile_network conf p3)`,
+  Induct_on `p1` >> rw[compile_network_def]
+  >- (* NNil *)
+     fs[payloadSemanticsTheory.reduction_def,trans_nil_false]
+  >- (* NPar *)
+     (fs[payloadSemanticsTheory.reduction_def] >>
+      qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once payloadSemanticsTheory.trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >> fs[]
+      >- (* Par-L *)
+         (fs[endpointPropsTheory.endpoints_def,ALL_DISTINCT_APPEND,choice_free_network_def] >>
+          first_x_assum drule_all >> strip_tac >>
+          fs[GSYM payloadSemanticsTheory.reduction_def] >>
+          rename1 `compile_network conf q` >>
+          drule_then (qspec_then `compile_network conf q` assume_tac) list_trans_par_l >>
+          Q.REFINE_EXISTS_TAC `NPar _ _` >>
+          simp[compile_network_def] >>
+          asm_exists_tac >> simp[] >>
+          metis_tac[trans_par_l,reduction_def])
+      >- (* Par-R *)
+         (fs[endpointPropsTheory.endpoints_def,ALL_DISTINCT_APPEND,choice_free_network_def] >>
+          first_x_assum drule_all >> strip_tac >>
+          fs[GSYM payloadSemanticsTheory.reduction_def] >>
+          rename1 `compile_network conf q` >>
+          drule_then (qspec_then `compile_network conf q` assume_tac) list_trans_par_r >>
+          Q.REFINE_EXISTS_TAC `NPar _ _` >>
+          simp[compile_network_def] >>
+          asm_exists_tac >> simp[] >>
+          metis_tac[trans_par_r,reduction_def]))
+  >- (* NEndpoint *)
+     (fs[payloadSemanticsTheory.reduction_def] >>
+      qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once payloadSemanticsTheory.trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >> fs[]
+      >- (* Send-last-payload *)
+         (Cases_on `e` >> fs[compile_endpoint_def] >> rveq >> fs[] >>
+          rename1 `pad _ d` >> rename1 `NEndpoint l s (Send p v e)` >>
+          qexists_tac `NEndpoint l s e` >> qexists_tac `d` >>
+          conj_tac >- rw[Once compile_message_def] >>
+          conj_tac >- metis_tac[trans_send] >>
+          rw[compile_network_def,Once compile_message_def,list_trans_def,DROP_LENGTH_TOO_LONG] >>
+          fs[final_pad_LENGTH])
+      >- (* Send-intermediate-payload *)
+         (Cases_on `e` >> fs[compile_endpoint_def] >> rveq >> fs[] >>
+          rename1 `pad _ d` >> rename1 `NEndpoint l s (Send p v e)` >>
+          qexists_tac `NEndpoint l s e` >> qexists_tac `d` >>
+          conj_tac >- rw[Once compile_message_def] >>
+          conj_tac >- metis_tac[trans_send] >>
+          rw[compile_network_def,Once compile_message_def,list_trans_def,DROP_LENGTH_TOO_LONG] >>
+          fs[final_pad_LENGTH] >>
+          match_mp_tac compile_message_preservation_send >>
+          simp[])
+     )
+  );
+
+val compile_network_reflection_single_receive = Q.store_thm("compile_network_reflection_single_receive",
+  `∀p1 p2 conf s d r.
+    conf.payload_size > 0
+    ∧ trans conf (compile_network conf p1) (LReceive s (HD(compile_message conf d)) r) p2
+    ==> ∃p3.
+      trans p1 (LReceive s d r) p3 /\
+      list_trans conf p2 (MAP (λd. LReceive s d r) (TL(compile_message conf d)))
+                 (compile_network conf p3)`,
+  Induct_on `p1` >> rw[compile_network_def]
+  >- (* NNil *)
+     fs[payloadSemanticsTheory.reduction_def,trans_nil_false]
+  >- (* NPar *)
+     (fs[payloadSemanticsTheory.reduction_def] >>
+      qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once payloadSemanticsTheory.trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >> fs[]
+      >- (* Par-L *)
+         (fs[endpointPropsTheory.endpoints_def,ALL_DISTINCT_APPEND,choice_free_network_def] >>
+          first_x_assum drule_all >> strip_tac >>
+          fs[GSYM payloadSemanticsTheory.reduction_def] >>
+          rename1 `compile_network conf q` >>
+          drule_then (qspec_then `compile_network conf q` assume_tac) list_trans_par_l >>
+          Q.REFINE_EXISTS_TAC `NPar _ _` >>
+          simp[compile_network_def] >>
+          metis_tac[trans_par_l])
+      >- (* Par-R *)
+         (fs[endpointPropsTheory.endpoints_def,ALL_DISTINCT_APPEND,choice_free_network_def] >>
+          first_x_assum drule_all >> strip_tac >>
+          fs[GSYM payloadSemanticsTheory.reduction_def] >>
+          rename1 `compile_network conf q` >>
+          drule_then (qspec_then `compile_network conf q` assume_tac) list_trans_par_r >>
+          Q.REFINE_EXISTS_TAC `NPar _ _` >>
+          simp[compile_network_def] >>
+          metis_tac[trans_par_r]))
+  >- (* NEndpoint *)
+     (fs[payloadSemanticsTheory.reduction_def] >>
+      qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once payloadSemanticsTheory.trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >> fs[] >>
+      qexists_tac `NEndpoint l (s with queue := SNOC (s',d) s.queue) e` >>
+      rw[trans_enqueue] >>
+      fs[compile_network_def] >>
+      rw[Once compile_message_def] >-
+        (rw[Once compile_message_def,list_trans_def] >>
+         simp[SNOC_APPEND,compile_queue_def,compile_queue_append] >>
+         rw[Once compile_message_def]) >>
+      rw[Once compile_message_def] >>
+      drule_all compile_message_preservation_enqueue >>
+      qmatch_goalsub_abbrev_tac `sa with queue := qa` >>
+      disch_then(qspecl_then [`DROP conf.payload_size d`,
+                              `qa`,`compile_endpoint e`,`sa`] mp_tac) >>
+      qmatch_goalsub_abbrev_tac `list_trans _ _ _ (NEndpoint _ (_ with queue := q1) _)
+                                 ==> list_trans _ _ _ (NEndpoint _ (_ with queue := q2) _)` >>
+      `q1 = q2` suffices_by metis_tac[] >>
+      unabbrev_all_tac >>
+      rw[compile_queue_def,compile_queue_append] >>
+      simp[SimpR ``$=``,Once compile_message_def])
+  );
+
 val compile_network_reflection_single = Q.store_thm("compile_network_reflection_single",
   `∀p1 p2 conf.
     conf.payload_size > 0
@@ -454,9 +572,27 @@ val compile_network_reflection_single = Q.store_thm("compile_network_reflection_
       qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once payloadSemanticsTheory.trans_cases]) >>
       fs[] >> rveq >> fs[] >> rveq >> fs[]
       >- (* Com-L *)
-         cheat
+         (drule_all_then strip_assume_tac compile_network_reflection_single_send >>
+          rveq >>
+          drule_all_then strip_assume_tac compile_network_reflection_single_receive >>
+          drule_all_then assume_tac compile_network_preservation_com_l >>
+          drule_all_then assume_tac payloadSemanticsTheory.trans_com_l >>
+          drule_all_then assume_tac trans_com_l >>
+          Q.REFINE_EXISTS_TAC `NPar _ _` >>
+          simp[compile_network_def] >>
+          asm_exists_tac >>
+          simp[reduction_def])
       >- (* Com-R *)
-         cheat
+         (drule_all_then strip_assume_tac compile_network_reflection_single_send >>
+          rveq >>
+          drule_all_then strip_assume_tac compile_network_reflection_single_receive >>
+          drule_all_then assume_tac compile_network_preservation_com_r >>
+          drule_all_then assume_tac payloadSemanticsTheory.trans_com_r >>
+          drule_all_then assume_tac trans_com_r >>
+          Q.REFINE_EXISTS_TAC `NPar _ _` >>
+          simp[compile_network_def] >>
+          asm_exists_tac >>
+          simp[reduction_def])
       >- (* Par-L *)
          (fs[endpointPropsTheory.endpoints_def,ALL_DISTINCT_APPEND,choice_free_network_def] >>
           first_x_assum drule_all >> strip_tac >>
