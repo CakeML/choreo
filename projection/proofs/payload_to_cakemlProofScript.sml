@@ -10,19 +10,6 @@ open preamble
 
 val _ = new_theory "payload_to_cakemlProof";
 
-(*
-val pres_ref_def = Define
-  ‘
-  pres_ref cl =
-     ∀v.
-      ∃env exp mc dc refs' u.
-        do_opapp [cl; v] = SOME (env,exp) ∧
-        (∀sc :comms_state semanticPrimitives$state.
-          (mc ≤ sc.clock ⇔ (evaluate sc env [exp] = (sc with <| clock := sc.clock - dc; refs := sc.refs ++ refs' |>, Rval [u]))) ∧
-          (mc > sc.clock ⇔ ∃es. evaluate sc env [exp] = (es, Rerr (Rabort Rtimeout_error)))
-        )
-  ’;
-*)
 
 val has_v_def = Define
   ‘has_v env n cfty f =
@@ -616,408 +603,54 @@ val sem_env_cor_def =
         )
     ’;
 
-(* UNDERSTANDING WHAT LABELS MEAN IN CAKEML LAND - CONSISTENCY OF STATE *)
-
-(* CHECK OF FFI STATE AND PAYLOAD STATE CONSISTENCY WITH LABELS *)
-val check_ffi_past_def =
-    Define
-    ‘
-    check_ffi_past pySt ffiSt = (LTAKE (LENGTH pySt.queue) ffiSt.receive_messages = SOME pySt.queue)
-    ’;
-
-val TLDROP_def =
+(* CHECKING CONSISTENCY BETWEEN FFI AND PAYLOAD STATE *)
+val ffi_cor_def =
   Define
   ‘
-  TLDROP n ll = case LDROP n ll of
-                    SOME x => x
-                |   NONE   => LNIL
+  ffi_cor cpNum pSt (fNum,fQueue,fNet) =
+    ((cpNum = fNum) ∧
+     (∀extproc.
+      let
+        (pMes = FILTER (λ(n,_). n = extproc) pSt.queue);
+        (fMes = FILTER (λ(n,_). n = extproc) fQueue)
+      in  
+          isPREFIX pMes fMes))
   ’;
 
-Theorem TAKE_NONE_DROP_NONE:
-  ∀n ll. LTAKE n ll = NONE ⇔ LDROP n ll = NONE
+(* FINAL DEFINITION OF A VALID PAYLOAD/CAKEML EVALUATION *)
+
+val cpEval_valid_def =
+  Define
+  ‘
+  cpEval_valid conf cpNum cEnv pSt pCd vs cSt =
+    (enc_ok conf cEnv (letfuns pCd) vs ∧
+     sem_env_cor conf pSt cEnv ∧
+     ffi_cor cpNum pSt cSt.ffi.ffi_state)
+  ’;
+
+(* DEFINITION OF EQUIVALENT CAKEML EVALUTATIONS *)
+
+val cEval_equiv_def =
+  Define
+  ‘
+  cEval_equiv conf (csA,crA) (csB,crB) =
+    ((ffi_eq conf csA.ffi.ffi_state csB.ffi.ffi_state) ∧
+     (crA = crB))
+  ’;
+
+
+Theorem ffi_irrel:
+  ∀conf se cpNum cEnv pSt pCd vs cSt1 cSt2.
+    cpEval_valid conf cpNum cEnv pSt pCd vs cSt1 ∧
+    cpEval_valid conf cpNum cEnv pSt pCd vs cSt2 ∧
+    ffi_eq conf cSt1.ffi.ffi_state cSt2.ffi.ffi_state
+    ⇒ ∃mc. cEval_equiv conf
+            (evaluate (cSt1  with clock := mc) cEnv
+                      [compile_endpoint conf vs  ep])
+            (evaluate (cSt2  with clock := mc) cEnv
+                      [compile_endpoint conf vs  ep])
 Proof
-  Induct_on ‘n’
-  >> simp[]
-  >> Cases_on ‘ll’
-  >> simp[]
-QED
-
-Theorem LTAKE_TLDROP_THM:
-  ∀ll1 ll2 n l. (LTAKE n ll1 = SOME l) ∧
-                (LTAKE n ll2 = SOME l) ∧
-                (TLDROP n ll1 = TLDROP n ll2) ⇒
-                ll1 = ll2
-Proof
-  rw[LNTH_EQ] >>
-  rename [‘LNTH m ll1 = LNTH m ll2’] >>
-  Cases_on ‘m < n’
-  >- metis_tac[LTAKE_LNTH_EL] >>
-  fs[TLDROP_def] >>
-  ‘LENGTH l = n’
-    by metis_tac[LTAKE_LENGTH] >>
-  rpt (dxrule_then strip_assume_tac LTAKE_IMP_LDROP) >>
-  qpat_assum ‘LAPPEND _ _ = ll2’ (fn x => SUBST1_TAC (GSYM x)) >>
-  qpat_assum ‘LAPPEND _ _ = ll1’ (fn x => SUBST1_TAC (GSYM x)) >>
-  fs[LNTH_LAPPEND]
-QED
-
-val get_ffi_future_def =
-    Define
-    ‘
-    get_ffi_future pySt ffiSt = TLDROP (LENGTH pySt.queue) ffiSt.receive_messages
-    ’;
-
-val ffi_stat_prog_cons_def =
-    Define
-    ‘
-    ffi_stat_prog_cons pySt1 ffiSt1 lab pySt2 ffiSt2 =
-        ((check_ffi_past pySt1 ffiSt1) ∧
-        (check_ffi_past pySt2 ffiSt2) ∧
-        (case lab of
-                LReceive src data _ => (get_ffi_future pySt1 ffiSt1 = (src,data):::get_ffi_future pySt2 ffiSt2)
-            |   _                   => (get_ffi_future pySt1 ffiSt1 = get_ffi_future pySt2 ffiSt2)
-        ) ∧
-        (case lab of
-                LSend _ data dest   => (ffiSt2.sent_messages = (dest,data)::ffiSt1.sent_messages)
-            |   _                   => (ffiSt2.sent_messages = ffiSt1.sent_messages)
-        )
-        )
-    ’;
-
-val stat_prog_cor_def =
-    Define
-    ‘
-    stat_prog_cor pySt1 ckSt1 lab pySt2 ckSt2 =
-        (ffi_stat_prog_cons pySt1 (ckSt1.ffi.ffi_state) lab pySt2 (ckSt2.ffi.ffi_state) ∧
-        (ckSt1.ffi.oracle = comms_ffi_oracle) ∧
-        (ckSt2.ffi.oracle = comms_ffi_oracle))
-    ’;
-
-Theorem payload_cakeml_proj_irrelrefs:
-  ∀sc sc' se se' vs vs' ep sc1 res conf.
-    env_asm se conf ∧
-    env_asm se' conf ∧
-    enc_ok conf se (letfuns ep) vs ∧
-    enc_ok conf se' (letfuns ep) vs' ∧
-    stat_prog_cor sp sc LTau sp sc' ∧
-    evaluate sc  se  [compile_endpoint conf vs ep]  = (sc1, res)
-    ⇒
-    ∃sc1'. evaluate sc' se'  [compile_endpoint conf vs' ep]  = (sc1', res) ∧
-           sc1.ffi.ffi_state = sc1'.ffi.ffi_state
-Proof
-  Induct_on ‘ep’ >>
-  simp[compile_endpoint_def]
-  >- (simp[evaluate_def,do_con_check_def,build_conv_def] >>
-      simp[stat_prog_cor_def,ffi_stat_prog_cons_def,check_ffi_past_def,get_ffi_future_def] >>
-      rw[comms_state_component_equality] >>
-      metis_tac[LTAKE_TLDROP_THM])
-  >- (rw[evaluate_def,env_asm_def] >>
-      rw[do_if_def]
-QED
-
-Theorem payload_cakeml_proj_irrelrefs:
-  ∀sc0 se conf vs ep sc1 res.
-    env_asm se conf ∧
-    evaluate sc0  se  [compile_endpoint conf vs ep]  = (sc1, res)
-    ⇒
-    ∃δ. sc1.refs = sc0.refs ++ δ ∧
-        ∀refs'. evaluate (sc0 with refs := refs') se [compile_endpoint conf vs  ep] =
-                (sc1 with refs := refs' ++ δ, res)
-Proof
-  Induct_on ‘ep’
-  (* Nil endpoint case *)
-  >- (rw[compile_endpoint_def,evaluate_def] >>
-      fs[build_conv_def,do_con_check_def])
-  (* Send endpoint case *)
-  >- (simp[compile_endpoint_def,evaluate_def] >>
-      rw[AllCaseEqs ()] >>
-      fs[PULL_EXISTS] >>
-      rename [‘evaluate _ lenv [lexp] = (_,_)’,
-                  ‘nsLookup _ (Short mlistNm) = SOME mval’,
-                  ‘nsLookup _ conf.length = SOME lc’]
-      >- (drule_then assume_tac (CONJUNCT1 evaluate_length) >>
-          fs[] >>
-          rename [‘evaluate _ lenv [lexp] = (_,Rval lvs)’] >>
-          ‘∃lv. lvs = [lv]’
-            by (Cases_on ‘lvs’ >> fs[]) >>
-          rw[] >> fs[] >>
-          ‘pres_ref lc’
-            by fs[env_asm_def,has_v_def] >>
-          fs[pres_ref_def] >>
-          cheat
-          (*
-          pop_assum (qspec_then ‘mval’ (qx_choose_then ‘δ’ assume_tac)) >>
-          qexists_tac ‘δ’ >>
-          rfs[] >>
-          fs[eval_rel_def] >>
-          cheat
-          *)
-          )
-      >- (cheat)
-      >- (cheat)
-      >- (cheat)
-      >- (cheat))
-(*          >> 
-        )
-      Cases_on ‘nsLookup se.v (Short s)’ >>
-      fs[] >>
-      Cases_on ‘nsLookup se.v conf.length’ >>
-      fs[] >>
-      Cases_on ‘res’ >>
-      fs[] >>
-      qexists_tac ‘refs'’ >>
-      simp[] >>
-      Cases_on ‘do_opapp [x'; x]’
-      >- fs[]
-      >- (fs[]
-
-
-      >- (fs[] >>
-          Cases_on ‘res’ >>
-          fs[] >>
-          qexists_tac ‘refs'’ >>
-          simp[])
-      >- (fs[] >>
-          Cases_on ‘nsLookup se.v conf.length’ >>
-          fs[] >>)
-
-
-      fs[]
-      Cases_on ‘’ *)
-  >- (cheat)
-  >- (cheat)
-  >- (cheat)
-QED
-
-
-Theorem payload_cakeml_proj_correct:
-    ∀conf p sp sp' ep ep' L.
-        trans conf (NEndpoint p sp ep) L (NEndpoint p sp' ep')
-        ⇒  (∀se vs se' vs' sc sc'.
-                (enc_ok conf se  (letfuns ep)  vs)  ∧
-                (enc_ok conf se' (letfuns ep') vs') ∧
-                (sem_env_cor conf sp  se)  ∧
-                (sem_env_cor conf sp' se') ∧
-                (stat_prog_cor sp sc L sp' sc')
-                ⇒ ∃mc s s' res.
-                    (evaluate (sc  with clock := mc)  se  [compile_endpoint conf vs  ep]  = (s, res)) ∧
-                    (evaluate (sc' with clock := mc)  se' [compile_endpoint conf vs' ep'] = (s',res)) ∧
-                    (s.ffi.ffi_state = s'.ffi.ffi_state) 
-            )
-Proof
-    Cases_on ‘ep’
-    (* Nil Endpoint Case *)
-    >- (rpt strip_tac >>
-        Cases_on ‘L’ >>
-        fs[Once trans_cases] >>
-        (* Only LReceive Possible *)
-        rw[compile_endpoint_def,evaluate_def] >>
-        rw[do_con_check_def,build_conv_def] >>
-        (* We don't actually need all the assumptions *)
-        fs[stat_prog_cor_def,ffi_stat_prog_cons_def] >>
-        (* Everything else is equal in the record by assumptions *)
-        ‘sc.ffi.ffi_state.receive_messages = sc'.ffi.ffi_state.receive_messages’
-            suffices_by rw[comms_state_component_equality] >>
-        (* Essentially split the lists and abbreviate to allow for proof *)
-        fs[check_ffi_past_def,get_ffi_future_def] >>
-        fs[TLDROP_def] >>
-        rw[LNTH_EQ] >>
-        fs[check_ffi_past_def] >>
-        qabbrev_tac ‘LQ = LENGTH sp.queue’ >>
-        qabbrev_tac ‘OR = sc.ffi.ffi_state.receive_messages’ >>
-        qabbrev_tac ‘NR = sc'.ffi.ffi_state.receive_messages’ >>
-        ‘OR = LAPPEND (fromList (THE (LTAKE LQ OR))) (THE (LDROP LQ OR))’
-            by (‘¬LFINITE OR ∨ LQ ≤ (THE (LLENGTH OR))’
-                    by (CCONTR_TAC >>
-                        Cases_on ‘LLENGTH OR’ >>
-                        fs[LTAKE_LLENGTH_NONE] >>
-                        fs[LLENGTH]) >>
-                metis_tac[LTAKE_DROP]) >>
-        ‘NR = LAPPEND (fromList (THE (LTAKE LQ NR))) (THE (LDROP LQ NR))’
-            by (‘¬LFINITE NR ∨ LQ ≤ (THE (LLENGTH NR))’
-                    by (CCONTR_TAC >>
-                        Cases_on ‘LLENGTH NR’ >>
-                        fs[LTAKE_LLENGTH_NONE] >>
-                        fs[LLENGTH]) >>
-                metis_tac[LTAKE_DROP]) >>
-        first_x_assum (SUBST1_TAC) >>
-        first_x_assum (SUBST1_TAC) >>
-        (* Can quickly reduce to the tail equality *)
-        ‘LTAKE LQ NR = SOME sp.queue’
-            by (CCONTR_TAC >>
-                Cases_on ‘LTAKE LQ NR’ >>
-                Cases_on ‘LNTH LQ NR’ >>
-                fs[LTAKE_SNOC_LNTH]) >>
-        rw[LNTH_LAPPEND] >>
-        ‘LDROP LQ OR = LDROP LQ NR’
-            suffices_by rw[] >>
-        (* We can now squeeze out an assumption to get the info we need *)
-        fs[get_ffi_future_def] >>
-        fs[TLDROP_def] >>
-        Cases_on ‘LDROP LQ OR’ >>
-        fs[] >>
-        Cases_on ‘LDROP (SUC LQ) NR’
-        >- (fs[LDROP_SUC]
-            >- (‘LFINITE NR’
-                    by metis_tac[LDROP_NONE_LFINITE] >>
-                (* We can prove this case nonsensical based on the known info on LTAKE (SUC LQ) NR *)
-                ‘LQ = THE (LLENGTH NR)’
-                    suffices_by (rpt strip_tac >>
-                                ‘∃y. LDROP LQ NR = SOME y’
-                                    by rw[LFINITE_DROP] >>
-                                fs[]) >>
-                ‘THE (LLENGTH NR) ≤ LQ’
-                    by (CCONTR_TAC >>
-                        ‘∃y. LDROP LQ NR = SOME y’
-                            by rw[LFINITE_DROP] >>
-                        fs[]) >>
-                ‘LQ ≤ THE (LLENGTH NR)’
-                    by (CCONTR_TAC >>
-                        ‘∃l. LLENGTH NR = SOME l’
-                            by fs[LFINITE_LLENGTH] >>
-                        ‘l' < SUC LQ’
-                            by fs[THE_DEF] >>
-                        ‘LTAKE (SUC LQ) NR = NONE’
-                            by metis_tac[LTAKE_LLENGTH_NONE] >>
-                        fs[]) >>
-                simp[])
-            >- (‘LLENGTH NR = SOME LQ’
-                    by metis_tac[LDROP_EQ_LNIL] >>
-                ‘LQ < SUC LQ’
-                    by rw[] >>
-                ‘LTAKE (SUC LQ) NR = NONE’
-                    by metis_tac[LTAKE_LLENGTH_NONE] >>
-                fs[])
-            )
-        >- (fs[LDROP_SUC] >>
-            Cases_on ‘x''’
-            >> fs[LTL]
-            >> ‘SOME h = LNTH LQ NR’
-                    by rw[LNTH_HD_LDROP]
-            >> ‘LNTH LQ NR = SOME (EL LQ (SNOC (l,l0) sp.queue))’
-                    by (‘LQ < SUC LQ’
-                            by rw[] >>
-                        metis_tac[LTAKE_LNTH_EL])
-            >> ‘(l,l0) = EL LQ (SNOC (l,l0) sp.queue)’
-                    suffices_by fs[]
-            >> qunabbrev_tac ‘LQ’
-            >> rw[EL_LENGTH_SNOC])
-        )
-    (* The Send endpoint case *)
-    >- (Cases_on ‘L’ >>
-        simp[Once trans_cases]
-        (* Send Label Case *)
-        >- (rw[compile_endpoint_def]
-            (* Final Message Case *)
-            >- ((* This is just essentially translating CakeML AST back into HOL! *)
-                fs[sem_env_cor_def] >>
-                ‘∃ dc. nsLookup se.v (Short s) = SOME dc ∧ LIST_TYPE WORD d dc’
-                    by metis_tac[] >>
-                ‘has_v se.v conf.length (LIST_TYPE ^WORD8 --> NUM) LENGTH’
-                    by metis_tac[env_asm_def] >>
-                fs[has_v_def] >>
-                rename [‘(_ --> _) LENGTH lengthc’] >>
-                fs[Arrow_def, AppReturns_def] >>
-                pop_assum (drule_then assume_tac) >>
-                pop_assum (qspec_then ‘sc.refs’ strip_assume_tac) >>
-                rw[evaluate_def] >>
-                Q.REFINE_EXISTS_TAC ‘SUC mc’ >>
-                simp[dec_clock_def] >>
-                drule_then assume_tac evaluate_empty_state_IMP >>
-                fs[eval_rel_def] >>
-                rename [‘evaluate (sc with clock := ck1) _ _ = (sc with <|clock := ck2; refs := _ |>, _)’] >>
-                Q.REFINE_EXISTS_TAC ‘mc + ck1’ >>
-                ‘∀mc.
-                  (evaluate (sc with clock := mc + ck1) env [exp] =
-                    (sc with <|clock := mc + ck2; refs := sc.refs ++ refs'|>, Rval [u]))’
-                  by (strip_tac >>
-                      qabbrev_tac ‘es = (sc with clock := ck1)’ >>
-                      qabbrev_tac ‘es' = sc with <|clock := ck2; refs := sc.refs ++ refs'|>’ >>
-                      ‘evaluate (es with clock := es.clock + mc) env [exp]
-                        = (es' with clock := es'.clock + mc,Rval [u])’
-                        suffices_by  rw[Abbr ‘es’, Abbr ‘es'’] >>
-                      ‘evaluate es env [exp] = (es', Rval [u])’
-                        suffices_by rw[evaluate_add_to_clock] >>
-                      simp[]) >>
-                simp[] >>
-                fs[NUM_def,INT_def] >>
-                rw[do_app_def, do_if_def,opb_lookup_def]
-                >- (fs[letfuns_def] >>
-
-
-                ‘∃env exp. do_opapp [lengthc;dc] = SOME (env,exp)’
-                    by metis_tac[] >>
-                ‘∃u. NUM (LENGTH d) u’
-                    by metis_tac[] >>
-                ‘∀st :comms_state semanticPrimitives$state.
-                    ∃refs'. eval_rel st env exp (st with refs := st.refs ++ refs') u’
-                    by (‘∀refs.
-                             ∃refs'.
-                                 eval_rel (empty_state with refs := refs) env exp
-                                   (empty_state with refs := refs ++ refs') u’
-                            by (‘∀ a u1 u2. NUM a u1 ∧ NUM a u2 ⇒ (u1 = u2)’
-                                    by rw[NUM_def,INT_def] >>
-                                rpt strip_tac >>
-                                first_x_assum (qspec_then ‘refs’ assume_tac) >>
-                                fs[] >>
-                                ‘SOME (env,exp) = SOME (env',exp')’
-                                    by metis_tac[EQ_SYM_EQ] >>
-                                ‘env = env'’
-                                    by rw[] >>
-                                ‘exp = exp'’
-                                    by rw[] >>
-                                rw[] >>
-                                metis_tac[]) >>
-                        strip_tac >>
-                        pop_assum (qspec_then ‘st.refs’ assume_tac) >>
-                        fs[] >>
-                        qexists_tac ‘refs'’ >>
-                        irule evaluate_empty_state_IMP >>
-                        simp[]) >>
-                qpat_x_assum ‘∀r. ∃a b c d. P’ kall_tac >>
-                simp[] >>
-                Q.REFINE_EXISTS_TAC ‘SUC mc’ >>
-                simp[] >>
-                simp[dec_clock_def] >>
-                fs[eval_rel_def] >>
-                pop_assum (qspec_then ‘sc’ strip_assume_tac) >>
-                Q.REFINE_EXISTS_TAC ‘mc + ck1'’ >>
-                ‘∀mc.
-                  (evaluate (sc with clock := mc + ck1) env [exp] =
-                    (sc with <|clock := mc + ck2; refs := sc.refs ++ refs'|>, Rval [u]))’
-                  by (strip_tac >>
-                      qabbrev_tac ‘es = (sc with clock := ck1)’ >>
-                      qabbrev_tac ‘es' = sc with <|clock := ck2; refs := sc.refs ++ refs'|>’ >>
-                      ‘evaluate (es with clock := es.clock + mc) env [exp]
-                        = (es' with clock := es'.clock + mc,Rval [u])’
-                        suffices_by  rw[Abbr ‘es’, Abbr ‘es'’] >>
-                      ‘evaluate es env [exp] = (es', Rval [u])’
-                        suffices_by rw[evaluate_add_to_clock] >>
-                      simp[]) >>
-                rw[] >>
-                simp[do_app_def] >>
-                fs[NUM_def,INT_def] >>
-                rw[opb_lookup_def] >>
-                rw[do_if_def]
-                *)
-                (* Case where LENGTH d <= n *)
-                (*
-                >- (fs[letfuns_def] >>
-                *)
-                    (* Need ref independence *)
-                    (* Need constancy of compile semantics under relation of vs to vs' *)
-                (*
-                    cheat)
-                *)
-            (* Intermediate Message Case *)
-            >- (cheat)
-          )     
-        (* Receive Label Case *)
-        >- (cheat)
-      )
-    >- (cheat)
-    >- (cheat)
-    >- (cheat)
+  cheat
 QED
 
 val _ = export_theory ();
