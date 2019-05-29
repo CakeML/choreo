@@ -575,12 +575,12 @@ val enc_ok_def =
     Define
     ‘
     (enc_ok _ _ [] [] = T) ∧
-    (enc_ok conf ckEnv (f::fs) (n::ns) =
+    (enc_ok conf cEnv (f::fs) (n::ns) =
        ((∃cl.
-            (SOME cl = nsLookup (ckEnv.v) (getLetID conf n)) ∧
+            (SOME cl = nsLookup (cEnv.v) (getLetID conf n)) ∧
             (LIST_TYPE ^(DATUM) --> ^DATUM) f cl
          ) ∧
-        enc_ok conf ckEnv fs ns
+        enc_ok conf cEnv fs ns
         )
     ) ∧
     (enc_ok _ _ _ _ = F)
@@ -594,12 +594,12 @@ val enc_ok_def =
 val sem_env_cor_def =
     Define
     ‘
-    sem_env_cor conf pySt ckEnv =
-       ((∀ n v. (FLOOKUP pySt.bindings n = SOME v)
-                 ⇒ (∃v'. (nsLookup (ckEnv.v) (Short n) = SOME v') ∧
+    sem_env_cor conf pSt cEnv =
+       ((∀ n v. (FLOOKUP pSt.bindings n = SOME v)
+                 ⇒ (∃v'. (nsLookup (cEnv.v) (Short n) = SOME v') ∧
                          ^(DATUM) v v')
          ) ∧
-        env_asm ckEnv conf
+        env_asm cEnv conf
         )
     ’;
 
@@ -646,11 +646,17 @@ Theorem ffi_irrel:
     ffi_eq conf cSt1.ffi.ffi_state cSt2.ffi.ffi_state
     ⇒ ∃mc. cEval_equiv conf
             (evaluate (cSt1  with clock := mc) cEnv
-                      [compile_endpoint conf vs  ep])
+                      [compile_endpoint conf vs  pCd])
             (evaluate (cSt2  with clock := mc) cEnv
-                      [compile_endpoint conf vs  ep])
+                      [compile_endpoint conf vs  pCd])
 Proof
-  cheat
+  Induct_on ‘pCd’
+  >- (rw[compile_endpoint_def,evaluate_def,do_con_check_def,
+         build_conv_def, cEval_equiv_def])
+  >- (cheat)
+  >- (cheat)
+  >- (cheat)
+  >- (cheat)
 QED
 
 val _ = export_theory ();
