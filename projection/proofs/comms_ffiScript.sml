@@ -1,8 +1,5 @@
-open    HolKernel
-        Parse
-        bossLib
+open    preamble
         relationTheory
-        quotientTheory
         astBakeryTheory
         payloadSemanticsTheory
         ffiTheory;
@@ -69,19 +66,7 @@ Define
 Theorem bisimRel_equivRel:
   ∀ts. equivalence (bisimRel ts)
 Proof
-  rw[equivalence_def] >> cheat
-QED
-
-val ffi_eq_def =
-Define
-‘
-  ffi_eq conf = bisimRel (strans conf)
-’;
-
-Theorem ffi_eq_equivRel:
-  ∀conf. equivalence (ffi_eq conf)
-Proof
-  rw [ffi_eq_def,bisimRel_equivRel]
+  rw [equivalence_def]
   >- (rw[reflexive_def, bisimRel_def] >>
       qexists_tac ‘$=’ >>
       rw[bisim_def])
@@ -94,6 +79,18 @@ Proof
       qexists_tac ‘λa c. ∃b. R a b ∧ R' b c’ >>
       fs[bisim_def] >>
       metis_tac[])
+QED
+
+val ffi_eq_def =
+Define
+‘
+  ffi_eq conf = bisimRel (strans conf)
+’;
+
+Theorem ffi_eq_equivRel:
+  ∀conf. equivalence (ffi_eq conf)
+Proof
+  rw [ffi_eq_def,bisimRel_equivRel]
 QED
 
 val ffi_send_def =
