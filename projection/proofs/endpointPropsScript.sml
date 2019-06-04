@@ -128,6 +128,23 @@ val trans_ext_choice_r' = Q.store_thm("trans_ext_choice_r'",
   >> match_mp_tac (trans_ext_choice_r)
   >> simp[]);
 
+val trans_let' = Q.store_thm("trans_let'",
+  `∀s v p f vl e q.
+         EVERY IS_SOME (MAP (FLOOKUP s.bindings) vl) ⇒
+         trans (NEndpoint p (s with queue:= q) (Let v f vl e)) LTau
+           (NEndpoint p
+              (<|bindings := s.bindings |+ (v,f (MAP (THE ∘ FLOOKUP s.bindings) vl));
+                 queue:= q
+                 |>) e)`,
+  rpt strip_tac
+  >> qmatch_goalsub_abbrev_tac `trans (NEndpoint _ s1 _) _ (NEndpoint _ s2 _)`
+  >> `s2 = s1 with bindings := s1.bindings |+ (v,f (MAP (THE ∘ FLOOKUP s1.bindings) vl))`
+     by(unabbrev_all_tac >> simp[])
+  >> pop_assum (fn thm => PURE_ONCE_REWRITE_TAC [thm])  
+  >> unabbrev_all_tac
+  >> match_mp_tac trans_let
+  >> simp[]);
+
 val trans_ext_choice_F_receive = Q.store_thm("trans_ext_choice_F_receive",
   `!e1 e2 p1 p2. trans e1 (LReceive p1 [0w] p2) e2 =
            trans e1 (LExtChoice p1 F p2) e2
@@ -551,6 +568,580 @@ val junkcong_trans_pres = Q.store_thm("junkcong_trans_pres",
      ⇒ ∃q2. trans q1 alpha q2 ∧ junkcong fv p2 q2`,
   metis_tac[junkcong_trans_eq])
 
+val (qcong_rules, qcong_ind, qcong_cases) = Hol_reln `
+  (* Reflexive *)
+  (∀n. qcong n n)
+
+  (* Symmetric *)
+∧ (∀n1 n2.
+    qcong n1 n2
+    ⇒ qcong n2 n1)
+  (* Transitive *)
+∧ (∀n1 n2 n3.
+     qcong n1 n2
+     ∧ qcong n2 n3
+     ⇒ qcong n1 n3)
+
+  (* Queue-Reorder *)
+∧ (∀p s e p1 d1 p2 d2 q1 q2.
+    s.queue = q1 ++ [(p1,d1);(p2,d2)] ++ q2
+    ∧ p1 ≠ p2
+    ⇒ qcong (NEndpoint p s e) (NEndpoint p (s with queue:= q1 ++ [(p2,d2);(p1,d1)] ++ q2) e))
+
+  (* Par *)
+∧ (∀n1 n2 n3 n4.
+     qcong n1 n2
+     ∧ qcong n3 n4
+     ⇒ qcong (NPar n1 n3) (NPar n2 n4))`
+
+val [qcong_refl,qcong_sym,qcong_trans,qcong_queue_reorder,qcong_par]
+    = zip ["qcong_refl","qcong_sym","qcong_trans","qcong_queue_reorder","qcong_par"]
+          (CONJUNCTS qcong_rules) |> map save_thm;
+
+val qcong_strongind = fetch "-" "qcong_strongind"
+
+val (qrel_rules, qrel_ind, qrel_cases) = Hol_reln `
+  (* Reflexive *)
+  (∀q. qrel q q)
+
+  (* Symmetric *)
+∧ (∀q1 q2.
+    qrel q1 q2
+    ⇒ qrel q2 q1)
+  (* Transitive *)
+∧ (∀q1 q2 q3.
+     qrel q1 q2
+     ∧ qrel q2 q3
+     ⇒ qrel q1 q3)
+
+  (* Queue-Reorder *)
+∧ (∀p1 d1 p2 d2 q1 q2.
+    p1 ≠ p2
+    ⇒ qrel (q1 ++ [(p1,d1);(p2,d2)] ++ q2) (q1 ++ [(p2,d2);(p1,d1)] ++ q2))`
+
+val qrel_strongind = fetch "-" "qrel_strongind"  
+
+val [qrel_refl,qrel_sym,qrel_trans,qrel_queue_reorder]
+    = zip ["qrel_refl","qrel_sym","qrel_trans","qrel_queue_reorder"]
+          (CONJUNCTS qrel_rules) |> map save_thm;
+                           
+val qcong_queue_reorder' = Q.store_thm("qcong_queue_reorder'",
+  `∀p s e p1 d1 p2 d2 q1 q2.
+     p1 ≠ p2
+     ⇒ qcong (NEndpoint p (s with queue:=q1 ++ [(p1,d1);(p2,d2)] ++ q2) e)
+              (NEndpoint p (s with queue:= q1 ++ [(p2,d2);(p1,d1)] ++ q2) e)`,
+  rpt strip_tac
+  >> qmatch_goalsub_abbrev_tac `qcong (NEndpoint _ (_ with queue := a1) _) (NEndpoint _ (_ with queue := a2) _)`
+  >> `s with queue := a2 = (s with queue := a1) with queue := a2` by fs[]
+  >> pop_assum (fn thm => PURE_ONCE_REWRITE_TAC [thm])
+  >> unabbrev_all_tac
+  >> match_mp_tac qcong_queue_reorder
+  >> simp[]);
+
+val qrel_IMP_qcong = Q.store_thm("qrel_IMP_qcong",
+  `!q1 q2 p s e.
+    qrel q1 q2
+    ==> qcong (NEndpoint p (s with queue := q1) e) (NEndpoint p (s with queue := q2) e)`,
+  simp[GSYM PULL_FORALL]
+  >> ho_match_mp_tac qrel_strongind
+  >> metis_tac[qcong_rules,qcong_queue_reorder'])
+
+val qrel_cons = Q.store_thm("qrel_cons",
+  `!q1 q2 qe. qrel q1 q2 ==> qrel (qe::q1) (qe::q2)`,
+  simp[GSYM AND_IMP_INTRO,GSYM PULL_FORALL]
+  >> ho_match_mp_tac qrel_strongind >> rpt strip_tac
+  >- metis_tac[qrel_rules]
+  >- metis_tac[qrel_rules]
+  >- metis_tac[qrel_rules]
+  >> `!a b. qe::(a ++ b) = qe::a ++ b` by simp[]
+  >> ASM_SIMP_TAC pure_ss [] >> pop_assum kall_tac
+  >> metis_tac[qrel_rules]);
+
+val qrel_snoc = Q.store_thm("qrel_snoc",
+  `!q1 q2 qe. qrel q1 q2 ==> qrel (SNOC qe q1) (SNOC qe q2)`,
+  simp[GSYM AND_IMP_INTRO,GSYM PULL_FORALL]
+  >> ho_match_mp_tac qrel_strongind >> rpt strip_tac
+  >- metis_tac[qrel_rules]
+  >- metis_tac[qrel_rules]
+  >- metis_tac[qrel_rules]
+  >> simp[SNOC_APPEND]
+  >> metis_tac[qrel_rules,APPEND_ASSOC]);
+
+val qrel_append_l = Q.store_thm("qrel_append_l",
+  `!q1 q2 q3. qrel q2 q3 ==> qrel (q1++q2) (q1++q3)`,
+  Induct >> simp[] >> metis_tac[qrel_cons]);
+
+val qrel_append_r = Q.store_thm("qrel_append_r",
+  `!q3 q1 q2. qrel q1 q2 ==> qrel (q1++q3) (q2++q3)`,
+  ho_match_mp_tac SNOC_INDUCT >> rpt strip_tac >> simp[APPEND_SNOC] >> metis_tac[qrel_snoc]);
+
+val qrel_append = Q.store_thm("qrel_append",
+  `!q1 q2 q3 q4. qrel q1 q2 /\ qrel q3 q4 ==> qrel (q1++q3) (q2++q4)`,
+  metis_tac[qrel_rules,qrel_append_l,qrel_append_r]);
+
+val qrel_LENGTH = Q.store_thm("qrel_LENGTH",
+  `!q1 q2. qrel q1 q2 ==> LENGTH q1 = LENGTH q2`,
+  ho_match_mp_tac qrel_ind >> rw[]);
+
+val qrel_PERM = Q.store_thm("qrel_PERM",
+  `!q1 q2. qrel q1 q2 ==> PERM q1 q2`,
+  ho_match_mp_tac qrel_strongind
+  >> rpt strip_tac
+  >> fs[PERM_SYM]
+  >- metis_tac[PERM_TRANS]
+  >- CONV_TAC permLib.PERM_ELIM_DUPLICATES_CONV);
+
+val qrel_cons_IMP_lemma = Q.prove(
+  `!q1l q1r q2 qe. qrel (q1l ++ [qe] ++ q1r) q2 /\ EVERY (λ(p,_). p ≠ FST qe) q1l ==> ?q2l q2r. q2 = q2l ++ [qe] ++ q2r /\ qrel (q1l ++ q1r) (q2l++q2r) /\ EVERY (λ(p,_). p ≠ FST qe) q2l`,
+  `!q1 q2. qrel q1 q2 ==> ((!q1l q1r qe. q1 = q1l ++ [qe] ++ q1r /\ EVERY (λ(p,_). p ≠ FST qe) q1l ==> ?q2l q2r. q2 = q2l ++ [qe] ++ q2r /\ qrel (q1l++q1r) (q2l++q2r) /\ EVERY (λ(p,_). p ≠ FST qe) q2l)
+                           /\ (!q2l q2r qe. q2 = q2l ++ [qe] ++ q2r /\ EVERY (λ(p,_). p ≠ FST qe) q2l ==> ?q1l q1r. q1 = q1l ++ [qe] ++ q1r /\ qrel (q1l++q1r) (q2l++q2r) /\ EVERY (λ(p,_). p ≠ FST qe) q1l))`
+    suffices_by metis_tac[]
+  >> ho_match_mp_tac qrel_strongind >> rpt strip_tac >> rveq
+  >- metis_tac[qrel_refl]
+  >- metis_tac[qrel_refl]
+  >- metis_tac[qrel_sym]
+  >- metis_tac[qrel_sym]
+  >- (last_x_assum (qspecl_then [`q1l`,`q1r`,`qe`] assume_tac)
+      >> rfs[] >> rveq
+      >> last_x_assum (qspecl_then [`q2l`,`q2r`,`qe`] assume_tac)
+      >> rfs[] >> rveq
+      >> last_x_assum (qspecl_then [`q2l`,`q2r`,`qe`] assume_tac)
+      >> rfs[] >> rveq
+      >> last_x_assum (qspecl_then [`q2l'`,`q2r'`,`qe`] assume_tac) (* TODO: generated names *)
+      >> rfs[] >> rveq
+      >> metis_tac[qrel_trans])
+  >- (first_x_assum (qspecl_then [`q2l`,`q2r`,`qe`] assume_tac)
+      >> rfs[] >> rveq
+      >> first_x_assum (qspecl_then [`q1l`,`q1r`,`qe`] assume_tac)
+      >> rfs[] >> rveq
+      >> first_x_assum (qspecl_then [`q1l`,`q1r`,`qe`] assume_tac)
+      >> rfs[] >> rveq
+      >> first_x_assum (qspecl_then [`q1l'`,`q1r'`,`qe`] assume_tac) (* TODO: generated names *)
+      >> rfs[] >> rveq
+      >> metis_tac[qrel_trans])
+  >- (qpat_x_assum `_ = _` (assume_tac o REWRITE_RULE [APPEND_EQ_APPEND_MID |> CONV_RULE(LHS_CONV SYM_CONV)])
+      >> fs[] >> rveq
+      >- (qexists_tac `q1l` >> rw[]
+          >> metis_tac[qrel_queue_reorder,APPEND_ASSOC])
+      >- (rename1 `[_;_] = a1 ++ _ ++ _`
+          >> Cases_on `a1`
+          >- (fs[] >> rveq >> qexists_tac `q1++[(p2,d2)]` >> rw[qrel_refl])
+          >> fs[] >> rveq
+          >> fs[APPEND_EQ_SING |> CONV_RULE(LHS_CONV SYM_CONV)] >> rveq
+          >> qexists_tac `q1` >> rw[]
+          >> qmatch_goalsub_abbrev_tac `qrel a1 a2`
+          >> `a1 = a2` suffices_by rw[qrel_refl]
+          >> unabbrev_all_tac
+          >> rw[])
+      >- (qexists_tac `q1 ++ [(p2,d2); (p1,d1)] ++ l` >> rw[] >> fs[EVERY_APPEND]
+          >> metis_tac[qrel_queue_reorder,APPEND_ASSOC]))
+  >- (qpat_x_assum `_ = _` (assume_tac o REWRITE_RULE [APPEND_EQ_APPEND_MID |> CONV_RULE(LHS_CONV SYM_CONV)])
+      >> fs[] >> rveq
+      >- (qexists_tac `q2l` >> rw[]
+          >> metis_tac[qrel_queue_reorder,APPEND_ASSOC])
+      >- (rename1 `[_;_] = a1 ++ _ ++ _`
+          >> Cases_on `a1`
+          >- (fs[] >> rveq >> qexists_tac `q1++[(p1,d1)]` >> rw[qrel_refl])
+          >> fs[] >> rveq
+          >> fs[APPEND_EQ_SING |> CONV_RULE(LHS_CONV SYM_CONV)] >> rveq
+          >> qexists_tac `q1` >> rw[]
+          >> qmatch_goalsub_abbrev_tac `qrel a1 a2`
+          >> `a1 = a2` suffices_by rw[qrel_refl]
+          >> unabbrev_all_tac
+          >> rw[])
+      >- (qexists_tac `q1 ++ [(p1,d1); (p2,d2)] ++ l` >> rw[] >> fs[EVERY_APPEND]
+          >> metis_tac[qrel_queue_reorder,APPEND_ASSOC])));
+
+val qrel_snoc_IMP_lemma = Q.prove(
+  `!q1l q1r q2 qe. qrel (q1l ++ [qe] ++ q1r) q2 /\ EVERY (λ(p,_). p ≠ FST qe) q1r ==> ?q2l q2r. q2 = q2l ++ [qe] ++ q2r /\ qrel (q1l ++ q1r) (q2l++q2r) /\ EVERY (λ(p,_). p ≠ FST qe) q2r`,
+  `!q1 q2. qrel q1 q2 ==> ((!q1l q1r qe. q1 = q1l ++ [qe] ++ q1r /\ EVERY (λ(p,_). p ≠ FST qe) q1r ==> ?q2l q2r. q2 = q2l ++ [qe] ++ q2r /\ qrel (q1l++q1r) (q2l++q2r) /\ EVERY (λ(p,_). p ≠ FST qe) q2r)
+                           /\ (!q2l q2r qe. q2 = q2l ++ [qe] ++ q2r /\ EVERY (λ(p,_). p ≠ FST qe) q2r ==> ?q1l q1r. q1 = q1l ++ [qe] ++ q1r /\ qrel (q1l++q1r) (q2l++q2r) /\ EVERY (λ(p,_). p ≠ FST qe) q1r))`
+    suffices_by metis_tac[]
+  >> ho_match_mp_tac qrel_strongind >> rpt strip_tac >> rveq
+  >- metis_tac[qrel_refl]
+  >- metis_tac[qrel_refl]
+  >- metis_tac[qrel_sym]
+  >- metis_tac[qrel_sym]
+  >- (last_x_assum (qspecl_then [`q1l`,`q1r`,`qe`] assume_tac)
+      >> rfs[] >> rveq
+      >> last_x_assum (qspecl_then [`q2l`,`q2r`,`qe`] assume_tac)
+      >> rfs[] >> rveq
+      >> last_x_assum (qspecl_then [`q2l`,`q2r`,`qe`] assume_tac)
+      >> rfs[] >> rveq
+      >> last_x_assum (qspecl_then [`q2l'`,`q2r'`,`qe`] assume_tac) (* TODO: generated names *)
+      >> rfs[] >> rveq
+      >> metis_tac[qrel_trans])
+  >- (first_x_assum (qspecl_then [`q2l`,`q2r`,`qe`] assume_tac)
+      >> rfs[] >> rveq
+      >> first_x_assum (qspecl_then [`q1l`,`q1r`,`qe`] assume_tac)
+      >> rfs[] >> rveq
+      >> first_x_assum (qspecl_then [`q1l`,`q1r`,`qe`] assume_tac)
+      >> rfs[] >> rveq
+      >> first_x_assum (qspecl_then [`q1l'`,`q1r'`,`qe`] assume_tac) (* TODO: generated names *)
+      >> rfs[] >> rveq
+      >> metis_tac[qrel_trans])
+  >- (qpat_x_assum `_ = _` (assume_tac o REWRITE_RULE [APPEND_EQ_APPEND_MID |> CONV_RULE(LHS_CONV SYM_CONV)])
+      >> fs[] >> rveq
+      >- (qexists_tac `q1l` >> rw[] >> fs[EVERY_APPEND]
+          >> metis_tac[qrel_queue_reorder,APPEND_ASSOC,EVERY_APPEND])
+      >- (rename1 `[_;_] = a1 ++ _ ++ _`
+          >> Cases_on `a1`
+          >- (fs[] >> rveq >> qexists_tac `q1++[(p2,d2)]` >> rw[qrel_refl])
+          >> fs[] >> rveq
+          >> fs[APPEND_EQ_SING |> CONV_RULE(LHS_CONV SYM_CONV)] >> rveq
+          >> qexists_tac `q1` >> rw[]
+          >> qmatch_goalsub_abbrev_tac `qrel a1 a2`
+          >> `a1 = a2` suffices_by rw[qrel_refl]
+          >> unabbrev_all_tac
+          >> rw[])
+      >- (qexists_tac `q1 ++ [(p2,d2); (p1,d1)] ++ l` >> rw[] >> fs[EVERY_APPEND]
+          >> metis_tac[qrel_queue_reorder,APPEND_ASSOC]))
+  >- (qpat_x_assum `_ = _` (assume_tac o REWRITE_RULE [APPEND_EQ_APPEND_MID |> CONV_RULE(LHS_CONV SYM_CONV)])
+      >> fs[] >> rveq
+      >- (qexists_tac `q2l` >> rw[] >> fs[EVERY_APPEND]
+          >> metis_tac[qrel_queue_reorder,APPEND_ASSOC,EVERY_APPEND])
+      >- (rename1 `[_;_] = a1 ++ _ ++ _`
+          >> Cases_on `a1`
+          >- (fs[] >> rveq >> qexists_tac `q1++[(p1,d1)]` >> rw[qrel_refl])
+          >> fs[] >> rveq
+          >> fs[APPEND_EQ_SING |> CONV_RULE(LHS_CONV SYM_CONV)] >> rveq
+          >> qexists_tac `q1` >> rw[]
+          >> qmatch_goalsub_abbrev_tac `qrel a1 a2`
+          >> `a1 = a2` suffices_by rw[qrel_refl]
+          >> unabbrev_all_tac
+          >> rw[])
+      >- (qexists_tac `q1 ++ [(p1,d1); (p2,d2)] ++ l` >> rw[] >> fs[EVERY_APPEND]
+          >> metis_tac[qrel_queue_reorder,APPEND_ASSOC])));
+
+val qrel_cons_IMP = Q.prove(
+  `!q1 q2 qe. qrel (qe::q1) q2 ==> ?q2l q2r. q2 = q2l ++ [qe] ++ q2r /\ qrel q1 (q2l++q2r) /\ EVERY (λ(p,_). p ≠ FST qe) q2l`,
+  rpt gen_tac
+  >> `qe::q1 = [] ++ [qe] ++ q1` by rw[]
+  >> pop_assum(fn thm => PURE_ONCE_REWRITE_TAC [thm])
+  >> rpt strip_tac
+  >> dxrule qrel_cons_IMP_lemma >> rw[]);
+
+val qrel_snoc_IMP = Q.prove(
+  `!q1 q2 qe. qrel (SNOC qe q1) q2 ==> ?q2l q2r. q2 = q2l ++ [qe] ++ q2r /\ qrel q1 (q2l++q2r) /\ EVERY (λ(p,_). p ≠ FST qe) q2r`,
+  rpt gen_tac
+  >> `SNOC qe q1 = q1 ++ [qe] ++ []` by rw[SNOC_APPEND]
+  >> pop_assum(fn thm => PURE_ONCE_REWRITE_TAC [thm])
+  >> rpt strip_tac
+  >> dxrule qrel_snoc_IMP_lemma >> rw[]);
+
+val qrel_consE = Q.store_thm("qrel_consE",
+  `!q1 q2 qe. qrel (qe::q1) (qe::q2) ==> qrel q1 q2`,  
+  `!qq1 qq2. qrel qq1 qq2 ==> (!q1 q2 qe. qq1 = (qe::q1) /\ qq2 = (qe::q2) ==> qrel q1 q2)`
+    suffices_by metis_tac[qrel_refl]
+  >> ho_match_mp_tac qrel_strongind >> rpt strip_tac
+  >> fs[] >> rveq
+  >- metis_tac[qrel_rules]
+  >- metis_tac[qrel_rules]
+  >- (imp_res_tac qrel_LENGTH
+      >> qpat_x_assum `qrel _ (_::_)` (assume_tac o MATCH_MP qrel_sym)
+      >> imp_res_tac qrel_cons_IMP
+      >> rveq >> fs[]
+      >> match_mp_tac qrel_trans >> asm_exists_tac >> rw[]
+      >> match_mp_tac qrel_sym
+      >> match_mp_tac qrel_trans >> asm_exists_tac >> rw[]
+      >> fs[APPEND_EQ_APPEND_MID] >> rveq >> fs[] >> rpt(pairarg_tac >> fs[])
+      >> fs[APPEND_EQ_SING |> CONV_RULE(LHS_CONV SYM_CONV)] >> rw[qrel_refl])
+  >- (Cases_on `q1` >> fs[] >> rveq
+      >> match_mp_tac qrel_queue_reorder >> rw[]));
+
+val qrel_snocE = Q.store_thm("qrel_snocE",
+  `!q1 q2 qe. qrel (SNOC qe q1) (SNOC qe q2) ==> qrel q1 q2`,  
+  `!qq1 qq2. qrel qq1 qq2 ==> (!q1 q2 qe. qq1 = (SNOC qe q1) /\ qq2 = (SNOC qe q2) ==> qrel q1 q2)`
+    suffices_by metis_tac[qrel_refl]
+  >> ho_match_mp_tac qrel_strongind >> rpt strip_tac
+  >> fs[] >> rveq
+  >- metis_tac[qrel_rules]
+  >- metis_tac[qrel_rules]
+  >- (imp_res_tac qrel_LENGTH
+      >> qpat_x_assum `qrel _ (_ ++ _)` (assume_tac o MATCH_MP qrel_sym)
+      >> imp_res_tac (qrel_snoc_IMP |> REWRITE_RULE [SNOC_APPEND])
+      >> rveq >> fs[]
+      >> match_mp_tac qrel_trans >> asm_exists_tac >> rw[]
+      >> match_mp_tac qrel_sym
+      >> match_mp_tac qrel_trans >> asm_exists_tac >> rw[]
+      >> fs[APPEND_EQ_APPEND_MID] >> rveq >> fs[] >> rpt(pairarg_tac >> fs[])
+      >> fs[APPEND_EQ_SING |> CONV_RULE(LHS_CONV SYM_CONV)] >> rw[qrel_refl])
+  >- (Q.ISPEC_THEN `q2` assume_tac SNOC_CASES >> fs[] >> rveq
+      >> fs[] >> rveq
+      >> match_mp_tac qrel_queue_reorder >> rw[]));
+
+val qrel_append_r_E = Q.store_thm("qrel_append_r_E",
+  `!q3 q1 q2. qrel (q1++q3) (q2++q3) ==> qrel q1 q2`,
+  ho_match_mp_tac SNOC_INDUCT >> rpt strip_tac >> fs[APPEND_SNOC] >> metis_tac[qrel_snocE]);
+
+val qrel_append_l_E = Q.store_thm("qrel_append_l_E",
+  `!q1 q2 q3. qrel (q1++q2) (q1++q3) ==> qrel q2 q3`,
+  Induct >> rpt strip_tac >> fs[] >> metis_tac[qrel_consE]);
+
+val qcong_nil_rel_nil = Q.store_thm("qcong_nil_rel_nil",
+  `!n2.
+    qcong NNil n2
+    ==> n2 = NNil`,
+  `!n1 n2.
+    qcong n1 n2
+    ==> (n1 = NNil ==> n2 = NNil)
+        /\ (n2 = NNil ==> n1 = NNil)`
+    suffices_by metis_tac[]
+  >> ho_match_mp_tac qcong_strongind >> rpt strip_tac
+  >> rveq >> fs[]);
+
+val qcong_endpoint_rel_endpoint = Q.store_thm("qcong_endpoint_rel_endpoint",
+  `!p1 s1 e1 n2.
+    qcong (NEndpoint p1 s1 e1) n2
+    ==> ?s2. n2 = (NEndpoint p1 s2 e1)`,
+  `!n1 n2.
+    qcong n1 n2
+    ==> (!p1 s1 e1. n1 = NEndpoint p1 s1 e1 ==> ?s2. n2 = NEndpoint p1 s2 e1)
+        /\ (!p2 s2 e2. n2 = NEndpoint p2 s2 e2 ==> ?s1. n1 = NEndpoint p2 s1 e2)`
+    suffices_by metis_tac[]
+  >> ho_match_mp_tac qcong_strongind >> rpt strip_tac
+  >> rveq >> fs[])
+
+val qcong_par_rel_par = Q.store_thm("qcong_par_rel_par",
+  `!n1 n2 n3.
+    qcong (NPar n1 n2) n3
+    ==> ?n4 n5. n3 = (NPar n4 n5) /\ qcong n1 n4 /\ qcong n2 n5`,
+  `!n1 n2.
+    qcong n1 n2
+    ==> (!n3 n4. n1 = NPar n3 n4 ==> ?n5 n6. n2 = NPar n5 n6 /\ qcong n3 n5 /\ qcong n4 n6)
+        /\ (!n3 n4. n2 = NPar n3 n4 ==> ?n5 n6. n1 = NPar n5 n6 /\ qcong n5 n3 /\ qcong n6 n4)`
+    suffices_by metis_tac[]
+  >> ho_match_mp_tac qcong_strongind >> rpt strip_tac
+  >> rveq >> fs[qcong_refl,qcong_sym]
+  >> rpt(first_x_assum drule >> strip_tac) >> metis_tac[qcong_rules]);
+
+val qcong_par_rel_par_sym = Q.store_thm("qcong_par_rel_par_sym",
+  `!n1 n2 n3.
+    qcong n1 (NPar n2 n3)
+    ==> ?n4 n5. n1 = (NPar n4 n5) /\ qcong n4 n2 /\ qcong n5 n3`,
+  metis_tac[qcong_par_rel_par,qcong_sym]);
+
+val qcong_IMP_qrel = Q.store_thm("qcong_IMP_qrel",
+  `!p1 s1 e1 p2 s2 e2.
+    qcong (NEndpoint p1 s1 e1) (NEndpoint p2 s2 e2)
+    ==> qrel s1.queue s2.queue`,
+  `!n1 n2.
+    qcong n1 n2 ==>
+    !p1 s1 e1 p2 s2 e2.
+    n1 = NEndpoint p1 s1 e1 /\ n2 = NEndpoint p2 s2 e2
+    ==> qrel s1.queue s2.queue` suffices_by metis_tac[]
+  >> ho_match_mp_tac qcong_strongind >> rpt strip_tac
+  >> rveq >> fs[] >> rveq >> simp[]
+  >> metis_tac[qrel_rules,qcong_endpoint_rel_endpoint]);
+
+val qcong_queue_reorder'' = Q.store_thm("qcong_queue_reorder''",
+  `∀p e p1 d1 p2 d2 b q1 q2.
+     p1 ≠ p2
+     ⇒ qcong (NEndpoint p (<|bindings := b; queue:=q1 ++ [(p1,d1);(p2,d2)] ++ q2|>) e)
+              (NEndpoint p (<|bindings := b; queue:= q1 ++ [(p2,d2);(p1,d1)] ++ q2|>) e)`,
+  rpt strip_tac
+  >> qmatch_goalsub_abbrev_tac `qcong (NEndpoint _ a1 _) (NEndpoint _ (<|bindings := _; queue := a2|>) _)`
+  >> `<|bindings := b; queue := a2|> = a1 with queue := a2` by(unabbrev_all_tac >> fs[])
+  >> pop_assum (fn thm => PURE_ONCE_REWRITE_TAC [thm])
+  >> unabbrev_all_tac
+  >> match_mp_tac qcong_queue_reorder
+  >> simp[]);
+
+val qcong_endpoints = Q.store_thm("qcong_endpoints",
+  `!n1 n2. qcong n1 n2 ==> MAP FST (endpoints n2) = MAP FST (endpoints n1)`,
+  ho_match_mp_tac qcong_strongind >> rw[endpoints_def])
+
+val qcong_sym_eq = Q.store_thm("qcong_sym_eq",
+`∀p q. qcong p q = qcong q p`,metis_tac[qcong_sym]);
+
+val qcong_trans_eq = Q.store_thm("qcong_trans_eq",
+  `∀p1 q1 .
+     qcong p1 q1
+     ⇒ ∀ alpha p2 q2.
+            ((trans p1 alpha p2 ⇒ (∃q2. trans q1 alpha q2 ∧ qcong p2 q2))
+         ∧ (trans q1 alpha q2 ⇒ (∃p2. trans p1 alpha p2 ∧ qcong p2 q2)))`,
+  ho_match_mp_tac qcong_strongind
+  >> rpt strip_tac
+  >- metis_tac[qcong_rules]
+  >- metis_tac[qcong_rules]
+  >- metis_tac[qcong_rules]
+  >- metis_tac[qcong_rules]
+  >- metis_tac[qcong_rules]
+  >- metis_tac[qcong_rules]
+  >- (* qcong_queue_reorder *)
+     (qpat_x_assum `trans _ _ _` (assume_tac
+                                  o REWRITE_RULE [Once trans_cases])
+      >> fs[] >> rveq
+      >> TRY(qmatch_goalsub_abbrev_tac `qcong (NEndpoint a1 a2 a3)`
+             >> qexists_tac `NEndpoint a1 (a2 with queue := q1 ⧺ [(p2,d2); (p1,d1)] ⧺ q2) a3`
+             >> conj_tac
+             >- (unabbrev_all_tac
+                 >> MAP_FIRST match_mp_tac (CONJUNCTS trans_rules)
+                 >> fs[])
+             >- metis_tac[qcong_rules])
+      >> TRY(qmatch_goalsub_abbrev_tac `qcong (NEndpoint a1 (a2 with queue := SNOC a3 _) a4)`
+             >> qexists_tac `NEndpoint a1 (a2 with queue := SNOC a3 (q1 ++ [(p2,d2);(p1,d1)] ++ q2)) a4`
+             >> conj_tac
+             >- (unabbrev_all_tac
+                 >> MAP_FIRST match_mp_tac [trans_enqueue',trans_enqueue_choice_l',trans_enqueue_choice_r']
+                 >> simp[])
+             >- (simp[SNOC_APPEND] >> metis_tac[qcong_queue_reorder',APPEND_ASSOC]))
+      >> TRY(qmatch_goalsub_abbrev_tac `qcong (NEndpoint a1 (a2 with bindings := a3) a4)`
+              >> qexists_tac `NEndpoint a1 ((a2 with queue := (q1 ++ [(p2,d2);(p1,d1)] ++ q2))
+                                                with bindings := a3) a4`
+             >> conj_tac
+             >- (unabbrev_all_tac
+                 >> `s.bindings = (s with queue := q1 ++ [(p2,d2); (p1,d1)] ++ q2).bindings`
+                       by simp[]
+                 >> pop_assum (fn thm => PURE_ONCE_REWRITE_TAC [thm])
+                 >> match_mp_tac trans_let
+                 >> simp[])
+             >- (`(a2 with bindings := a3).queue = a2.queue` by fs[]
+                 >> PURE_ONCE_REWRITE_TAC [GSYM endpointLangTheory.state_fupdcanon]
+                 >> metis_tac [qcong_queue_reorder]))
+      >> TRY(rename1 `Receive`
+             >> fs[APPEND_EQ_APPEND_MID] >> rveq >> fs[Once APPEND_EQ_CONS]
+             >> fs[APPEND_EQ_SING] >> rveq >> fs[] >> rveq >> fs[]
+             >> rw[Once trans_cases,PULL_EXISTS]
+             >> qexists_tac `d`
+             >> TRY(qmatch_goalsub_abbrev_tac `_ ++ [(_,_); (_,_)] ++ _` >>
+                    qexists_tac `q1 ++ [(p2,d2)]` >>
+                    rw[qcong_refl] >>
+                    NO_TAC
+                   )
+             >> TRY(qmatch_goalsub_abbrev_tac `_ ++ [(_,_); (_,_)] ++ _ ++ _` >>
+                    qexists_tac `q1 ++ [(p2,d2);(p1,d1)] ++ l` >>
+                    rw[] >>
+                    metis_tac[qcong_queue_reorder'',qcong_refl,APPEND_ASSOC,APPEND] >>
+                    NO_TAC
+                   )
+             >> HINT_EXISTS_TAC
+             >> rw[]
+             >> metis_tac[qcong_queue_reorder'',qcong_refl,APPEND_ASSOC,APPEND])
+      >> TRY(fs[APPEND_EQ_APPEND_MID] >> rveq >> fs[Once APPEND_EQ_CONS]
+             >> fs[APPEND_EQ_SING] >> rveq >> fs[] >> rveq >> fs[]
+             >> Q.REFINE_EXISTS_TAC `NEndpoint _ _ _`
+             >> rw[Once trans_cases,PULL_EXISTS,EXISTS_OR_THM,RIGHT_AND_OVER_OR]
+             >> ((qmatch_asmsub_abbrev_tac `_ <> [1w]` >> disj2_tac) ORELSE disj1_tac)
+             >> TRY(qmatch_goalsub_abbrev_tac `_ ++ [(_,_); (_,_)] ++ _` >>
+                    qexists_tac `q1 ++ [(p2,d2)]` >>
+                    rw[qcong_refl] >>
+                    NO_TAC
+                   )
+             >> TRY(qmatch_goalsub_abbrev_tac `_ ++ [(_,_); (_,_)] ++ _ ++ _` >>
+                    qexists_tac `q1 ++ [(p2,d2);(p1,d1)] ++ l` >>
+                    rw[] >>
+                    metis_tac[qcong_queue_reorder',qcong_refl,APPEND_ASSOC,APPEND]
+                   )
+             >> HINT_EXISTS_TAC
+             >> rw[]
+             >> metis_tac[qcong_queue_reorder',qcong_refl,APPEND_ASSOC,APPEND]))
+  >- (* qcong_queue_reorder, symmetric case *)
+     (qmatch_asmsub_abbrev_tac `NEndpoint _ s' _`
+      >> `s'.queue = q1 ⧺ [(p2,d2); (p1,d1)] ⧺ q2` by(unabbrev_all_tac >> simp[])
+      >> `s = s' with queue := q1 ⧺ [(p1,d1); (p2,d2)] ⧺ q2`
+            by(unabbrev_all_tac >> simp[endpointLangTheory.state_component_equality])
+      >> pop_assum (fn thm => fs[thm])
+      >> qpat_x_assum `Abbrev _` kall_tac
+      >> rename1 `s with queue := _ ++ [(p3,d3); (p4,d4)] ++ _`
+      >> rename1 `_ with queue := _ ++ [(p2,d2); (p1,d1)] ++ _`
+      >> PURE_ONCE_REWRITE_TAC [qcong_sym_eq]
+      >> qpat_x_assum `trans _ _ _` (assume_tac
+                                  o REWRITE_RULE [Once trans_cases])
+      >> fs[] >> rveq
+      >> TRY(qmatch_goalsub_abbrev_tac `qcong (NEndpoint a1 a2 a3)`
+             >> qexists_tac `NEndpoint a1 (a2 with queue := q1 ⧺ [(p2,d2); (p1,d1)] ⧺ q2) a3`
+             >> conj_tac
+             >- (unabbrev_all_tac
+                 >> MAP_FIRST match_mp_tac (CONJUNCTS trans_rules)
+                 >> fs[])
+             >- metis_tac[qcong_rules])
+      >> TRY(qmatch_goalsub_abbrev_tac `qcong (NEndpoint a1 (a2 with queue := SNOC a3 _) a4)`
+             >> qexists_tac `NEndpoint a1 (a2 with queue := SNOC a3 (q1 ++ [(p2,d2);(p1,d1)] ++ q2)) a4`
+             >> conj_tac
+             >- (unabbrev_all_tac
+                 >> MAP_FIRST match_mp_tac [trans_enqueue',trans_enqueue_choice_l',trans_enqueue_choice_r']
+                 >> simp[])
+             >- (simp[SNOC_APPEND] >> metis_tac[qcong_queue_reorder',APPEND_ASSOC]))
+      >> TRY(qmatch_goalsub_abbrev_tac `qcong (NEndpoint a1 (a2 with bindings := a3) a4)`
+              >> qexists_tac `NEndpoint a1 ((a2 with queue := (q1 ++ [(p2,d2);(p1,d1)] ++ q2))
+                                                with bindings := a3) a4`
+             >> conj_tac
+             >- (unabbrev_all_tac
+                 >> `s.bindings = (s with queue := q1 ++ [(p2,d2); (p1,d1)] ++ q2).bindings`
+                       by simp[]
+                 >> pop_assum (fn thm => PURE_ONCE_REWRITE_TAC [thm])
+                 >> match_mp_tac trans_let
+                 >> simp[])
+             >- (`(a2 with bindings := a3).queue = a2.queue` by fs[]
+                 >> PURE_ONCE_REWRITE_TAC [GSYM endpointLangTheory.state_fupdcanon]
+                 >> metis_tac [qcong_queue_reorder]))
+      >> TRY(rename1 `Receive`
+             >> fs[APPEND_EQ_APPEND_MID] >> rveq >> fs[Once APPEND_EQ_CONS]
+             >> fs[APPEND_EQ_SING] >> rveq >> fs[] >> rveq >> fs[]
+             >> rw[Once trans_cases,PULL_EXISTS]
+             >> qexists_tac `d`
+             >> TRY(qmatch_goalsub_abbrev_tac `_ ++ [(_,_); (_,_)] ++ _` >>
+                    qexists_tac `q1 ++ [(p2,d2)]` >>
+                    rw[qcong_refl] >>
+                    NO_TAC
+                   )
+             >> TRY(qmatch_goalsub_abbrev_tac `_ ++ [(_,_); (_,_)] ++ _ ++ _` >>
+                    qexists_tac `q1 ++ [(p2,d2);(p1,d1)] ++ l` >>
+                    rw[] >>
+                    metis_tac[qcong_queue_reorder'',qcong_refl,APPEND_ASSOC,APPEND] >>
+                    NO_TAC
+                   )
+             >> HINT_EXISTS_TAC
+             >> rw[]
+             >> metis_tac[qcong_queue_reorder'',qcong_refl,APPEND_ASSOC,APPEND])
+      >> TRY(fs[APPEND_EQ_APPEND_MID] >> rveq >> fs[Once APPEND_EQ_CONS]
+             >> fs[APPEND_EQ_SING] >> rveq >> fs[] >> rveq >> fs[]
+             >> Q.REFINE_EXISTS_TAC `NEndpoint _ _ _`
+             >> rw[Once trans_cases,PULL_EXISTS,EXISTS_OR_THM,RIGHT_AND_OVER_OR]
+             >> ((qmatch_asmsub_abbrev_tac `_ <> [1w]` >> disj2_tac) ORELSE disj1_tac)
+             >> TRY(qmatch_goalsub_abbrev_tac `_ ++ [(_,_); (_,_)] ++ _` >>
+                    qexists_tac `q1 ++ [(p2,d2)]` >>
+                    rw[qcong_refl] >>
+                    NO_TAC
+                   )
+             >> TRY(qmatch_goalsub_abbrev_tac `_ ++ [(_,_); (_,_)] ++ _ ++ _` >>
+                    qexists_tac `q1 ++ [(p2,d2);(p1,d1)] ++ l` >>
+                    rw[] >>
+                    metis_tac[qcong_queue_reorder',qcong_refl,APPEND_ASSOC,APPEND]
+                   )
+             >> HINT_EXISTS_TAC
+             >> rw[]
+             >> metis_tac[qcong_queue_reorder',qcong_refl,APPEND_ASSOC,APPEND]))
+  >- (qpat_x_assum `trans (NPar _ _) _ _` (assume_tac
+                                           o REWRITE_RULE [Once trans_cases])
+      >> fs[] >> rveq
+      >> EVERY_ASSUM imp_res_tac
+      >> imp_res_tac trans_com_l
+      >> imp_res_tac trans_com_r
+      >> imp_res_tac trans_com_choice_l
+      >> imp_res_tac trans_com_choice_r
+      >> imp_res_tac trans_par_l
+      >> imp_res_tac trans_par_r
+      >> metis_tac[qcong_rules])
+  >- (qpat_x_assum `trans (NPar _ _) _ _` (assume_tac
+                                           o REWRITE_RULE [Once trans_cases])
+      >> fs[] >> rveq
+      >> EVERY_ASSUM imp_res_tac
+      >> imp_res_tac trans_com_l
+      >> imp_res_tac trans_com_r
+      >> imp_res_tac trans_com_choice_l
+      >> imp_res_tac trans_com_choice_r
+      >> imp_res_tac trans_par_l
+      >> imp_res_tac trans_par_r
+      >> metis_tac[qcong_rules]));
+
+val qcong_trans_pres = Q.store_thm("qcong_trans_pres",
+  `∀p1 q1 alpha p2.
+     qcong p1 q1 ∧ trans p1 alpha p2
+     ⇒ ∃q2. trans q1 alpha q2 ∧ qcong p2 q2`,
+  metis_tac[qcong_trans_eq])
+
 val list_trans_def = Define `
     (list_trans p [] q = (p = q))
  /\ (list_trans p (alpha::l) q = ?p'. trans p alpha p' /\ list_trans p' l q)`
@@ -578,6 +1169,11 @@ val list_trans_par_r = Q.store_thm("list_trans_par_r",
 val endpoint_names_trans = Q.store_thm("endpoint_names_trans",
   `!n1 alpha n2. trans n1 alpha n2 ==> MAP FST (endpoints n2) = MAP FST(endpoints n1)`,
   ho_match_mp_tac trans_strongind >> rpt strip_tac >> fs[endpoints_def]);
+
+val endpoint_names_list_trans = Q.store_thm("endpoint_names_list_trans",
+  `!n1 alpha n2. list_trans n1 alpha n2 ==> MAP FST (endpoints n2) = MAP FST(endpoints n1)`,
+  Induct_on `alpha` >> rw[list_trans_def] >>
+  metis_tac[endpoint_names_trans]);
 
 val sender_is_endpoint = Q.store_thm("sender_is_endpoint",
  `∀p1 p2 q1 d q2.
@@ -839,5 +1435,204 @@ val sender_receiver_distinct = Q.store_thm("sender_receiver_distinct",
   >> ho_match_mp_tac trans_strongind
   >> rpt strip_tac >> fs[]);
 
+Theorem trans_same_sender_determ:
+  trans p1 (LSend q2 d1 q1) p2
+  /\ trans p1 (LSend q2 d2 q3) p3
+  /\ ALL_DISTINCT(MAP FST(endpoints p1))
+  ==> q1 = q3 /\ d1 = d2 /\ p2 = p3
+Proof
+  qmatch_goalsub_abbrev_tac `trans _ alpha`
+  >> rpt(disch_then strip_assume_tac)
+  >> pop_assum mp_tac
+  >> qhdtm_x_assum `Abbrev` (mp_tac o REWRITE_RULE[markerTheory.Abbrev_def])
+  >> rpt(pop_assum mp_tac)
+  >> MAP_EVERY qid_spec_tac [`q2`,`d2`,`q1`,`d1`,`p3`,`q3`,`p2`,`alpha`,`p1`]
+  >> Ho_Rewrite.PURE_REWRITE_TAC[GSYM PULL_FORALL]
+  >> ho_match_mp_tac trans_strongind
+  >> rpt conj_tac >> rpt(gen_tac ORELSE disch_then strip_assume_tac)
+  >> fs[] >> rveq
+  >> qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+  >> fs[] >> rveq >> fs[] >> rveq >> fs[endpoints_def,ALL_DISTINCT_APPEND]
+  >> metis_tac[sender_is_endpoint]
+QED
+
+Theorem trans_same_sender_choice_determ:
+  trans p1 (LIntChoice q2 d1 q1) p2
+  /\ trans p1 (LIntChoice q2 d2 q3) p3
+  /\ ALL_DISTINCT(MAP FST(endpoints p1))
+  ==> q1 = q3 /\ d1 = d2 /\ p2 = p3
+Proof
+  qmatch_goalsub_abbrev_tac `trans _ alpha`
+  >> rpt(disch_then strip_assume_tac)
+  >> pop_assum mp_tac
+  >> qhdtm_x_assum `Abbrev` (mp_tac o REWRITE_RULE[markerTheory.Abbrev_def])
+  >> rpt(pop_assum mp_tac)
+  >> MAP_EVERY qid_spec_tac [`q2`,`d2`,`q1`,`d1`,`p3`,`q3`,`p2`,`alpha`,`p1`]
+  >> Ho_Rewrite.PURE_REWRITE_TAC[GSYM PULL_FORALL]
+  >> ho_match_mp_tac trans_strongind
+  >> rpt conj_tac >> rpt(gen_tac ORELSE disch_then strip_assume_tac)
+  >> fs[] >> rveq
+  >> qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+  >> fs[] >> rveq >> fs[] >> rveq >> fs[endpoints_def,ALL_DISTINCT_APPEND]
+  >> metis_tac[choice_sender_is_endpoint]
+QED
+
+Theorem trans_same_receiver_determ:
+  trans p1 (LReceive s d r) p2
+  /\ trans p1 (LReceive s d r) p3
+  /\ ALL_DISTINCT(MAP FST(endpoints p1))
+  ==> p2 = p3
+Proof
+  qmatch_goalsub_abbrev_tac `trans _ alpha`
+  >> rpt(disch_then strip_assume_tac)
+  >> pop_assum mp_tac
+  >> qhdtm_x_assum `Abbrev` (mp_tac o REWRITE_RULE[markerTheory.Abbrev_def])
+  >> rpt(pop_assum mp_tac)
+  >> MAP_EVERY qid_spec_tac [`p3`,`s`,`d`,`r`,`p2`,`alpha`,`p1`]
+  >> Ho_Rewrite.PURE_REWRITE_TAC[GSYM PULL_FORALL]
+  >> ho_match_mp_tac trans_strongind
+  >> rpt conj_tac >> rpt(gen_tac ORELSE disch_then strip_assume_tac)
+  >> fs[] >> rveq
+  >> qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+  >> fs[] >> rveq >> fs[] >> rveq >> fs[endpoints_def,ALL_DISTINCT_APPEND]
+  >> metis_tac[receiver_is_endpoint]
+QED
+
+Theorem trans_send_choice_distinct_senders:
+  trans p1 (LSend q2 d1 q1) p2
+  /\ trans p1 (LIntChoice q3 b q4) p3
+  /\ ALL_DISTINCT(MAP FST(endpoints p1))
+  ==> q2 <> q3
+Proof
+  qmatch_goalsub_abbrev_tac `trans _ alpha`
+  >> rpt(disch_then strip_assume_tac)
+  >> pop_assum mp_tac
+  >> qhdtm_x_assum `Abbrev` (mp_tac o REWRITE_RULE[markerTheory.Abbrev_def])
+  >> rpt(pop_assum mp_tac)
+  >> MAP_EVERY qid_spec_tac [`q4`,`q2`,`d2`,`q1`,`d1`,`p3`,`q3`,`p2`,`alpha`,`p1`]
+  >> Ho_Rewrite.PURE_REWRITE_TAC[GSYM PULL_FORALL]
+  >> ho_match_mp_tac trans_strongind
+  >> rpt conj_tac >> rpt(gen_tac ORELSE disch_then strip_assume_tac)
+  >> fs[] >> rveq
+  >> qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+  >> fs[] >> rveq >> fs[] >> rveq >> fs[endpoints_def,ALL_DISTINCT_APPEND]
+  >> metis_tac[sender_is_endpoint,choice_sender_is_endpoint]
+QED
+
+Theorem trans_no_selfloop:
+  !p1 alpha p2.
+  trans p1 alpha p2
+  ==> p1 <> p2
+Proof
+  PURE_REWRITE_TAC[GSYM AND_IMP_INTRO] >>
+  ho_match_mp_tac trans_ind >> rw[] >> fs[endpointLangTheory.state_component_equality] >>
+  TRY(disj2_tac) >> spose_not_then strip_assume_tac >>
+  qmatch_asmsub_abbrev_tac `a1 = a2` >>
+  `endpoint_size a1 = endpoint_size a2` by simp[] >>
+  pop_assum mp_tac >> unabbrev_all_tac >> rpt(pop_assum kall_tac) >>
+  simp[endpoint_size_def]
+QED
+
+Theorem trans_different_sender:
+  trans p1 (LSend s1 d1 r1) p2
+  /\ trans p1 (LSend s2 d2 r2) p3
+  /\ s1 <> s2
+  ==> p2 <> p3
+Proof
+  qmatch_goalsub_abbrev_tac `trans _ alpha`
+  >> rpt(disch_then strip_assume_tac)
+  >> pop_assum mp_tac
+  >> qhdtm_x_assum `Abbrev` (mp_tac o REWRITE_RULE[markerTheory.Abbrev_def])
+  >> rpt(pop_assum mp_tac)
+  >> MAP_EVERY qid_spec_tac [`r2`,`r1`,`d2`,`s2`,`d1`,`p3`,`s1`,`p2`,`alpha`,`p1`]
+  >> Ho_Rewrite.PURE_REWRITE_TAC[GSYM PULL_FORALL]
+  >> ho_match_mp_tac trans_strongind
+  >> rpt conj_tac >> rpt(gen_tac ORELSE disch_then strip_assume_tac)
+  >> fs[] >> rveq
+  >> qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+  >> fs[] >> rveq >> fs[] >> rveq >> fs[endpoints_def,ALL_DISTINCT_APPEND]
+  >> metis_tac[sender_is_endpoint,trans_no_selfloop]
+QED
+
+Theorem trans_send_receive_distinct:
+  trans p1 (LSend s1 d1 r1) p2
+  /\ trans p1 (LReceive s2 d2 r2) p3
+  ==> p2 <> p3
+Proof
+  qmatch_goalsub_abbrev_tac `trans _ alpha`
+  >> rpt(disch_then strip_assume_tac)
+  >> pop_assum mp_tac
+  >> qhdtm_x_assum `Abbrev` (mp_tac o REWRITE_RULE[markerTheory.Abbrev_def])
+  >> rpt(pop_assum mp_tac)
+  >> MAP_EVERY qid_spec_tac [`r2`,`r1`,`d2`,`s2`,`d1`,`p3`,`s1`,`p2`,`alpha`,`p1`]
+  >> Ho_Rewrite.PURE_REWRITE_TAC[GSYM PULL_FORALL]
+  >> ho_match_mp_tac trans_strongind
+  >> rpt conj_tac >> rpt(gen_tac ORELSE disch_then strip_assume_tac)
+  >> fs[] >> rveq
+  >> qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+  >> fs[] >> rveq >> fs[] >> rveq >> fs[endpoints_def,ALL_DISTINCT_APPEND]
+  >> fs[endpointLangTheory.state_component_equality]
+  >> metis_tac[sender_is_endpoint,trans_no_selfloop]
+QED
+
+val receive_ext_choice_rel_def = Define
+  `receive_ext_choice_rel alpha beta =
+   ?s d r b.
+    alpha = LReceive s d r /\ beta = LExtChoice s b r /\
+    d = if b then [1w] else [0w]`
+
+val label_rel_def = Define `
+ label_rel alpha beta =
+ (alpha = beta \/ receive_ext_choice_rel alpha beta \/ receive_ext_choice_rel beta alpha)
+ `
+
+Theorem trans_send_receive_distinct:
+  trans p1 (LSend s1 d1 r1) p2
+  /\ trans p1 (LReceive s2 d2 r2) p3
+  ==> p2 <> p3
+Proof
+  qmatch_goalsub_abbrev_tac `trans _ alpha`
+  >> rpt(disch_then strip_assume_tac)
+  >> pop_assum mp_tac
+  >> qhdtm_x_assum `Abbrev` (mp_tac o REWRITE_RULE[markerTheory.Abbrev_def])
+  >> rpt(pop_assum mp_tac)
+  >> MAP_EVERY qid_spec_tac [`r2`,`r1`,`d2`,`s2`,`d1`,`p3`,`s1`,`p2`,`alpha`,`p1`]
+  >> Ho_Rewrite.PURE_REWRITE_TAC[GSYM PULL_FORALL]
+  >> ho_match_mp_tac trans_strongind
+  >> rpt conj_tac >> rpt(gen_tac ORELSE disch_then strip_assume_tac)
+  >> fs[] >> rveq
+  >> qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+  >> fs[] >> rveq >> fs[] >> rveq >> fs[endpoints_def,ALL_DISTINCT_APPEND]
+  >> fs[endpointLangTheory.state_component_equality]
+  >> metis_tac[sender_is_endpoint,trans_no_selfloop]
+QED
+
+Theorem trans_no_selfloop'[simp]:
+  trans p1 alpha p1 <=> F
+Proof
+  metis_tac[trans_no_selfloop]
+QED
+
+Theorem trans_distinct_residual:
+  !p1 alpha p2 beta p3.
+  trans p1 alpha p2
+  /\ trans p1 beta p3
+  /\ ~label_rel alpha beta
+  ==> p2 <> p3
+Proof
+  Ho_Rewrite.PURE_REWRITE_TAC[GSYM PULL_FORALL,GSYM AND_IMP_INTRO] >>
+  ho_match_mp_tac trans_strongind >> rpt strip_tac >>
+  fs[] >> rveq >>
+  qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+  fs[] >> rveq >> fs[] >> rveq >>
+  fs[endpointLangTheory.state_component_equality,
+     label_rel_def,label_rel_def,receive_ext_choice_rel_def] >>
+  TRY(qmatch_asmsub_abbrev_tac `a1 = (a2:endpoint)` >>
+      `endpoint_size a1 = endpoint_size a2` by simp[] >>
+      fs[Abbr `a1`, Abbr `a2`,endpoint_size_def] >>
+      NO_TAC
+      ) >>
+  metis_tac[]
+QED
 
 val _ = export_theory ()
