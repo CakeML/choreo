@@ -2,6 +2,7 @@ open preamble
      endpoint_to_payloadTheory (* for compile_message only*)
      payloadLangTheory payload_to_cakemlTheory
      evaluateTheory terminationTheory ml_translatorTheory ml_progTheory evaluatePropsTheory
+     namespaceTheory
      semanticPrimitivesTheory
      ffiTheory
      comms_ffiTheory
@@ -11,20 +12,20 @@ open preamble
 val _ = new_theory "payload_to_cakemlProof";
 
 
-val has_v_def = Define
-  ‘has_v env n cfty f =
+Definition has_v_def:
+  has_v env n cfty f =
    (∃v. nsLookup env n = SOME v
         ∧ cfty f v)
-  ’;
+End
 
 val WORD8 = “WORD:word8 -> v -> bool”;
 
-val in_module_def = Define ‘
+Definition in_module_def:
   in_module name =
   ∀x y (env:(modN,varN,v) namespace). nsLookup (nsBind x y env) name = nsLookup env name
-  ’;
+End
 
-val env_asm_def = Define ‘
+Definition env_asm_def:
   env_asm env conf = (
     has_v env.v conf.concat (LIST_TYPE ^WORD8 --> LIST_TYPE ^WORD8 --> LIST_TYPE ^WORD8) $++ ∧ 
     has_v env.v conf.length (LIST_TYPE ^WORD8 --> NUM) LENGTH ∧
@@ -43,16 +44,17 @@ val env_asm_def = Define ‘
     in_module conf.take ∧
     in_module conf.drop ∧
     in_module conf.fromList)
-  ’;
+End
 
 
-val evaluate_empty_state_norel = Q.prove(
-  ‘∀s x refs refs' exp env ck1 ck2.
+Theorem evaluate_empty_state_norel:
+  ∀s x refs refs' exp env ck1 ck2.
     evaluate (empty_state with <|clock := ck1; refs := refs|>) env [exp] =
              (empty_state with <|clock := ck2; refs := refs ++ refs'|>,Rval [x]) ⇒
     ∃ck1 ck2.
       evaluate (s with <|clock := ck1; refs := refs; ffi:= s.ffi|>) env [exp] =
-      (s with <|clock := ck2; refs := refs ++ refs'; ffi:= s.ffi|>,Rval [x])’,
+      (s with <|clock := ck2; refs := refs ++ refs'; ffi:= s.ffi|>,Rval [x])
+Proof
   rpt strip_tac >>
   qabbrev_tac ‘a1 = s with refs := refs’ >>
   ‘refs = a1.refs’ by(qunabbrev_tac ‘a1’ >> simp[]) >>
@@ -60,15 +62,18 @@ val evaluate_empty_state_norel = Q.prove(
   drule (SIMP_RULE (srw_ss()) [ml_progTheory.eval_rel_def,PULL_EXISTS] evaluate_empty_state_IMP
          |> GEN_ALL) >>
   unabbrev_all_tac >>
-  Cases_on ‘s’ >> fs[state_fn_updates]);
+  Cases_on ‘s’ >> fs[state_fn_updates]
+QED
 
-Theorem LUPDATE_REPLICATE
-  ‘∀n m x y. n < m ⇒
-   LUPDATE x n (REPLICATE m y) = REPLICATE n y ++ [x] ++ REPLICATE (m - (n + 1)) y’
- (Induct >> Cases >> rw[LUPDATE_def] >> simp[ADD1]);
+Theorem LUPDATE_REPLICATE:
+  ∀n m x y. n < m ⇒
+   LUPDATE x n (REPLICATE m y) = REPLICATE n y ++ [x] ++ REPLICATE (m - (n + 1)) y
+Proof
+  Induct >> Cases >> rw[LUPDATE_def] >> simp[ADD1]
+QED
 
-Theorem padv_correct
- ‘∀env conf l lv le s1 s2 refs.
+Theorem padv_correct:
+ ∀env conf l lv le s1 s2 refs.
   env_asm env conf ∧
   LIST_TYPE ^WORD8 l lv ∧
   evaluate$evaluate s1 env [le] = (s2 with refs := s1.refs ++ refs, Rval [lv])
@@ -77,8 +82,8 @@ Theorem padv_correct
   evaluate$evaluate (s1 with clock:= ck1) env [App Opapp [padv conf; le]] =
            (s2 with <|clock := ck2; refs := APPEND s1.refs refs'|>, Rval [Loc num]) ∧
   store_lookup num (APPEND s1.refs refs') = SOME(W8array(pad conf l))
-  ’
- (rpt strip_tac >>
+Proof
+  rpt strip_tac >>
   drule evaluate_add_to_clock >>
   simp[] >>
   qabbrev_tac ‘ack = s2.clock’ >>
@@ -374,31 +379,36 @@ Theorem padv_correct
           semanticPrimitivesTheory.state_component_equality,LUPDATE_APPEND,
           REWRITE_RULE [ADD1] REPLICATE,LUPDATE_def,TAKE_TAKE] >>
      rw[pad_def,DROP_NIL] >> intLib.COOPER_TAC)
-  );
+QED
 
-val ffi_accepts_rel_def = Define ‘
+Definition ffi_accepts_rel_def:
   ffi_accepts_rel stpred pred oracle =
   ∀st s conf bytes.
     stpred st.ffi_state ∧ st.oracle = oracle ∧ pred s conf bytes ⇒
     ∃ffi. st.oracle s st.ffi_state conf bytes = Oracle_return ffi bytes ∧
-          stpred ffi’;
+          stpred ffi
+End
 
-val send_events_def = Define ‘
+Definition send_events_def:
   send_events conf dest d =
-  MAP (λm. IO_event "send" dest (ZIP (m,m)))(compile_message conf d)’;
+  MAP (λm. IO_event "send" dest (ZIP (m,m)))(compile_message conf d)
+End
 
-val update_state_def = Define ‘
+Definition update_state_def:
   (update_state st oracle [] = st) ∧
   (update_state st oracle (IO_event s c b::es) =
    update_state (@st'. oracle s st c (MAP FST b) = Oracle_return st' (MAP SND b))
-                oracle es)’;
+                oracle es)
+End
 
-val LUPDATE_SAME' = Q.prove(
-  ‘n < LENGTH ls ∧ EL n ls = a ⇒ LUPDATE a n ls = ls’,
-  metis_tac[LUPDATE_SAME]);
+Theorem LUPDATE_SAME':
+  n < LENGTH ls ∧ EL n ls = a ⇒ LUPDATE a n ls = ls
+Proof
+  metis_tac[LUPDATE_SAME]
+QED
 
-Theorem sendloop_correct
- ‘∀conf l env env' lv le s refs stpred dest.
+Theorem sendloop_correct:
+  ∀conf l env env' lv le s refs stpred dest.
   env_asm env' conf ∧
   conf.payload_size ≠ 0 ∧
   LIST_TYPE ^WORD8 l lv ∧
@@ -418,8 +428,9 @@ Theorem sendloop_correct
                          <|io_events := s.ffi.io_events ++ send_events conf dest l;
                            ffi_state := update_state s.ffi.ffi_state s.ffi.oracle (send_events conf dest l)
                           |>
-                        |>, Rval [Conv NONE []])’
- (ho_match_mp_tac compile_message_ind>>
+                        |>, Rval [Conv NONE []])
+Proof
+  ho_match_mp_tac compile_message_ind>>
   rpt strip_tac >>
   ntac 4 (simp[Once evaluate_def]) >>
   simp[do_opapp_def] >>
@@ -563,7 +574,7 @@ Theorem sendloop_correct
   simp[semanticPrimitivesTheory.state_component_equality,ffiTheory.ffi_state_component_equality] >>
   conj_tac >> CONV_TAC(RHS_CONV(PURE_ONCE_REWRITE_CONV [compile_message_def])) >>
   simp[final_pad_LENGTH,update_state_def]
-  );
+QED
 
 val DATUM = “LIST_TYPE ^WORD8”;
 
@@ -571,9 +582,7 @@ val DATUM = “LIST_TYPE ^WORD8”;
 
 (* enc_ok (v sem_env) -> string list -> LIST_TYPE (LIST_TYPE DATUM -> DATUM) -> Boolv_def *)
 
-val enc_ok_def =
-    Define
-    ‘
+Definition enc_ok_def:
     (enc_ok _ _ [] [] = T) ∧
     (enc_ok conf cEnv (f::fs) (n::ns) =
        ((∃cl.
@@ -584,60 +593,133 @@ val enc_ok_def =
         )
     ) ∧
     (enc_ok _ _ _ _ = F)
-    ’;
+End
 
 (* UNDERSTANDING WHAT VARIABLES AND CONFIG MEAN IN CAKEML LAND - CONSISTENCY OF SEMANTIC ENVIRONMENT *)
+
+(* Check the payload code and state make sense wrt. free variables *)
+Definition pFv_def[simp]:
+  pFv Nil = {} ∧
+  pFv (Send _ fv _ npCd) = fv INSERT pFv npCd ∧
+  pFv (Receive _ fv _ npCd) = fv INSERT pFv npCd ∧
+  pFv (IfThen fv npCd1 npCd2) = fv INSERT pFv npCd1 ∪ pFv npCd2 ∧
+  pFv (Let bv _ fvs npCd) = (pFv npCd DELETE bv) ∪ set fvs
+End
+
+Definition pSt_pCd_corr_def:
+  pSt_pCd_corr pSt pCd ⇔ ∀vn. vn ∈ pFv pCd
+                              ⇒ ∃vv. FLOOKUP pSt.bindings vn = SOME vv
+End
 
 (* Check the semantic environment contains all the variable bindings in
    the payload state and also matches all the config assumptions        *)
 
-val sem_env_cor_def =
-    Define
-    ‘
-    sem_env_cor conf pSt cEnv =
-       ((∀ n v. (FLOOKUP pSt.bindings n = SOME v)
-                 ⇒ (∃v'. (nsLookup (cEnv.v) (Short n) = SOME v') ∧
-                         ^(DATUM) v v')
-         ) ∧
-        env_asm cEnv conf
-        )
-    ’;
+Definition sem_env_cor_def:
+    sem_env_cor conf pSt cEnv ⇔
+        env_asm cEnv conf ∧
+        ∀ n v.  FLOOKUP pSt.bindings n = SOME v
+                ⇒ ∃v'.  nsLookup (cEnv.v) (Short n) = SOME v' ∧
+                        ^(DATUM) v v'
+End
 
 (* CHECKING CONSISTENCY BETWEEN FFI AND PAYLOAD STATE *)
-val ffi_cor_def =
-  Define
-  ‘
-  ffi_cor cpNum pSt (fNum,fQueue,fNet) =
-    ((cpNum = fNum) ∧
-     (∀extproc.
+Definition ffi_cor_def:
+  ffi_cor cpNum pSt (fNum,fQueue,fNet) ⇔
+    cpNum = fNum ∧
+    ∀extproc.
       let
-        (pMes = FILTER (λ(n,_). n = extproc) pSt.queue);
-        (fMes = FILTER (λ(n,_). n = extproc) fQueue)
+        pMes = FILTER (λ(n,_). n = extproc) pSt.queue;
+        fMes = FILTER (λ(n,_). n = extproc) fQueue
       in  
-          isPREFIX pMes fMes))
-  ’;
+        isPREFIX pMes fMes
+End
 
 (* FINAL DEFINITION OF A VALID PAYLOAD/CAKEML EVALUATION *)
 
-val cpEval_valid_def =
-  Define
-  ‘
-  cpEval_valid conf cpNum cEnv pSt pCd vs cSt =
-    (enc_ok conf cEnv (letfuns pCd) vs ∧
-     sem_env_cor conf pSt cEnv ∧
-     ffi_cor cpNum pSt cSt.ffi.ffi_state)
-  ’;
+Definition cpEval_valid_def:
+  cpEval_valid conf cpNum cEnv pSt pCd vs cSt ⇔
+    env_asm cEnv conf ∧
+    enc_ok conf cEnv (letfuns pCd) vs ∧
+    pSt_pCd_corr pSt pCd ∧
+    sem_env_cor conf pSt cEnv ∧
+    ffi_cor cpNum pSt cSt.ffi.ffi_state
+End
 
 (* DEFINITION OF EQUIVALENT CAKEML EVALUTATIONS *)
 
-val cEval_equiv_def =
-  Define
-  ‘
-  cEval_equiv conf (csA,crA) (csB,crB) =
-    ((ffi_eq conf csA.ffi.ffi_state csB.ffi.ffi_state) ∧
-     (crA = crB))
-  ’;
+Definition cEval_equiv_def:
+  cEval_equiv conf (csA,crA) (csB,crB) ⇔
+    ffi_eq conf csA.ffi.ffi_state csB.ffi.ffi_state ∧
+    crA = crB ∧
+    crA ≠ Rerr (Rabort Rtimeout_error)
+End
 
+Theorem evaluate_general:
+  ∀ (cSt: 'ffi semanticPrimitives$state) env ck1 ck2 refs' u. 
+      evaluate (empty_state with <|clock := ck1; refs := cSt.refs|>) env
+           [exp] =
+         (empty_state with <|clock := ck2; refs := cSt.refs ++ refs'|>,
+          Rval [u])
+    ⇒ ∀mc. evaluate (cSt with clock := ck1 + mc) env [exp]
+                = (cSt with <|clock := ck2 + mc;
+                               refs := cSt.refs ++ refs'|>,
+                   Rval [u])
+Proof
+  rpt strip_tac >>
+  ‘evaluate (cSt with clock := ck1) env [exp]
+                  = (cSt with <|clock := ck2;
+                                 refs := cSt.refs ++ refs'|>,
+                     Rval[u])’
+    suffices_by (qspecl_then [‘cSt with clock := ck1’,
+                              ‘env’, ‘[exp]’,
+                              ‘cSt with <|clock := ck2;
+                                 refs := cSt.refs ++ refs'|>’,
+                              ‘Rval [u]’, ‘mc’]
+                              assume_tac evaluate_add_to_clock >>
+                 fs[]) >>
+  qabbrev_tac ‘s  = empty_state with <|clock := ck1;
+                                      refs   := cSt.refs|>’ >>
+  qabbrev_tac ‘s' = empty_state with <|clock := ck2;
+                                      refs   := cSt.refs ++ refs'|>’ >>
+  qabbrev_tac ‘e = [exp]’ >>
+  qabbrev_tac ‘r = Rval [u] :(v list, v) result’ >>
+  ‘(evaluate s env e = (s',r)) ∧ (s'.ffi = s.ffi) ∧
+    (∀outcome. r ≠ Rerr (Rabort (Rffi_error outcome))) ⇒
+    ∀t : 'ffi semanticPrimitives$state.
+        (t.clock = s.clock) ∧ (t.refs = s.refs) ⇒
+        (evaluate t env e =
+        (t with <|clock := s'.clock; refs := s'.refs|>,r))’
+    by metis_tac[evaluate_ffi_intro] >>
+  rfs[Abbr ‘s'’, Abbr ‘s’, Abbr ‘r’]
+QED
+
+
+Theorem clock_irrel:
+  ∀ conf cSt1 cSt2 cEnv cExps.
+    ∀mc eck1 eck2.    
+      cEval_equiv conf
+        (evaluate (cSt1 with clock := mc) cEnv cExps)
+        (evaluate (cSt2 with clock := mc) cEnv cExps)
+    ⇒ cEval_equiv conf
+        (evaluate (cSt1 with clock := eck1 + mc) cEnv cExps)
+        (evaluate (cSt2 with clock := eck2 + mc) cEnv cExps)
+Proof
+  rpt strip_tac >>
+  Cases_on ‘evaluate (cSt1 with clock := mc) cEnv cExps’ >>
+  Cases_on ‘evaluate (cSt2 with clock := mc) cEnv cExps’ >>
+  fs[cEval_equiv_def] >>
+  ‘evaluate (cSt1 with clock := eck1 + mc) cEnv cExps
+    = (q with clock := eck1 + q.clock,r)’
+    by (Q.ISPECL_THEN [‘(cSt1 with clock := mc)’,‘cEnv’, ‘cExps’,‘q’,‘r’,‘eck1’]
+                      assume_tac evaluate_add_to_clock >>
+        rfs[]) >>
+  ‘evaluate (cSt2 with clock := eck2 + mc) cEnv cExps
+    = (q' with clock := eck2 + q'.clock,r')’
+    by (Q.ISPECL_THEN [‘(cSt2 with clock := mc)’,‘cEnv’, ‘cExps’,‘q'’,‘r'’,‘eck2’]
+                      assume_tac evaluate_add_to_clock >>
+        rfs[]) >>
+  rw[cEval_equiv_def]
+QED
 
 Theorem ffi_irrel:
   ∀conf se cpNum cEnv pSt pCd vs cSt1 cSt2.
@@ -653,7 +735,91 @@ Proof
   Induct_on ‘pCd’
   >- (rw[compile_endpoint_def,evaluate_def,do_con_check_def,
          build_conv_def, cEval_equiv_def])
-  >- (cheat)
+  >- (rw[compile_endpoint_def,evaluate_def] >>
+      ‘∃sv. FLOOKUP pSt.bindings s = SOME sv’
+        by fs[cpEval_valid_def,pSt_pCd_corr_def] >>
+      ‘∃z. nsLookup cEnv.v (Short s) = SOME z ∧
+           LIST_TYPE WORD sv z’
+        by fs[cpEval_valid_def,sem_env_cor_def] >>
+      simp[cEval_equiv_def] >>
+      ‘has_v cEnv.v conf.length (LIST_TYPE ^WORD8 --> NUM) LENGTH’
+        by fs[cpEval_valid_def,env_asm_def] >>
+      fs[has_v_def,Arrow_def,AppReturns_def] >>
+      pop_assum (drule_then assume_tac) >>
+      first_assum (qspec_then ‘cSt1.refs’ assume_tac) >>
+      first_assum (qspec_then ‘cSt2.refs’ assume_tac) >>
+      fs[] >> Q.REFINE_EXISTS_TAC ‘SUC mc’ >> simp[] >>
+      fs[eval_rel_def] >>
+      simp[dec_clock_def] >>
+      Q.REFINE_EXISTS_TAC ‘ck1 + ck1' + mc’ >>
+      ‘∀mc. evaluate (cSt1 with clock := ck1 + ck1' + mc) env [exp]
+            = (cSt1 with <|clock := ck2 + ck1' + mc;
+                           refs := cSt1.refs ++ refs'|>,
+               Rval [u])’
+        by (strip_tac >>
+            ‘ck1 + ck1' + mc = ck1 + (ck1' + mc)’
+              by simp[] >>
+            first_x_assum SUBST1_TAC >>
+            ‘ck2 + ck1' + mc = ck2 + (ck1' + mc)’
+              by simp[] >>
+            first_x_assum SUBST1_TAC >>
+            metis_tac[evaluate_general]) >>
+      ‘∀mc. evaluate (cSt2 with clock := ck1 + ck1' + mc) env [exp]
+            = (cSt2 with <|clock := ck2' + ck1 + mc;
+                           refs := cSt2.refs ++ refs''|>,
+               Rval [u'])’
+        by (strip_tac >>
+            ‘ck1 + ck1' + mc = ck1' + (ck1 + mc)’
+              by simp[] >>
+            first_x_assum SUBST1_TAC >>
+            ‘ck2' + ck1 + mc = ck2' + (ck1 + mc)’
+              by simp[] >>
+            first_x_assum SUBST1_TAC >>
+            metis_tac[evaluate_general]) >>
+      simp[] >>
+      rw[do_app_def] >>
+      fs[NUM_def,INT_def] >>
+      simp[do_if_def, Boolv_def, opb_lookup_def] >>
+      Cases_on ‘LENGTH sv ≤ n’ >> simp[]
+      >- (last_x_assum (qspecl_then [‘conf’,‘cpNum’,‘cEnv’,
+                                    ‘pSt’,‘vs’,
+                                    ‘cSt1 with refs := cSt1.refs ++ refs'’,
+                                    ‘cSt2 with refs := cSt2.refs ++ refs''’]
+                                  assume_tac) >>
+          rfs[cpEval_valid_def,letfuns_def] >>
+          ‘pSt_pCd_corr pSt pCd’
+            by fs[pSt_pCd_corr_def,Once pFv_def] >>
+          fs[] >>
+          qexists_tac ‘mc’ >>
+          ‘cSt1 with <|clock := ck1' + (ck2 + mc); refs := cSt1.refs ++ refs';
+                       ffi := cSt1.ffi|> =
+           cSt1 with <|clock := ck1' + (ck2 + mc); refs := cSt1.refs ++ refs'|>’
+            by simp[state_component_equality] >>
+          first_x_assum SUBST1_TAC >>
+          ‘cSt2 with <|clock := ck1 + (ck2' + mc); refs := cSt2.refs ++ refs'';
+                       ffi := cSt2.ffi|> =
+           cSt2 with <|clock := ck1 + (ck2' + mc); refs := cSt2.refs ++ refs''|>’
+            by simp[state_component_equality] >>
+          first_x_assum SUBST1_TAC >>
+          ‘ck1' + (ck2  + mc) = (ck1' + ck2 ) + mc’
+            by simp[] >>
+          first_x_assum SUBST1_TAC >>
+          ‘ck1  + (ck2' + mc) = (ck1  + ck2') + mc’
+            by simp[] >>
+          first_x_assum SUBST1_TAC >>
+          qspecl_then [‘conf’,‘cSt1 with refs := cSt1.refs ++ refs'’,
+                       ‘cSt2 with refs := cSt2.refs ++ refs''’, ‘cEnv’,
+                       ‘[compile_endpoint conf vs pCd]’,
+                       ‘mc’, ‘ck1' + ck2’, ‘ck1 + ck2'’]
+                      assume_tac clock_irrel >>
+          rfs[])
+      >- (ntac 2 (ONCE_REWRITE_TAC [evaluate_def]) >>
+          ‘ALL_DISTINCT (MAP (λ(x,y,z). x) (sendloop conf (MAP (CHR ∘ w2n) l)))’
+            by EVAL_TAC >>
+          simp[] >>
+          rw[sendloop_correct] >>              
+          cheat)
+      )
   >- (cheat)
   >- (cheat)
   >- (cheat)

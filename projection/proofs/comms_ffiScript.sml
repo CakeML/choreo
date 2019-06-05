@@ -47,20 +47,16 @@ val (strans_rules,strans_ind,strans_cases) = Hol_reln
      ⇒  strans conf (c,q,N) (ASend rp d) (c,q,N'))
 ’;
 
-val bisim_def =
-Define
-‘
+Definition bisim_def:
   bisim ts R = ∀p q α.
                 R p q ⇒
                 (∀p'. ts p α p' ⇒ (∃q'. ts q α q' ∧ R p' q')) ∧
                 (∀q'. ts q α q' ⇒ (∃p'. ts p α p' ∧ R p' q'))
-’;
+End
 
-val bisimRel_def =
-Define
-‘
+Definition bisimRel_def:
   bisimRel ts p q = ∃R. bisim ts R ∧ R p q
-’;
+End
 
 
 Theorem bisimRel_equivRel:
@@ -81,11 +77,9 @@ Proof
       metis_tac[])
 QED
 
-val ffi_eq_def =
-Define
-‘
+Definition ffi_eq_def:
   ffi_eq conf = bisimRel (strans conf)
-’;
+End
 
 Theorem ffi_eq_equivRel:
   ∀conf. equivalence (ffi_eq conf)
@@ -93,29 +87,24 @@ Proof
   rw [ffi_eq_def,bisimRel_equivRel]
 QED
 
-val ffi_send_def =
-    Define
-    ‘
-        ffi_send conf os dest data =
-          if (∃ns. strans conf os (ASend dest data) ns) then
-            Oracle_return (@ns. strans conf os (ASend dest data) ns) data
-          else
-            Oracle_final FFI_diverged
-    ’;
+Definition ffi_send_def:
+  ffi_send conf os dest data =
+    if (∃ns. strans conf os (ASend dest data) ns) then
+      Oracle_return (@ns. strans conf os (ASend dest data) ns) data
+    else
+      Oracle_final FFI_diverged
+End
 
-val ffi_receive_def =
-    Define
-    ‘
-        ffi_receive conf os src _ =
-          if (∃p. strans conf os (ARecv src (FST p)) (SND p)) then
-            let (m,ns) = (@p. strans conf os (ARecv src (FST p)) (SND p)) in
-              Oracle_return ns m
-          else
-            Oracle_final FFI_diverged
-    ’;
+Definition ffi_receive_def:
+  ffi_receive conf os src _ =
+    if (∃p. strans conf os (ARecv src (FST p)) (SND p)) then
+      let (m,ns) = (@p. strans conf os (ARecv src (FST p)) (SND p)) in
+        Oracle_return ns m
+    else
+      Oracle_final FFI_diverged
+End
 
-val comms_ffi_oracle_def = Define
-‘
+Definition comms_ffi_oracle_def:
   comms_ffi_oracle conf name =
     if name = "send" then
         ffi_send conf
@@ -123,7 +112,7 @@ val comms_ffi_oracle_def = Define
         ffi_receive conf
     else
         (λ _ _ _. Oracle_final FFI_failed)
-’;
+End
 
 
 val _ = export_theory ();
