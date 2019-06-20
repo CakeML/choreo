@@ -1349,9 +1349,437 @@ Proof
           strip_tac >>
           metis_tac[trans_com_r,trans_par_r,qcong_par,qcong_refl,qcong_sym]))
   >- (* Com-Choice-L *)
-     cheat
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >> fs[endpoints_def,ALL_DISTINCT_APPEND]
+      >- (qmatch_asmsub_abbrev_tac `trans _ (LSend s1 _ _)` >>
+          qmatch_asmsub_abbrev_tac `trans _ (LIntChoice s2 _ _)` >>
+          rpt(qhdtm_x_assum `Abbrev` kall_tac) >>
+          drule (GEN_ALL trans_send_choice_distinct_senders) >>
+          rpt(disch_then drule) >> strip_tac >>
+          imp_res_tac sender_is_endpoint >>
+          imp_res_tac receiver_is_endpoint >>
+          imp_res_tac choice_sender_is_endpoint >>
+          imp_res_tac choice_receiver_is_endpoint >>          
+          dxrule endpoint_local_confluence_send_rotated >>
+          disch_then dxrule >>
+          impl_tac >- (simp[] >> metis_tac[]) >>
+          strip_tac >>
+          dxrule_all_then strip_assume_tac endpoint_local_confluence_receive_choice >>
+          metis_tac[trans_com_l,trans_com_choice_l,qcong_par,qcong_sym,qcong_refl])
+      >- (qmatch_asmsub_abbrev_tac `trans _ (LSend s1 _ _)` >>
+          qmatch_asmsub_abbrev_tac `trans _ (LIntChoice s2 _ _)` >>
+          rpt(qhdtm_x_assum `Abbrev` kall_tac) >>
+          drule (GEN_ALL trans_send_choice_distinct_senders) >>
+          rpt(disch_then drule) >> strip_tac >>
+          imp_res_tac sender_is_endpoint >>
+          imp_res_tac receiver_is_endpoint >>
+          imp_res_tac choice_sender_is_endpoint >>
+          imp_res_tac choice_receiver_is_endpoint >>
+          qpat_x_assum `trans _ (LSend _ _ _) _` assume_tac >>
+          drule trans_distinct_residual >>
+          qpat_x_assum `trans _ (LIntChoice _ _ _) _` assume_tac >>
+          disch_then drule >>
+          impl_tac >- simp[label_rel_def,receive_ext_choice_rel_def] >>
+          strip_tac >>
+          dxrule (GEN_ALL endpoint_local_confluence_send_rotated) >>
+          disch_then dxrule >>
+          impl_tac >- (simp[] >> metis_tac[]) >>
+          strip_tac >>
+          dxrule_all_then strip_assume_tac endpoint_local_confluence_receive_choice >>
+          metis_tac[trans_com_l,trans_com_choice_l,qcong_par,qcong_sym,qcong_refl])
+      >- (imp_res_tac sender_is_endpoint >>
+          imp_res_tac receiver_is_endpoint >>
+          imp_res_tac choice_sender_is_endpoint >>
+          imp_res_tac choice_receiver_is_endpoint >>
+          drule trans_distinct_residual >>
+          qpat_x_assum `trans _ (LExtChoice _ _ _) _` assume_tac >>
+          disch_then drule >>
+          impl_tac >- (simp[label_rel_def,receive_ext_choice_rel_def]) >>
+          strip_tac >>
+          dxrule_then assume_tac endpoint_local_confluence_send >>
+          pop_assum drule >>
+          impl_tac >- simp[] >>
+          strip_tac >>
+          dxrule endpoint_local_confluence_int_choice_rotated >>
+          disch_then dxrule >>
+          impl_tac >- (simp[] >> metis_tac[]) >>
+          strip_tac >>
+          metis_tac[trans_com_choice_l,trans_com_r,qcong_par,qcong_sym,qcong_refl])
+      >- (imp_res_tac sender_is_endpoint >>
+          imp_res_tac receiver_is_endpoint >>
+          imp_res_tac choice_sender_is_endpoint >>
+          imp_res_tac choice_receiver_is_endpoint >>
+          drule_then assume_tac (GEN_ALL trans_distinct_residual) >>
+          qhdtm_x_assum `trans` mp_tac >>
+          pop_assum drule >>
+          impl_tac >- simp[label_rel_def,receive_ext_choice_rel_def] >>
+          strip_tac >>
+          drule_then assume_tac (GEN_ALL trans_distinct_residual) >>
+          qhdtm_x_assum `trans` mp_tac >>
+          pop_assum drule >>
+          impl_tac >- simp[label_rel_def,receive_ext_choice_rel_def] >>
+          rpt strip_tac >>
+          dxrule endpoint_local_confluence_send_rotated >>
+          disch_then dxrule >>
+          impl_tac >- (simp[] >> metis_tac[]) >>
+          strip_tac >>
+          dxrule endpoint_local_confluence_int_choice_rotated >>
+          disch_then dxrule >>
+          impl_tac >- (simp[] >> metis_tac[]) >>
+          strip_tac >>
+          metis_tac[trans_com_choice_l,trans_com_r,qcong_par,qcong_sym,qcong_refl])
+      >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
+          imp_res_tac sender_is_endpoint >>
+          imp_res_tac receiver_is_endpoint >>
+          imp_res_tac choice_sender_is_endpoint >>
+          imp_res_tac choice_receiver_is_endpoint >>
+          qmatch_asmsub_abbrev_tac `trans _ (LIntChoice s1 _ _) _` >>
+          qpat_x_assum `trans _ (LIntChoice s1 _ _) _` mp_tac >>
+          qmatch_asmsub_abbrev_tac `trans _ (LIntChoice s2 _ _) _` >>
+          rpt(qhdtm_x_assum `Abbrev` kall_tac) >>
+          strip_tac >>
+          Cases_on `s1 = s2` >-
+            (rveq >>
+             drule_then assume_tac (GEN_ALL trans_same_sender_choice_determ) >>
+             qhdtm_x_assum `trans` mp_tac >>
+             pop_assum dxrule >> disch_then drule >>
+             strip_tac >> rveq >>
+             fs[]
+            ) >>
+          dxrule endpoint_local_confluence_int_choice_rotated >>
+          disch_then dxrule >>
+          impl_tac >-
+            (simp[] >> metis_tac[]
+            ) >>
+          strip_tac >>
+          dxrule_all_then strip_assume_tac endpoint_local_confluence_choice >>
+          metis_tac[trans_com_choice_l,qcong_par,qcong_sym,qcong_refl])
+      >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
+          imp_res_tac sender_is_endpoint >>
+          imp_res_tac receiver_is_endpoint >>
+          imp_res_tac choice_sender_is_endpoint >>
+          imp_res_tac choice_receiver_is_endpoint >>
+          qmatch_asmsub_abbrev_tac `trans _ (LIntChoice s1 _ _) _` >>
+          qpat_x_assum `trans _ (LIntChoice s1 _ _) _` mp_tac >>
+          qmatch_asmsub_abbrev_tac `trans _ (LIntChoice s2 _ _) _` >>
+          rpt(qhdtm_x_assum `Abbrev` kall_tac) >>
+          strip_tac >>
+          Cases_on `s1 = s2` >-
+            (rveq >>
+             drule_then assume_tac (GEN_ALL trans_same_sender_choice_determ) >>
+             qhdtm_x_assum `trans` mp_tac >>
+             pop_assum dxrule >> disch_then drule >>
+             strip_tac >> rveq >>
+             fs[] >> metis_tac[trans_same_receiver_choice_determ]
+            ) >>
+          drule_then strip_assume_tac trans_distinct_residual >>
+          qpat_x_assum `trans _ (LIntChoice _ _ _) _` mp_tac >>
+          pop_assum drule >>
+          impl_tac >- simp[label_rel_def,receive_ext_choice_rel_def] >>
+          ntac 2 strip_tac >>
+          dxrule endpoint_local_confluence_int_choice_rotated >>
+          disch_then dxrule >>
+          impl_tac >-
+            (simp[] >> metis_tac[]
+            ) >>
+          strip_tac >>
+          dxrule_all_then strip_assume_tac endpoint_local_confluence_choice >>
+          metis_tac[trans_com_choice_l,qcong_par,qcong_sym,qcong_refl])
+      >- (imp_res_tac choice_sender_is_endpoint >>
+          imp_res_tac choice_receiver_is_endpoint >>
+          drule_then assume_tac trans_distinct_residual >>
+          qhdtm_x_assum `trans` mp_tac >>
+          pop_assum drule >>
+          impl_tac >- simp[label_rel_def,receive_ext_choice_rel_def] >>
+          strip_tac >>
+          drule_then assume_tac trans_distinct_residual >>
+          qhdtm_x_assum `trans` mp_tac >>
+          pop_assum drule >>
+          impl_tac >- simp[label_rel_def,receive_ext_choice_rel_def] >>
+          rpt strip_tac >>
+          dxrule(GEN_ALL endpoint_local_confluence_int_choice_rotated) >>
+          disch_then dxrule >> impl_tac >- metis_tac[] >>
+          dxrule(GEN_ALL endpoint_local_confluence_int_choice_rotated) >>
+          disch_then drule >> impl_tac >- metis_tac[] >>
+          metis_tac[trans_com_choice_l,trans_com_choice_r,qcong_par,qcong_sym,qcong_refl])
+      >- (imp_res_tac choice_sender_is_endpoint >>
+          imp_res_tac choice_receiver_is_endpoint >>
+          drule_then assume_tac trans_distinct_residual >>
+          qhdtm_x_assum `trans` mp_tac >>
+          pop_assum drule >>
+          impl_tac >- simp[label_rel_def,receive_ext_choice_rel_def] >>
+          strip_tac >>
+          drule_then assume_tac trans_distinct_residual >>
+          qhdtm_x_assum `trans` mp_tac >>
+          pop_assum drule >>
+          impl_tac >- simp[label_rel_def,receive_ext_choice_rel_def] >>
+          rpt strip_tac >>
+          dxrule(GEN_ALL endpoint_local_confluence_int_choice_rotated) >>
+          disch_then dxrule >> impl_tac >- metis_tac[] >>
+          dxrule(GEN_ALL endpoint_local_confluence_int_choice_rotated) >>
+          disch_then drule >> impl_tac >- metis_tac[] >>
+          metis_tac[trans_com_choice_l,trans_com_choice_r,qcong_par,qcong_sym,qcong_refl])
+      >- (imp_res_tac choice_sender_is_endpoint >>
+          imp_res_tac choice_receiver_is_endpoint >>
+          dxrule endpoint_local_confluence_int_choice >>
+          disch_then dxrule >>
+          impl_tac >- (simp[] >> metis_tac[]) >>
+          strip_tac >>
+          metis_tac[trans_com_choice_l,trans_par_l,qcong_par,qcong_refl,qcong_sym])
+      >- (imp_res_tac choice_sender_is_endpoint >>
+          imp_res_tac choice_receiver_is_endpoint >>
+          drule_then assume_tac trans_distinct_residual >>
+          qhdtm_x_assum `trans` mp_tac >>
+          pop_assum drule >> impl_tac >- simp[label_rel_def,receive_ext_choice_rel_def] >>
+          rpt strip_tac >>
+          dxrule endpoint_local_confluence_int_choice >>
+          disch_then dxrule >>
+          impl_tac >- (simp[] >> metis_tac[]) >>
+          strip_tac >>
+          metis_tac[trans_com_choice_l,trans_par_l,qcong_par,qcong_refl,qcong_sym])
+      >- (imp_res_tac choice_sender_is_endpoint >>
+          imp_res_tac choice_receiver_is_endpoint >>
+          drule_then assume_tac trans_distinct_residual >>
+          qhdtm_x_assum `trans` mp_tac >>
+          pop_assum drule >> impl_tac >- simp[label_rel_def,receive_ext_choice_rel_def] >>
+          rpt strip_tac >>
+          dxrule endpoint_local_confluence_tau_choice >>
+          disch_then dxrule >>
+          impl_tac >- (simp[] >> metis_tac[]) >>
+          strip_tac >>
+          metis_tac[trans_com_choice_l,trans_par_r,qcong_par,qcong_refl,qcong_sym])
+      >- (imp_res_tac choice_sender_is_endpoint >>
+          imp_res_tac choice_receiver_is_endpoint >>
+          drule_then assume_tac trans_distinct_residual >>
+          qhdtm_x_assum `trans` mp_tac >>
+          pop_assum drule >> impl_tac >- simp[label_rel_def,receive_ext_choice_rel_def] >>
+          rpt strip_tac >>
+          dxrule endpoint_local_confluence_tau_choice >>
+          disch_then dxrule >>
+          impl_tac >- (simp[] >> metis_tac[]) >>
+          strip_tac >>
+          metis_tac[trans_com_choice_l,trans_par_r,qcong_par,qcong_refl,qcong_sym]))
   >- (* Com-Choice-R *)
-     cheat
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >> fs[endpoints_def,ALL_DISTINCT_APPEND]
+      >- (imp_res_tac sender_is_endpoint >>
+          imp_res_tac receiver_is_endpoint >>
+          imp_res_tac choice_sender_is_endpoint >>
+          imp_res_tac choice_receiver_is_endpoint >>
+          drule_then assume_tac (GEN_ALL trans_distinct_residual) >>
+          qhdtm_x_assum `trans` mp_tac >>
+          pop_assum drule >>
+          impl_tac >- simp[label_rel_def,receive_ext_choice_rel_def] >>
+          strip_tac >>
+          drule_then assume_tac (GEN_ALL trans_distinct_residual) >>
+          qhdtm_x_assum `trans` mp_tac >>
+          pop_assum drule >>
+          impl_tac >- simp[label_rel_def,receive_ext_choice_rel_def] >>
+          rpt strip_tac >>
+          dxrule endpoint_local_confluence_send_rotated >>
+          disch_then dxrule >>
+          impl_tac >- (simp[] >> metis_tac[]) >>
+          strip_tac >>
+          dxrule endpoint_local_confluence_int_choice_rotated >>
+          disch_then dxrule >>
+          impl_tac >- (simp[] >> metis_tac[]) >>
+          strip_tac >>
+          metis_tac[trans_com_choice_r,trans_com_l,qcong_par,qcong_sym,qcong_refl])
+      >- (imp_res_tac sender_is_endpoint >>
+          imp_res_tac receiver_is_endpoint >>
+          imp_res_tac choice_sender_is_endpoint >>
+          imp_res_tac choice_receiver_is_endpoint >>
+          drule_then assume_tac (GEN_ALL trans_distinct_residual) >>
+          qhdtm_x_assum `trans` mp_tac >>
+          pop_assum drule >>
+          impl_tac >- simp[label_rel_def,receive_ext_choice_rel_def] >>
+          strip_tac >>
+          drule_then assume_tac (GEN_ALL trans_distinct_residual) >>
+          qhdtm_x_assum `trans` mp_tac >>
+          pop_assum drule >>
+          impl_tac >- simp[label_rel_def,receive_ext_choice_rel_def] >>
+          rpt strip_tac >>
+          dxrule endpoint_local_confluence_send_rotated >>
+          disch_then dxrule >>
+          impl_tac >- (simp[] >> metis_tac[]) >>
+          strip_tac >>
+          dxrule endpoint_local_confluence_int_choice_rotated >>
+          disch_then dxrule >>
+          impl_tac >- (simp[] >> metis_tac[]) >>
+          strip_tac >>
+          metis_tac[trans_com_choice_r,trans_com_l,qcong_par,qcong_sym,qcong_refl])
+      >- (qmatch_asmsub_abbrev_tac `trans _ (LSend s1 _ _)` >>
+          qmatch_asmsub_abbrev_tac `trans _ (LIntChoice s2 _ _)` >>
+          rpt(qhdtm_x_assum `Abbrev` kall_tac) >>
+          drule (GEN_ALL trans_send_choice_distinct_senders) >>
+          rpt(disch_then drule) >> strip_tac >>
+          imp_res_tac sender_is_endpoint >>
+          imp_res_tac receiver_is_endpoint >>
+          imp_res_tac choice_sender_is_endpoint >>
+          imp_res_tac choice_receiver_is_endpoint >>
+          qpat_x_assum `trans _ (LSend _ _ _) _` assume_tac >>
+          drule trans_distinct_residual >>
+          qpat_x_assum `trans _ (LIntChoice _ _ _) _` assume_tac >>
+          disch_then drule >>
+          impl_tac >- simp[label_rel_def,receive_ext_choice_rel_def] >>
+          strip_tac >>
+          dxrule (GEN_ALL endpoint_local_confluence_send_rotated) >>
+          disch_then dxrule >>
+          impl_tac >- (simp[] >> metis_tac[]) >>
+          strip_tac >>
+          dxrule_all_then strip_assume_tac endpoint_local_confluence_receive_choice >>
+          metis_tac[trans_com_choice_r,trans_com_r,qcong_par,qcong_sym,qcong_refl])
+      >- (qmatch_asmsub_abbrev_tac `trans _ (LSend s1 _ _)` >>
+          qmatch_asmsub_abbrev_tac `trans _ (LIntChoice s2 _ _)` >>
+          rpt(qhdtm_x_assum `Abbrev` kall_tac) >>
+          drule (GEN_ALL trans_send_choice_distinct_senders) >>
+          rpt(disch_then drule) >> strip_tac >>
+          imp_res_tac sender_is_endpoint >>
+          imp_res_tac receiver_is_endpoint >>
+          imp_res_tac choice_sender_is_endpoint >>
+          imp_res_tac choice_receiver_is_endpoint >>          
+          dxrule endpoint_local_confluence_send_rotated >>
+          disch_then dxrule >>
+          impl_tac >- (simp[] >> metis_tac[]) >>
+          strip_tac >>
+          dxrule_all_then strip_assume_tac endpoint_local_confluence_receive_choice >>
+          metis_tac[trans_com_r,trans_com_choice_r,qcong_par,qcong_sym,qcong_refl])
+      >- (imp_res_tac choice_sender_is_endpoint >>
+          imp_res_tac choice_receiver_is_endpoint >>
+          drule_then assume_tac trans_distinct_residual >>
+          qhdtm_x_assum `trans` mp_tac >>
+          pop_assum drule >>
+          impl_tac >- simp[label_rel_def,receive_ext_choice_rel_def] >>
+          strip_tac >>
+          drule_then assume_tac trans_distinct_residual >>
+          qhdtm_x_assum `trans` mp_tac >>
+          pop_assum drule >>
+          impl_tac >- simp[label_rel_def,receive_ext_choice_rel_def] >>
+          rpt strip_tac >>
+          dxrule(GEN_ALL endpoint_local_confluence_int_choice_rotated) >>
+          disch_then dxrule >> impl_tac >- metis_tac[] >>
+          dxrule(GEN_ALL endpoint_local_confluence_int_choice_rotated) >>
+          disch_then drule >> impl_tac >- metis_tac[] >>
+          metis_tac[trans_com_choice_l,trans_com_choice_r,qcong_par,qcong_sym,qcong_refl])
+      >- (imp_res_tac choice_sender_is_endpoint >>
+          imp_res_tac choice_receiver_is_endpoint >>
+          drule_then assume_tac trans_distinct_residual >>
+          qhdtm_x_assum `trans` mp_tac >>
+          pop_assum drule >>
+          impl_tac >- simp[label_rel_def,receive_ext_choice_rel_def] >>
+          strip_tac >>
+          drule_then assume_tac trans_distinct_residual >>
+          qhdtm_x_assum `trans` mp_tac >>
+          pop_assum drule >>
+          impl_tac >- simp[label_rel_def,receive_ext_choice_rel_def] >>
+          rpt strip_tac >>
+          dxrule(GEN_ALL endpoint_local_confluence_int_choice_rotated) >>
+          disch_then dxrule >> impl_tac >- metis_tac[] >>
+          dxrule(GEN_ALL endpoint_local_confluence_int_choice_rotated) >>
+          disch_then drule >> impl_tac >- metis_tac[] >>
+          metis_tac[trans_com_choice_l,trans_com_choice_r,qcong_par,qcong_sym,qcong_refl])
+      >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
+          imp_res_tac sender_is_endpoint >>
+          imp_res_tac receiver_is_endpoint >>
+          imp_res_tac choice_sender_is_endpoint >>
+          imp_res_tac choice_receiver_is_endpoint >>
+          qmatch_asmsub_abbrev_tac `trans _ (LIntChoice s1 _ _) _` >>
+          qpat_x_assum `trans _ (LIntChoice s1 _ _) _` mp_tac >>
+          qmatch_asmsub_abbrev_tac `trans _ (LIntChoice s2 _ _) _` >>
+          rpt(qhdtm_x_assum `Abbrev` kall_tac) >>
+          strip_tac >>
+          Cases_on `s1 = s2` >-
+            (rveq >>
+             drule_then assume_tac (GEN_ALL trans_same_sender_choice_determ) >>
+             qhdtm_x_assum `trans` mp_tac >>
+             pop_assum dxrule >> disch_then drule >>
+             strip_tac >> rveq >>
+             fs[] >> metis_tac[trans_same_receiver_choice_determ]
+            ) >>
+          drule_then strip_assume_tac trans_distinct_residual >>
+          qpat_x_assum `trans _ (LIntChoice _ _ _) _` mp_tac >>
+          pop_assum drule >>
+          impl_tac >- simp[label_rel_def,receive_ext_choice_rel_def] >>
+          ntac 2 strip_tac >>
+          dxrule endpoint_local_confluence_int_choice_rotated >>
+          disch_then dxrule >>
+          impl_tac >-
+            (simp[] >> metis_tac[]
+            ) >>
+          strip_tac >>
+          dxrule_all_then strip_assume_tac endpoint_local_confluence_choice >>
+          metis_tac[trans_com_choice_r,qcong_par,qcong_sym,qcong_refl])
+      >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
+          imp_res_tac sender_is_endpoint >>
+          imp_res_tac receiver_is_endpoint >>
+          imp_res_tac choice_sender_is_endpoint >>
+          imp_res_tac choice_receiver_is_endpoint >>
+          qmatch_asmsub_abbrev_tac `trans _ (LIntChoice s1 _ _) _` >>
+          qpat_x_assum `trans _ (LIntChoice s1 _ _) _` mp_tac >>
+          qmatch_asmsub_abbrev_tac `trans _ (LIntChoice s2 _ _) _` >>
+          rpt(qhdtm_x_assum `Abbrev` kall_tac) >>
+          strip_tac >>
+          Cases_on `s1 = s2` >-
+            (rveq >>
+             drule_then assume_tac (GEN_ALL trans_same_sender_choice_determ) >>
+             qhdtm_x_assum `trans` mp_tac >>
+             pop_assum dxrule >> disch_then drule >>
+             strip_tac >> rveq >>
+             fs[] >> metis_tac[trans_same_receiver_choice_determ]
+            ) >>
+          drule_then strip_assume_tac trans_distinct_residual >>
+          qpat_x_assum `trans _ (LIntChoice _ _ _) _` mp_tac >>
+          pop_assum drule >>
+          impl_tac >- simp[label_rel_def,receive_ext_choice_rel_def] >>
+          ntac 2 strip_tac >>
+          dxrule endpoint_local_confluence_int_choice_rotated >>
+          disch_then dxrule >>
+          impl_tac >-
+            (simp[] >> metis_tac[]
+            ) >>
+          strip_tac >>
+          dxrule_all_then strip_assume_tac endpoint_local_confluence_choice >>
+          metis_tac[trans_com_choice_r,qcong_par,qcong_sym,qcong_refl])
+      >- (imp_res_tac choice_sender_is_endpoint >>
+          imp_res_tac choice_receiver_is_endpoint >>
+          drule_then assume_tac trans_distinct_residual >>
+          qhdtm_x_assum `trans` mp_tac >>
+          pop_assum drule >> impl_tac >- simp[label_rel_def,receive_ext_choice_rel_def] >>
+          rpt strip_tac >>
+          dxrule endpoint_local_confluence_tau_choice >>
+          disch_then dxrule >>
+          impl_tac >- (simp[] >> metis_tac[]) >>
+          strip_tac >>
+          metis_tac[trans_com_choice_r,trans_par_l,qcong_par,qcong_refl,qcong_sym])
+      >- (imp_res_tac choice_sender_is_endpoint >>
+          imp_res_tac choice_receiver_is_endpoint >>
+          drule_then assume_tac trans_distinct_residual >>
+          qhdtm_x_assum `trans` mp_tac >>
+          pop_assum drule >> impl_tac >- simp[label_rel_def,receive_ext_choice_rel_def] >>
+          rpt strip_tac >>
+          dxrule endpoint_local_confluence_tau_choice >>
+          disch_then dxrule >>
+          impl_tac >- (simp[] >> metis_tac[]) >>
+          strip_tac >>
+          metis_tac[trans_com_choice_r,trans_par_l,qcong_par,qcong_refl,qcong_sym])
+      >- (imp_res_tac choice_sender_is_endpoint >>
+          imp_res_tac choice_receiver_is_endpoint >>
+          drule_then assume_tac trans_distinct_residual >>
+          qhdtm_x_assum `trans` mp_tac >>
+          pop_assum drule >> impl_tac >- simp[label_rel_def,receive_ext_choice_rel_def] >>
+          rpt strip_tac >>
+          dxrule endpoint_local_confluence_int_choice >>
+          disch_then dxrule >>
+          impl_tac >- (simp[] >> metis_tac[]) >>
+          strip_tac >>
+          metis_tac[trans_com_choice_r,trans_par_r,qcong_par,qcong_refl,qcong_sym])
+      >- (imp_res_tac choice_sender_is_endpoint >>
+          imp_res_tac choice_receiver_is_endpoint >>
+          dxrule endpoint_local_confluence_int_choice >>
+          disch_then dxrule >>
+          impl_tac >- (simp[] >> metis_tac[]) >>
+          strip_tac >>
+          metis_tac[trans_com_choice_r,trans_par_r,qcong_par,qcong_refl,qcong_sym]))
   >- (* Dequeue *)
      (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
       fs[] >> rveq >> fs[] >> rveq >> fs[] >>

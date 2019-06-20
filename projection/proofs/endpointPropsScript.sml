@@ -1498,6 +1498,27 @@ Proof
   >> metis_tac[receiver_is_endpoint]
 QED
 
+Theorem trans_same_receiver_choice_determ:
+  trans p1 (LExtChoice s b r) p2
+  /\ trans p1 (LExtChoice s b r) p3
+  /\ ALL_DISTINCT(MAP FST(endpoints p1))
+  ==> p2 = p3
+Proof
+  qmatch_goalsub_abbrev_tac `trans _ alpha`
+  >> rpt(disch_then strip_assume_tac)
+  >> pop_assum mp_tac
+  >> qhdtm_x_assum `Abbrev` (mp_tac o REWRITE_RULE[markerTheory.Abbrev_def])
+  >> rpt(pop_assum mp_tac)
+  >> MAP_EVERY qid_spec_tac [`p3`,`s`,`b`,`r`,`p2`,`alpha`,`p1`]
+  >> Ho_Rewrite.PURE_REWRITE_TAC[GSYM PULL_FORALL]
+  >> ho_match_mp_tac trans_strongind
+  >> rpt conj_tac >> rpt(gen_tac ORELSE disch_then strip_assume_tac)
+  >> fs[] >> rveq
+  >> qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+  >> fs[] >> rveq >> fs[] >> rveq >> fs[endpoints_def,ALL_DISTINCT_APPEND]
+  >> metis_tac[choice_receiver_is_endpoint]
+QED
+
 Theorem trans_send_choice_distinct_senders:
   trans p1 (LSend q2 d1 q1) p2
   /\ trans p1 (LIntChoice q3 b q4) p3
