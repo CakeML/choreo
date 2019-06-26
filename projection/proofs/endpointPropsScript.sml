@@ -1656,4 +1656,271 @@ Proof
   metis_tac[]
 QED
 
+val join_endpoint_def = Define `
+  (join_endpoint Nil Nil = SOME Nil) /\
+  (join_endpoint (Send p1 v1 e1) (Send p2 v2 e2) =
+   if p1 = p2 /\ v1 = v2 then
+     OPTION_BIND (join_endpoint e1 e2) (SOME o Send p1 v2)
+   else NONE) /\
+  (join_endpoint (Receive p1 v1 e1) (Receive p2 v2 e2) =
+   if p1 = p2 /\ v1 = v2 then
+     OPTION_BIND (join_endpoint e1 e2) (SOME o Receive p1 v2)
+   else NONE) /\
+  (join_endpoint (IntChoice b1 p1 e1) (IntChoice b2 p2 e2) =
+   if p1 = p2 /\ b1 = b2 then
+     OPTION_BIND (join_endpoint e1 e2) (SOME o IntChoice b1 p1)
+   else NONE) /\
+  (join_endpoint (IfThen v1 e1 e2) (IfThen v2 e3 e4) =
+   if v1 = v2 then
+     case (join_endpoint e1 e3, join_endpoint e2 e4) of
+       (SOME e5, SOME e6) => SOME(IfThen v1 e5 e6)
+     | _ => NONE
+    else NONE) /\
+  (join_endpoint (Let v1 f1 l1 e1) (Let v2 f2 l2 e2) =
+     if v1 = v2 /\ f1 = f2 /\ l1 = l2 then
+       OPTION_BIND (join_endpoint e1 e2) (SOME o Let v1 f1 l1)
+     else NONE) /\
+  (join_endpoint (ExtChoice p1 e1 e2) (ExtChoice p2 e3 e4) =
+   if p1 = p2 then
+    (case (join_endpoint e1 e3, join_endpoint e2 e4) of
+        (SOME e5, SOME e6) => SOME(ExtChoice p1 e5 e6)
+      | (SOME e5, NONE) =>
+        if e2 = Nil then
+          SOME(ExtChoice p1 e5 e4)
+        else if e4 = Nil then
+          SOME(ExtChoice p1 e5 e2)
+        else NONE
+      | (NONE, SOME e6) =>
+        if e1 = Nil then
+          SOME(ExtChoice p1 e3 e6)
+        else if e3 = Nil then
+          SOME(ExtChoice p1 e1 e6)
+        else NONE
+      | (NONE,NONE) =>
+        if (e1 = Nil \/ e3 = Nil) /\ (e2 = Nil \/ e4 = Nil) then
+          SOME(ExtChoice p1
+                (if e1 = Nil then e3 else e1)
+                (if e2 = Nil then e4 else e2)
+              )
+        else NONE
+      | _ => NONE)
+   else NONE) /\
+  (join_endpoint _ _ = NONE)
+`
+
+val join_network_def = Define `
+ (join_network (NPar n1 n2) (NPar n3 n4) =
+   (case (join_network n1 n3, join_network n2 n4) of
+      (SOME n5, SOME n6) => SOME(NPar n5 n6)
+    | _ => NONE)) /\
+ (join_network NNil NNil =
+   SOME NNil) /\
+ (join_network (NEndpoint p1 s1 e1) (NEndpoint p2 s2 e2) =
+   if p1 = p2 /\ s1 = s2 then
+     OPTION_BIND (join_endpoint e1 e2) (SOME o NEndpoint p1 s1)
+   else NONE) /\
+  (join_network _ _ = NONE)`
+
+Theorem join_endpoint_nil:
+  join_endpoint e Nil = SOME Nil ==> e = Nil
+Proof
+  Induct_on `e` >> rw[join_endpoint_def]
+QED
+
+Theorem join_endpoint_nil_not_nil:
+  e <> Nil ==>
+  join_endpoint e Nil = NONE /\ join_endpoint Nil e = NONE
+Proof
+  Induct_on `e` >> rw[join_endpoint_def]
+QED
+
+Theorem join_endpoint_sym:
+  !e1 e2. join_endpoint e1 e2 = join_endpoint e2 e1
+Proof
+  recInduct (fetch "-" "join_endpoint_ind") \\
+  rpt strip_tac \\
+  PURE_ONCE_REWRITE_TAC[join_endpoint_def] \\
+  fs[]
+  >- (metis_tac[])
+  >- (metis_tac[])
+  >- (reverse IF_CASES_TAC >- metis_tac[] \\
+      rw[] \\ metis_tac[])
+  >- (reverse IF_CASES_TAC >- metis_tac[] \\
+      rw[] \\ metis_tac[])
+  >- (reverse IF_CASES_TAC >- metis_tac[] \\
+      rw[] \\ metis_tac[])
+  >- (reverse IF_CASES_TAC >- metis_tac[] \\
+      rw[] >> rw[] >> fs[] >>
+      rpt(PURE_FULL_CASE_TAC >> fs[] >> rveq) \\
+      imp_res_tac join_endpoint_nil_not_nil \\
+      fs[] \\ rfs[])
+QED
+
+Theorem join_endpoint_nil_sym:
+  join_endpoint Nil e = SOME Nil ==> e = Nil
+Proof
+  metis_tac[join_endpoint_nil,join_endpoint_sym]
+QED
+
+Theorem join_network_nil:
+  join_network n NNil = SOME NNil ==> n = NNil
+Proof
+  Induct_on `n` >> rw[join_network_def,join_endpoint_nil]
+QED
+
+Theorem join_endpoint_idem:
+  join_endpoint e e = SOME e
+Proof
+  Induct_on `e` >> rw[join_endpoint_def]
+QED
+
+Theorem join_endpoint_nil_eq_nil_right:
+  !e1 e2. join_endpoint e1 Nil = SOME e2 ==> e1 = Nil /\ e2 = Nil
+Proof
+  Induct_on `e1` >> rw[join_endpoint_def]
+QED
+
+Theorem join_endpoint_nil_eq_nil_left:
+  !e1 e2. join_endpoint Nil e1 = SOME e2 ==> e1 = Nil /\ e2 = Nil
+Proof
+  Induct_on `e1` >> rw[join_endpoint_def]
+QED
+
+Theorem join_endpoint_trans:
+  !e1 e2 e3.
+  join_endpoint e1 e2 = SOME e2 /\ join_endpoint e2 e3 = SOME e3
+  ==> join_endpoint e1 e3 = SOME e3
+Proof
+  Ho_Rewrite.PURE_REWRITE_TAC[GSYM AND_IMP_INTRO, RIGHT_FORALL_IMP_THM] \\
+  recInduct(fetch "-" "join_endpoint_ind") \\
+  rpt strip_tac \\
+  rename1 `join_endpoint _ ee` \\
+  Cases_on `ee` \\
+  fs[join_endpoint_def]
+  >-
+    (rpt(PURE_FULL_CASE_TAC \\ fs[] \\ rveq) \\ fs[join_endpoint_def,join_endpoint_nil] \\
+     res_tac \\ fs[]) \\
+  rpt(PURE_FULL_CASE_TAC \\ fs[] \\ rveq) \\ fs[join_endpoint_def,join_endpoint_nil] \\
+  MAP_EVERY imp_res_tac [join_endpoint_nil_eq_nil_right,join_endpoint_nil_eq_nil_left] \\ fs[] \\
+  res_tac \\ fs[]
+QED
+
+Theorem join_network_trans:
+  !n1 n2 n3.
+  join_network n1 n2 = SOME n2 /\ join_network n2 n3 = SOME n3
+  ==> join_network n1 n3 = SOME n3
+Proof
+  Ho_Rewrite.PURE_REWRITE_TAC[GSYM AND_IMP_INTRO, RIGHT_FORALL_IMP_THM] \\
+  recInduct(fetch "-" "join_network_ind") \\
+  rpt strip_tac \\
+  rename1 `join_network _ ee` \\
+  Cases_on `ee` \\
+  fs[join_network_def]
+  >-
+    (rpt(PURE_FULL_CASE_TAC \\ fs[] \\ rveq) \\ fs[join_network_def] \\
+     res_tac \\ fs[]) \\
+  metis_tac[join_endpoint_trans]
+QED
+
+Theorem join_network_idem:
+  join_network n n = SOME n
+Proof
+  Induct_on `n` >> rw[join_network_def,join_endpoint_idem]
+QED
+
+val (prunes_rules,prunes_coind,prunes_cases) = Hol_coreln `
+  join_network n1 n2 = SOME n2 /\
+  (!n2'. (reduction n2 n2' ==> ?n1'. reduction n1 n1' /\ prunes n1' n2'))
+  ==>
+  prunes n1 n2
+  `
+
+Theorem prunes_refl:
+  prunes n1 n1
+Proof
+  ho_match_mp_tac(MP_CANON prunes_coind) \\
+  qexists_tac `\x y. x = y` \\
+  rw[join_network_def,reduction_def,join_network_idem]
+QED
+
+Theorem prunes_trans:
+  prunes n1 n2 /\ prunes n2 n3 ==> prunes n1 n3
+Proof
+  strip_tac \\
+  ho_match_mp_tac(MP_CANON prunes_coind) \\
+  qexists_tac `\n1 n3. ?n2. prunes n1 n2 /\ prunes n2 n3` \\
+  reverse conj_tac >- metis_tac[] \\
+  rpt(pop_assum kall_tac) \\
+  reverse(rpt strip_tac) >-
+    (fs[] >>
+     imp_res_tac prunes_cases >>
+     metis_tac[]) >>
+  fs[] >>
+  imp_res_tac prunes_cases >>
+  imp_res_tac join_network_trans
+QED
+
+Theorem prunes_strongcoind:
+  ∀prunes'.
+    (∀a0 a1.
+        prunes' a0 a1 ⇒
+        join_network a0 a1 = SOME a1 ∧
+        ∀n2'.
+          reduction a1 n2' ⇒
+          ∃n1'. reduction a0 n1' ∧ (prunes' n1' n2' \/ prunes n1' n2')) ⇒
+    ∀a0 a1. prunes' a0 a1 ⇒ prunes a0 a1
+Proof
+  rpt strip_tac \\
+  ho_match_mp_tac(MP_CANON prunes_coind) \\
+  qexists_tac `\x y. prunes x y \/ prunes' x y` \\
+  rw[] \\
+  metis_tac[prunes_cases]
+QED
+
+Theorem prunes_example:
+  EVERY (λ(p,_). p ≠ p1) ARB.queue ==>
+  prunes
+    (NPar (NEndpoint p1 ARB (IntChoice F p2 Nil))
+          (NEndpoint p2 ARB (ExtChoice p1 Nil (Send ARB ARB Nil))))
+    (NPar (NEndpoint p1 ARB (IntChoice F p2 Nil))
+          (NEndpoint p2 ARB (ExtChoice p1 (Receive ARB ARB Nil) (Send ARB ARB Nil))))  
+Proof
+  strip_tac \\
+  qmatch_goalsub_abbrev_tac `prunes a1 a2` \\
+  ho_match_mp_tac(MP_CANON prunes_strongcoind) \\
+  qexists_tac `\x y. (x = a1 /\ y = a2)` \\
+  reverse conj_tac >- metis_tac[] \\
+  rw[Abbr `a1`,Abbr `a2`] \\
+  rw[join_network_def,join_endpoint_def,join_network_idem] \\
+  fs[reduction_def] \\
+  rpt(qhdtm_x_assum `trans` (assume_tac o PURE_ONCE_REWRITE_RULE [trans_cases]) \\
+      fs[] \\ rveq) \\
+  fs[] \\
+  qexists_tac `
+    (NPar (NEndpoint p1 ARB Nil)
+                 (NEndpoint p2 <|queue := SNOC (p1,[0w]) ARB.queue|>
+                    (ExtChoice p1 Nil (Send ARB ARB Nil))))` \\
+  conj_tac >- metis_tac[trans_rules] \\
+  qmatch_goalsub_abbrev_tac `prunes a1 a2` \\
+  ho_match_mp_tac(MP_CANON prunes_strongcoind) \\
+  qexists_tac `\x y. (x = a1 /\ y = a2)` \\
+  reverse conj_tac >- metis_tac[] \\
+  rw[Abbr `a1`,Abbr `a2`] \\
+  rw[join_network_def,join_endpoint_def,join_network_idem] \\
+  fs[reduction_def] \\
+  rpt(qhdtm_x_assum `trans` (assume_tac o PURE_ONCE_REWRITE_RULE [trans_cases]) \\
+      fs[] \\ rveq)
+  >- (fs[APPEND_EQ_APPEND_MID |> CONV_RULE(LHS_CONV SYM_CONV)] \\
+      rveq \\ fs[] \\
+      fs[APPEND_EQ_SING |> CONV_RULE(LHS_CONV SYM_CONV)]) \\
+  simp[SNOC_APPEND] \\
+  qmatch_goalsub_abbrev_tac `prunes _ a1` \\
+  qexists_tac `a1` \\
+  rw[prunes_refl] \\
+  unabbrev_all_tac \\
+  match_mp_tac trans_par_r \\
+  match_mp_tac trans_ext_choice_r' \\
+  rw[]
+QED
+
 val _ = export_theory ()
