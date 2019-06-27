@@ -1923,4 +1923,74 @@ Proof
   rw[]
 QED
 
+Theorem join_network_endpoint_LENGTH:
+  !s1 s2 s3.
+  join_network s1 s2 = SOME s3 ==>
+  LENGTH(endpoints s1) = LENGTH(endpoints s2)
+Proof
+  Ho_Rewrite.PURE_REWRITE_TAC[GSYM AND_IMP_INTRO, RIGHT_FORALL_IMP_THM] \\
+  ho_match_mp_tac(fetch "-" "join_network_ind") \\
+  rpt strip_tac \\
+  fs[join_network_def,endpoints_def] \\
+  rpt(PURE_FULL_CASE_TAC \\ fs[] \\ rveq) \\ fs[endpoints_def]
+QED
+
+Theorem join_network_endpoint_LENGTH2:
+  !s1 s2 s3.
+  join_network s1 s2 = SOME s3 ==>
+  LENGTH(endpoints s2) = LENGTH(endpoints s3)
+Proof
+  Ho_Rewrite.PURE_REWRITE_TAC[GSYM AND_IMP_INTRO, RIGHT_FORALL_IMP_THM] \\
+  ho_match_mp_tac(fetch "-" "join_network_ind") \\
+  rpt strip_tac \\
+  fs[join_network_def,endpoints_def] \\
+  rpt(PURE_FULL_CASE_TAC \\ fs[] \\ rveq) \\ fs[endpoints_def] \\
+  rveq \\ fs[endpoints_def]
+QED
+
+(* TODO: move*)
+
+Theorem MAP3_APPEND:
+  !f l1 l2 l3 l1' l2' l3'.
+  LENGTH l1 = LENGTH l2 /\ LENGTH l1 = LENGTH l3 ==>
+  MAP3 f (l1 ++ l1') (l2 ++ l2') (l3 ++ l3') =
+  MAP3 f l1 l2 l3 ++ MAP3 f l1' l2' l3'
+Proof
+  recInduct MAP3_ind \\
+  rw[MAP3_def] \\ fs[]
+QED
+
+Theorem join_network_endpoints:
+  !s1 s2 s3.
+  join_network s1 s2 = SOME s3 ==>
+  endpoints s3 =
+  MAP2 (\e1 e2. (FST e1, FST(SND e1), THE(join_endpoint(SND(SND e1)) (SND(SND e2)))))
+  (endpoints s1) (endpoints s2)
+Proof
+  Ho_Rewrite.PURE_REWRITE_TAC[GSYM AND_IMP_INTRO, RIGHT_FORALL_IMP_THM] \\
+  recInduct(fetch "-" "join_network_ind") \\
+  rpt strip_tac \\
+  fs[join_network_def] \\
+  rpt(PURE_FULL_CASE_TAC \\ fs[] \\ rveq) \\
+  fs[endpoints_def] \\ rveq \\ fs[endpoints_def,join_endpoint_idem] \\
+  MAP_EVERY imp_res_tac [join_network_endpoint_LENGTH,join_network_endpoint_LENGTH2] \\
+  metis_tac[APPEND_LENGTH_EQ,MAP2_APPEND]
+QED
+
+Theorem prunes_endpoints:
+  !s1 s2 s3.
+  prunes s1 s2 ==>
+  MAP FST (endpoints s1) = MAP FST (endpoints s2)
+  /\
+  MAP (FST o SND) (endpoints s1) = MAP (FST o SND) (endpoints s2)
+Proof
+  rw[Once prunes_cases] \\
+  imp_res_tac join_network_endpoints \\
+  imp_res_tac join_network_endpoint_LENGTH \\
+  fs[MAP2_MAP] \\
+  qpat_x_assum `endpoints _ = MAP _ _` (fn thm => PURE_ONCE_REWRITE_TAC [thm]) \\
+  rw[MAP_MAP_o,ELIM_UNCURRY,o_DEF] \\
+  simp[GSYM o_DEF] \\ metis_tac[o_ASSOC,MAP_ZIP]  
+QED
+  
 val _ = export_theory ()
