@@ -385,4 +385,95 @@ val trans_s_def = Define`
   trans_s = RTC (λp q. ∃s. trans p s q)
 `;
 
+(* Give a state and a transition tag, one can generate the resulting state *)
+val state_from_tag_def = Define`
+  state_from_tag s (LCom p1 v1 p2 v2) = (s |+ ((v2,p2),s ' (v1,p1)))
+∧ state_from_tag s (LLet v p f vl)  =
+    (s |+ ((v,p),f (MAP (THE ∘ FLOOKUP s) (MAP (λv. (v,p)) vl))))
+∧ state_from_tag s _ = s`
+
+
+(* The resulting state of any transition can be described using `state_from_tag` *)
+Theorem trans_state:
+  ∀s c α τ s' c'. trans (s,c) (α,τ) (s',c') ⇒ s' = state_from_tag s α
+Proof
+  ho_match_mp_tac trans_pairind
+  \\ rw [state_from_tag_def]
+  \\ fs [FLOOKUP_DEF]
+QED
+
+(* Making the state bigger does not affect the behaviour of the choreography *)
+Theorem trans_submap:
+  ∀s c α τ s' c' z.
+   trans (s,c) (α,τ) (s',c') ∧ s ⊑ z
+   ⇒ ∃z'. trans (z,c) (α,τ) (z',c') ∧ s' ⊑ z'
+Proof
+  let
+    val local_metis =
+      metis_tac [trans_rules,FLOOKUP_SUBMAP,SUBMAP_mono_FUPDATE
+                , SUBMAP_DOMSUB,GSYM SUBMAP_DOMSUB_gen
+                , SUBMAP_TRANS]
+  in
+  `∀s c α τ s' c'.
+   trans (s,c) (α,τ) (s',c')
+   ⇒ ∀z. s ⊑ z
+      ⇒ ∃z'. trans (z,c) (α,τ) (z',c') ∧ s' ⊑ z'`
+  suffices_by metis_tac []
+  \\ ho_match_mp_tac trans_pairind
+  \\ rw []
+  >- local_metis
+  >- local_metis
+  >- (`EVERY IS_SOME (MAP (FLOOKUP z) (MAP (λv. (v,p)) vl))`
+      by (Induct_on `vl` \\ rw [FLOOKUP_DEF,IS_SOME_DEF]
+         \\ rfs [SUBMAP_DEF])
+      \\  qexists_tac `z |+ ((v,p),f (MAP (THE ∘ FLOOKUP z) (MAP (λv. (v,p)) vl)))`
+      \\ qmatch_goalsub_abbrev_tac `s |+ sl ⊑ z |+ zl`
+      \\ `sl = zl` suffices_by local_metis
+      \\ unabbrev_all_tac \\ rw [] \\ AP_TERM_TAC
+      \\ Induct_on `vl` \\ rw []
+      \\ fs [IS_SOME_EXISTS,SUBMAP_DEF,FLOOKUP_SUBMAP,FLOOKUP_DEF])
+  >- local_metis
+  >- local_metis
+  >- (res_tac
+     \\ `z' = z''` by metis_tac [trans_state]
+     \\ rveq \\ qexists_tac `z'` \\ local_metis)
+  \\ local_metis
+  end
+QED
+
+val RTC_TRANS =  RTC_RULES |> CONV_RULE FORALL_AND_CONV
+                           |> CONJUNCTS |> el 2;
+
+(* RTC version of `trans_submap` *)
+Theorem trans_s_submap_gen:
+  ∀s c α τ s' c' z.
+   trans_s (s,c) (s',c') ∧ s ⊑ z
+   ⇒ ∃z'. trans_s (z,c) (z',c') ∧ s' ⊑ z'
+Proof
+  `∀x y. trans_s x y
+    ⇒ ∀s c s' c' z. x = (s,c) ∧ y = (s',c') ∧ s ⊑ z
+       ⇒ ∃z'. trans_s (z,c) (z',c') ∧ s' ⊑ z'`
+  suffices_by metis_tac []
+  \\ rewrite_tac [trans_s_def]
+  \\ ho_match_mp_tac RTC_INDUCT
+  \\ rw []
+  >- (qexists_tac `z` \\ rw [])
+  \\ PairCases_on `x'` \\ Cases_on `s`
+  \\ drule trans_submap
+  \\ disch_then drule  \\ rw []
+  \\ pop_assum drule   \\ rw []
+  \\ qexists_tac `z''` \\ rw []
+  \\ ho_match_mp_tac RTC_TRANS
+  \\ metis_tac []
+QED
+
+(* Slightly more mp-friendly version of `trans_s_submap_gen` *)
+Theorem trans_s_submap:
+  ∀s c α τ s' c' z.
+   trans_s (s,c) (s',c') ∧ s ⊑ z
+   ⇒ ∃z'. trans_s (z,c) (z',c')
+Proof
+  metis_tac [trans_s_submap_gen]
+QED
+
 val _ = export_theory ()
