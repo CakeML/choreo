@@ -4,49 +4,6 @@ open semBakeryTheory
 
 val _ = new_theory "confluence";
 
-(* TODO: move to somewhere nicer *)
-val free_variables_def = Define `
-  (free_variables (Nil) = {}) /\
-  (free_variables (IfThen v p c1 c2) = {(v,p)} ∪ (free_variables c1 ∪ free_variables c2)) /\
-  (free_variables (Com p1 v1 p2 v2 c) = {(v1,p1)} ∪ (free_variables c DELETE (v2,p2))) /\
-  (free_variables (Let v p f vl c) = set(MAP (λv. (v,p)) vl) ∪ (free_variables c DELETE (v,p))) /\
-  (free_variables (Sel p b q c) = free_variables c)
-`
-
-val defined_vars_def = Define `
-  defined_vars (s,c) = FDOM s`
-
-val no_undefined_vars_def = Define `
-  no_undefined_vars (s,c) = (free_variables c ⊆ FDOM s)`
-
-val defined_vars_mono = Q.store_thm("defined_vars_mono",
-  `!sc alpha sc'. trans sc alpha sc' ==> defined_vars sc ⊆ defined_vars sc'`,
-  ho_match_mp_tac trans_ind
-  >> rpt strip_tac
-  >> fs[defined_vars_def,SUBSET_OF_INSERT]);
-
-val free_vars_mono = Q.store_thm("free_vars_mono",
-  `!sc alpha sc'. trans sc alpha sc' ==> (free_variables(SND sc') DIFF defined_vars sc' ⊆ free_variables(SND sc) DIFF defined_vars sc)`,
-  ho_match_mp_tac trans_strongind
-  >> rpt strip_tac
-  >> imp_res_tac defined_vars_mono
-  >> fs[free_variables_def,defined_vars_def,DIFF_INSERT] >> rw[]
-  >> fs[DELETE_DEF,DIFF_DEF,SUBSET_DEF] >> rpt strip_tac
-  >> fs[] >> metis_tac[]);
-
-val no_undefined_vars_trans_pres = Q.store_thm("no_undefined_vars_trans_pres",
-  `!sc alpha sc'. no_undefined_vars sc /\ trans sc alpha sc' ==> no_undefined_vars sc'`,
-  rpt gen_tac >> disch_then(MAP_EVERY assume_tac o CONJUNCTS)
-  >> qpat_x_assum `no_undefined_vars _` mp_tac
-  >> qpat_x_assum `trans _ _ _` mp_tac
-  >> MAP_EVERY (W(curry Q.SPEC_TAC)) (rev [`sc`,`alpha`,`sc'`])
-  >> ho_match_mp_tac trans_strongind
-  >> rpt strip_tac
-  >> imp_res_tac defined_vars_mono
-  >> imp_res_tac free_vars_mono
-  >> fs[no_undefined_vars_def,free_variables_def,DELETE_SUBSET_INSERT,defined_vars_def,SUBSET_OF_INSERT]
-  >> fs[SUBSET_DEF,INSERT_DEF,DIFF_DEF] >> metis_tac[]);
-
 val semantics_deterministic = Q.store_thm("semantics_deterministic",
 `!sc alpha l l' sc' sc''. trans sc (alpha,l) sc' /\ trans sc (alpha,l') sc'' ==> (sc' = sc'')`,
   rpt gen_tac
