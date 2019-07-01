@@ -2,6 +2,8 @@ open preamble
 
 open semBakeryTheory
 
+val _ = new_theory "deadlockFreedom";
+
 val RTC_TRANS =  RTC_RULES |> CONV_RULE FORALL_AND_CONV
                            |> CONJUNCTS |> el 2;
 
@@ -78,3 +80,5 @@ Proof
       \\ ho_match_mp_tac RTC_TRANS
       \\ metis_tac [trans_sel])
 QED
+
+val _ = export_theory ()
