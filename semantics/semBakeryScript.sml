@@ -525,4 +525,13 @@ Proof
   >> fs[SUBSET_DEF,INSERT_DEF,DIFF_DEF] >> metis_tac[]
 QED
 
+val no_self_comunication_def = Define `
+  no_self_comunication (Com p _ q _ c)   = (p ≠ q ∧ no_self_comunication c)
+∧ no_self_comunication (Sel p _ q c)     = (p ≠ q ∧ no_self_comunication c)
+∧ no_self_comunication (IfThen _ _ c c') = (no_self_comunication c ∧
+                                            no_self_comunication c')
+
+∧ no_self_comunication (Let _ _ _ _ c)   = no_self_comunication c
+∧ no_self_comunication _                 = T
+`
 val _ = export_theory ()
