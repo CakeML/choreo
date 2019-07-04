@@ -204,17 +204,23 @@ val receiveloop_def = Define ‘receiveloop conf src =
    having to depend on basis, we assume that, eg., conf.append is the name
    of a function that refines APPEND.
  *)
+
+val ps2cs_def = Define
+  ‘
+  ps2cs ps = #"P"::ps
+  ’;
+
 val compile_endpoint_def = Define ‘
    (compile_endpoint conf vs payloadLang$Nil = Con NONE [])
 ∧ (compile_endpoint conf vs (Send p v n e) =
-    let vv = Var(Short v) in
+    let vv = Var(Short (ps2cs v)) in
       If (App (Opb Leq) [App Opapp [Var conf.length; vv]; Lit(IntLit(&n))])
          (compile_endpoint conf vs e)
          (Let NONE
            (Letrec
               (sendloop conf (MAP (CHR o w2n) p))
               (App Opapp [Var(Short "sendloop");
-                          App Opapp [Var conf.drop; vv; Lit(IntLit(&n))]
+                          App Opapp [App Opapp [Var conf.drop; vv]; Lit(IntLit(&n))]
               ])
            )
            (compile_endpoint conf vs e)
@@ -242,7 +248,7 @@ val compile_endpoint_def = Define ‘
         (compile_endpoint conf (TAKE vn vs) e1)
         (compile_endpoint conf (DROP vn vs) e2))
 ∧ (compile_endpoint conf (hv::vs) (payloadLang$Let v f vl e) =
-   ast$Let (SOME v)
+   ast$Let (SOME (ps2cs v))
        (App Opapp ((Var o (getLetID conf)) hv::MAP (Var o Short) vl))
        (compile_endpoint conf vs e))’;
 
