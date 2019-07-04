@@ -7,7 +7,9 @@ open preamble
      ffiTheory
      comms_ffiTheory
      payloadPropsTheory
-     payloadSemanticsTheory;
+     payloadSemanticsTheory
+     evaluate_rwLib
+     ckExp_EquivTheory;
 
 val _ = new_theory "payload_to_cakemlProof";
 
@@ -408,7 +410,7 @@ Proof
 QED
 
 Theorem sendloop_correct:
-  ∀conf l env env' lv le s refs stpred dest.
+  ∀conf l env env' lv le s stpred dest.
   env_asm env' conf ∧
   conf.payload_size ≠ 0 ∧
   LIST_TYPE ^WORD8 l lv ∧
@@ -618,7 +620,7 @@ Definition sem_env_cor_def:
     sem_env_cor conf pSt cEnv ⇔
         env_asm cEnv conf ∧
         ∀ n v.  FLOOKUP pSt.bindings n = SOME v
-                ⇒ ∃v'.  nsLookup (cEnv.v) (Short n) = SOME v' ∧
+                ⇒ ∃v'.  nsLookup (cEnv.v) (Short (ps2cs n)) = SOME v' ∧
                         ^(DATUM) v v'
 End
 
@@ -654,45 +656,12 @@ Definition cEval_equiv_def:
     crA ≠ Rerr (Rabort Rtimeout_error)
 End
 
-Theorem evaluate_general:
-  ∀ (cSt: 'ffi semanticPrimitives$state) env ck1 ck2 refs' u. 
-      evaluate (empty_state with <|clock := ck1; refs := cSt.refs|>) env
-           [exp] =
-         (empty_state with <|clock := ck2; refs := cSt.refs ++ refs'|>,
-          Rval [u])
-    ⇒ ∀mc. evaluate (cSt with clock := ck1 + mc) env [exp]
-                = (cSt with <|clock := ck2 + mc;
-                               refs := cSt.refs ++ refs'|>,
-                   Rval [u])
+Theorem remove_ffi[simp]:
+  ∀cSt: 'ffi semanticPrimitives$state.
+    (cSt with ffi := cSt.ffi) = cSt
 Proof
-  rpt strip_tac >>
-  ‘evaluate (cSt with clock := ck1) env [exp]
-                  = (cSt with <|clock := ck2;
-                                 refs := cSt.refs ++ refs'|>,
-                     Rval[u])’
-    suffices_by (qspecl_then [‘cSt with clock := ck1’,
-                              ‘env’, ‘[exp]’,
-                              ‘cSt with <|clock := ck2;
-                                 refs := cSt.refs ++ refs'|>’,
-                              ‘Rval [u]’, ‘mc’]
-                              assume_tac evaluate_add_to_clock >>
-                 fs[]) >>
-  qabbrev_tac ‘s  = empty_state with <|clock := ck1;
-                                      refs   := cSt.refs|>’ >>
-  qabbrev_tac ‘s' = empty_state with <|clock := ck2;
-                                      refs   := cSt.refs ++ refs'|>’ >>
-  qabbrev_tac ‘e = [exp]’ >>
-  qabbrev_tac ‘r = Rval [u] :(v list, v) result’ >>
-  ‘(evaluate s env e = (s',r)) ∧ (s'.ffi = s.ffi) ∧
-    (∀outcome. r ≠ Rerr (Rabort (Rffi_error outcome))) ⇒
-    ∀t : 'ffi semanticPrimitives$state.
-        (t.clock = s.clock) ∧ (t.refs = s.refs) ⇒
-        (evaluate t env e =
-        (t with <|clock := s'.clock; refs := s'.refs|>,r))’
-    by metis_tac[evaluate_ffi_intro] >>
-  rfs[Abbr ‘s'’, Abbr ‘s’, Abbr ‘r’]
+  simp[state_component_equality]
 QED
-
 
 Theorem clock_irrel:
   ∀ conf cSt1 cSt2 cEnv cExps.
@@ -721,6 +690,21 @@ Proof
   rw[cEval_equiv_def]
 QED
 
+val JSPEC_THEN =
+  fn spTr => fn nxTc => fn spTh => 
+    FIRST[Q.ISPEC_THEN spTr nxTc spTh, qspec_then spTr nxTc spTh];
+
+fun JSPECL_THEN []            = (fn nxTc => (fn spTh => nxTc spTh))
+  | JSPECL_THEN (spTr::spTrs) =
+    (fn nxTc =>
+      (fn spTh =>
+        let
+          val recFunc = (JSPECL_THEN spTrs nxTc)
+        in
+          JSPEC_THEN spTr recFunc spTh
+        end)
+    ); 
+
 Theorem ffi_irrel:
   ∀conf se cpNum cEnv pSt pCd vs cSt1 cSt2.
     cpEval_valid conf cpNum cEnv pSt pCd vs cSt1 ∧
@@ -732,93 +716,178 @@ Theorem ffi_irrel:
             (evaluate (cSt2  with clock := mc) cEnv
                       [compile_endpoint conf vs  pCd])
 Proof
-  Induct_on ‘pCd’
-  >- (rw[compile_endpoint_def,evaluate_def,do_con_check_def,
-         build_conv_def, cEval_equiv_def])
-  >- (rw[compile_endpoint_def,evaluate_def] >>
-      ‘∃sv. FLOOKUP pSt.bindings s = SOME sv’
+  Induct_on ‘pCd’ >> rw[compile_endpoint_def]
+  >- (rw eval_sl_nf >> rw[cEval_equiv_def])
+  >- (rw eval_sl_nf >>
+      ‘∃ha_s. FLOOKUP pSt.bindings s = SOME ha_s’
         by fs[cpEval_valid_def,pSt_pCd_corr_def] >>
-      ‘∃z. nsLookup cEnv.v (Short s) = SOME z ∧
-           LIST_TYPE WORD sv z’
-        by fs[cpEval_valid_def,sem_env_cor_def] >>
-      simp[cEval_equiv_def] >>
-      ‘has_v cEnv.v conf.length (LIST_TYPE ^WORD8 --> NUM) LENGTH’
-        by fs[cpEval_valid_def,env_asm_def] >>
-      fs[has_v_def,Arrow_def,AppReturns_def] >>
-      pop_assum (drule_then assume_tac) >>
-      first_assum (qspec_then ‘cSt1.refs’ assume_tac) >>
-      first_assum (qspec_then ‘cSt2.refs’ assume_tac) >>
-      fs[] >> Q.REFINE_EXISTS_TAC ‘SUC mc’ >> simp[] >>
-      fs[eval_rel_def] >>
-      simp[dec_clock_def] >>
-      Q.REFINE_EXISTS_TAC ‘ck1 + ck1' + mc’ >>
-      ‘∀mc. evaluate (cSt1 with clock := ck1 + ck1' + mc) env [exp]
-            = (cSt1 with <|clock := ck2 + ck1' + mc;
-                           refs := cSt1.refs ++ refs'|>,
-               Rval [u])’
-        by (strip_tac >>
-            ‘ck1 + ck1' + mc = ck1 + (ck1' + mc)’
-              by simp[] >>
-            first_x_assum SUBST1_TAC >>
-            ‘ck2 + ck1' + mc = ck2 + (ck1' + mc)’
-              by simp[] >>
-            first_x_assum SUBST1_TAC >>
-            metis_tac[evaluate_general]) >>
-      ‘∀mc. evaluate (cSt2 with clock := ck1 + ck1' + mc) env [exp]
-            = (cSt2 with <|clock := ck2' + ck1 + mc;
-                           refs := cSt2.refs ++ refs''|>,
-               Rval [u'])’
-        by (strip_tac >>
-            ‘ck1 + ck1' + mc = ck1' + (ck1 + mc)’
-              by simp[] >>
-            first_x_assum SUBST1_TAC >>
-            ‘ck2' + ck1 + mc = ck2' + (ck1 + mc)’
-              by simp[] >>
-            first_x_assum SUBST1_TAC >>
-            metis_tac[evaluate_general]) >>
+      ‘ck_equiv_hol cEnv NUM (App Opapp [Var conf.length; Var (Short (ps2cs s))]) (LENGTH ha_s)’
+        by (irule ck_equiv_hol_App >>
+            qexists_tac ‘LIST_TYPE ^WORD8’ >>
+            rw[] >>irule ck_equiv_hol_Var
+            >> fs[cpEval_valid_def,env_asm_def,has_v_def,sem_env_cor_def]) >>
+      drule_then (JSPEC_THEN ‘cSt2’strip_assume_tac) ck_equiv_hol_apply >>
+      rename1 ‘∀dc.
+                evaluate (cSt2 with clock := bc1_2 + dc) cEnv
+                  [App Opapp [Var conf.length; Var (Short (ps2cs s))]] =
+                (cSt2 with <|clock := dc + bc2_2; refs := cSt2.refs ++ drefs_2|>,
+                 Rval [cV_2])’ >>
+      Q.REFINE_EXISTS_TAC ‘bc1_2 + mc’ >>
       simp[] >>
-      rw[do_app_def] >>
-      fs[NUM_def,INT_def] >>
-      simp[do_if_def, Boolv_def, opb_lookup_def] >>
-      Cases_on ‘LENGTH sv ≤ n’ >> simp[]
+      first_x_assum (K ALL_TAC) >>
+      drule_then (JSPEC_THEN ‘cSt1’ strip_assume_tac) ck_equiv_hol_apply >>
+      rename1 ‘∀dc.
+                evaluate (cSt1 with clock := bc1_1 + dc) cEnv
+                  [App Opapp [Var conf.length; Var (Short (ps2cs s))]] =
+                (cSt1 with <|clock := dc + bc2_1; refs := cSt1.refs ++ drefs_1|>,
+                 Rval [cV_1])’ >>
+      Q.REFINE_EXISTS_TAC ‘bc1_1 + mc’ >>
+      simp[] >>
+      first_x_assum (K ALL_TAC) >>
+      fs trans_sl >>
+      ntac 3 (first_x_assum (K ALL_TAC)) >>
+      (* BEGIN: COMPACT CLOCK CHANGE *)
+      qabbrev_tac ‘dc1 = bc1_2 + bc2_1’ >>
+      qabbrev_tac ‘dc2 = bc1_1 + bc2_2’ >>
+      ‘∀mc. bc1_2 + (bc2_1 + mc) = dc1 + mc’
+        by simp[Abbr ‘dc1’] >>
+      ‘∀mc. bc1_1 + (bc2_2 + mc) = dc2  + mc’
+        by simp[Abbr ‘dc2 ’] >>
+      ASM_SIMP_TAC bossLib.bool_ss [] >>
+      ntac 4 (first_x_assum (K ALL_TAC)) >>
+      (* END: COMPACT CLOCK CHANGE *)
+      (* BEGIN: DISPOSE REFS CHANGE *)
+      qabbrev_tac ‘cSt1I = cSt1 with refs := (cSt1).refs ++ drefs_1’ >>
+      qabbrev_tac ‘cSt2I = cSt2 with refs := (cSt2).refs ++ drefs_2’ >>
+      ‘cpEval_valid conf cpNum cEnv pSt (Send l s n pCd) vs cSt1I’
+        by (qunabbrev_tac ‘cSt1I’ >> fs[cpEval_valid_def]) >>
+      qpat_x_assum ‘cpEval_valid conf cpNum cEnv pSt (Send l s n pCd) vs cSt1’ (K ALL_TAC) >>
+      ‘cpEval_valid conf cpNum cEnv pSt (Send l s n pCd) vs cSt2I’
+        by (qunabbrev_tac ‘cSt2I’ >> fs[cpEval_valid_def]) >>
+      qpat_x_assum ‘cpEval_valid conf cpNum cEnv pSt (Send l s n pCd) vs cSt2’ (K ALL_TAC) >>
+      ‘ffi_eq conf (cSt1I).ffi.ffi_state (cSt2I).ffi.ffi_state’
+        by simp[Abbr ‘cSt1I’, Abbr ‘cSt2I’] >>
+      qpat_x_assum ‘ffi_eq conf (cSt1).ffi.ffi_state (cSt2).ffi.ffi_state’ (K ALL_TAC) >>
+      qpat_x_assum ‘Abbrev (cSt1A = cSt1 with refs := (cSt1).refs ++ drefs_1)’ (K ALL_TAC) >>
+      qpat_x_assum ‘Abbrev (cSt2A = cSt2 with refs := (cSt2).refs ++ drefs_2)’ (K ALL_TAC) >>
+      rename1 ‘ffi_eq conf cSt1.ffi.ffi_state cSt2.ffi.ffi_state’ >>
+      (* END: DISPOSE REFS CHANGE *)
+      rw eval_sl_nf
       >- (last_x_assum (qspecl_then [‘conf’,‘cpNum’,‘cEnv’,
-                                    ‘pSt’,‘vs’,
-                                    ‘cSt1 with refs := cSt1.refs ++ refs'’,
-                                    ‘cSt2 with refs := cSt2.refs ++ refs''’]
+                                    ‘pSt’,‘vs’,‘cSt1’,‘cSt2’]
                                   assume_tac) >>
           rfs[cpEval_valid_def,letfuns_def] >>
           ‘pSt_pCd_corr pSt pCd’
             by fs[pSt_pCd_corr_def,Once pFv_def] >>
           fs[] >>
           qexists_tac ‘mc’ >>
-          ‘cSt1 with <|clock := ck1' + (ck2 + mc); refs := cSt1.refs ++ refs';
-                       ffi := cSt1.ffi|> =
-           cSt1 with <|clock := ck1' + (ck2 + mc); refs := cSt1.refs ++ refs'|>’
-            by simp[state_component_equality] >>
-          first_x_assum SUBST1_TAC >>
-          ‘cSt2 with <|clock := ck1 + (ck2' + mc); refs := cSt2.refs ++ refs'';
-                       ffi := cSt2.ffi|> =
-           cSt2 with <|clock := ck1 + (ck2' + mc); refs := cSt2.refs ++ refs''|>’
-            by simp[state_component_equality] >>
-          first_x_assum SUBST1_TAC >>
-          ‘ck1' + (ck2  + mc) = (ck1' + ck2 ) + mc’
-            by simp[] >>
-          first_x_assum SUBST1_TAC >>
-          ‘ck1  + (ck2' + mc) = (ck1  + ck2') + mc’
-            by simp[] >>
-          first_x_assum SUBST1_TAC >>
-          qspecl_then [‘conf’,‘cSt1 with refs := cSt1.refs ++ refs'’,
-                       ‘cSt2 with refs := cSt2.refs ++ refs''’, ‘cEnv’,
+          qspecl_then [‘conf’,‘cSt1’, ‘cSt2’, ‘cEnv’,
                        ‘[compile_endpoint conf vs pCd]’,
-                       ‘mc’, ‘ck1' + ck2’, ‘ck1 + ck2'’]
+                       ‘mc’, ‘dc1’, ‘dc2’]
                       assume_tac clock_irrel >>
-          rfs[])
-      >- (ntac 2 (ONCE_REWRITE_TAC [evaluate_def]) >>
-          ‘ALL_DISTINCT (MAP (λ(x,y,z). x) (sendloop conf (MAP (CHR ∘ w2n) l)))’
+          rfs[] >>
+          rw[])
+      >- (fs[] >>
+          ‘ALL_DISTINCT (MAP (λ(x,y,z). x) (sendloop conf (MAP (CHR ∘ w2n) l))) = T’
             by EVAL_TAC >>
+          first_x_assum SUBST1_TAC >>
+          rw eval_sl_nf >>
+          qabbrev_tac ‘cEnvBR =
+                        cEnv with v :=
+                         FOLDR
+                           (λ(f,x,e) env'.
+                                nsBind f
+                                  (Recclosure cEnv (sendloop conf (MAP (CHR ∘ w2n) l)) f)
+                                  env') cEnv.v (sendloop conf (MAP (CHR ∘ w2n) l))’ >>
+          qabbrev_tac ‘Drop_Exp =
+                        App Opapp
+                        [App Opapp [Var conf.drop;
+                                    Var (Short (ps2cs s))];
+                         Lit (IntLit (&n))]’ >>
+          rw eval_sl >>
+          ‘ck_equiv_hol cEnvBR (LIST_TYPE ^WORD8) Drop_Exp (combin$C DROP ha_s n)’
+              by (qunabbrev_tac ‘Drop_Exp’ >>
+                  irule ck_equiv_hol_App >>
+                  qexists_tac ‘NUM’ >>
+                  rw[]
+                  >- (irule ck_equiv_hol_Lit >>
+                      rw trans_sl)
+                  >- (irule ck_equiv_hol_App >>
+                      qexists_tac ‘LIST_TYPE ^WORD8’ >>
+                      rw[]
+                      >- (irule ck_equiv_hol_Var >>
+                          ‘nsLookup cEnvBR.v (Short (ps2cs s)) = nsLookup cEnv.v (Short (ps2cs s))’
+                            by (qunabbrev_tac ‘cEnvBR’ >> rw[sendloop_def] >> EVAL_TAC) >>
+                          first_x_assum SUBST1_TAC >>
+                          fs[cpEval_valid_def,sem_env_cor_def])
+                      >- (irule ck_equiv_hol_Var >>
+                          ‘nsLookup cEnvBR.v conf.drop = nsLookup cEnv.v conf.drop’
+                            by (qunabbrev_tac ‘cEnvBR’ >>
+                                rw[sendloop_def] >> fs[cpEval_valid_def,env_asm_def,in_module_def]) >>
+                          first_x_assum SUBST1_TAC >>    
+                          fs[cpEval_valid_def,env_asm_def,has_v_def]))) >>
+          drule_then (JSPEC_THEN ‘cSt2’ strip_assume_tac) ck_equiv_hol_apply >>
+          rename1 ‘∀dc.
+                    evaluate (cSt2 with clock := bc1_2 + dc) cEnvBR
+                      [Drop_Exp] =
+                    (cSt2 with <|clock := dc + bc2_2; refs := cSt2.refs ++ drefs_2|>,
+                     Rval [cV_2])’ >>
+          Q.REFINE_EXISTS_TAC ‘bc1_2 + mc’ >>
           simp[] >>
-          rw[sendloop_correct] >>              
-          cheat)
+          first_x_assum (K ALL_TAC) >>
+          drule_then (JSPEC_THEN ‘cSt1’ strip_assume_tac) ck_equiv_hol_apply >>
+          rename1 ‘∀dc.
+                    evaluate (cSt1 with clock := bc1_1 + dc) cEnvBR
+                      [Drop_Exp] =
+                    (cSt1 with <|clock := dc + bc2_1; refs := cSt1.refs ++ drefs_1|>,
+                     Rval [cV_1])’ >>
+          Q.REFINE_EXISTS_TAC ‘bc1_1 + mc’ >>
+          simp[] >>
+          first_x_assum (K ALL_TAC) >>
+          qpat_x_assum ‘Abbrev (Drop_Exp = _)’ (K ALL_TAC) >>
+          simp[] >>
+          ‘nsLookup cEnvBR.v (Short "sendloop")
+            = SOME (Recclosure cEnv (sendloop conf (MAP (CHR o w2n) l)) "sendloop")’
+            by rw[Abbr ‘cEnvBR’,sendloop_def,nsLookup_def,nsBind_def] >>
+          first_x_assum SUBST1_TAC >>
+          simp[] >>
+          qpat_x_assum ‘Abbrev (cEnvBR = _)’ (K ALL_TAC) >>
+          qpat_x_assum ‘ck_equiv_hol cEnvBR _ Drop_Exp _’ (K ALL_TAC) >>
+          Q.REFINE_EXISTS_TAC ‘SUC mc’ >>
+          rw[ADD1,dec_clock_def] >>
+          (* BEGIN: COMPACT CLOCK CHANGE *)
+          qabbrev_tac ‘dc1I = bc1_2 + bc2_1 + dc1’ >>
+          qabbrev_tac ‘dc2I = bc1_1 + bc2_2 + dc2’ >>
+          ‘∀mc. bc1_2 + (bc2_1 + (dc1 + mc)) = dc1I + mc’
+            by simp[Abbr ‘dc1I’] >>
+          ‘∀mc. bc1_1 + (bc2_2 + (dc2 + mc)) = dc2I  + mc’
+            by simp[Abbr ‘dc2I ’] >>
+          ASM_SIMP_TAC bossLib.bool_ss [] >>
+          ntac 4 (first_x_assum (K ALL_TAC)) >>
+          qabbrev_tac ‘dc1 = dc1I’ >>
+          qabbrev_tac ‘dc2 = dc2I’ >>
+          ntac 2 (first_x_assum (K ALL_TAC)) >>
+          (* END: COMPACT CLOCK CHANGE *)
+          (* BEGIN: DISPOSE REFS CHANGE *)
+          qabbrev_tac ‘cSt1I = cSt1 with refs := (cSt1).refs ++ drefs_1’ >>
+          qabbrev_tac ‘cSt2I = cSt2 with refs := (cSt2).refs ++ drefs_2’ >>
+          ‘cpEval_valid conf cpNum cEnv pSt (Send l s n pCd) vs cSt1I’
+            by (qunabbrev_tac ‘cSt1I’ >> fs[cpEval_valid_def]) >>
+          qpat_x_assum ‘cpEval_valid conf cpNum cEnv pSt (Send l s n pCd) vs cSt1’ (K ALL_TAC) >>
+          ‘cpEval_valid conf cpNum cEnv pSt (Send l s n pCd) vs cSt2I’
+            by (qunabbrev_tac ‘cSt2I’ >> fs[cpEval_valid_def]) >>
+          qpat_x_assum ‘cpEval_valid conf cpNum cEnv pSt (Send l s n pCd) vs cSt2’ (K ALL_TAC) >>
+          ‘ffi_eq conf (cSt1I).ffi.ffi_state (cSt2I).ffi.ffi_state’
+            by simp[Abbr ‘cSt1I’, Abbr ‘cSt2I’] >>
+          qpat_x_assum ‘ffi_eq conf (cSt1).ffi.ffi_state (cSt2).ffi.ffi_state’ (K ALL_TAC) >>
+          qpat_x_assum ‘Abbrev (cSt1I = cSt1 with refs := (cSt1).refs ++ drefs_1)’ (K ALL_TAC) >>
+          qpat_x_assum ‘Abbrev (cSt2I = cSt2 with refs := (cSt2).refs ++ drefs_2)’ (K ALL_TAC) >>
+          rename1 ‘ffi_eq conf cSt1.ffi.ffi_state cSt2.ffi.ffi_state’ >>
+          (* END: DISPOSE REFS CHANGE *)
+          (* TODO: APPLY SEND LOOP CORRECT, for now we cheat! *)
+          cheat
+          )
+      >- (rw[cEval_equiv_def])
       )
   >- (cheat)
   >- (cheat)
