@@ -1,9 +1,15 @@
-open preamble
+structure evaluate_rwLib :> evaluate_rwLib =
+	struct
+
+	open preamble
      evaluateTheory terminationTheory ml_translatorTheory ml_progTheory
      evaluatePropsTheory namespaceTheory semanticPrimitivesTheory ffiTheory;
 
-structure evaluate_rwLib =
-	struct
+    structure Parse =
+    struct
+    	open Parse;
+    	val (Type,Term) = parse_from_grammars evaluatePropsTheory.evaluateProps_grammars
+    end
 
 	val trans_sl =
 	[UNIT_TYPE_def,
@@ -17,8 +23,8 @@ structure evaluate_rwLib =
 	LIST_TYPE_def];
 
 	val evaluate_nofunapp_simp =
-	Q.prove(
-		‘
+	prove(
+		“
 		(∀st env. evaluate st env [] = (st,Rval [])) ∧
 		(∀st es env e2 e1.
 		    evaluate st env (e1::e2::es) =
@@ -102,7 +108,7 @@ structure evaluate_rwLib =
 		    else (st,Rerr (Rabort Rtype_error))) ∧
 		(∀t st env e. evaluate st env [Tannot e t] = evaluate st env [e]) ∧
 		(∀st l env e. evaluate st env [Lannot e l] = evaluate st env [e])
-		’, simp[evaluate_def]);
+		”, simp[evaluate_def]);
 
 
 	val eval_sl_nf =
