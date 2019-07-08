@@ -8,7 +8,7 @@ val _ = new_theory "ckExp_Equiv";
 (* Helper Specialisation code *)
 val JSPEC_THEN =
   fn spTr => fn nxTc => fn spTh => 
-    FIRST[Q.ISPEC_THEN spTr nxTc spTh, qspec_then spTr nxTc spTh];
+    FIRST[qspec_then spTr nxTc spTh,Q.ISPEC_THEN spTr nxTc spTh];
 
 fun JSPECL_THEN []            = (fn nxTc => (fn spTh => nxTc spTh))
   | JSPECL_THEN (spTr::spTrs) =
