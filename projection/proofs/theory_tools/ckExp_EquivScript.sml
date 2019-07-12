@@ -1,7 +1,9 @@
-open preamble
-     evaluateTheory terminationTheory ml_translatorTheory ml_progTheory
-     evaluatePropsTheory namespaceTheory semanticPrimitivesTheory ffiTheory
-     evaluate_toolsTheory;
+open HolKernel boolLib Parse bossLib;
+open evaluateTheory
+     terminationTheory
+     evaluatePropsTheory
+     ml_translatorTheory;
+open evaluate_toolsTheory;
 
 val _ = new_theory "ckExp_Equiv";
 
@@ -126,7 +128,7 @@ Proof
              <|clock := bc2 + dc;
                refs := arefs ++ drefs_a ++ drefs_f ++ drefs|>,Rval [crv])’ >>
   MAP_EVERY qexists_tac [‘SUC bc1’,‘bc2+(bc2_a+bc2_f)’,‘drefs_a ++ drefs_f ++ drefs’,‘crv’] >>
-  rw[ADD1,dec_clock_def]
+  rw[arithmeticTheory.ADD1,dec_clock_def]
 QED
 
 

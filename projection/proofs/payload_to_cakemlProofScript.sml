@@ -5,12 +5,14 @@ open preamble
      namespaceTheory
      semanticPrimitivesTheory
      ffiTheory
-     comms_ffiTheory
+     comms_ffi_modelTheory
+     comms_ffi_toolsTheory
      payloadPropsTheory
      payloadSemanticsTheory
      evaluate_rwLib
      state_tacticLib
-     ckExp_EquivTheory;
+     ckExp_EquivTheory
+     rich_listTheory;
 
 val _ = new_theory "payload_to_cakemlProof";
 
@@ -398,14 +400,6 @@ Proof
      rw[pad_def,DROP_NIL] >> intLib.COOPER_TAC)
 QED
 
-Definition ffi_accepts_rel_def:
-  ffi_accepts_rel stpred pred oracle =
-  ∀st s conf bytes.
-    stpred st.ffi_state ∧ st.oracle = oracle ∧ pred s conf bytes ⇒
-    ∃ffi. st.oracle s st.ffi_state conf bytes = Oracle_return ffi bytes ∧
-          stpred ffi
-End
-
 Definition send_events_def:
   send_events conf dest d =
   MAP (λm. IO_event "send" dest (ZIP (m,m)))(compile_message conf d)
@@ -416,6 +410,14 @@ Definition update_state_def:
   (update_state st oracle (IO_event s c b::es) =
    update_state (@st'. oracle s st c (MAP FST b) = Oracle_return st' (MAP SND b))
                 oracle es)
+End
+
+Definition valid_send_event_format_def:
+  valid_send_event_format conf dest event =
+    case event of
+      IO_event n d c =>
+         (valid_send_call_format conf dest n d (MAP FST c) ∧
+          (MAP FST c = MAP SND c))
 End
 
 Theorem LUPDATE_SAME':
@@ -438,10 +440,7 @@ Theorem sendloop_correct:
   nsLookup env.v (Short "sendloop") = SOME(Recclosure env' (sendloop conf (MAP (CHR o w2n) dest)) "sendloop") ∧
   ck_equiv_hol env (LIST_TYPE ^WORD8) aexp l ∧
   stpred s.ffi.ffi_state ∧
-  ffi_accepts_rel
-    stpred
-    (λs c bytes. s = "send" ∧ c = dest ∧ LENGTH bytes = SUC conf.payload_size)
-    s.ffi.oracle
+  ffi_accepts_rel stpred (valid_send_call_format conf dest) s.ffi.oracle
   ⇒
   ∃ck1 ck2 refs' num lv'.
   evaluate$evaluate (s with clock:= ck1) env [App Opapp [Var (Short "sendloop"); aexp]] =
@@ -481,7 +480,9 @@ Proof
   simp[ml_progTheory.nsLookup_nsBind_compute,namespaceTheory.nsOptBind_def,
        do_app_def,ffiTheory.call_FFI_def] >>
   simp[Once evaluate_def] >>
-  qhdtm_assum ‘ffi_accepts_rel’ (mp_tac o REWRITE_RULE [ffi_accepts_rel_def]) >>
+  qhdtm_assum ‘ffi_accepts_rel’
+              (mp_tac o REWRITE_RULE [valid_send_call_format_def,
+                                      ffi_accepts_rel_def]) >>
   disch_then drule >> simp[] >>
   disch_then(qspec_then ‘pad conf l’ mp_tac) >>
   impl_keep_tac >- rw[pad_def] >>
@@ -569,10 +570,7 @@ Proof
             qexists_tac ‘cVD’ >> rw[]) >>
       ‘stpred s3.ffi.ffi_state’
         by (qunabbrev_tac ‘s3’ >> qunabbrev_tac ‘s2’ >> fs[]) >>
-      ‘ffi_accepts_rel stpred
-          (λs c bytes.
-               s = "send" ∧ c = dest ∧ LENGTH bytes = SUC conf.payload_size)
-          s3.ffi.oracle’
+      ‘ffi_accepts_rel stpred (valid_send_call_format conf dest) s3.ffi.oracle’
         by (qunabbrev_tac ‘s3’ >> qunabbrev_tac ‘s2’ >> fs[]) >>
       fs[] >>
       ntac 4 (first_x_assum (K ALL_TAC)) >>
@@ -648,8 +646,8 @@ Definition sem_env_cor_def:
 End
 
 (* CHECKING CONSISTENCY BETWEEN FFI AND PAYLOAD STATE *)
-Definition ffi_cor_def:
-  ffi_cor cpNum pSt (fNum,fQueue,fNet) ⇔
+Definition ffi_state_cor_def:
+  ffi_state_cor cpNum pSt (fNum,fQueue,fNet) ⇔
     cpNum = fNum ∧
     ∀extproc.
       let
@@ -663,11 +661,13 @@ End
 
 Definition cpEval_valid_def:
   cpEval_valid conf cpNum cEnv pSt pCd vs cSt ⇔
+    conf.payload_size ≠ 0 ∧
     env_asm cEnv conf ∧
     enc_ok conf cEnv (letfuns pCd) vs ∧
     pSt_pCd_corr pSt pCd ∧
     sem_env_cor conf pSt cEnv ∧
-    ffi_cor cpNum pSt cSt.ffi.ffi_state
+    ffi_state_cor cpNum pSt cSt.ffi.ffi_state ∧
+    cSt.ffi.oracle = (comms_ffi_oracle conf)
 End
 
 (* DEFINITION OF EQUIVALENT CAKEML EVALUTATIONS *)
@@ -704,6 +704,108 @@ Proof
                       assume_tac evaluate_add_to_clock >>
         rfs[]) >>
   rw[cEval_equiv_def]
+QED
+
+
+
+Theorem ffi_state_cor_send_stream_irrel:
+  ∀conf cpNum pSt ckFSt l send_stream P.
+    conf.payload_size ≠ 0 ∧
+    ffi_state_cor cpNum pSt ckFSt ∧
+    EVERY (valid_send_event_format conf l) send_stream ∧
+    ffi_accepts_rel P (valid_send_call_format conf l) (comms_ffi_oracle conf) ∧
+    P ckFSt
+    ⇒
+    ffi_state_cor cpNum pSt (update_state ckFSt (comms_ffi_oracle conf) send_stream)
+Proof
+  Induct_on ‘send_stream’ >>
+  rw[update_state_def] >>
+  Cases_on ‘h’ >>
+  PURE_ONCE_REWRITE_TAC [update_state_def] >>
+  qmatch_goalsub_abbrev_tac ‘ffi_state_cor cpNum pSt (update_state ckFSt1 _ send_stream)’ >>
+  rename1 ‘valid_send_event_format conf l (IO_event s l' d)’ >>
+  ‘l' = l’
+    by fs[valid_send_event_format_def,valid_send_call_format_def] >>
+  fs[] >>
+  first_x_assum (K ALL_TAC) >>
+  last_x_assum irule >>
+  qpat_assum ‘ffi_accepts_rel _ _ _’ (assume_tac o (REWRITE_RULE [ffi_accepts_rel_def])) >>
+  first_x_assum (JSPECL_THEN [‘<|oracle := comms_ffi_oracle conf;
+                               ffi_state := ckFSt;
+                               io_events := ARB|>’,
+                               ‘s’,‘l’,‘MAP FST d’]
+                           strip_assume_tac) >>
+  rfs[valid_send_event_format_def] >>
+  fs[] >> qunabbrev_tac ‘ckFSt1’ >>
+  qmatch_goalsub_rename_tac ‘ffi_state_cor _ _ ckFSt1’ >>
+  rw[]
+  >- (MAP_EVERY qexists_tac [‘P’,‘l’] >> fs[]) >>
+  fs[ffi_accepts_rel_def,valid_send_event_format_def] >>
+  rfs[] >>
+  qpat_x_assum ‘∀a b c d. e’ (K ALL_TAC) >>
+  fs[comms_ffi_oracle_def] >>
+  ‘s = "send"’
+    by fs[valid_send_call_format_def] >>
+  fs[ffi_send_def] >> first_x_assum (K ALL_TAC) >>
+  Cases_on ‘∃ns. strans conf ckFSt (ASend l (MAP SND d)) ns’ >>
+  Cases_on ‘LENGTH d = SUC conf.payload_size’ >>
+  fs[] >> rw[] >>
+  irule SELECT_ELIM_THM >>
+  rw[]
+  >- (qpat_x_assum ‘strans _ _ _ ns’ (K ALL_TAC) >>
+      qmatch_goalsub_rename_tac ‘ffi_state_cor _  _ ns’ >>
+      Cases_on ‘ns’ >> Cases_on ‘ckFSt’ >>
+      rename1 ‘strans conf (PN,R) _ (PN',R')’ >>
+      ‘PN' = PN’
+        by (drule strans_pres_pnum >>
+            simp[]) >>
+      fs[] >> first_x_assum (K ALL_TAC) >>
+      ‘PN = cpNum’
+        by (Cases_on ‘R’ >>
+            fs[ffi_state_cor_def]) >>
+      fs[] >>
+      first_x_assum (K ALL_TAC) >>
+      Cases_on ‘R’ >> Cases_on ‘R'’ >>
+      rename1 ‘strans conf (_,Q,N) _ (_,Q',N')’ >>
+      ‘isPREFIX Q Q'’
+        suffices_by (rw[] >> fs[ffi_state_cor_def] >>
+                     rw[] >> first_x_assum (qspec_then ‘extproc’ assume_tac) >>
+                     qmatch_goalsub_abbrev_tac ‘isPREFIX (FILTER C pSt.queue) _’ >>
+                     ‘isPREFIX (FILTER C Q) (FILTER C Q')’
+                        suffices_by metis_tac[IS_PREFIX_TRANS] >>
+                     rw[IS_PREFIX_FILTER]) >>
+      metis_tac[strans_queue_pres])
+  >- (qexists_tac ‘ns’ >> simp[])
+QED
+
+Theorem ffi_state_cor_send_events_irrel:
+  ∀conf cpNum pSt ckFSt l d P.
+    conf.payload_size ≠ 0 ∧
+    ffi_state_cor cpNum pSt ckFSt ∧
+    ffi_accepts_rel P (valid_send_call_format conf l) (comms_ffi_oracle conf) ∧
+    P ckFSt
+    ⇒
+    ffi_state_cor cpNum pSt (update_state ckFSt (comms_ffi_oracle conf)
+                                          (send_events conf l d))
+Proof
+  rpt strip_tac >>
+  ‘EVERY (valid_send_event_format conf l) (send_events conf l d)’
+    suffices_by  (rw[] >> irule ffi_state_cor_send_stream_irrel >> rw[] >>
+                  MAP_EVERY qexists_tac [‘P’,‘l’] >> rw[]) >>
+  completeInduct_on ‘LENGTH d’ >>
+  rw[send_events_def,Once compile_message_def] >>
+  rw[valid_send_event_format_def,valid_send_call_format_def,pad_def] >>
+  ‘0 < LENGTH d’
+    by (‘0 ≠ LENGTH d’
+          suffices_by metis_tac[DECIDE “0 ≠ (n:num) ⇒ 0 < n”] >>
+        CCONTR_TAC >> fs[] >>
+        ‘final (pad conf d)’
+          suffices_by fs[] >>
+        simp[pad_def,final_def]) >>
+  qmatch_goalsub_abbrev_tac ‘EVERY (valid_send_event_format conf l) func’ >>
+  ‘func = send_events conf l (DROP conf.payload_size d)’
+    suffices_by rw[] >>
+  rw[Abbr ‘func’,send_events_def]
 QED
 
 Theorem ffi_irrel:
@@ -797,7 +899,6 @@ Proof
                         [App Opapp [Var conf.drop;
                                     Var (Short (ps2cs s))];
                          Lit (IntLit (&n))]’ >>
-          rw eval_sl >>
           ‘ck_equiv_hol cEnvBR (LIST_TYPE ^WORD8) Drop_Exp (combin$C DROP ha_s n)’
               by (qunabbrev_tac ‘Drop_Exp’ >>
                   irule ck_equiv_hol_App >>
@@ -819,60 +920,29 @@ Proof
                                 rw[sendloop_def] >> fs[cpEval_valid_def,env_asm_def,in_module_def]) >>
                           first_x_assum SUBST1_TAC >>    
                           fs[cpEval_valid_def,env_asm_def,has_v_def]))) >>
-          drule_then (JSPEC_THEN ‘cSt2’ strip_assume_tac) ck_equiv_hol_apply >>
-          rename1 ‘∀dc.
-                    evaluate (cSt2 with clock := bc1_2 + dc) cEnvBR
-                      [Drop_Exp] =
-                    (cSt2 with <|clock := dc + bc2_2; refs := cSt2.refs ++ drefs_2|>,
-                     Rval [cV_2])’ >>
-          Q.REFINE_EXISTS_TAC ‘bc1_2 + mc’ >>
-          simp[] >>
-          first_x_assum (K ALL_TAC) >>
-          drule_then (JSPEC_THEN ‘cSt1’ strip_assume_tac) ck_equiv_hol_apply >>
-          rename1 ‘∀dc.
-                    evaluate (cSt1 with clock := bc1_1 + dc) cEnvBR
-                      [Drop_Exp] =
-                    (cSt1 with <|clock := dc + bc2_1; refs := cSt1.refs ++ drefs_1|>,
-                     Rval [cV_1])’ >>
-          Q.REFINE_EXISTS_TAC ‘bc1_1 + mc’ >>
-          simp[] >>
-          first_x_assum (K ALL_TAC) >>
-          qpat_x_assum ‘Abbrev (Drop_Exp = _)’ (K ALL_TAC) >>
-          simp[] >>
+          JSPECL_THEN [‘conf’,‘combin$C DROP ha_s n’,‘cEnvBR’,‘cEnv’,‘Drop_Exp’,‘cSt1’,
+                       ‘valid_send_dest l’,‘l’] strip_assume_tac sendloop_correct >>
+          ‘env_asm cEnv conf’
+            by fs[cpEval_valid_def] >>
+          ‘conf.payload_size ≠ 0’
+            by fs[cpEval_valid_def] >>
           ‘nsLookup cEnvBR.v (Short "sendloop")
             = SOME (Recclosure cEnv (sendloop conf (MAP (CHR o w2n) l)) "sendloop")’
             by rw[Abbr ‘cEnvBR’,sendloop_def,nsLookup_def,nsBind_def] >>
-          first_x_assum SUBST1_TAC >>
-          simp[] >>
-          qpat_x_assum ‘Abbrev (cEnvBR = _)’ (K ALL_TAC) >>
-          qpat_x_assum ‘ck_equiv_hol cEnvBR _ Drop_Exp _’ (K ALL_TAC) >>
-          Q.REFINE_EXISTS_TAC ‘SUC mc’ >>
-          rw[ADD1,dec_clock_def] >>
-          unite_nums "dc1" >>
-          unite_nums "dc2" >>
-          (* BEGIN: DISPOSE REFS CHANGE *)
-          qabbrev_tac ‘cSt1I = cSt1 with refs := (cSt1).refs ++ drefs_1’ >>
-          qabbrev_tac ‘cSt2I = cSt2 with refs := (cSt2).refs ++ drefs_2’ >>
-          ‘cpEval_valid conf cpNum cEnv pSt (Send l s n pCd) vs cSt1I’
-            by (qunabbrev_tac ‘cSt1I’ >> fs[cpEval_valid_def]) >>
-          qpat_x_assum ‘cpEval_valid conf cpNum cEnv pSt (Send l s n pCd) vs cSt1’ (K ALL_TAC) >>
-          ‘cpEval_valid conf cpNum cEnv pSt (Send l s n pCd) vs cSt2I’
-            by (qunabbrev_tac ‘cSt2I’ >> fs[cpEval_valid_def]) >>
-          qpat_x_assum ‘cpEval_valid conf cpNum cEnv pSt (Send l s n pCd) vs cSt2’ (K ALL_TAC) >>
-          ‘ffi_eq conf (cSt1I).ffi.ffi_state (cSt2I).ffi.ffi_state’
-            by simp[Abbr ‘cSt1I’, Abbr ‘cSt2I’] >>
-          qpat_x_assum ‘ffi_eq conf (cSt1).ffi.ffi_state (cSt2).ffi.ffi_state’ (K ALL_TAC) >>
-          qpat_x_assum ‘Abbrev (cSt1I = cSt1 with refs := (cSt1).refs ++ drefs_1)’ (K ALL_TAC) >>
-          qpat_x_assum ‘Abbrev (cSt2I = cSt2 with refs := (cSt2).refs ++ drefs_2)’ (K ALL_TAC) >>
-          rename1 ‘ffi_eq conf cSt1.ffi.ffi_state cSt2.ffi.ffi_state’ >>
-          (* END: DISPOSE REFS CHANGE *)
-          ‘cV_1 = cV_2’
-            by metis_tac[LIST_TYPE_UNCT,WORD_UNCT,UNCT_def] >>
-          cheat)
-      >- cheat)
+          qpat_x_assum ‘ck_equiv_hol _ _ Drop_Exp _’ assume_tac >>
+          ‘ffi_accepts_rel (valid_send_dest l) (valid_send_call_format conf l) (cSt1.ffi.oracle)’
+            by (‘cSt1.ffi.oracle = comms_ffi_oracle conf’
+                  by fs[cpEval_valid_def] >>
+                rw [send_invariant]) >>
+          fs[] >>
+          Cases_on ‘valid_send_dest l cSt1.ffi.ffi_state’
+          >- (cheat)
+          >- (cheat)
+        )
+      >- (cheat)
+    )     
   >- (cheat)
   >- (cheat)
   >- (cheat)
 QED
-
 val _ = export_theory ();

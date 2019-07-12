@@ -1,6 +1,9 @@
-open preamble
-     evaluateTheory terminationTheory ml_translatorTheory ml_progTheory
-     evaluatePropsTheory namespaceTheory semanticPrimitivesTheory ffiTheory;
+open HolKernel boolLib Parse bossLib;
+open evaluateTheory
+     terminationTheory
+     evaluatePropsTheory
+     ml_progTheory
+     ml_translatorTheory;
 
 val _ = new_theory "evaluate_tools";
 
@@ -102,7 +105,7 @@ Proof
             (cSt with <|clock := bc2 + dc; refs := cSt.refs ++ drefs|>,
              Rval [crv])’] >>
   MAP_EVERY qexists_tac [‘SUC bc1’,‘bc2’,‘drefs’,‘crv’] >>
-  rw[dec_clock_def,ADD1]
+  rw[dec_clock_def,arithmeticTheory.ADD1]
 QED
 
 Theorem evaluate_translate_lit:
@@ -128,7 +131,7 @@ Proof
             (cSt with <|clock := bc2 + dc; refs := cSt.refs ++ drefs|>,
              Rval [crv])’] >>
   MAP_EVERY qexists_tac [‘SUC bc1’,‘bc2’,‘drefs’,‘crv’] >>
-  rw[dec_clock_def,ADD1]
+  rw[dec_clock_def,arithmeticTheory.ADD1]
 QED
 
 Theorem evaluate_ltwo_translate:
@@ -157,7 +160,7 @@ Proof
           (cSt with <|clock := bc2 + dc; refs := cSt.refs ++ drefs1|>,
            Rval [crv1])’] >>
   Q.REFINE_EXISTS_TAC ‘bc1 + SUC bc1'’ >>
-  rw[ADD1,dec_clock_def] >>
+  rw[arithmeticTheory.ADD1,dec_clock_def] >>
   ASM_SIMP_TAC bossLib.bool_ss [] >>
   qpat_x_assum ‘∀dc. _’ (K ALL_TAC) >>
   ntac 5 (last_x_assum (K ALL_TAC)) >>
@@ -170,7 +173,7 @@ Proof
           (cSt with <|clock := Abc2 + dc; refs := cSt.refs ++ drefs1 ++ drefs2|>,
            Rval [crv2])’ >>
   Q.REFINE_EXISTS_TAC ‘Abc1 + SUC bc1'’ >>
-  rw[ADD1,dec_clock_def] >>
+  rw[arithmeticTheory.ADD1,dec_clock_def] >>
   MAP_EVERY qexists_tac [‘0’,‘Abc2 + bc2’,‘drefs1 ++ drefs2’,‘crv2’] >>
   rw[]
 QED

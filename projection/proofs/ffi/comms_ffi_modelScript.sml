@@ -1,10 +1,23 @@
-open    preamble
-        relationTheory
-        astBakeryTheory
-        payloadSemanticsTheory
-        ffiTheory;
+open HolKernel boolLib Parse bossLib;
+open ffiTheory;
+open payloadSemanticsTheory;
 
-val _ = new_theory "comms_ffi";
+val _ = new_theory "comms_ffi_model";
+
+val JSPEC_THEN =
+  fn spTr => fn nxTc => fn spTh => 
+    FIRST[qspec_then spTr nxTc spTh, Q.ISPEC_THEN spTr nxTc spTh];
+
+fun JSPECL_THEN []            = (fn nxTc => (fn spTh => nxTc spTh))
+  | JSPECL_THEN (spTr::spTrs) =
+    (fn nxTc =>
+      (fn spTh =>
+        let
+          val recFunc = (JSPECL_THEN spTrs nxTc)
+        in
+          JSPEC_THEN spTr recFunc spTh
+        end)
+    ); 
 
 val _ = type_abbrev("message", “: proc # datum”);
 val _ = type_abbrev("queue" , “: message list”);
@@ -47,48 +60,11 @@ val (strans_rules,strans_ind,strans_cases) = Hol_reln
      ⇒  strans conf (c,q,N) (ASend rp d) (c,q,N'))
 ’;
 
-Definition bisim_def:
-  bisim ts R = ∀p q α.
-                R p q ⇒
-                (∀p'. ts p α p' ⇒ (∃q'. ts q α q' ∧ R p' q')) ∧
-                (∀q'. ts q α q' ⇒ (∃p'. ts p α p' ∧ R p' q'))
-End
-
-Definition bisimRel_def:
-  bisimRel ts p q = ∃R. bisim ts R ∧ R p q
-End
-
-
-Theorem bisimRel_equivRel:
-  ∀ts. equivalence (bisimRel ts)
-Proof
-  rw [equivalence_def]
-  >- (rw[reflexive_def, bisimRel_def] >>
-      qexists_tac ‘$=’ >>
-      rw[bisim_def])
-  >- (rw[symmetric_def, bisimRel_def] >>
-      rw[EQ_IMP_THM] >>
-      qexists_tac ‘SC R’ >>
-      fs[bisim_def,SC_DEF] >>
-      metis_tac[])
-  >- (rw[transitive_def,bisimRel_def] >>
-      qexists_tac ‘λa c. ∃b. R a b ∧ R' b c’ >>
-      fs[bisim_def] >>
-      metis_tac[])
-QED
-
-Definition ffi_eq_def:
-  ffi_eq conf = bisimRel (strans conf)
-End
-
-Theorem ffi_eq_equivRel:
-  ∀conf. equivalence (ffi_eq conf)
-Proof
-  rw [ffi_eq_def,bisimRel_equivRel]
-QED
-
 Definition ffi_send_def:
   ffi_send conf os dest data =
+  if (LENGTH data ≠ SUC conf.payload_size) then
+    Oracle_final FFI_failed
+  else
     if (∃ns. strans conf os (ASend dest data) ns) then
       Oracle_return (@ns. strans conf os (ASend dest data) ns) data
     else
@@ -113,6 +89,5 @@ Definition comms_ffi_oracle_def:
     else
         (λ _ _ _. Oracle_final FFI_failed)
 End
-
 
 val _ = export_theory ();
