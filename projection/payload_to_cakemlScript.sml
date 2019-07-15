@@ -35,6 +35,14 @@ val convDatumList_def = Define
   (convDatumList conf (x::xs) = Con (SOME conf.cons) [convDatum conf x; convDatumList conf xs]) 
   ’;
 
+(* Simple helper function to convert HOL list of CakeML expressions into CakeML list of
+CakeML expressions *)
+val convList_def = Define
+  ‘
+  (convList conf []    = Con (SOME conf.nil) []) ∧
+  (convList conf (x::xs) = Con (SOME conf.cons) [x; convList conf xs]) 
+  ’;
+
 (* CakeML deep embedding of message padding function *)
 val padv_def = Define
   ‘padv conf =
@@ -254,7 +262,7 @@ val compile_endpoint_def = Define ‘
         (compile_endpoint conf (DROP vn vs) e2))
 ∧ (compile_endpoint conf (hv::vs) (payloadLang$Let v f vl e) =
    ast$Let (SOME (ps2cs v))
-       (App Opapp ((Var o (getLetID conf)) hv::MAP (Var o Short) vl))
+       (App Opapp [((ast$Var o (getLetID conf)) hv);convList conf (MAP (Var o Short o ps2cs) vl)])
        (compile_endpoint conf vs e))’;
 
 val _ = export_theory ();
