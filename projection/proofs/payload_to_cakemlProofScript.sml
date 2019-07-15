@@ -46,6 +46,8 @@ End
 
 Definition env_asm_def:
   env_asm env conf = (
+    has_v env.c conf.nil  $= (0,TypeStamp "[]" list_type_num) ∧
+    has_v env.c conf.cons $= (2,TypeStamp "::" list_type_num) ∧
     has_v env.v conf.concat (LIST_TYPE ^WORD8 --> LIST_TYPE ^WORD8 --> LIST_TYPE ^WORD8) $++ ∧ 
     has_v env.v conf.length (LIST_TYPE ^WORD8 --> NUM) LENGTH ∧
     has_v env.v conf.null (LIST_TYPE ^WORD8 --> BOOL) NULL ∧
@@ -57,6 +59,8 @@ Definition env_asm_def:
            ⇒ ∀s1: unit semanticPrimitives$state. ∃env' exp ck1 ck2. do_opapp [v; lv] = SOME(env',exp)
                ∧ evaluate (s1 with clock := ck1) env' [exp] =
                   (s1 with <|clock := ck2; refs := s1.refs ++ [W8array l]|>,Rval [Loc(LENGTH s1.refs)]))) ∧
+    in_module conf.nil ∧
+    in_module conf.cons ∧
     in_module conf.concat ∧
     in_module conf.length ∧
     in_module conf.null ∧
