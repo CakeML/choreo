@@ -1,9 +1,11 @@
 open HolKernel boolLib Parse bossLib;
-open evaluateTheory
+open semanticPrimitivesTheory
+     evaluateTheory
      terminationTheory
      evaluatePropsTheory
      ml_translatorTheory;
-open evaluate_toolsTheory;
+open evaluate_toolsTheory
+     evaluate_rwLib;
 
 val _ = new_theory "ckExp_Equiv";
 
@@ -152,6 +154,23 @@ Proof
   simp[evaluate_generalise]
 QED
 
+Theorem ck_equiv_hol_apply_alt:
+  ∀ cEnv hT cExp hV cSt.
+    ck_equiv_hol cEnv hT cExp hV ⇒
+      ∃bc1 bc2 drefs cV.
+        hT hV cV ∧
+        ∀dc.
+          evaluate (cSt with clock := bc1 + dc) cEnv [cExp]
+          = (cSt with <|clock := dc + bc2;
+                        refs := cSt.refs ++ drefs|>,
+                    Rval [cV])
+Proof
+  rw[] >>
+  drule_then (JSPEC_THEN ‘cSt’ strip_assume_tac) ck_equiv_hol_apply >>
+  MAP_EVERY qexists_tac [‘bc1’,‘bc2’,‘drefs’,‘cV’] >>
+  simp[]
+QED
+
 (* Apply partial equivalence to evaluation of function *)
 Definition UNCT_def:
   UNCT (tf:α -> v -> bool) = ∀(a:α) (v1 v2:v). tf a v1 ∧ tf a v2 ⇒ v1 = v2
@@ -208,7 +227,74 @@ Proof
       fs[LIST_TYPE_def] >>
       metis_tac[])
 QED
+(*
+Theorem ck_equiv_hol_apply_equality:
+  ∀fexp aexp hT hA cEnv cL.
+    UNCT hT  ∧
+    ck_equiv_hol cEnv hT   aexp hA ∧
+    ck_equiv_hol cEnv hT   bexp hB   ⇒
+    ck_equiv_hol cEnv BOOL (App Equality [aexp;bexp]) (hA = hB)
+Proof
+  rpt strip_tac >>
+  rw [ck_equiv_hol_def] >>
+  CONV_TAC (RESORT_EXISTS_CONV rev) >>
+  MAP_EVERY qexists_tac [‘Boolv (hA = hB)’] >>
+  simp trans_sl >>
+  CONV_TAC (RESORT_EXISTS_CONV rev) >>
+  rw eval_sl
+  >- (qmatch_goalsub_abbrev_tac ‘evaluate (cSt with clock := _) _ _’ >>
+      Q.ISPECL_THEN [‘cEnv’,‘hT’,‘bexp’,‘hA’,‘cSt’]
+                  strip_assume_tac ck_equiv_hol_apply_alt >>
+      rfs[] >>
+      Q.REFINE_EXISTS_TAC ‘bc1 + r1’ >>
+      simp[] >>
+      qpat_x_assum ‘∀dc. P dc’ (K ALL_TAC) >>
+      qunabbrev_tac ‘cSt’ >>
+      simp [] >>
+      qmatch_goalsub_abbrev_tac ‘evaluate (cSt with clock := _) _ _’ >>
+      Q.ISPECL_THEN [‘cEnv’,‘hT’,‘aexp’,‘hA’,‘cSt’]
+                  strip_assume_tac ck_equiv_hol_apply_alt >>
+      rfs[] >>
+      ‘cV' = cV’
+        by metis_tac[UNCT_def] >>
+      fs[] >>
+      first_x_assum (K ALL_TAC) >>
+      Q.REFINE_EXISTS_TAC ‘bc1 + r1’ >>
+      simp[] >>
+      qpat_x_assum ‘∀dc. P dc’ (K ALL_TAC) >>
+      ‘do_eq cV cV = Eq_val T’
+        suffices_by (qunabbrev_tac ‘cSt’ >> rw[] >>
+                     MAP_EVERY qexists_tac [‘0’,‘bc2 + bc2'’,‘drefs ++ drefs'’] >>
+                     simp[state_component_equality]) >>
+      ‘∀l. do_eq_list l l = Eq_val T’
+        suffices_by (Cases_on ‘cV’ >> rw[do_eq_def] >> rw[]) >>
+      completeInduct_on ‘LENGTH l’
+      Cases_on ‘h’ >> rw[do_eq_def]
 
+      Induct_on ‘l’ >> rw[do_eq_def] >>
+      Cases_on ‘h’ >> rw[do_eq_def]
+      >- (Cases_on ‘l’
+          >> rw[do_eq_def]
+
+  >- 
+  >- 
+
+  rw[evaluate_def] >>
+  qpat_x_assum ‘ck_equiv_hol cEnv hT aexp hA’ assume_tac >>
+  
+  rename1 ‘∀dc.
+            evaluate (cSt with clock := bc1_a + dc) cEnv [aexp] =
+            (cSt with <|clock := dc + bc2_a; refs := cSt.refs ++ drefs_a|>,
+             Rval [cV])’ >>
+  Q.REFINE_EXISTS_TAC ‘bc1_a + mc1’ >>
+  simp[] >>
+  MAP_EVERY qexists_tac [‘0’,‘bc2_a’,‘drefs_a’] >>
+  ‘Litv cL = cV’
+    suffices_by simp[] >>
+  metis_tac[UNCT_def]
+QED
+
+*)
 Theorem ck_equiv_hol_apply_lit_App:
   ∀fexp aexp hT hA cEnv cL.
     UNCT hT                      ∧
@@ -237,7 +323,6 @@ Proof
     suffices_by simp[] >>
   metis_tac[UNCT_def]
 QED
-
 
 val _ = export_theory()
 
