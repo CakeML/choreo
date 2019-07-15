@@ -210,6 +210,11 @@ val ps2cs_def = Define
   ps2cs ps = #"P"::ps
   ’;
 
+val w1ckV_def = Define
+  ‘
+  w1ckV conf = Con (SOME conf.cons) [Lit (Word8 1w);Con (SOME conf.nil) []]
+  ’;
+
 val compile_endpoint_def = Define ‘
    (compile_endpoint conf vs payloadLang$Nil = Con NONE [])
 ∧ (compile_endpoint conf vs (Send p v n e) =
@@ -244,7 +249,7 @@ val compile_endpoint_def = Define ‘
    )
 ∧ (compile_endpoint conf vs (IfThen v e1 e2) =
    let vn = LENGTH(letfuns e1) in
-     If (Var(Short v))
+     If (App Equality [Var(Short (ps2cs v)); w1ckV conf])
         (compile_endpoint conf (TAKE vn vs) e1)
         (compile_endpoint conf (DROP vn vs) e2))
 ∧ (compile_endpoint conf (hv::vs) (payloadLang$Let v f vl e) =
