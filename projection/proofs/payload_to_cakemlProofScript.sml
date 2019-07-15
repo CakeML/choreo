@@ -714,7 +714,6 @@ QED
 
 Theorem ffi_state_cor_send_stream_irrel:
   ∀conf cpNum pSt ckFSt l send_stream P.
-    conf.payload_size ≠ 0 ∧
     ffi_state_cor cpNum pSt ckFSt ∧
     EVERY (valid_send_event_format conf l) send_stream ∧
     ffi_accepts_rel P (valid_send_call_format conf l) (comms_ffi_oracle conf) ∧
