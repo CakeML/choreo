@@ -140,6 +140,16 @@ Proof
   rw [ffi_eq_def,BISIM_REL_IS_EQUIV_REL]
 QED
 
+(*
+Theorem ffi_eq_pres:
+  ∀conf SA L SB1 SB2.
+    strans conf SA L SB1 ∧
+    strans conf SA L SB2   ⇒
+    ffi_eq conf SB1 SB2
+Proof
+  cheat
+QED
+*)
 
 (* Notions of send validity, both in terms of format and actual destination *)
 Definition valid_send_dest_def:
@@ -152,39 +162,35 @@ Definition valid_send_call_format_def:
 End
 
 Theorem strans_send_cond:
-  ∀dest S1.
-    valid_send_dest dest S1 ⇔
-    (∀s c bytes.
-      valid_send_call_format conf dest s c bytes ⇒
-      ∃S2.
-        strans conf S1 (ASend c bytes)  S2)
+  ∀S1 dest.
+    valid_send_dest dest S1 ⇒
+    (∀bytes. ∃S2.
+      strans conf S1 (ASend dest bytes) S2)
 Proof
-  rw[EQ_IMP_THM]
-  >- (Cases_on ‘S1’ >> qmatch_goalsub_rename_tac ‘(P,R)’ >>
-      Cases_on ‘R’  >> qmatch_goalsub_rename_tac ‘(P,Q1,N1)’ >>
-      ‘∃N2. trans conf N1 (LReceive P bytes c) N2’
-        suffices_by metis_tac[strans_rules] >>
-      fs[valid_send_dest_def,ffi_has_node_def] >>
-      ‘c = dest’
-          by fs[valid_send_call_format_def] >>
-      fs[] >> metis_tac[trans_receive_cond])
-  >- (qabbrev_tac ‘ad = REPLICATE (SUC conf.payload_size) (ARB :word8)’ >>
-      first_x_assum (JSPECL_THEN [‘"send"’,‘dest’,‘ad’] strip_assume_tac) >>
-      rfs[valid_send_call_format_def] >>
-      ‘LENGTH ad = SUC conf.payload_size’
-        by (qunabbrev_tac ‘ad’ >> simp[rich_listTheory.LENGTH_REPLICATE]) >>
-      fs[] >> first_x_assum (K ALL_TAC) >>
-      qabbrev_tac ‘chkPrd = λa:config s0:total_state l:action s1:total_state.
-                          ∀md mc. (l = ASend md mc) ⇒ valid_send_dest md s0’ >> 
-      ‘∀c s1 l s2.
-        strans c s1 l s2 ⇒ chkPrd c s1 l s2’
-        suffices_by (qunabbrev_tac ‘chkPrd’ >> rw[] >>
-                     first_x_assum drule >> rw[]) >>
-      rw[] >> irule strans_ind >> qunabbrev_tac ‘chkPrd’ >>
-      rw[valid_send_dest_def,ffi_has_node_def] >>
-      metis_tac[trans_pres_nodes,trans_receive_cond])
+  rw[] >> Cases_on ‘S1’ >> qmatch_goalsub_rename_tac ‘(P,R)’ >>
+  Cases_on ‘R’  >> qmatch_goalsub_rename_tac ‘(P,Q1,N1)’ >>
+  ‘∃N2. trans conf N1 (LReceive P bytes dest) N2’
+    suffices_by metis_tac[strans_rules] >>
+  fs[valid_send_dest_def,ffi_has_node_def] >>
+  metis_tac[trans_receive_cond]
 QED
 
+Theorem strans_dest_check:
+  ∀S1 dest.
+    (∃bytes S2.
+      strans conf S1 (ASend dest bytes) S2) ⇒
+    valid_send_dest dest S1
+Proof
+  qabbrev_tac ‘chkPrd = λa:config s0:total_state l:action s1:total_state.
+                      ∀md mc. (l = ASend md mc) ⇒ valid_send_dest md s0’ >> 
+  ‘∀c s1 l s2.
+    strans c s1 l s2 ⇒ chkPrd c s1 l s2’
+    suffices_by (qunabbrev_tac ‘chkPrd’ >> rw[] >>
+                 first_x_assum drule >> rw[]) >>
+  rw[] >> irule strans_ind >> qunabbrev_tac ‘chkPrd’ >>
+  rw[valid_send_dest_def,ffi_has_node_def] >>
+  metis_tac[trans_pres_nodes,trans_receive_cond]
+QED
 
 (* Modelling invariants on FFI *)
 Definition ffi_accepts_rel_def:
@@ -227,15 +233,15 @@ Proof
       fs[ffi_has_node_def] >> metis_tac[trans_receive_cond])
 QED
 
-(*
+
 Theorem ffi_eq_sendval:
   ∀conf fs1 fs2.
     ffi_eq conf fs1 fs2 ⇒
     (∀l. valid_send_dest l fs1 ⇔ valid_send_dest l fs2)
 Proof
   rw[EQ_IMP_THM] >> JSPECL_THEN [‘conf’,‘l’] assume_tac send_invariant >>
-  fs[ffi_accepts_rel_def] >> qmatch_asmsub_abbrev_tac ‘valid_send_dest l KS’ >>
-  qmatch_goalsub_abbrev_tac ‘valid_send_dest l US’ >>
+  fs[ffi_accepts_rel_def] >> qmatch_asmsub_rename_tac ‘valid_send_dest l KS’ >>
+  qmatch_goalsub_rename_tac ‘valid_send_dest l US’ >>
   qabbrev_tac ‘ad = REPLICATE (SUC conf.payload_size) (ARB :word8)’ >>
   first_x_assum (JSPECL_THEN [‘<|oracle := comms_ffi_oracle conf;
                                ffi_state := KS;
@@ -248,13 +254,11 @@ Proof
   rfs[] >>
   Cases_on ‘∃NKS. strans conf KS (ASend l ad) NKS’ >>
   fs[] >> qpat_x_assum ‘(@X. Y) = Z’ (K ALL_TAC) >>
+  fs[ffi_eq_def,BISIM_REL_def,BISIM_def] >>
   ‘∃NUS. strans conf US (ASend l ad) NUS’
     by metis_tac[ffi_eq_def,BISIM_REL_def,BISIM_REL_def] >>
-  Cases_on ‘US’ >> qmatch_goalsub_rename_tac ‘(P,R)’ >>
-  Cases_on ‘R’ >> qmatch_goalsub_rename_tac ‘valid_send_dest l (P,QU,NU)’ >>
-  Cases_on ‘NUS’ >> rename1 ‘strans conf (P,QU,NU) (ASend L AD) (PN,R)’ >>
-  Cases_on ‘R’ >> rename1 ‘strans conf (P,QU,NU) (ASend L AD) (PN,QUN,NUN)’ >>
-  JSPECL_THEN [‘L’,‘(P,QU,NU)’] strip_assume_tac trans_receive_cond
+  JSPECL_THEN [‘US’,‘l’] strip_assume_tac strans_dest_check >>
+  metis_tac[]
 QED
-*)
+
 val _ = export_theory ();
