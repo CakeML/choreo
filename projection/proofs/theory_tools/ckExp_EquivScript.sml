@@ -25,6 +25,9 @@ fun JSPECL_THEN []            = (fn nxTc => (fn spTh => nxTc spTh))
         end)
     ); 
 
+val WORD8 = “WORD:word8 -> v -> bool”;
+
+
 (* Basic Definition of CakeML Expression/HOL Term equivalence *)
 Definition ck_equiv_hol_def:
   ck_equiv_hol cEnv hT cExp hVal =
@@ -227,12 +230,11 @@ Proof
       fs[LIST_TYPE_def] >>
       metis_tac[])
 QED
-(*
-Theorem ck_equiv_hol_apply_equality:
-  ∀fexp aexp hT hA cEnv cL.
-    UNCT hT  ∧
-    ck_equiv_hol cEnv hT   aexp hA ∧
-    ck_equiv_hol cEnv hT   bexp hB   ⇒
+
+Theorem ck_equiv_hol_apply_list_word8_equality:
+  ∀cEnv aexp hA bexp hB.
+    ck_equiv_hol cEnv (LIST_TYPE ^WORD8) aexp hA ∧
+    ck_equiv_hol cEnv (LIST_TYPE ^WORD8) bexp hB   ⇒
     ck_equiv_hol cEnv BOOL (App Equality [aexp;bexp]) (hA = hB)
 Proof
   rpt strip_tac >>
@@ -241,60 +243,56 @@ Proof
   MAP_EVERY qexists_tac [‘Boolv (hA = hB)’] >>
   simp trans_sl >>
   CONV_TAC (RESORT_EXISTS_CONV rev) >>
-  rw eval_sl
-  >- (qmatch_goalsub_abbrev_tac ‘evaluate (cSt with clock := _) _ _’ >>
-      Q.ISPECL_THEN [‘cEnv’,‘hT’,‘bexp’,‘hA’,‘cSt’]
-                  strip_assume_tac ck_equiv_hol_apply_alt >>
-      rfs[] >>
-      Q.REFINE_EXISTS_TAC ‘bc1 + r1’ >>
-      simp[] >>
-      qpat_x_assum ‘∀dc. P dc’ (K ALL_TAC) >>
-      qunabbrev_tac ‘cSt’ >>
-      simp [] >>
-      qmatch_goalsub_abbrev_tac ‘evaluate (cSt with clock := _) _ _’ >>
-      Q.ISPECL_THEN [‘cEnv’,‘hT’,‘aexp’,‘hA’,‘cSt’]
-                  strip_assume_tac ck_equiv_hol_apply_alt >>
-      rfs[] >>
-      ‘cV' = cV’
-        by metis_tac[UNCT_def] >>
+  qmatch_goalsub_abbrev_tac ‘evaluate (cSt with clock := _) _ _’ >>
+  JSPECL_THEN [‘cEnv’,‘LIST_TYPE ^WORD8’,‘bexp’,‘hB’,‘cSt’]
+              strip_assume_tac ck_equiv_hol_apply_alt >>
+  rfs[] >>
+  Q.REFINE_EXISTS_TAC ‘bc1 + r1’ >>
+  rw eval_sl >>
+  qpat_x_assum ‘∀dc. P dc’ (K ALL_TAC) >>
+  qunabbrev_tac ‘cSt’ >>
+  simp [] >>
+  qmatch_goalsub_abbrev_tac ‘evaluate (cSt with clock := _) _ _’ >>
+  JSPECL_THEN [‘cEnv’,‘LIST_TYPE ^WORD8’,‘aexp’,‘hA’,‘cSt’]
+              strip_assume_tac ck_equiv_hol_apply_alt >>
+  rfs[] >>
+  Q.REFINE_EXISTS_TAC ‘bc1 + r1’ >>
+  simp[] >>
+  qpat_x_assum ‘∀dc. P dc’ (K ALL_TAC)
+  >- (‘cV' = cV’
+        by metis_tac[UNCT_def,LIST_TYPE_UNCT,WORD_UNCT] >>
       fs[] >>
       first_x_assum (K ALL_TAC) >>
-      Q.REFINE_EXISTS_TAC ‘bc1 + r1’ >>
-      simp[] >>
-      qpat_x_assum ‘∀dc. P dc’ (K ALL_TAC) >>
-      ‘do_eq cV cV = Eq_val T’
-        suffices_by (qunabbrev_tac ‘cSt’ >> rw[] >>
-                     MAP_EVERY qexists_tac [‘0’,‘bc2 + bc2'’,‘drefs ++ drefs'’] >>
+      ‘∀hL cL. LIST_TYPE ^WORD8 hL cL ⇒ (do_eq cL cL = Eq_val T)’
+        suffices_by (qunabbrev_tac ‘cSt’ >> rw[] >> ‘do_eq cV cV = Eq_val T’ by metis_tac[] >>
+                     simp[] >> MAP_EVERY qexists_tac [‘0’,‘bc2 + bc2'’,‘drefs ++ drefs'’] >>
                      simp[state_component_equality]) >>
-      ‘∀l. do_eq_list l l = Eq_val T’
-        suffices_by (Cases_on ‘cV’ >> rw[do_eq_def] >> rw[]) >>
-      completeInduct_on ‘LENGTH l’
-      Cases_on ‘h’ >> rw[do_eq_def]
-
-      Induct_on ‘l’ >> rw[do_eq_def] >>
-      Cases_on ‘h’ >> rw[do_eq_def]
-      >- (Cases_on ‘l’
-          >> rw[do_eq_def]
-
-  >- 
-  >- 
-
-  rw[evaluate_def] >>
-  qpat_x_assum ‘ck_equiv_hol cEnv hT aexp hA’ assume_tac >>
-  
-  rename1 ‘∀dc.
-            evaluate (cSt with clock := bc1_a + dc) cEnv [aexp] =
-            (cSt with <|clock := dc + bc2_a; refs := cSt.refs ++ drefs_a|>,
-             Rval [cV])’ >>
-  Q.REFINE_EXISTS_TAC ‘bc1_a + mc1’ >>
-  simp[] >>
-  MAP_EVERY qexists_tac [‘0’,‘bc2_a’,‘drefs_a’] >>
-  ‘Litv cL = cV’
-    suffices_by simp[] >>
-  metis_tac[UNCT_def]
+      Induct_on ‘hL’
+      >- (rw trans_sl >> EVAL_TAC)
+      >- (Cases_on ‘cL’ >> rw [do_eq_def,LIST_TYPE_def] >>
+          rw [do_eq_def] >> Cases_on ‘v2_1’ >> fs[do_eq_def,WORD_def]))
+  >- (‘∀hAt cAt hBt cBt.
+        LIST_TYPE ^WORD8 hAt cAt ∧
+        LIST_TYPE ^WORD8 hBt cBt ∧
+        hAt ≠ hBt ⇒
+        (do_eq cAt cBt = Eq_val F)’
+        suffices_by (qunabbrev_tac ‘cSt’ >> rw[] >> ‘do_eq cV' cV = Eq_val F’ by metis_tac[] >>
+                     simp[] >> MAP_EVERY qexists_tac [‘0’,‘bc2 + bc2'’,‘drefs ++ drefs'’] >>
+                     simp[state_component_equality]) >>
+      Induct_on ‘hAt’
+      >- (rw[LIST_TYPE_def] >> Cases_on ‘hBt’ >> fs [] >>
+          fs[LIST_TYPE_def] >> rw[do_eq_def] >>
+          fs[ctor_same_type_def,same_type_def])
+      >- (rw[LIST_TYPE_def] >> Cases_on ‘hBt’ >> fs[LIST_TYPE_def] >>
+          rw[do_eq_def] >> fs[ctor_same_type_def,same_type_def] >>
+          Cases_on ‘v2_1’ >> Cases_on ‘v2_1'’ >> fs trans_sl >>
+          rw[do_eq_def] >> fs[lit_same_type_def,same_type_def] >>
+          ‘do_eq v2_2 v2_2' = Eq_val F’
+            by metis_tac[] >>
+          Cases_on ‘h = h'’ >> simp[]))
 QED
 
-*)
+
 Theorem ck_equiv_hol_apply_lit_App:
   ∀fexp aexp hT hA cEnv cL.
     UNCT hT                      ∧
