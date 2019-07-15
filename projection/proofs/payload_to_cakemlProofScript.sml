@@ -761,6 +761,27 @@ Proof
 QED
 
 
+Theorem send_events_is_stream:
+  ∀conf l d.
+    EVERY (valid_send_event_format conf l) (send_events conf l d)
+Proof
+  rw[] >> Cases_on ‘conf.payload_size = 0’
+  >- rw[send_events_def,Once compile_message_def] >>
+  completeInduct_on ‘LENGTH d’ >>
+  rw[send_events_def,Once compile_message_def] >>
+  rw[valid_send_event_format_def,valid_send_call_format_def,pad_def] >>
+  ‘0 < LENGTH d’
+    by (‘0 ≠ LENGTH d’
+          suffices_by metis_tac[DECIDE “0 ≠ (n:num) ⇒ 0 < n”] >>
+        CCONTR_TAC >> fs[] >>
+        ‘final (pad conf d)’
+          suffices_by fs[] >>
+        simp[pad_def,final_def]) >>
+  qmatch_goalsub_abbrev_tac ‘EVERY (valid_send_event_format conf l) func’ >>
+  ‘func = send_events conf l (DROP conf.payload_size d)’
+    suffices_by rw[] >>
+  rw[Abbr ‘func’,send_events_def]
+QED
 
 Theorem ffi_state_cor_send_stream_irrel:
   ∀conf cpNum pSt ckFSt l send_stream P.
@@ -833,7 +854,6 @@ QED
 
 Theorem ffi_state_cor_send_events_irrel:
   ∀conf cpNum pSt ckFSt l d P.
-    conf.payload_size ≠ 0 ∧
     ffi_state_cor cpNum pSt ckFSt ∧
     ffi_accepts_rel P (valid_send_call_format conf l) (comms_ffi_oracle conf) ∧
     P ckFSt
@@ -845,21 +865,83 @@ Proof
   ‘EVERY (valid_send_event_format conf l) (send_events conf l d)’
     suffices_by  (rw[] >> irule ffi_state_cor_send_stream_irrel >> rw[] >>
                   MAP_EVERY qexists_tac [‘P’,‘l’] >> rw[]) >>
-  completeInduct_on ‘LENGTH d’ >>
-  rw[send_events_def,Once compile_message_def] >>
-  rw[valid_send_event_format_def,valid_send_call_format_def,pad_def] >>
-  ‘0 < LENGTH d’
-    by (‘0 ≠ LENGTH d’
-          suffices_by metis_tac[DECIDE “0 ≠ (n:num) ⇒ 0 < n”] >>
-        CCONTR_TAC >> fs[] >>
-        ‘final (pad conf d)’
-          suffices_by fs[] >>
-        simp[pad_def,final_def]) >>
-  qmatch_goalsub_abbrev_tac ‘EVERY (valid_send_event_format conf l) func’ >>
-  ‘func = send_events conf l (DROP conf.payload_size d)’
-    suffices_by rw[] >>
-  rw[Abbr ‘func’,send_events_def]
+  metis_tac[send_events_is_stream]
 QED
+
+Theorem ffi_eq_send_stream_irrel:
+  ∀conf fs1 fs2 l send_stream P.
+    ffi_eq conf fs1 fs2 ∧
+    EVERY (valid_send_event_format conf l) send_stream ∧
+    ffi_accepts_rel P (valid_send_call_format conf l) (comms_ffi_oracle conf) ∧
+    P fs1 ∧
+    P fs2
+    ⇒
+    ffi_eq conf (update_state fs1 (comms_ffi_oracle conf) send_stream)
+                (update_state fs2 (comms_ffi_oracle conf) send_stream)
+Proof
+  Induct_on ‘send_stream’ >>
+  rw[update_state_def] >>
+  Cases_on ‘h’ >>
+  PURE_ONCE_REWRITE_TAC [update_state_def] >>
+  qmatch_goalsub_abbrev_tac ‘ffi_eq conf (update_state fs1A _ _) (update_state fs2A _ _)’ >>
+  last_x_assum irule >>
+  ‘l' = l’
+    by fs[valid_send_event_format_def,valid_send_call_format_def] >>
+  fs[] >> first_x_assum (K ALL_TAC) >>
+  qmatch_asmsub_rename_tac ‘IO_event s l data’ >> rw[]
+  >- (MAP_EVERY qexists_tac [‘P’,‘l’] >> qunabbrev_tac ‘fs1A’ >>
+      qunabbrev_tac ‘fs2A’ >> simp[] >>
+      ‘∀si. P si ⇒ P (@st. comms_ffi_oracle conf s si l (MAP FST data) =
+                            Oracle_return st (MAP SND data))’
+        suffices_by rw[] >>
+      rw[] >> SELECT_ELIM_TAC >> rw[] >>
+      fs[ffi_accepts_rel_def] >>
+      first_x_assum (JSPECL_THEN [‘<|oracle := comms_ffi_oracle conf;
+                                     ffi_state := si;
+                                     io_events := ARB|>’,
+                                     ‘s’,‘l’,‘MAP FST data’]
+                       strip_assume_tac) >>
+      fs[valid_send_event_format_def] >>
+      rfs[])
+  >- (‘∃L. strans conf fs1 L fs1A ∧ strans conf fs2 L fs2A’
+        suffices_by metis_tac[ffi_eq_pres] >>
+      qexists_tac ‘ASend l (MAP FST data)’ >>
+      qunabbrev_tac ‘fs1A’ >> qunabbrev_tac ‘fs2A’ >>
+      ‘s = "send"’
+        by fs[valid_send_event_format_def,valid_send_call_format_def] >>
+      fs[] >> first_x_assum (K ALL_TAC) >>
+      ‘LENGTH data = SUC conf.payload_size’
+        by fs[valid_send_event_format_def,valid_send_call_format_def] >>
+      rw[] >> qmatch_goalsub_rename_tac ‘strans conf si _ _’ >>
+      SELECT_ELIM_TAC >> rw[] >>
+      fs[ffi_accepts_rel_def,comms_ffi_oracle_def,ffi_send_def] >>
+      first_x_assum (JSPECL_THEN [‘<|oracle := comms_ffi_oracle conf;
+                                     ffi_state := si;
+                                     io_events := ARB|>’,
+                                     ‘"send"’,‘l’,‘MAP FST data’]
+                       strip_assume_tac) >>
+      fs[valid_send_event_format_def,valid_send_call_format_def,comms_ffi_oracle_def,ffi_send_def] >>
+      rfs[] >>
+      Cases_on ‘∃ns. strans conf si (ASend l (MAP SND data)) ns’ >> fs[] >>
+      metis_tac[])
+QED
+
+Theorem ffi_eq_send_events_irrel:
+∀conf fs1 fs2 l send_stream P d.
+  ffi_eq conf fs1 fs2 ∧
+  ffi_accepts_rel P (valid_send_call_format conf l) (comms_ffi_oracle conf) ∧
+  P fs1 ∧
+  P fs2 ⇒
+  ffi_eq conf (update_state fs1 (comms_ffi_oracle conf) (send_events conf l d))
+              (update_state fs2 (comms_ffi_oracle conf) (send_events conf l d))
+Proof
+  rpt strip_tac >>
+  ‘EVERY (valid_send_event_format conf l) (send_events conf l d)’
+    suffices_by  (rw[] >> irule ffi_eq_send_stream_irrel >> rw[] >>
+                  MAP_EVERY qexists_tac [‘P’,‘l’] >> rw[]) >>
+  metis_tac[send_events_is_stream]
+QED
+
 
 Theorem undo_encode_decode[simp]:
   ∀MEP:word8 list.
@@ -1047,8 +1129,21 @@ Proof
                     qexists_tac ‘valid_send_dest l’ >> fs[]) >>
               ‘ffi_eq conf cSt1M.ffi.ffi_state cSt2M.ffi.ffi_state’
                 suffices_by (rw[] >> fs[] >> metis_tac[clock_irrel]) >>
-              cheat
-              )
+              qunabbrev_tac ‘cSt1M’ >> qunabbrev_tac ‘cSt2M’ >> simp[] >>
+              qpat_x_assum ‘ffi_accepts_rel _ _ _’ assume_tac >>
+              qpat_x_assum ‘ffi_eq conf _ _’ assume_tac >>
+              ‘cSt2.ffi.oracle = comms_ffi_oracle conf’
+                by fs[cpEval_valid_def] >>
+              fs[] >>
+              first_x_assum (K ALL_TAC) >>
+              qpat_x_assum ‘valid_send_dest _ cSt1.ffi.ffi_state’ assume_tac >>
+              qpat_x_assum ‘valid_send_dest _ cSt2.ffi.ffi_state’ assume_tac >>
+              ntac 13 (last_x_assum (K ALL_TAC)) >>
+              qabbrev_tac ‘fs1 = cSt1.ffi.ffi_state’ >>
+              qabbrev_tac ‘fs2 = cSt2.ffi.ffi_state’ >>
+              ntac 2 (first_x_assum (K ALL_TAC)) >>
+              irule ffi_eq_send_events_irrel >> simp[] >>
+              qexists_tac ‘valid_send_dest l’ >> simp[])
           >- (qpat_x_assum ‘valid_send_dest _ _ ⇒ _’ (K ALL_TAC) >>
               rw eval_sl >>
               drule_then (JSPEC_THEN ‘cSt1’ strip_assume_tac) ck_equiv_hol_apply >>

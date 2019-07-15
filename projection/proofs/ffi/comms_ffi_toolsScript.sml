@@ -1,4 +1,5 @@
 open HolKernel boolLib Parse bossLib;
+open relationTheory;
 open ffiTheory;
 open bisimulationTheory
      payloadSemanticsTheory
@@ -140,8 +141,8 @@ Proof
   rw [ffi_eq_def,BISIM_REL_IS_EQUIV_REL]
 QED
 
-(*
-Theorem ffi_eq_pres:
+
+Theorem ffi_eq_mutate_self:
   ∀conf SA L SB1 SB2.
     strans conf SA L SB1 ∧
     strans conf SA L SB2   ⇒
@@ -149,7 +150,29 @@ Theorem ffi_eq_pres:
 Proof
   cheat
 QED
-*)
+
+Theorem ffi_eq_pres:
+  ∀conf SA1 SA2 L SB1 SB2.
+    ffi_eq conf SA1 SA2   ∧
+    strans conf SA1 L SB1 ∧
+    strans conf SA2 L SB2   ⇒
+    ffi_eq conf SB1 SB2
+Proof
+  rw[] >>
+  ‘∃SBI. strans conf SA2 L SBI ∧ ffi_eq conf SB1 SBI’
+    suffices_by metis_tac[ffi_eq_equivRel,equivalence_def,
+                          transitive_def,ffi_eq_mutate_self] >>
+  qmatch_goalsub_abbrev_tac ‘∃SBI. strans conf SA2 L SBI ∧ atP SBI’ >>
+  fs[ffi_eq_def,BISIM_REL_def,BISIM_def] >>
+  last_assum (drule_then (JSPEC_THEN ‘L’ strip_assume_tac)) >>
+  last_x_assum (assume_tac o REWRITE_RULE [GSYM BISIM_def]) >>
+  qpat_x_assum ‘∀a. strans conf SA2 L a ⇒ _’ (K ALL_TAC) >>
+  first_x_assum (JSPEC_THEN ‘SB1’ strip_assume_tac) >>
+  rfs[] >> rename1 ‘R SB1 SBI’ >> qexists_tac ‘SBI’ >>
+  fs[] >> qunabbrev_tac ‘atP’ >> simp[BISIM_REL_def] >>
+  qexists_tac ‘R’ >> simp[BISIM_def] >> fs[]
+QED
+
 
 (* Notions of send validity, both in terms of format and actual destination *)
 Definition valid_send_dest_def:
