@@ -11,7 +11,9 @@ open preamble
      payloadSemanticsTheory
      evaluate_rwLib
      state_tacticLib
+     evaluate_toolsTheory
      ckExp_EquivTheory
+     optionTheory
      rich_listTheory
      bisimulationTheory;
 
@@ -54,6 +56,14 @@ Definition env_asm_def:
     has_v env.v conf.null (LIST_TYPE ^WORD8 --> BOOL) NULL ∧
     has_v env.v conf.take (LIST_TYPE ^WORD8 --> NUM --> LIST_TYPE ^WORD8) (combin$C TAKE) ∧
     has_v env.v conf.drop (LIST_TYPE ^WORD8 --> NUM --> LIST_TYPE ^WORD8) (combin$C DROP) ∧
+    (∃v. nsLookup env.v conf.toList = SOME v ∧
+         (∀s1:unit semanticPrimitives$state l ll.
+           store_lookup ll s1.refs = SOME (W8array l)
+            ⇒ ∃env' exp ck1 ck2 lv.
+              do_opapp [v; Loc ll] = SOME(env',exp)           ∧
+              evaluate (s1 with clock := ck1) env' [exp] =
+                (s1 with <|clock := ck2|>,Rval [lv])      ∧
+              LIST_TYPE ^WORD8 l lv)) ∧
     (∃v. nsLookup env.v conf.fromList = SOME v ∧
          (∀l lv.
            LIST_TYPE ^WORD8 l lv
@@ -67,9 +77,24 @@ Definition env_asm_def:
     in_module conf.null ∧
     in_module conf.take ∧
     in_module conf.drop ∧
-    in_module conf.fromList)
+    in_module conf.fromList ∧
+    in_module conf.toList)
 End
 
+
+Theorem remove_ffi[simp]:
+  ∀cSt: 'ffi semanticPrimitives$state.
+    (cSt with ffi := cSt.ffi) = cSt
+Proof
+  simp[state_component_equality]
+QED
+
+Theorem remove_refs[simp]:
+  ∀cSt: 'ffi semanticPrimitives$state.
+    (cSt with refs := cSt.refs) = cSt
+Proof
+  simp[state_component_equality]
+QED
 
 Theorem evaluate_empty_state_norel:
   ∀s x refs refs' exp env ck1 ck2.
@@ -405,6 +430,397 @@ Proof
      rw[pad_def,DROP_NIL] >> intLib.COOPER_TAC)
 QED
 
+Definition hfind_one_def:
+hfind_one n l =
+    if (LENGTH l ≤ n) then
+      LENGTH l
+    else
+      if (1w = EL n l) then
+        n
+      else
+        hfind_one (SUC n) l
+Termination
+  WF_REL_TAC ‘measure (λ(n,l). LENGTH l - n)’
+End
+
+Theorem find_one_equiv:
+  ∀env lnum s1 l n. 
+    nsLookup     env.v (Short "x") = SOME (Loc lnum) ∧
+    store_lookup lnum  s1.refs     = SOME (W8array l) ⇒
+    ∃ck1 ck2 drefs_f rv.
+      evaluate$evaluate (s1 with clock := ck1) env
+                      [Letrec find_one
+                        (App Opapp [Var (Short "find_one");
+                                    Lit (IntLit &n)])]
+      = (s1 with <|clock := ck2; refs := s1.refs ++ drefs_f|>,
+         Rval [rv]) ∧
+      NUM (hfind_one n l) rv
+Proof
+  rw[] >>
+  completeInduct_on ‘LENGTH l - n’ >>
+  rw (find_one_def::(Once find_recfun_def)::eval_sl) >>
+  qmatch_goalsub_abbrev_tac ‘App Opapp [Var (Short "find_one"); rec_value]’ >>
+  qabbrev_tac ‘rec_call = App Opapp [Var (Short "find_one"); rec_value]’ >>
+  qunabbrev_tac ‘rec_value’ >>
+  Q.REFINE_EXISTS_TAC ‘SUC ck1’ >> rw (ADD1::dec_clock_def::eval_sl)
+  >- (‘LENGTH l ≤ n’
+        by (CCONTR_TAC >> fs eval_sl) >>
+      rw (Once hfind_one_def::trans_sl) >>
+      MAP_EVERY qexists_tac [‘0’,‘0’,‘[]’] >>
+      rw[])
+  >- (‘LENGTH l > n’
+        by (CCONTR_TAC >> fs eval_sl) >>
+      rw (Once hfind_one_def::(trans_sl@eval_sl)) >> fs[]
+      >- (MAP_EVERY qexists_tac [‘0’,‘0’,‘[]’] >> rw[])
+      >- (rpt (qpat_x_assum ‘T’ (K ALL_TAC)) >>
+          first_x_assum (qspec_then ‘LENGTH l - (n + 1)’ assume_tac) >>
+          rfs[] >>
+          first_x_assum (qspecl_then [‘l’,‘n + 1’] assume_tac) >>
+          rfs(ADD1::store_lookup_def::trans_sl)  >>
+          MAP_EVERY qexists_tac [‘ck1’,‘ck2’,‘drefs_f’] >>
+          qmatch_goalsub_abbrev_tac ‘evaluate s1m envM _’ >>
+          qmatch_asmsub_abbrev_tac ‘evaluate s1m env [irecexp]’ >>
+          ‘evaluate s1m envM [rec_call] = evaluate s1m env [irecexp]’
+            suffices_by rw[] >>
+          qpat_x_assum ‘evaluate s1m env [irecexp] = _’ (K ALL_TAC) >>
+          qunabbrev_tac ‘irecexp’ >>
+          qunabbrev_tac ‘rec_call’ >>
+          qmatch_goalsub_abbrev_tac ‘evaluate s1m envM IGNORE’ >>
+          qmatch_goalsub_abbrev_tac ‘evaluate s1m env [Letrec find_one IGNORE2]’ >>
+          rw eval_sl
+          >- (EVAL_TAC >>
+              qmatch_goalsub_abbrev_tac ‘evaluate s1m envMR [IGNORE2]’ >>
+              ‘envM = envMR with v := nsBind "n" (Litv (IntLit (&n))) envMR.v’
+                by (qunabbrev_tac ‘envM’ >> qunabbrev_tac ‘envMR’ >> simp[]) >>
+              rw[] >>
+              qunabbrev_tac ‘IGNORE’ >> qunabbrev_tac ‘IGNORE2’ >>
+              PURE_ONCE_REWRITE_TAC [evaluate_def] >>
+              simp[] >>
+              qabbrev_tac ‘IGNORE = do_opapp’ >>
+              rw eval_sl >>
+              ‘(((&(n :num)) :int) + 1) = ((&(n + (1 :num))) :int)’
+                suffices_by rw[] >>
+              intLib.COOPER_TAC)
+          >- (‘ALL_DISTINCT (MAP (λ(x,y,z). x) find_one)’
+                suffices_by fs[] >>
+              EVAL_TAC)))
+  >- (Cases_on ‘LENGTH l ≤ n’ >> fs eval_sl)
+QED 
+
+Theorem find_one_correct:
+  ∀env lnum s1 h l. 
+    nsLookup     env.v (Short "x") = SOME (Loc lnum) ∧
+    store_lookup lnum  s1.refs     = SOME (W8array (h::l)) ⇒
+    ∃ck1 ck2 drefs_f rv.
+      evaluate$evaluate (s1 with clock := ck1) env
+                      [Letrec find_one
+                        (App Opapp [Var (Short "find_one");
+                                    Lit (IntLit &1)])]
+      = (s1 with <|clock := ck2; refs := s1.refs ++ drefs_f|>,
+         Rval [rv]) ∧
+      NUM (1 + LENGTH (FST (SPLITP ($=1w) l))) rv
+Proof
+  rw[] >>
+  ‘1 + LENGTH (FST (SPLITP ($=1w) l)) = hfind_one 1 (h::l)’
+    suffices_by (rw[] >> metis_tac[find_one_equiv]) >>
+  Cases_on ‘LENGTH l = 0’
+  >- (Cases_on ‘l’ >> fs[LENGTH_NIL,SPLITP,Once hfind_one_def]) >>
+  ‘0 < LENGTH l’
+    by simp[] >>
+  qpat_x_assum ‘LENGTH l ≠ 0’ (K ALL_TAC) >>
+  ‘∀n (l : word8 list). n < LENGTH l ⇒ hfind_one n l = n + LENGTH (FST (SPLITP ($=1w) (DROP n l)))’
+    suffices_by (rw[] >> first_x_assum (assume_tac o REWRITE_RULE [Once EQ_SYM_EQ]) >>
+                 first_x_assum (qspecl_then [‘1’,‘h::l’] assume_tac)) >>
+  rpt (first_x_assum (K ALL_TAC)) >>
+  rw[] >>
+  Induct_on ‘LENGTH l - n’
+  >- rw[Once hfind_one_def,DROP_LENGTH_TOO_LONG,SPLITP,FST]
+  >- (rw[Once hfind_one_def] >>
+      ‘DROP n l = (EL n l)::(DROP (SUC n) l)’
+        by (irule DROP_CONS_EL >> fs[])
+      >- rw[Once SPLITP]
+      >- (first_x_assum (JSPECL_THEN [‘l’,‘SUC n’] assume_tac) >>
+          rfs[] >>
+          Cases_on ‘SUC n < LENGTH l’
+          >- (fs[] >> rw[Once SPLITP])
+          >- (rw[Once SPLITP] >>
+              ‘DROP (SUC n) l = []’
+                by (irule DROP_LENGTH_TOO_LONG >> fs[]) >>
+              fs[SPLITP,FST,LENGTH_NIL] >>
+              rw[Once hfind_one_def])))
+QED
+
+
+Theorem unpadv_correct:
+ ∀env conf l le lnum s1 s2 refs.
+  env_asm env conf ∧
+  evaluate$evaluate s1 env [le] = (s2 with refs := s1.refs ++ refs, Rval [Loc lnum]) ∧
+  store_lookup lnum (APPEND s1.refs refs) = SOME(W8array l) ∧
+  LENGTH l > 0
+  ⇒
+  ∃ck1 ck2 refs' num ulv.
+  evaluate$evaluate (s1 with clock:= ck1) env [App Opapp [unpadv conf; le]] =
+           (s2 with <|clock := ck2; refs := APPEND s1.refs refs'|>, Rval [ulv]) ∧
+  LIST_TYPE ^WORD8 (unpad l) ulv
+Proof
+  rpt strip_tac >>
+  rw[unpadv_def,validv_def,finalv_def] >>
+  qabbrev_tac ‘FEXP = App Opapp [Var conf.toList; Var (Short "y")]’ >>
+  qabbrev_tac ‘BEXP = Letrec find_one (App Opapp [Var (Short "find_one"); Lit (IntLit 1)])’ >>
+  ‘∃h t. l = h::t’
+    by (Cases_on ‘l’ >> fs[LENGTH]) >>
+  rw(unpad_def::eval_sl) >>
+  drule_then strip_assume_tac evaluate_add_to_clock >>
+  fs[] >> Q.REFINE_EXISTS_TAC ‘ck1 + s1.clock’ >>
+  simp[] >> Q.REFINE_EXISTS_TAC ‘SUC ck1’ >>
+  rw[ADD1,dec_clock_def] >> rw eval_sl >>
+  ‘¬((&SUC (LENGTH t) :int) - 1 < 0)’
+        by (qmatch_goalsub_abbrev_tac ‘¬(SLT - 1 < 0)’ >>
+            ‘1 ≤ SLT’
+                suffices_by metis_tac[integerTheory.INT_NOT_LE,
+                                      integerTheory.INT_SUB_LE,
+                                      integerTheory.INT_LE] >>
+            qunabbrev_tac ‘SLT’ >> rw[realTheory.REAL]) >>
+  fs (store_lookup_def::terminationTheory.do_eq_def::eval_sl)
+  >- (rw eval_sl
+      >- (‘F’ suffices_by simp[] >>
+          ‘1 = 1 + (&SUC (LENGTH t) : int)’
+            by (CCONTR_TAC >> fs eval_sl) >>
+          intLib.COOPER_TAC)
+      >- (qabbrev_tac ‘TOG = s1.refs ++ refs’ >>
+          ‘LENGTH refs + LENGTH s1.refs = LENGTH TOG’
+            by rw[Abbr ‘TOG’,LENGTH_APPEND] >>
+          fs[EL_LENGTH_APPEND,EL_APPEND_EQN] >>
+          ‘Num (ABS (1 + &Num (ABS (&SUC (LENGTH t) − 1)))) = SUC (LENGTH t)’
+            by (qmatch_goalsub_abbrev_tac ‘1 + &Num (ABS SLT)’ >>
+                ‘ABS SLT = SLT’
+                  by (‘0 ≤ SLT’
+                        suffices_by metis_tac[integerTheory.INT_ABS_EQ_ID] >>
+                      metis_tac[integerTheory.INT_NOT_LE]) >>
+                rw[] >>
+                ‘&Num SLT = SLT’
+                  by (‘0 ≤ SLT’
+                        suffices_by metis_tac[integerTheory.INT_OF_NUM] >>
+                      metis_tac[integerTheory.INT_NOT_LE]) >>
+                rw[] >> qunabbrev_tac ‘SLT’ >> rw[]) >>
+          rw[] >>
+          qmatch_goalsub_abbrev_tac ‘evaluate (s2M with clock := _) envM [FEXP]’ >>
+          ‘env_asm envM conf’
+            by (qunabbrev_tac ‘envM’ >>
+                fs[env_asm_def,has_v_def,in_module_def]) >>
+          qunabbrev_tac ‘FEXP’ >>
+          rw[evaluate_def] >>
+          qunabbrev_tac ‘envM’ >>
+          rw[nsLookup_def,nsBind_def,nsLookup_nsBind_compute] >>
+          qmatch_asmsub_abbrev_tac ‘env_asm (env with v:= envMv) conf’ >>
+          qpat_x_assum ‘env_asm (env with v:= envMv) conf’
+                       (assume_tac o REWRITE_RULE [env_asm_def]) >>
+          qmatch_asmsub_abbrev_tac ‘_ ∧ has_v _ conf.drop _ _ ∧ toThing ∧ _’ >>
+          ‘toThing’
+            by (qunabbrev_tac ‘toThing’ >> fs[]) >>
+          qunabbrev_tac ‘toThing’ >>
+          qpat_x_assum ‘has_v _ _ _ _ ∧ _’
+                       (assume_tac o REWRITE_RULE [GSYM env_asm_def]) >>
+          fs[] >>
+          Q.REFINE_EXISTS_TAC ‘SUC ck1’ >>
+          rw[ADD1,dec_clock_def] >>
+          ‘store_lookup (LENGTH TOG) (empty_state with refs := s2M.refs).refs =
+            SOME (W8array t)’
+            by (qunabbrev_tac ‘s2M’ >> rw[store_lookup_def] >>
+                rw[EL_LENGTH_APPEND] >>
+                qmatch_goalsub_abbrev_tac ‘&Num (ABS SLT)’ >>
+                ‘ABS SLT = SLT’
+                  by (‘0 ≤ SLT’
+                        suffices_by metis_tac[integerTheory.INT_ABS_EQ_ID] >>
+                      metis_tac[integerTheory.INT_NOT_LE]) >>
+                rw[] >> qunabbrev_tac ‘SLT’ >>
+                rw[integerTheory.INT,int_arithTheory.elim_minus_ones] >>
+                rw[DROP_REPLICATE]) >>
+          first_x_assum (drule_then strip_assume_tac) >>
+          rw[] >>
+          qunabbrev_tac ‘s2M’ >> qunabbrev_tac ‘TOG’ >>
+          qmatch_asmsub_rename_tac ‘evaluate (empty_state with <| clock := ck1; refs := _|>)
+                                             senv [sexp] =
+                                      (empty_state with <| clock := ck2; refs := _ |>,Rval[ulv])’ >>
+          fs[] >>
+          qmatch_asmsub_abbrev_tac ‘evaluate _ _ _ = (empty_state with <|clock := ck2; refs := s1.refs ++ ex_refs1 ++ ex_refs2|>,_)’ >>
+          MAP_EVERY qexists_tac [‘ck1’,‘ck2 + s2.clock’,‘ex_refs1 ++ ex_refs2’,‘ulv’] >>
+          JSPECL_THEN [‘s2 with refs := s1.refs ++ ex_refs1 ++ ex_refs2’,
+                       ‘senv’,‘sexp’,‘ck1’,‘ck2’,‘[]’,‘ulv’] strip_assume_tac
+                       evaluate_generalise >>
+          rfs[])
+      >- (‘F’ suffices_by simp[] >>
+          ‘1 = 1 + (&SUC (LENGTH t) : int)’
+            by (CCONTR_TAC >> fs eval_sl) >>
+          intLib.COOPER_TAC))
+  >- (rw eval_sl
+      >- (‘F’ suffices_by simp[] >>
+          ‘1 = 1 + (&SUC (LENGTH t) : int)’
+            by (CCONTR_TAC >> fs eval_sl) >>
+          intLib.COOPER_TAC)
+      >- (qabbrev_tac ‘TOG = s1.refs ++ refs’ >>
+          ‘LENGTH refs + LENGTH s1.refs = LENGTH TOG’
+            by rw[Abbr ‘TOG’,LENGTH_APPEND] >>
+          fs[EL_LENGTH_APPEND,EL_APPEND_EQN] >>
+          ‘Num (ABS (1 + &Num (ABS (&SUC (LENGTH t) − 1)))) = SUC (LENGTH t)’
+            by (qmatch_goalsub_abbrev_tac ‘1 + &Num (ABS SLT)’ >>
+                ‘ABS SLT = SLT’
+                  by (‘0 ≤ SLT’
+                        suffices_by metis_tac[integerTheory.INT_ABS_EQ_ID] >>
+                      metis_tac[integerTheory.INT_NOT_LE]) >>
+                rw[] >>
+                ‘&Num SLT = SLT’
+                  by (‘0 ≤ SLT’
+                        suffices_by metis_tac[integerTheory.INT_OF_NUM] >>
+                      metis_tac[integerTheory.INT_NOT_LE]) >>
+                rw[] >> qunabbrev_tac ‘SLT’ >> rw[]) >>
+          rw[] >>
+          qmatch_goalsub_abbrev_tac ‘evaluate (s2M with clock := _) envM [FEXP]’ >>
+          ‘env_asm envM conf’
+            by (qunabbrev_tac ‘envM’ >>
+                fs[env_asm_def,has_v_def,in_module_def]) >>
+          qunabbrev_tac ‘FEXP’ >>
+          rw[evaluate_def] >>
+          qunabbrev_tac ‘envM’ >>
+          rw[nsLookup_def,nsBind_def,nsLookup_nsBind_compute] >>
+          qmatch_asmsub_abbrev_tac ‘env_asm (env with v:= envMv) conf’ >>
+          qpat_x_assum ‘env_asm (env with v:= envMv) conf’
+                       (assume_tac o REWRITE_RULE [env_asm_def]) >>
+          qmatch_asmsub_abbrev_tac ‘_ ∧ has_v _ conf.drop _ _ ∧ toThing ∧ _’ >>
+          ‘toThing’
+            by (qunabbrev_tac ‘toThing’ >> fs[]) >>
+          qunabbrev_tac ‘toThing’ >>
+          qpat_x_assum ‘has_v _ _ _ _ ∧ _’
+                       (assume_tac o REWRITE_RULE [GSYM env_asm_def]) >>
+          fs[] >>
+          Q.REFINE_EXISTS_TAC ‘SUC ck1’ >>
+          rw[ADD1,dec_clock_def] >>
+          ‘store_lookup (LENGTH TOG) (empty_state with refs := s2M.refs).refs =
+            SOME (W8array t)’
+            by (qunabbrev_tac ‘s2M’ >> rw[store_lookup_def] >>
+                rw[EL_LENGTH_APPEND] >>
+                qmatch_goalsub_abbrev_tac ‘&Num (ABS SLT)’ >>
+                ‘ABS SLT = SLT’
+                  by (‘0 ≤ SLT’
+                        suffices_by metis_tac[integerTheory.INT_ABS_EQ_ID] >>
+                      metis_tac[integerTheory.INT_NOT_LE]) >>
+                rw[] >> qunabbrev_tac ‘SLT’ >>
+                rw[integerTheory.INT,int_arithTheory.elim_minus_ones] >>
+                rw[DROP_REPLICATE]) >>
+          first_x_assum (drule_then strip_assume_tac) >>
+          rw[] >>
+          qunabbrev_tac ‘s2M’ >> qunabbrev_tac ‘TOG’ >>
+          qmatch_asmsub_rename_tac ‘evaluate (empty_state with <| clock := ck1; refs := _|>)
+                                             senv [sexp] =
+                                      (empty_state with <| clock := ck2; refs := _ |>,Rval[ulv])’ >>
+          fs[] >>
+          qmatch_asmsub_abbrev_tac ‘evaluate _ _ _ = (empty_state with <|clock := ck2; refs := s1.refs ++ ex_refs1 ++ ex_refs2|>,_)’ >>
+          MAP_EVERY qexists_tac [‘ck1’,‘ck2 + s2.clock’,‘ex_refs1 ++ ex_refs2’,‘ulv’] >>
+          JSPECL_THEN [‘s2 with refs := s1.refs ++ ex_refs1 ++ ex_refs2’,
+                       ‘senv’,‘sexp’,‘ck1’,‘ck2’,‘[]’,‘ulv’] strip_assume_tac
+                       evaluate_generalise >>
+          rfs[])
+      >- (‘F’ suffices_by simp[] >>
+          ‘1 = 1 + (&SUC (LENGTH t) : int)’
+            by (CCONTR_TAC >> fs eval_sl) >>
+          intLib.COOPER_TAC))
+  >- (qmatch_goalsub_abbrev_tac ‘evaluate (SE with clock := _) EE’ >>
+      JSPECL_THEN [‘EE’,‘lnum’,‘SE’,‘6w’,‘t’] strip_assume_tac find_one_correct >>
+      qunabbrev_tac ‘SE’ >> qunabbrev_tac ‘EE’ >> rfs[store_lookup_def] >>
+      drule_then strip_assume_tac evaluate_add_to_clock >>
+      fs trans_sl >>
+      Q.REFINE_EXISTS_TAC ‘ck1 + ck1f’ >>
+      simp[] >>
+      qabbrev_tac ‘TOG = s1.refs ++ refs’ >>
+      ‘LENGTH refs + LENGTH s1.refs = LENGTH TOG’
+        by rw[Abbr ‘TOG’,LENGTH_APPEND] >>
+      fs[EL_LENGTH_APPEND,EL_APPEND_EQN] >>
+      rw eval_sl
+      >- (fs[env_asm_def,has_v_def] >>
+          qunabbrev_tac ‘TOG’ >>
+          MAP_EVERY qexists_tac [‘0’,‘ck2+s2.clock’,‘refs ++ drefs_f’] >>
+          simp[] >>
+          ‘LENGTH (FST (SPLITP ($= 1w) t)) = LENGTH t’
+            by (CCONTR_TAC >> fs(ADD1::eval_sl)) >>
+          ‘LENGTH (SND (SPLITP ($= 1w) t)) = 0’
+            by (‘LENGTH t +
+                 LENGTH (SND (SPLITP ($=1w) t)) =
+                 LENGTH t’
+                  by metis_tac[SPLITP_LENGTH] >>
+                fs[]) >>
+          Cases_on ‘SPLITP ($= 1w) t’ >> fs (list_type_num_def::trans_sl))
+      >- (‘LENGTH (FST (SPLITP ($=1w) t)) + 1 < SUC (LENGTH t)’
+            by (‘LENGTH (FST (SPLITP ($=1w) t)) + 1 ≠ SUC (LENGTH t)’
+                  by (CCONTR_TAC >> fs eval_sl) >>
+                ‘∀ (l:word8 list). LENGTH (FST (SPLITP ($=1w) l)) ≤ LENGTH l’
+                  suffices_by (rw[] >> first_x_assum (qspec_then ‘t’ assume_tac) >>
+                               fs[ADD1]) >>
+                Induct_on ‘l’ >> 
+                rw[SPLITP]) >>
+          rw[EL_LENGTH_APPEND,EL_APPEND_EQN]
+          >- (intLib.COOPER_TAC) >>
+          simp[integerTheory.INT_OF_NUM,integerTheory.INT_ABS_NUM,
+               integerTheory.INT_ADD, integerTheory.INT_SUB,ADD1] >>
+          qunabbrev_tac ‘FEXP’ >>
+          fs[env_asm_def,in_module_def] >>
+          PURE_ONCE_REWRITE_TAC [evaluate_def] >>
+          rw eval_sl_nf >>
+          qmatch_goalsub_abbrev_tac ‘LUPDATE (W8array l) ll os’ >>
+          last_x_assum (qspecl_then [‘empty_state with refs :=
+                                        LUPDATE (W8array l) ll os’,
+                                     ‘l’,‘ll’] strip_assume_tac) >>
+          rpt (qpat_x_assum ‘has_v _ _ _ _’ (K ALL_TAC)) >>
+          rpt (qpat_x_assum ‘∀a. _’ (K ALL_TAC)) >>
+          rpt (qpat_x_assum ‘nsLookup _ _ = _’ (K ALL_TAC)) >>
+          qunabbrev_tac ‘ll’ >> qunabbrev_tac ‘os’ >>
+          rfs[store_lookup_def,EL_LENGTH_APPEND,EL_APPEND_EQN,
+              EL_LUPDATE] >>
+          Q.REFINE_EXISTS_TAC ‘SUC ck1f’ >>
+          rw[ADD1,dec_clock_def] >>
+          qmatch_goalsub_abbrev_tac
+            ‘evaluate (s2c with clock := _) envE [expE] = (_,_)’ >>
+          qmatch_asmsub_rename_tac ‘evaluate (empty_state with
+                                                <| clock := Ack1;
+                                                   refs := _|>)
+                                              _ _ =
+                                              (empty_state with
+                                                <| clock := Ack2;
+                                                   refs := _|>,
+                                              Rval[vE])’ >>
+          JSPECL_THEN [‘s2c’,‘envE’,‘expE’,‘Ack1’,‘Ack2’,‘[]’,‘vE’]
+                      strip_assume_tac evaluate_generalise >>
+          qunabbrev_tac ‘s2c’ >> rfs[] >>
+          Q.REFINE_EXISTS_TAC ‘Ack1 + ck1f’ >>
+          simp[] >>
+          qunabbrev_tac ‘TOG’ >>
+          MAP_EVERY qexists_tac [‘0’,‘Ack2 + ck2 + s2.clock’,
+                                 ‘refs ++ drefs_f ++ [W8array l]’] >>
+          qmatch_goalsub_abbrev_tac ‘s2 with <| clock := _; refs := r1 |> =
+                                     s2 with <| clock := _; refs := r2 |>’ >>
+          rw[state_component_equality]
+          >- (qunabbrev_tac ‘r1’ >> qunabbrev_tac ‘r2’ >>
+              rpt (first_x_assum (K ALL_TAC)) >>
+              qabbrev_tac ‘rj = s1.refs ++ refs ++ drefs_f’ >>
+              ‘LENGTH (s1.refs ++ refs) + LENGTH drefs_f = LENGTH rj’
+                by (qunabbrev_tac ‘rj’ >> simp[LENGTH_APPEND]) >>
+              rw[])
+          >- (qmatch_goalsub_abbrev_tac ‘LIST_TYPE WORD ol vE’ >>
+              ‘ol = l’
+                suffices_by rw[] >>
+              qunabbrev_tac ‘ol’ >> qunabbrev_tac ‘l’ >>
+              rpt (first_x_assum (K ALL_TAC)) >>
+              rw[DROP_LENGTH_TOO_LONG,LENGTH_REPLICATE] >>
+              Induct_on ‘t’ >> simp [SPLITP] >>
+              rw[] >> Cases_on ‘1w = h’ >> simp[] >> fs[ADD1] >>
+              Cases_on ‘SPLITP ($= 1w) t’ >> fs[]))
+      >- (Cases_on ‘LENGTH (FST (SPLITP ($= 1w) t)) + 1 = SUC (LENGTH t)’ >>
+          fs trans_sl))
+  >- (fs[env_asm_def,has_v_def] >>
+      MAP_EVERY qexists_tac [‘0’,‘s2.clock’,‘refs’] >>
+      rw (list_type_num_def::trans_sl))
+QED
+
+
 Definition send_events_def:
   send_events conf dest d =
   MAP (λm. IO_event "send" dest (ZIP (m,m)))(compile_message conf d)
@@ -429,13 +845,6 @@ Theorem LUPDATE_SAME':
   n < LENGTH ls ∧ EL n ls = a ⇒ LUPDATE a n ls = ls
 Proof
   metis_tac[LUPDATE_SAME]
-QED
-
-Theorem remove_ffi[simp]:
-  ∀cSt: 'ffi semanticPrimitives$state.
-    (cSt with ffi := cSt.ffi) = cSt
-Proof
-  simp[state_component_equality]
 QED
 
 Theorem sendloop_correct:
