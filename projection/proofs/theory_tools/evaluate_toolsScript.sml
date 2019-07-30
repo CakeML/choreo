@@ -8,7 +8,7 @@ open evaluateTheory
 val _ = new_theory "evaluate_tools";
 
 Theorem evaluate_generalise:
-  ∀ (cSt: 'ffi semanticPrimitives$state) env ck1 ck2 refs' u. 
+  ∀ (cSt: 'ffi semanticPrimitives$state) env exp ck1 ck2 refs' u. 
       evaluate (empty_state with <|clock := ck1; refs := cSt.refs|>) env
            [exp] =
          (empty_state with <|clock := ck2; refs := cSt.refs ++ refs'|>,
