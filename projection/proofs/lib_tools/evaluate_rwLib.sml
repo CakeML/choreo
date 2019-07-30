@@ -3,7 +3,8 @@ structure evaluate_rwLib :> evaluate_rwLib =
 
 	open preamble
      evaluateTheory terminationTheory ml_translatorTheory ml_progTheory
-     evaluatePropsTheory namespaceTheory semanticPrimitivesTheory ffiTheory;
+     evaluatePropsTheory namespaceTheory semanticPrimitivesTheory ffiTheory
+     terminationTheory;
 
     structure Parse =
     struct
@@ -122,6 +123,11 @@ structure evaluate_rwLib :> evaluate_rwLib =
 	Boolv_def,
 	build_rec_env_def,
 	do_app_def,
+	do_eq_def,
+	nsLookup_def,
+	nsOptBind_def,
+	nsBind_def,
+	nsLookup_nsBind_compute,
 	v_to_list_def,
 	list_to_v_def,
 	opn_lookup_def,
@@ -151,6 +157,12 @@ structure evaluate_rwLib :> evaluate_rwLib =
 	Boolv_def,
 	build_rec_env_def,
 	do_app_def,
+	do_opapp_def,
+	do_eq_def,
+	nsLookup_def,
+	nsOptBind_def,
+	nsBind_def,
+	nsLookup_nsBind_compute,
 	v_to_list_def,
 	list_to_v_def,
 	opn_lookup_def,
