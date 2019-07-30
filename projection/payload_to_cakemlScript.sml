@@ -134,9 +134,12 @@ val sendloop_def = Define ‘sendloop conf dest =
 val find_one_def = Define
   ‘find_one =
    [("find_one","n",
-     If (App Equality [Lit (Word8 1w); App Aw8sub [Var(Short "x"); Var(Short "n")]])
-       (Var (Short "n"))
-       (App Opapp [Var(Short "find_one"); App (Opn Plus) [Var(Short "n"); Lit(IntLit 1)]])
+     If (App (Opb Leq) [App Aw8length [Var (Short "x")]; Var(Short "n")])
+      (App Aw8length [Var (Short "x")])
+      (If (App Equality [Lit (Word8 1w); App Aw8sub [Var(Short "x"); Var(Short "n")]])
+        (Var (Short "n"))
+        (App Opapp [Var(Short "find_one"); App (Opn Plus) [Var(Short "n"); Lit(IntLit 1)]])
+      )
    )]’;
 
 (* True iff x is a W8array containing a message tagged as final. *)
@@ -146,36 +149,54 @@ val finalv_def = Define
        (App Equality [Lit (Word8 7w); App Aw8sub [Var(Short x); Lit(IntLit 0)]])
        (App Equality [Lit (Word8 2w); App Aw8sub [Var(Short x); Lit(IntLit 0)]])’;
 
+(* True iff x is a W8array containing a message tagged correctly. *)
+val validv_def = Define
+  ‘validv x =
+   Log Or
+       (App Equality [Lit (Word8 6w); App Aw8sub [Var(Short x); Lit(IntLit 0)]])
+       (finalv x)’;
+
 (* CakeML deep embedding of the unpad function. *)
 val unpadv_def = Define
-  ‘unpadv conf = 
-   Fun "x"
-   (Let (SOME "n")
-     (If (finalv "x")
-        (Lit(IntLit 1))
-        (Letrec find_one (App Opapp [Var(Short "find_one"); Lit(IntLit 1)]))
-     )
-     (Let (SOME "y")
-          (App Aw8alloc
-               [App (Opn Minus)
-                    [App Aw8length [Var (Short "x")];
-                     Var(Short "n")];
-                Lit(Word8 0w)
-               ]
-          )
-          (Let NONE
-               (App CopyAw8Aw8
-                    [Var(Short "x");
-                     Var(Short "n");
-                     App Aw8length [Var (Short "y")];
-                     Lit(IntLit 0)
-                    ]
-               )
-               (App Opapp [Var conf.toList; Var(Short "y")]
-               )
-          )
-     )
-     )
+        ‘unpadv conf = 
+         Fun "x"
+         (If (validv "x")
+         (Let (SOME "n")
+           (If (finalv "x")
+              (Lit(IntLit 1))
+              (App (Opn Plus) [Lit (IntLit 1);
+              Letrec find_one (App Opapp [Var(Short "find_one"); Lit(IntLit 1)])])
+           )
+           (If (App Equality [Var (Short "n");
+                              App (Opn Plus) [Lit (IntLit 1);
+                                              App Aw8length [Var (Short "x")]
+                                              ]
+                              ])
+            (Con (SOME conf.nil) [])
+            (Let (SOME "y")
+                (App Aw8alloc
+                     [App (Opn Minus)
+                          [App Aw8length [Var (Short "x")];
+                           Var(Short "n")];
+                      Lit(Word8 0w)
+                     ]
+                )
+                (Let NONE
+                     (App CopyAw8Aw8
+                          [Var(Short "x");
+                           Var(Short "n");
+                           App Aw8length [Var (Short "y")];
+                           Var(Short "y");
+                           Lit(IntLit 0)
+                          ]
+                     )
+                     (App Opapp [Var conf.toList; Var(Short "y")]
+                     )
+                )
+            )
+           )
+           )
+         (Con (SOME conf.nil) []))
   ’;
 
 (* This loop encodes the payloadLang Receive prefix,
