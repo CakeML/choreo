@@ -1,8 +1,10 @@
 open HolKernel boolLib Parse bossLib;
-open relationTheory;
+open optionTheory
+     relationTheory;
 open ffiTheory;
 open bisimulationTheory
      payloadSemanticsTheory
+     payloadLangTheory
      comms_ffi_modelTheory;
 
 val _ = new_theory "comms_ffi_tools";
@@ -36,18 +38,29 @@ Theorem trans_pres_nodes:
     trans conf s0 l s1 ⇒
       (∀nd. net_has_node s0 nd ⇔ net_has_node s1 nd)
 Proof
-  qabbrev_tac ‘chkPrd = λa:config s0:network l:label s1:network.
-                          (∀nd. net_has_node s0 nd ⇔ net_has_node s1 nd)’ >>
-  ‘∀conf S1 L S2.
-    trans conf S1 L S2 ⇒ chkPrd conf S1 L S2’
-    suffices_by (qunabbrev_tac ‘chkPrd’ >> rw[] >>
-                 first_x_assum drule >> rw[]) >>
-  rw[] >>
-  irule trans_ind >>
-  qunabbrev_tac ‘chkPrd’ >> rw[net_has_node_def]
+  Induct_on ‘trans’ >> rw[net_has_node_def]
 QED
 
-(* Conditions under which networks can receive *)
+Definition net_wf_def:
+  (net_wf NNil = T) ∧
+  (net_wf (NEndpoint _ _ _) = T) ∧
+  (net_wf (NPar n1 n2) = (net_wf n1 ∧ net_wf n2 ∧
+                         (∀nd.
+                          ¬net_has_node n1 nd ∨
+                          ¬net_has_node n2 nd)))
+End
+
+Theorem trans_pres_wf:
+  ∀conf s0 l s1.
+    trans conf s0 l s1 ⇒
+      (net_wf s0 ⇔ net_wf s1)
+Proof
+  Induct_on ‘trans’ >>
+  rw[net_wf_def] >>
+  metis_tac[trans_pres_nodes,EQ_IMP_THM]
+QED
+
+(* Conditions under which networks can receive and send *)
 
 Theorem trans_receive_cond:
   ∀conf sp N d dp.
@@ -55,28 +68,18 @@ Theorem trans_receive_cond:
     (∃N'. trans conf N (LReceive sp d dp) N') 
 Proof
   rw[EQ_IMP_THM]
-  >- (Induct_on ‘N’ >> rw[net_has_node_def]
-    >- (fs[] >> qexists_tac ‘NPar N'' N'’ >> rw [trans_rules])
-    >- (fs[] >> qexists_tac ‘NPar N N''’ >> rw [trans_rules])
-    >- (qmatch_goalsub_rename_tac ‘NEndpoint dp ps pe’ >>
-        qexists_tac ‘NEndpoint dp (ps with queue := SNOC (sp,d) ps.queue) pe’ >>
-        metis_tac[trans_rules]))
-  >- (qabbrev_tac ‘chkPrd = λa:config s0:network l:label s1:network.
-                          ∀sp d dp. (l = LReceive sp d dp) ⇒ sp ≠ dp’ >> 
-      ‘∀c s1 l s2.
-        trans c s1 l s2 ⇒ chkPrd c s1 l s2’
-        suffices_by (qunabbrev_tac ‘chkPrd’ >> rw[] >>
-                     first_x_assum drule >> rw[]) >>
-      rw[] >> irule trans_ind >> qunabbrev_tac ‘chkPrd’ >>
-      rw[])
-  >- (qabbrev_tac ‘chkPrd = λa:config s0:network l:label s1:network.
-                          ∀sp d dp. (l = LReceive sp d dp) ⇒ net_has_node s0 dp’ >> 
-      ‘∀c s1 l s2.
-        trans c s1 l s2 ⇒ chkPrd c s1 l s2’
-        suffices_by (qunabbrev_tac ‘chkPrd’ >> rw[] >>
-                     first_x_assum drule >> rw[]) >>
-      rw[] >> irule trans_ind >> qunabbrev_tac ‘chkPrd’ >>
-      rw[net_has_node_def])
+  >- (Induct_on ‘N’ >> rw[net_has_node_def] >> metis_tac[trans_rules])
+  >- (first_x_assum mp_tac >> Induct_on ‘trans’ >> rw[net_has_node_def])
+  >- (first_x_assum mp_tac >> Induct_on ‘trans’ >> rw[net_has_node_def])
+QED
+
+Theorem trans_send_cond:
+  ∀conf sp N d dp.
+    (∃N'. trans conf N (LSend sp d dp) N') ⇒
+    (sp ≠ dp ∧ net_has_node N sp)
+Proof
+  rw[] >> first_x_assum mp_tac >>
+  Induct_on ‘trans’ >> rw[net_has_node_def]
 QED
 
 (* Invariants under ffi state transformation *)
@@ -100,17 +103,8 @@ Theorem strans_queue_pres:
     strans conf (P,Q1,N1) (ASend D M) (P,Q2,N2) ⇒
       isPREFIX Q1 Q2
 Proof
-  qabbrev_tac ‘chkPrd = λa:config (pa,qa,na):total_state l (pb,qb,nb):total_state.
-                        (∃ms mc. l = ARecv ms mc) ∨
-                        (isPREFIX qa qb)’ >>
-  ‘∀conf S1 L S2.
-    strans conf S1 L S2 ⇒ chkPrd conf S1 L S2’
-    suffices_by (qunabbrev_tac ‘chkPrd’ >> rw[] >>
-                 first_x_assum drule >> rw[]) >>
-  rw[] >>
-  irule strans_ind >>
-  qunabbrev_tac ‘chkPrd’ >> rw[] >>
-  metis_tac[rich_listTheory.IS_PREFIX_APPEND1]
+  Induct_on ‘strans’ >> rw[] >>
+  metis_tac [rich_listTheory.IS_PREFIX_APPEND1]
 QED
 
 Theorem strans_pres_nodes:
@@ -118,16 +112,21 @@ Theorem strans_pres_nodes:
     strans conf s0 l s1 ⇒
       (∀nd. ffi_has_node nd s0 ⇔ ffi_has_node nd s1)
 Proof
-  qabbrev_tac ‘chkPrd = λa:config s0:total_state l:action s1:total_state.
-                          (∀nd. ffi_has_node nd s0 ⇔ ffi_has_node nd s1)’ >>
-  ‘∀conf S1 L S2.
-    strans conf S1 L S2 ⇒ chkPrd conf S1 L S2’
-    suffices_by (qunabbrev_tac ‘chkPrd’ >> rw[] >>
-                 first_x_assum drule >> rw[]) >>
-  rw[] >>
-  irule strans_ind >>
-  qunabbrev_tac ‘chkPrd’ >> rw[ffi_has_node_def] >>
+  Induct_on ‘strans’ >> rw[ffi_has_node_def] >>
   metis_tac[trans_pres_nodes]
+QED
+
+Definition ffi_wf_def:
+  ffi_wf (P,Q,N) = net_wf N
+End
+
+Theorem strans_pres_wf:
+  ∀conf s1 L s2.
+    strans conf s1 L s2 ⇒
+      (ffi_wf s1 ⇔ ffi_wf s2)
+Proof
+  Induct_on ‘strans’ >> rw[ffi_wf_def] >>
+  metis_tac[trans_pres_wf]
 QED
 
 (* Notion of ffi equivalence *)
@@ -141,18 +140,90 @@ Proof
   rw [ffi_eq_def,BISIM_REL_IS_EQUIV_REL]
 QED
 
+Theorem ffi_eq_net_ltau:
+  ∀conf cpNum q N1 N2.
+    trans conf N1 LTau N2 ⇒
+    ffi_eq conf (cpNum,q,N1) (cpNum,q,N2)
+Proof
+  cheat
+QED
+
+(* TODO: Put in renames for robustness! *)
+Theorem net_functional:
+  ∀conf N1 N2A N2B L.
+    L ≠ LTau ∧
+    trans conf N1 L N2A ∧
+    trans conf N1 L N2B ∧
+    net_wf N1 ⇒
+    N2A = N2B
+Proof
+  Cases_on ‘L’ >> fs[] >>
+  Induct_on ‘trans’ >> rw[]
+  >- (fs[Once trans_cases] >>
+      ‘LENGTH d' ≤ n + conf.payload_size’
+        by fs[pad_def] >>
+      fs[])
+  >- (fs[Once trans_cases] >>
+      ‘LENGTH d' > n + conf.payload_size’
+        by fs[pad_def] >>
+      fs[])
+  >- (fs[net_wf_def] >>
+      ‘¬(∃n2a. trans conf n2 (LSend l l0 l1) n2a)’
+        by metis_tac[trans_send_cond] >>
+      fs[] >>
+      ntac 2 (last_x_assum assume_tac) >>
+      first_x_assum (assume_tac o REWRITE_RULE [Once trans_cases]) >>
+      rfs[])
+  >- (fs[net_wf_def] >>
+      ‘¬(∃n1a. trans conf n1 (LSend l l0 l1) n1a)’
+        by metis_tac[trans_send_cond] >>
+      fs[] >>
+      ntac 2 (last_x_assum assume_tac) >>
+      first_x_assum (assume_tac o REWRITE_RULE [Once trans_cases]) >>
+      rfs[])
+  >- fs[Once trans_cases]
+  >- (fs[net_wf_def] >>
+      ‘¬(∃n2a. trans conf n2 (LReceive l l0 l1) n2a)’
+        by metis_tac[trans_receive_cond] >>
+      fs[] >>
+      ntac 2 (last_x_assum assume_tac) >>
+      first_x_assum (assume_tac o REWRITE_RULE [Once trans_cases]) >>
+      rfs[])
+  >- (fs[net_wf_def] >>
+      ‘¬(∃n1a. trans conf n1 (LReceive l l0 l1) n1a)’
+        by metis_tac[trans_receive_cond] >>
+      fs[] >>
+      ntac 2 (last_x_assum assume_tac) >>
+      first_x_assum (assume_tac o REWRITE_RULE [Once trans_cases]) >>
+      rfs[])
+QED
+
 
 Theorem ffi_eq_mutate_self:
   ∀conf SA L SB1 SB2.
+    ffi_wf SA ∧
     strans conf SA L SB1 ∧
     strans conf SA L SB2   ⇒
     ffi_eq conf SB1 SB2
 Proof
+  Cases_on ‘L’ >> fs[] >>
+  Induct_on ‘strans’ >> rw[]
+  >- (rename1 ‘ffi_wf (c,q,NI)’ >>
+      rename1 ‘ffi_wf’ >>
+      ‘ffi_wf (c,q,N')’
+        by metis_tac[ffi_wf_def,trans_pres_wf] >> 
+      fs[] >>
+      ‘∃SB2E. strans conf (c,q,N') (ASend l l0) SB2E ∧
+              ffi_eq conf SB2 SB2E’
+        suffices_by (cheat) >>
+      cheat) >>
   cheat
 QED
 
 Theorem ffi_eq_pres:
   ∀conf SA1 SA2 L SB1 SB2.
+    ffi_wf SA1 ∧
+    ffi_wf SA2 ∧
     ffi_eq conf SA1 SA2   ∧
     strans conf SA1 L SB1 ∧
     strans conf SA2 L SB2   ⇒
@@ -204,16 +275,27 @@ Theorem strans_dest_check:
       strans conf S1 (ASend dest bytes) S2) ⇒
     valid_send_dest dest S1
 Proof
-  qabbrev_tac ‘chkPrd = λa:config s0:total_state l:action s1:total_state.
-                      ∀md mc. (l = ASend md mc) ⇒ valid_send_dest md s0’ >> 
-  ‘∀c s1 l s2.
-    strans c s1 l s2 ⇒ chkPrd c s1 l s2’
-    suffices_by (qunabbrev_tac ‘chkPrd’ >> rw[] >>
-                 first_x_assum drule >> rw[]) >>
-  rw[] >> irule strans_ind >> qunabbrev_tac ‘chkPrd’ >>
+  Induct_on ‘strans’ >>
   rw[valid_send_dest_def,ffi_has_node_def] >>
   metis_tac[trans_pres_nodes,trans_receive_cond]
 QED
+
+Theorem ffi_eq_sendval:
+  ∀conf fs1 fs2.
+    ffi_eq conf fs1 fs2 ⇒
+    (∀l. valid_send_dest l fs1 ⇔ valid_send_dest l fs2)
+Proof
+  rw[EQ_IMP_THM] >> 
+  qmatch_asmsub_rename_tac ‘valid_send_dest l KS’ >>
+  qmatch_goalsub_rename_tac ‘valid_send_dest l US’ >>
+  qabbrev_tac ‘ad = REPLICATE (SUC conf.payload_size) (ARB :word8)’ >>
+  irule strans_dest_check >>
+  drule_then (JSPEC_THEN ‘ad’ strip_assume_tac) strans_send_cond >> 
+  rename1 ‘strans conf KS (ASend l ad) S2’ >>
+  MAP_EVERY qexists_tac [‘conf’,‘ad’] >>
+  metis_tac[ffi_eq_def,BISIM_REL_def,BISIM_def]
+QED
+
 
 (* Modelling invariants on FFI *)
 Definition ffi_accepts_rel_def:
@@ -231,57 +313,35 @@ Theorem send_invariant:
 Proof
   rw[valid_send_dest_def,ffi_accepts_rel_def,valid_send_call_format_def,
      comms_ffi_oracle_def,ffi_send_def] >>
+  DEEP_INTRO_TAC some_intro >>
   qmatch_goalsub_abbrev_tac ‘strans _ s _’ >>
   first_x_assum (K ALL_TAC) >>
   qpat_x_assum ‘_ = comms_ffi_oracle conf’ (K ALL_TAC) >>
   rw[]
-  >- (qmatch_goalsub_abbrev_tac ‘FST (@ns. C ns ) ≠ l’ >>
-      ‘(λs. FST s ≠ l) (@ns. C ns)’
-        suffices_by rw[] >>
-      irule SELECT_ELIM_THM >>
-      rw[] >> qunabbrev_tac ‘C’
-      >- metis_tac[strans_pres_pnum]
-      >- (qexists_tac ‘ns’ >> fs[]))
-  >- (irule SELECT_ELIM_THM >> rw[]
-      >- metis_tac[strans_pres_nodes]
-      >- (qexists_tac ‘ns’ >> fs[]))
-  >- (rename [‘¬∃s2. strans conf s1 (ASend l bytes) s2’] >>
-      ‘∃s2. strans conf s1 (ASend l bytes) s2’
-        suffices_by fs[] >>
-      first_x_assum (K ALL_TAC) >>
-      Cases_on ‘s1’ >> rename [‘ffi_has_node _ (P,R)’] >> Cases_on ‘R’ >>
-      rename [‘ffi_has_node _ (P,Q1,N1)’] >> 
-      ‘∃N2. trans conf N1 (LReceive P bytes l) N2’
-        suffices_by metis_tac[strans_rules] >>
-      fs[ffi_has_node_def] >> metis_tac[trans_receive_cond])
+  >- (rename1 ‘strans _ s _ s2’ >>
+      Cases_on ‘s’ >> Cases_on ‘s2’ >>
+      metis_tac[strans_pres_pnum])
+  >- (rename1 ‘strans _ s _ s2’ >>
+      Cases_on ‘s’ >> Cases_on ‘s2’ >>
+      metis_tac[strans_pres_nodes])
+  >- metis_tac[valid_send_dest_def,strans_send_cond]
 QED
 
-
-Theorem ffi_eq_sendval:
-  ∀conf fs1 fs2.
-    ffi_eq conf fs1 fs2 ⇒
-    (∀l. valid_send_dest l fs1 ⇔ valid_send_dest l fs2)
-Proof
-  rw[EQ_IMP_THM] >> JSPECL_THEN [‘conf’,‘l’] assume_tac send_invariant >>
-  fs[ffi_accepts_rel_def] >> qmatch_asmsub_rename_tac ‘valid_send_dest l KS’ >>
-  qmatch_goalsub_rename_tac ‘valid_send_dest l US’ >>
-  qabbrev_tac ‘ad = REPLICATE (SUC conf.payload_size) (ARB :word8)’ >>
-  first_x_assum (JSPECL_THEN [‘<|oracle := comms_ffi_oracle conf;
-                               ffi_state := KS;
-                               io_events := ARB|>’,
-                              ‘"send"’,‘l’,‘ad’]
-                             assume_tac) >>
-  ‘LENGTH ad = SUC conf.payload_size’
-    by simp[Abbr ‘ad’, rich_listTheory.LENGTH_REPLICATE] >>
-  fs[valid_send_call_format_def,comms_ffi_oracle_def,ffi_send_def] >>
-  rfs[] >>
-  Cases_on ‘∃NKS. strans conf KS (ASend l ad) NKS’ >>
-  fs[] >> qpat_x_assum ‘(@X. Y) = Z’ (K ALL_TAC) >>
-  fs[ffi_eq_def,BISIM_REL_def,BISIM_def] >>
-  ‘∃NUS. strans conf US (ASend l ad) NUS’
-    by metis_tac[ffi_eq_def,BISIM_REL_def,BISIM_REL_def] >>
-  JSPECL_THEN [‘US’,‘l’] strip_assume_tac strans_dest_check >>
-  metis_tac[]
-QED
+(* Modelling limited acceptance on FFI *)
+Definition ffi_laccepts_def:
+  (ffi_laccepts 0 oracle ipred mpred fpred st =
+    ∀s conf bytes.
+      ipred s conf bytes ⇒
+      ∃ffi nbytes.
+          (oracle s st conf bytes = Oracle_return ffi nbytes) ∧
+          (fpred nbytes))                                                       ∧
+  (ffi_laccepts (SUC n) oracle ipred mpred fpred st =
+    ∀s conf bytes.
+      ipred s conf bytes ⇒
+        ∃ffi nbytes.
+          (oracle s st conf bytes = Oracle_return ffi nbytes) ∧
+          (mpred nbytes) ∧
+          (ffi_laccepts n oracle ipred mpred fpred ffi))
+End
 
 val _ = export_theory ();

@@ -65,19 +65,16 @@ Definition ffi_send_def:
   if (LENGTH data ≠ SUC conf.payload_size) then
     Oracle_final FFI_failed
   else
-    if (∃ns. strans conf os (ASend dest data) ns) then
-      Oracle_return (@ns. strans conf os (ASend dest data) ns) data
-    else
-      Oracle_final FFI_diverged
+    case some ns. strans conf os (ASend dest data) ns of
+      SOME ns =>  Oracle_return ns data
+    | NONE    =>  Oracle_final FFI_diverged
 End
 
 Definition ffi_receive_def:
   ffi_receive conf os src _ =
-    if (∃p. strans conf os (ARecv src (FST p)) (SND p)) then
-      let (m,ns) = (@p. strans conf os (ARecv src (FST p)) (SND p)) in
-        Oracle_return ns m
-    else
-      Oracle_final FFI_diverged
+    case some (m,ns). strans conf os (ARecv src m) ns of
+      SOME (m,ns) =>  Oracle_return ns m
+    | NONE        =>  Oracle_final FFI_diverged
 End
 
 Definition comms_ffi_oracle_def:
