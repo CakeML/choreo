@@ -1,7 +1,8 @@
 open preamble astBakeryTheory (* todo: shouldn't have to depend on astBakery *)
-     endpointLangTheory (*for state*)
      astTheory (* for CakeML syntax-related types in the conf *)
 val _ = new_theory "payloadLang";
+
+val _ = Datatype `state = <| bindings : varN |-> datum; queues : proc |-> datum list  |>`;
 
 val _ = Datatype`
 endpoint = Nil

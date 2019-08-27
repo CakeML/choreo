@@ -29,11 +29,15 @@ val compile_queue_def = Define `
     MAP (λd. (p,d)) (compile_message conf d) ++ compile_queue conf q)
 `
 
+Definition compile_state_def:
+  compile_state (es : endpointLang$state) = (ARB : payloadLang$state)
+End
+
 val compile_network_def = Define `
    (compile_network conf endpointLang$NNil = payloadLang$NNil)
 ∧ (compile_network conf (NPar n1 n2) = NPar (compile_network conf n1) (compile_network conf n2))
 ∧ (compile_network conf (NEndpoint p s e) = NEndpoint p
-                                                       (s with queue := compile_queue conf s.queue)
+                                                       (compile_state s)
                                                        (compile_endpoint e))`
 
 val _ = export_theory ()

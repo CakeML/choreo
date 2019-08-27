@@ -2,6 +2,13 @@ open preamble payloadLangTheory
 
 val _ = new_theory "payloadSemantics";
 
+Definition FGET_def:
+  FGET fm dv k =
+    case FLOOKUP fm k of
+      SOME kv => kv
+    | NONE    => dv
+End
+
 val _ = Datatype `
  label = LSend proc datum proc
        | LReceive proc datum proc
@@ -31,7 +38,7 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
     p1 ≠ p2
     ⇒ trans conf (NEndpoint p2 s e)
              (LReceive p1 d p2)
-             (NEndpoint p2 (s with queue := SNOC (p1,d) s.queue) e))
+             (NEndpoint p2 (s with queues := s.queues |+ (p1, SNOC d (FGET s.queues [] p1))) e))
 
   (* Com-L *)
 ∧ (∀conf n1 n2 p1 p2 d n1' n2'.
@@ -48,25 +55,23 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
     ⇒ trans conf (NPar n1 n2) LTau (NPar n1' n2'))
 
   (* Dequeue-last-payload *)
-∧ (∀conf s v p1 p2 e q1 q2 d ds.
-    s.queue = q1 ++ [(p1,d)] ++ q2
-    ∧ p1 ≠ p2
-    ∧ EVERY (λ(p,_). p ≠ p1) q1 
+∧ (∀conf s v p1 p2 e d tl ds.
+    p1 ≠ p2
+    ∧ FLOOKUP s.queues p1 = SOME (d::tl)
     ∧ final d
     ⇒ trans conf (NEndpoint p2 s (Receive p1 v ds e))
              LTau
-             (NEndpoint p2 (s with <|queue := q1 ++ q2;
+             (NEndpoint p2 (s with <|queues :=  s.queues |+ (p1,tl);
                                      bindings := s.bindings |+ (v,FLAT(SNOC (unpad d) ds))|>) e))
 
   (* Dequeue-intermediate-payload *)
-∧ (∀conf s v p1 p2 e q1 q2 d ds.
-    s.queue = q1 ++ [(p1,d)] ++ q2
-    ∧ p1 ≠ p2
-    ∧ EVERY (λ(p,_). p ≠ p1) q1 
+∧ (∀conf s v p1 p2 e d tl ds.
+    p1 ≠ p2
+    ∧ FLOOKUP s.queues p1 = SOME (d::tl) 
     ∧ intermediate d
     ⇒ trans conf (NEndpoint p2 s (Receive p1 v ds e))
              LTau
-             (NEndpoint p2 (s with queue := q1 ++ q2) (Receive p1 v (SNOC (unpad d) ds) e)))
+             (NEndpoint p2 (s with queues := s.queues |+ (p1,tl)) (Receive p1 v (SNOC (unpad d) ds) e)))
 
   (* If-L *)
 ∧ (∀conf s v p e1 e2.
