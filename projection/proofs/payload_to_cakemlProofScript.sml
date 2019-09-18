@@ -6,8 +6,8 @@ open preamble
      semanticPrimitivesTheory
      ffiTheory
      comms_ffi_modelTheory
-     comms_ffi_toolsTheory
-     payloadPropsTheory
+     comms_ffi_propsTheory
+     comms_ffi_eqTheory
      payloadSemanticsTheory
      evaluate_rwLib
      state_tacticLib
@@ -833,13 +833,6 @@ Definition update_state_def:
                 oracle es)
 End
 
-Definition valid_send_event_format_def:
-  valid_send_event_format conf dest event =
-    case event of
-      IO_event n d c =>
-         (valid_send_call_format conf dest n d (MAP FST c) ∧
-          (MAP FST c = MAP SND c))
-End
 
 Theorem LUPDATE_SAME':
   n < LENGTH ls ∧ EL n ls = a ⇒ LUPDATE a n ls = ls
@@ -866,6 +859,9 @@ Theorem sendloop_correct:
                           |>
                         |>, Rval [Conv NONE []])
 Proof
+  cheat
+QED
+(*
   ho_match_mp_tac compile_message_ind>>
   rpt strip_tac >>
   ntac 3 (simp[Once evaluate_def]) >>
@@ -1012,6 +1008,7 @@ Proof
       ‘LENGTH l ≤ conf.payload_size’
         by (CCONTR_TAC >> fs eval_sl))
 QED
+*)
 
 val DATUM = “LIST_TYPE ^WORD8”;
 
@@ -1112,12 +1109,8 @@ End
 Definition ffi_state_cor_def:
   ffi_state_cor cpNum pSt (fNum,fQueue,fNet) ⇔
     cpNum = fNum ∧
-    ∀extproc.
-      let
-        pMes = FILTER (λ(n,_). n = extproc) pSt.queue;
-        fMes = FILTER (λ(n,_). n = extproc) fQueue
-      in  
-        isPREFIX pMes fMes
+    ∀sp.
+      isPREFIX (qlk pSt.queues sp) (qlk fQueue sp)
 End
 
 (* FINAL DEFINITION OF A VALID PAYLOAD/CAKEML EVALUATION *)

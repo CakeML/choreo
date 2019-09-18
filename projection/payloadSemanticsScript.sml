@@ -2,21 +2,50 @@ open preamble payloadLangTheory
 
 val _ = new_theory "payloadSemantics";
 
-Definition FGET_def:
-  FGET fm dv k =
+Definition fget_def:
+  fget fm dv k =
     case FLOOKUP fm k of
       SOME kv => kv
     | NONE    => dv
 End
 
-val _ = Datatype `
+Definition qlk_def:
+  qlk qs p = fget qs [] p
+End
+
+Definition qpush_def:
+  qpush qs sp d =
+    qs |+ (sp,SNOC d (qlk qs sp))
+End
+
+Theorem qpush_prefix:
+  ∀qs spL spA dA.
+    isPREFIX (qlk qs spL) (qlk (qpush qs spA dA) spL)
+Proof
+  rw[qlk_def,qpush_def,fget_def] >>
+  Cases_on ‘spL = spA’ >>
+  rw[finite_mapTheory.FLOOKUP_UPDATE] >>
+  Cases_on ‘FLOOKUP qs spA’ >> rw[rich_listTheory.IS_PREFIX_SNOC] 
+QED
+
+Theorem qpush_commutes:
+  ∀qs spA dA spB dB.
+    spA ≠ spB ⇒
+      qpush (qpush qs spA dA) spB dB =
+      qpush (qpush qs spB dB) spA dA
+Proof
+  rw[qpush_def,qlk_def,fget_def,finite_mapTheory.FLOOKUP_UPDATE] >>
+  metis_tac[finite_mapTheory.FUPDATE_COMMUTES]
+QED
+
+
+Datatype:
  label = LSend proc datum proc
        | LReceive proc datum proc
        | LTau
-`
+End
 
-val (trans_rules,trans_ind,trans_cases) = Hol_reln `
-
+Inductive trans:
   (* Send-last-payload *)
   (∀conf s v n d p1 p2 e.
     FLOOKUP s.bindings v = SOME d
@@ -38,7 +67,7 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
     p1 ≠ p2
     ⇒ trans conf (NEndpoint p2 s e)
              (LReceive p1 d p2)
-             (NEndpoint p2 (s with queues := s.queues |+ (p1, SNOC d (FGET s.queues [] p1))) e))
+             (NEndpoint p2 (s with queues := qpush s.queues p1 d) e))
 
   (* Com-L *)
 ∧ (∀conf n1 n2 p1 p2 d n1' n2'.
@@ -57,7 +86,7 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
   (* Dequeue-last-payload *)
 ∧ (∀conf s v p1 p2 e d tl ds.
     p1 ≠ p2
-    ∧ FLOOKUP s.queues p1 = SOME (d::tl)
+    ∧ qlk s.queues p1 = d::tl
     ∧ final d
     ⇒ trans conf (NEndpoint p2 s (Receive p1 v ds e))
              LTau
@@ -67,7 +96,7 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
   (* Dequeue-intermediate-payload *)
 ∧ (∀conf s v p1 p2 e d tl ds.
     p1 ≠ p2
-    ∧ FLOOKUP s.queues p1 = SOME (d::tl) 
+    ∧ qlk s.queues p1 = d::tl
     ∧ intermediate d
     ⇒ trans conf (NEndpoint p2 s (Receive p1 v ds e))
              LTau
@@ -107,7 +136,7 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
     ⇒ trans conf (NPar n1 n2)
              alpha
              (NPar n1 n2'))
-`
+End
 
  val _ = zip ["trans_send_last_payload","trans_send_intermediate_payload",
               "trans_enqueue","trans_com_l","trans_com_r",
@@ -115,15 +144,18 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
               "trans_if_true","trans_if_false","trans_let","trans_par_l","trans_par_r"]
             (CONJUNCTS trans_rules) |> map save_thm;
 
-val reduction_def = Define `
-  reduction conf p q = trans conf p LTau q`
+Definition reduction_def:
+  reduction conf p q = trans conf p LTau q
+End
 
-val weak_tau_trans_def = Define `
+Definition weak_tau_trans_def:
   weak_tau_trans conf p alpha q =
-    ?p' q'. (reduction conf)^* p p' /\ trans conf p' alpha q' /\ (reduction conf)^* q' q`
+    ∃p' q'. (reduction conf)^* p p' ∧ trans conf p' alpha q' ∧ (reduction conf)^* q' q
+End
 
-val weak_trans_def = Define `
+Definition weak_trans_def:
   weak_trans conf p alpha q =
-    if alpha = LTau then (reduction conf)^* p q else weak_tau_trans conf p alpha q`
+    if alpha = LTau then (reduction conf)^* p q else weak_tau_trans conf p alpha q
+End
 
 val _ = export_theory ()

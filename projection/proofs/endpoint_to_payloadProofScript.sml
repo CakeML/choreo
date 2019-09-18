@@ -1,6 +1,6 @@
 open preamble endpointLangTheory payloadLangTheory endpoint_to_payloadTheory
               endpointPropsTheory              
-              payloadSemanticsTheory endpointSemanticsTheory payloadPropsTheory;
+              payloadSemanticsTheory endpointSemanticsTheory;
 
 val _ = new_theory "endpoint_to_payloadProof";
 

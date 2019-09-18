@@ -4,61 +4,43 @@ open payloadSemanticsTheory;
 
 val _ = new_theory "comms_ffi_model";
 
-val JSPEC_THEN =
-  fn spTr => fn nxTc => fn spTh => 
-    FIRST[qspec_then spTr nxTc spTh, Q.ISPEC_THEN spTr nxTc spTh];
+Type queues = “: proc |-> datum list”;
+Type total_state = “: proc # queues # network”;
 
-fun JSPECL_THEN []            = (fn nxTc => (fn spTh => nxTc spTh))
-  | JSPECL_THEN (spTr::spTrs) =
-    (fn nxTc =>
-      (fn spTh =>
-        let
-          val recFunc = (JSPECL_THEN spTrs nxTc)
-        in
-          JSPEC_THEN spTr recFunc spTh
-        end)
-    ); 
-
-val _ = type_abbrev("message", “: proc # datum”);
-val _ = type_abbrev("queue" , “: message list”);
-val _ = type_abbrev("total_state" , “: proc # queue # network”);
-
-val _ = Datatype ‘
+Datatype:
  action = ASend proc datum
           | ARecv proc datum
-’;
+End
 
-val (strans_rules,strans_ind,strans_cases) = Hol_reln
-‘
+Inductive strans:
   (* ARecv *)
-  (∀conf c q q1 ms mc q2 N.
-    (q = q1 ++ [(ms,mc)] ++ q2) ∧
-    EVERY (λ(p,_). p ≠ ms) q1 
-    ⇒ strans conf (c,q,N) (ARecv ms mc) (c, q1 ++ q2, N))
+  (∀conf c q ms mc tl N.
+    qlk q ms = mc::tl
+    ⇒ strans conf (c,q,N) (ARecv ms mc) (c,q |+ (ms,tl), N)) ∧ 
 
   (* LTauL *)
-∧ (∀conf c q q' N N' N'' α.
+  (∀conf c q q' N N' N'' α.
      trans conf N LTau N' ∧
      strans conf (c,q,N') α (c,q',N'')
-     ⇒  strans conf (c,q,N) α (c,q',N''))
+     ⇒  strans conf (c,q,N) α (c,q',N'')) ∧
 
   (* LTauR *)
-∧ (∀conf c q q' N N' N'' α.
+  (∀conf c q q' N N' N'' α.
      strans conf (c,q,N) α (c,q',N') ∧
      trans conf N' LTau N''
-     ⇒  strans conf (c,q,N) α (c,q',N''))
+     ⇒  strans conf (c,q,N) α (c,q',N'')) ∧
 
   (* LSend *)
-∧ (∀conf c q q' N N' N'' sp d α.
+  (∀conf c q q' N N' N'' sp d α.
      trans conf N (LSend sp d c) N' ∧
-     strans conf (c,q++[(sp,d)],N') α (c,q',N'')
-     ⇒  strans conf (c,q,N) α (c,q',N''))
+     strans conf (c,qpush q sp d,N') α (c,q',N'')
+     ⇒  strans conf (c,q,N) α (c,q',N'')) ∧
 
   (* ASend *)
-∧ (∀conf c q N N' rp d.
+  (∀conf c q N N' rp d.
      trans conf N (LReceive c d rp) N'
      ⇒  strans conf (c,q,N) (ASend rp d) (c,q,N'))
-’;
+End
 
 Definition ffi_send_def:
   ffi_send conf os dest data =
