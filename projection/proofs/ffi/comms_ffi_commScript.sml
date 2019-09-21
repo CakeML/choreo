@@ -2,8 +2,7 @@ open HolKernel boolLib Parse bossLib;
 open optionTheory
      relationTheory;
 open ffiTheory;
-open bisimulationTheory
-     confluenceTheory
+open confluenceTheory
      payloadPropsTheory
      payloadSemanticsTheory
      payloadLangTheory

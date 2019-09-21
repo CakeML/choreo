@@ -28,6 +28,16 @@ Proof
   rw [ffi_eq_def,BISIM_REL_IS_EQUIV_REL]
 QED
 
+(* Equivalence means same sending destinations *)
+Theorem ffi_eq_sendval:
+  ∀x y. ffi_eq conf x y ⇒
+    (∀rp. valid_send_dest rp x ⇔ valid_send_dest rp y)
+Proof
+  rw[EQ_IMP_THM] >>
+  metis_tac[strans_send_cond,strans_dest_check,ffi_eq_def,
+            BISIM_REL_def,BISIM_def]
+QED
+
 (* Irrelevance if queues are similar *)
 Theorem qsame_irrel_ffi_eq:
   ∀c q1 q2 N.

@@ -266,11 +266,17 @@ val compile_endpoint_def = Define ‘
              (Letrec
                 (receiveloop conf (MAP (CHR o w2n) p))
                 (App Opapp
-                     [Var conf.concat;
-                      App Opapp [Var(Short "receiveloop");
+                     [
+                      App Opapp
+                        [
+                          Var conf.concat;
+                          App Opapp [
+                                      Var(Short "receiveloop");
+                                      Con NONE []
+                                    ]
+                        ];
                       convDatumList conf l
                       ]
-                     ]
                 )
              )
         )

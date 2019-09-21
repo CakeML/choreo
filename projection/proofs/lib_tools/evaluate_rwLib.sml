@@ -181,4 +181,38 @@ structure evaluate_rwLib :> evaluate_rwLib =
 	lit_same_type_def,
 	ctor_same_type_def];
 
+	val eval_sl_nffi =
+	[evaluate_def,
+	do_con_check_def,
+	build_conv_def,
+	do_log_def,
+	And_def,
+	Eq_def,
+	do_if_def,
+	Boolv_def,
+	build_rec_env_def,
+	do_app_def,
+	do_opapp_def,
+	do_eq_def,
+	nsLookup_def,
+	nsOptBind_def,
+	nsBind_def,
+	nsLookup_nsBind_compute,
+	v_to_list_def,
+	list_to_v_def,
+	opn_lookup_def,
+	opb_lookup_def,
+	opw8_lookup_def,
+	opw64_lookup_def,
+	shift8_lookup_def,
+	shift64_lookup_def,
+	store_assign_def,
+	store_v_same_type_def,
+	store_alloc_def,
+	store_lookup_def,
+	copy_array_def,
+	do_eq_def,
+	lit_same_type_def,
+	ctor_same_type_def];
+
 	end;

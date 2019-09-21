@@ -4,8 +4,7 @@ open optionTheory
      listTheory
      rich_listTheory;
 open ffiTheory;
-open bisimulationTheory
-     payloadSemanticsTheory
+open payloadSemanticsTheory
      payloadLangTheory
      payloadPropsTheory
      comms_ffi_modelTheory
@@ -317,6 +316,24 @@ Definition valid_send_event_format_def:
           (MAP FST c = MAP SND c))
 End
 
+(* Receive Validity Checks *)
+(* -- Destination *)
+Definition valid_receive_src_def:
+  valid_receive_src src ffiSt = ((FST ffiSt ≠ src) ∧ (ffi_has_node src ffiSt))
+End
+(* -- Call Format *)
+Definition valid_receive_call_format_def:
+  valid_receive_call_format conf src s c bytes =
+    ((s = "receive") ∧ (c = src) ∧ (LENGTH bytes = SUC conf.payload_size))
+End
+(* -- Event Format *)
+Definition valid_receive_event_format_def:
+  valid_receive_event_format conf src event =
+    case event of
+      IO_event n d c =>
+         (valid_receive_call_format conf src n d (MAP FST c))
+End
+
 (* Send Properties *)
 (* -- Sufficient Sending Conditions *)
 Theorem strans_send_cond:
@@ -376,7 +393,7 @@ Proof
   >- metis_tac[valid_send_dest_def,strans_send_cond]
 QED
 
-(* Complex FFI State Invariant Definition *)
+(*
 Definition ffi_laccepts_def:
   (ffi_laccepts 0 oracle ipred mpred fpred st =
     ∀s conf bytes.
@@ -392,5 +409,68 @@ Definition ffi_laccepts_def:
           (mpred nbytes) ∧
           (ffi_laccepts n oracle ipred mpred fpred ffi))
 End
+*)
+
+(* FFI State Receive property *)
+Definition ffi_receives_def:
+  ffi_receives conf st src msg =
+    ((conf.payload_size > 0) ∧
+    (LENGTH msg > 0) ∧
+    (∀s param bytes.
+      conf.payload_size > 0 ∧
+      LENGTH msg > 0 ∧
+      valid_receive_call_format conf src s param bytes ⇒
+      ∃nst nbytes.
+          call_FFI st s param bytes = FFI_return nst nbytes ∧
+          ((intermediate nbytes ∧
+            TAKE conf.payload_size msg = unpad nbytes ∧
+            ffi_receives conf nst src (DROP conf.payload_size msg)) ∨
+           (final nbytes ∧
+            unpad nbytes = msg))))
+Termination
+  WF_REL_TAC ‘measure (λ(_,_,_,msg). LENGTH msg)’ >>
+  rw[]
+End
+
+Theorem ffi_receives_alt:
+  ffi_receives conf st src msg =
+    ((conf.payload_size > 0) ∧
+    (LENGTH msg > 0) ∧
+    (∀s param bytes.
+      valid_receive_call_format conf src s param bytes ⇒
+      ∃nst nbytes.
+          call_FFI st s param bytes = FFI_return nst nbytes ∧
+          ((intermediate nbytes ∧
+            ∃nmsg.
+              msg = (unpad nbytes) ++ nmsg ∧
+              ffi_receives conf nst src nmsg) ∨
+           (final nbytes ∧
+            unpad nbytes = msg))))
+Proof
+  rw[Once ffi_receives_def] >>
+  rw[EQ_IMP_THM]
+  >- (first_x_assum (drule_all_then strip_assume_tac) >>
+      rw[] >> DISJ1_TAC >>
+      qexists_tac ‘DROP conf.payload_size msg’ >>
+      rw[] >> qpat_x_assum ‘TAKE _ _ = _’ (SUBST1_TAC o GSYM) >>
+      metis_tac[TAKE_DROP])
+  >- (first_x_assum (drule_all_then strip_assume_tac) >>
+      rw[] >> DISJ1_TAC >>
+      ‘conf.payload_size = LENGTH (unpad nbytes)’
+        suffices_by (disch_then SUBST1_TAC >>
+                     rw[DROP_APPEND,TAKE_APPEND,
+                        DROP_LENGTH_TOO_LONG]) >>
+      ‘SUC conf.payload_size = LENGTH nbytes’
+        suffices_by (Cases_on ‘nbytes’ >>
+                     fs[unpad_def,intermediate_def]) >>
+      ‘SUC conf.payload_size = LENGTH bytes’
+        suffices_by (rw[] >>
+                     fs[call_FFI_def] >>
+                     Cases_on ‘s ≠ ""’ >>
+                     Cases_on ‘st.oracle s st.ffi_state param bytes’ >>
+                     Cases_on ‘LENGTH l = LENGTH bytes’ >>
+                     fs[] >> metis_tac[]) >>
+      fs[valid_receive_call_format_def])
+QED
 
 val _ = export_theory ();

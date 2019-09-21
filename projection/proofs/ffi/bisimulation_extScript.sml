@@ -1,8 +1,6 @@
-open  HolKernel
-      boolLib
-      bossLib
-      relationTheory
-      bisimulationTheory;
+open HolKernel boolLib Parse bossLib;
+open relationTheory
+     bisimulationTheory;
 
 val _ = new_theory "bisimulation_ext";
 
