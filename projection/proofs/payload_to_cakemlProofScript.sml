@@ -1914,6 +1914,65 @@ Proof
       MAP_EVERY qexists_tac [‘0’,‘abc2_h+bc2_l’,‘drefs_l ++ drefs_h’] >> simp[])
 QED
 
+Theorem convDatum_corr:
+  ∀env conf hv.
+    env_asm env conf ⇒
+    ck_equiv_hol env ^DATUM (convDatum conf hv) hv
+Proof
+  Induct_on ‘hv’ >>
+  rw (convDatum_def::ck_equiv_hol_def::eval_sl) >>
+  qpat_assum ‘env_asm _ _’ (assume_tac o (el 1) o (CONJUNCTS o REWRITE_RULE [env_asm_def])) >>
+  qpat_assum ‘env_asm _ _’ (assume_tac o (el 2) o (CONJUNCTS o REWRITE_RULE [env_asm_def])) >>
+  fs[has_v_def] >>
+  rw (list_type_num_def::trans_sl)
+  >- (MAP_EVERY qexists_tac [‘0’,‘0’,‘[]’] >> rw[]) >>
+  last_x_assum (drule_all_then assume_tac) >>
+  qspecl_then [‘env’,‘^DATUM’,‘convDatum conf hv’,‘hv’,‘empty_state with refs := arefs’]
+              assume_tac ck_equiv_hol_apply_alt >>
+  rfs[] >>
+  first_x_assum (qspec_then ‘0’ assume_tac) >>
+  qexists_tac ‘bc1’ >>
+  fs[] >>
+  MAP_EVERY qexists_tac [‘bc2’,‘drefs’] >>
+  rw[]
+QED
+
+Theorem convDatumList_corr:
+  ∀env conf hvs.
+    env_asm env conf ⇒
+    ck_equiv_hol env (LIST_TYPE ^DATUM) (convDatumList conf hvs) hvs
+Proof
+  Induct_on ‘hvs’ >> rw[] >>
+  qpat_assum ‘env_asm _ _’ (assume_tac o (el 1) o (CONJUNCTS o REWRITE_RULE [env_asm_def])) >>
+  qpat_assum ‘env_asm _ _’ (assume_tac o (el 2) o (CONJUNCTS o REWRITE_RULE [env_asm_def])) >>
+  rw (convDatumList_def::ck_equiv_hol_def::eval_sl) >>
+  fs (has_v_def::list_type_num_def::trans_sl)
+  >- metis_tac[APPEND_NIL] >>
+  last_x_assum (drule_all_then assume_tac) >>
+  qspecl_then [‘env’,‘LIST_TYPE ^DATUM’,‘convDatumList conf hvs’,‘hvs’,‘empty_state with refs := arefs’]
+              assume_tac ck_equiv_hol_apply_alt >>
+  rfs[] >>
+  Q.REFINE_EXISTS_TAC ‘bc1 + bc1e’ >>
+  simp[] >>
+  drule_all_then assume_tac convDatum_corr >>
+  pop_assum (qspec_then ‘h’ assume_tac) >>
+  qspecl_then [‘env’,‘^DATUM’,‘convDatum conf h’,‘h’,‘empty_state with refs := arefs ++ drefs’]
+              assume_tac ck_equiv_hol_apply_alt >>
+  rfs[] >>
+  qmatch_asmsub_rename_tac
+    ‘∀dc.
+       evaluate
+       (empty_state with <|clock := abc1 + dc; refs := arefs ++ drefs|>) env
+       [convDatum conf h] =
+       (empty_state with <|clock := abc2 + dc; refs := arefs ++ drefs ++ drefs2 |>,
+        Rval [cV2])’ >>
+  Q.REFINE_EXISTS_TAC ‘abc1 + bc1e’ >>
+  simp[] >>
+  MAP_EVERY qexists_tac [‘0’,‘abc2 + bc2’,‘drefs ++ drefs2’] >>
+  rw[]
+QED
+
+
 Theorem ffi_irrel:
   ∀conf se cpNum cEnv pSt pCd vs cSt1 cSt2.
     cpEval_valid conf cpNum cEnv pSt pCd vs cSt1 ∧
