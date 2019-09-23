@@ -147,13 +147,13 @@ val finalv_def = Define
   ‘finalv x =
    Log Or
        (App Equality [Lit (Word8 7w); App Aw8sub [Var(Short x); Lit(IntLit 0)]])
-       (App Equality [Lit (Word8 2w); App Aw8sub [Var(Short x); Lit(IntLit 0)]])’;
+       (App Equality [Lit (Word8 6w); App Aw8sub [Var(Short x); Lit(IntLit 0)]])’;
 
 (* True iff x is a W8array containing a message tagged correctly. *)
 val validv_def = Define
   ‘validv x =
    Log Or
-       (App Equality [Lit (Word8 6w); App Aw8sub [Var(Short x); Lit(IntLit 0)]])
+       (App Equality [Lit (Word8 2w); App Aw8sub [Var(Short x); Lit(IntLit 0)]])
        (finalv x)’;
 
 (* CakeML deep embedding of the unpad function. *)
@@ -162,7 +162,9 @@ val unpadv_def = Define
          Fun "x"
          (If (validv "x")
          (Let (SOME "n")
-           (If (finalv "x")
+           (If (Log Or
+                   (App Equality [Lit (Word8 7w); App Aw8sub [Var(Short "x"); Lit(IntLit 0)]])
+                   (App Equality [Lit (Word8 2w); App Aw8sub [Var(Short "x"); Lit(IntLit 0)]]))
               (Lit(IntLit 1))
               (App (Opn Plus) [Lit (IntLit 1);
               Letrec find_one (App Opapp [Var(Short "find_one"); Lit(IntLit 1)])])
@@ -206,16 +208,16 @@ val unpadv_def = Define
 val receiveloop_def = Define ‘receiveloop conf src =
   [("receiveloop","u",
     (Let NONE (App (FFI "receive") [Lit(StrLit src); Var(Short "buff")])
+      (Let (SOME "n") (App Opapp [unpadv conf;Var(Short "buff")])
        (If (finalv "buff")
           (Con (SOME conf.cons)
-               [App Opapp [unpadv conf;Var(Short "buff")];
+               [Var (Short "n");
                 Con(SOME conf.nil) []])
           (Con(SOME conf.cons)
-               [App Opapp [unpadv conf;Var(Short "buff")];
-                App Opapp [Var(Short "receiveloop");Var(Short "u")]
-               ]
-          )
-       )
+               [Var (Short "n");
+                App Opapp [Var(Short "receiveloop");Var(Short "u")]])
+        )
+      )
     )
   )]’;
 

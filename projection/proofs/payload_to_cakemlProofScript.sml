@@ -1221,43 +1221,231 @@ Theorem receiveloop_correct:
     (* Our ffi is in the right state to receive a message *)
     ffi_receives conf s.ffi src l
     ⇒
-    ∃ck1 ck2 refs' ulv.
+    ∃ck1 ck2 bufFinl refs' ulv.
     evaluate$evaluate (s with clock:= ck1) env [App Opapp [Var (Short "receiveloop"); Con NONE []]] =
                       (s with
-                         <|clock := ck2; refs := APPEND s.refs refs';
+                         <|clock := ck2; refs := APPEND (LUPDATE bufFinl bufLoc s.refs) refs';
                            ffi:= s.ffi with
                            <|io_events := s.ffi.io_events ++ receive_events conf bufInit src l;
                              ffi_state := update_state s.ffi.ffi_state s.ffi.oracle (receive_events conf bufInit src l)
                             |>
                           |>, Rval [ulv]) ∧
-    LIST_TYPE ^WORD8 l ulv
+    LIST_TYPE (LIST_TYPE ^WORD8) (MAP unpad (compile_message conf l)) ulv
 Proof
   ntac 2 gen_tac >>
   completeInduct_on ‘LENGTH l’ >>
-  rw (receiveloop_def::eval_sl_nffi) >>
+  rw [receiveloop_def] >>
+  qabbrev_tac ‘NESTREC = App Opapp [Var(Short "receiveloop");Var(Short "u")]’ >>
+  qabbrev_tac ‘NOEVAL = App Opapp [unpadv conf; Var (Short "buff")]’ >>
+  rw eval_sl_nffi >>
+  fs[store_lookup_def] >>
   PURE_ONCE_REWRITE_TAC [find_recfun_def] >>
   rw eval_sl_nffi >>
   Q.REFINE_EXISTS_TAC ‘SUC ck1’ >>
   rw[dec_clock_def,ADD1] >>
   simp[IMPLODE_EXPLODE_I,MAP_MAP_o,o_DEF,
      SIMP_RULE std_ss [o_DEF] n2w_ORD_CHR_w2n] >>
-  pop_assum (assume_tac o ONCE_REWRITE_RULE [ffi_receives_alt]) >>
+  qpat_x_assum ‘ffi_receives _ _ _ _’ (assume_tac o ONCE_REWRITE_RULE [ffi_receives_def]) >>
   rfs[] >>
   first_x_assum (qspecl_then [‘"receive"’,‘src’,‘bufInit’] assume_tac) >>
   ‘valid_receive_call_format conf src "receive" src bufInit’
     by rw[valid_receive_call_format_def] >>
   reverse (fs[final_def,intermediate_def]) >>
-  rw (finalv_def::eval_sl)
-  (* UP TO HERE *)
+  rfs[] >>
+  rw (finalv_def::eval_sl) 
   (* Final Message *)
   >- (rw (EL_LUPDATE::eval_sl) >>
-      Cases_on ‘nbytes’ >> fs[final_def]
+      Cases_on ‘pad conf l’ >> fs[final_def] >>
+      rw (EL_LUPDATE::eval_sl) >>
+      qpat_assum ‘env_asm _ _’ (assume_tac o (el 1) o (CONJUNCTS o REWRITE_RULE [env_asm_def])) >>
+      qpat_assum ‘env_asm _ _’ (assume_tac o (el 2) o (CONJUNCTS o REWRITE_RULE [env_asm_def])) >>
+      fs[has_v_def] >>
+      qmatch_goalsub_abbrev_tac ‘evaluate (sUn with clock := _) envUn [NOEVAL]’ >>
+      qunabbrev_tac ‘NOEVAL’
       (* Message takes whole space *)
-      >- cheat
-      (* Message takes less space *)
-      >- cheat)
+      >- (qspecl_then [‘envUn’,‘conf’,‘7w::t’,‘Var (Short "buff")’,‘bufLoc’,
+                       ‘sUn’,‘sUn’,‘[]’] assume_tac unpadv_correct >>
+          ‘env_asm envUn conf’
+            by fs[Abbr ‘envUn’,env_asm_def,has_v_def,in_module_def] >>
+          ‘evaluate sUn envUn [Var (Short "buff")] =
+            (sUn with refs := sUn.refs ++ [], Rval[Loc bufLoc])’
+            by fs (Abbr ‘envUn’::eval_sl) >>
+          ‘store_lookup bufLoc (sUn.refs ++ []) = SOME (W8array (7w::t))’
+            by rw (Abbr ‘sUn’::EL_LUPDATE::eval_sl) >>
+          ‘LENGTH (7w::t) > 0’
+            by rw[] >>
+          fs[] >>
+          Q.REFINE_EXISTS_TAC ‘sUn.clock + ck1’ >>
+          qpat_x_assum ‘evaluate _ _ [App Opapp _] = _’ assume_tac >>
+          dxrule_then assume_tac evaluate_add_to_clock >>
+          fs[store_lookup_def] >>
+          rw (EL_LUPDATE::eval_sl) >>
+          qunabbrev_tac ‘sUn’ >>
+          rw (EL_APPEND_EQN::LENGTH_LUPDATE::EL_LUPDATE::eval_sl) >>
+          rename1 ‘(s with <| refs := _; ffi := _|>).refs ++ drefs’ >>
+          MAP_EVERY qexists_tac [‘ck2 + s.clock’,‘W8array (7w::t)’,‘drefs’] >>
+          rw[state_component_equality] >>
+          fs[call_FFI_def,receive_events_def,update_state_def,
+                 unpad_def] >>
+          Cases_on ‘s.ffi.oracle "receive" s.ffi.ffi_state src bufInit’ >>
+          fs[] >>
+          rename1 ‘LENGTH rl = LENGTH bufInit’ >>
+          Cases_on ‘LENGTH rl = LENGTH bufInit’ >>
+          fs[] >>
+          rfs[LENGTH] >>
+          ‘compile_message conf l = [pad conf t]’
+                by (rw[Once compile_message_def] >>
+                    rfs[final_def,pad_def])
+          >- (qpat_x_assum ‘_ = nst’ (SUBST1_TAC o GSYM) >>
+              rw[ffi_state_component_equality] >>
+              EVAL_TAC >> rw[Once ZIP_def] >>
+              rw[Once update_state_def] >>
+              ‘MAP FST (ZIP (bufInit,7w::t)) = bufInit’
+                by metis_tac[MAP_ZIP,LENGTH] >>
+              rw[] >> SELECT_ELIM_TAC >> rw[] >>
+              metis_tac[MAP_ZIP,LENGTH])
+          >- (rw[unpad_def] >>
+              Cases_on ‘t’ >> rw[pad_def,unpad_def]
+              >- fs[LENGTH] >>
+              rw[Once LIST_TYPE_def,list_type_num_def] >>
+              rw[Once LIST_TYPE_def]))
+      (* Message takes some of the space *)
+      >- (qspecl_then [‘envUn’,‘conf’,‘6w::t’,‘Var (Short "buff")’,‘bufLoc’,
+                       ‘sUn’,‘sUn’,‘[]’] assume_tac unpadv_correct >>
+          ‘env_asm envUn conf’
+            by fs[Abbr ‘envUn’,env_asm_def,has_v_def,in_module_def] >>
+          ‘evaluate sUn envUn [Var (Short "buff")] =
+            (sUn with refs := sUn.refs ++ [], Rval[Loc bufLoc])’
+            by fs (Abbr ‘envUn’::eval_sl) >>
+          ‘store_lookup bufLoc (sUn.refs ++ []) = SOME (W8array (6w::t))’
+            by rw (Abbr ‘sUn’::EL_LUPDATE::eval_sl) >>
+          ‘LENGTH (6w::t) > 0’
+            by rw[] >>
+          fs[] >>
+          Q.REFINE_EXISTS_TAC ‘sUn.clock + ck1’ >>
+          qpat_x_assum ‘evaluate _ _ [App Opapp _] = _’ assume_tac >>
+          dxrule_then assume_tac evaluate_add_to_clock >>
+          fs[store_lookup_def] >>
+          rw (EL_LUPDATE::eval_sl) >>
+          qunabbrev_tac ‘sUn’ >>
+          rw (EL_APPEND_EQN::LENGTH_LUPDATE::EL_LUPDATE::eval_sl) >>
+          rename1 ‘(s with <| refs := _; ffi := _|>).refs ++ drefs’ >>
+          MAP_EVERY qexists_tac [‘ck2 + s.clock’,‘W8array (6w::t)’,‘drefs’] >>
+          rw[state_component_equality] >>
+          fs[call_FFI_def,receive_events_def,update_state_def] >>
+          Cases_on ‘s.ffi.oracle "receive" s.ffi.ffi_state src bufInit’ >>
+          fs[] >>
+          rename1 ‘LENGTH rl = LENGTH bufInit’ >>
+          Cases_on ‘LENGTH rl = LENGTH bufInit’ >>
+          fs[] >>
+          rfs[LENGTH] >>
+          ‘compile_message conf l = [pad conf l]’
+                by (rw[Once compile_message_def] >>
+                    rfs[final_def,pad_def]) >>
+          rw[ZIP_def,ffi_state_component_equality]
+          >- (rw[update_state_def] >>
+              ‘(MAP FST (ZIP (bufInit,6w::t)) = bufInit) ∧
+               (MAP SND (ZIP (bufInit,6w::t)) = 6w::t)’
+                by (‘∀x. LENGTH (pad conf x) = SUC conf.payload_size’
+                      suffices_by (rw[] >> metis_tac[MAP_ZIP,LENGTH]) >>
+                    rw[pad_def]) >>
+              rw[] >> SELECT_ELIM_TAC >> rw[])
+          >- (rw[Once LIST_TYPE_def,list_type_num_def] >>
+              rw[Once LIST_TYPE_def])))
   (* Intermediate Message *)
-  >- (cheat)
+  >- (rw (EL_LUPDATE::eval_sl) >>
+      Cases_on ‘pad conf l’ >> fs[intermediate_def] >>
+      rw (EL_LUPDATE::eval_sl) >>
+      qpat_assum ‘env_asm _ _’ (assume_tac o (el 1) o (CONJUNCTS o REWRITE_RULE [env_asm_def])) >>
+      qpat_assum ‘env_asm _ _’ (assume_tac o (el 2) o (CONJUNCTS o REWRITE_RULE [env_asm_def])) >>
+      fs[has_v_def] >>
+      qmatch_goalsub_abbrev_tac ‘evaluate (sUn with clock := _) envUn [NOEVAL]’ >>
+      qunabbrev_tac ‘NOEVAL’ >>
+      qspecl_then [‘envUn’,‘conf’,‘2w::t’,‘Var (Short "buff")’,‘bufLoc’,
+                       ‘sUn’,‘sUn’,‘[]’] assume_tac unpadv_correct >>
+      ‘env_asm envUn conf’
+        by fs[Abbr ‘envUn’,env_asm_def,has_v_def,in_module_def] >>
+      ‘evaluate sUn envUn [Var (Short "buff")] =
+        (sUn with refs := sUn.refs ++ [], Rval[Loc bufLoc])’
+        by fs (Abbr ‘envUn’::eval_sl) >>
+      ‘store_lookup bufLoc (sUn.refs ++ []) = SOME (W8array (2w::t))’
+        by rw (Abbr ‘sUn’::EL_LUPDATE::eval_sl) >>
+      ‘LENGTH (2w::t) > 0’
+        by rw[] >>
+      fs[] >>
+      qpat_x_assum ‘evaluate _ _ [App Opapp _] = _’ assume_tac >>
+      dxrule_then assume_tac evaluate_add_to_clock >>
+      Q.REFINE_EXISTS_TAC ‘ck1 + ck1e’ >>
+      fs[store_lookup_def] >>
+      rw (EL_LUPDATE::eval_sl) >>
+      qunabbrev_tac ‘sUn’ >>
+      rw (EL_APPEND_EQN::LENGTH_LUPDATE::EL_LUPDATE::eval_sl) >>
+      qmatch_goalsub_abbrev_tac ‘evaluate (sRn with clock := _) envRn [NESTREC]’ >>
+      qunabbrev_tac ‘NESTREC’ >>
+      last_x_assum (qspec_then ‘LENGTH (DROP conf.payload_size l)’ assume_tac) >>
+      fs[LENGTH_DROP] >> rfs[] >>
+      first_x_assum (qspec_then ‘DROP conf.payload_size l’ assume_tac) >>
+      fs[LENGTH_DROP] >> rfs[] >>
+      first_x_assum (qspecl_then [‘envRn’,‘env'’,‘sRn’,‘src’,
+                                  ‘bufLoc’,‘2w::t’]
+                                 assume_tac) >>
+      rfs[] >>
+      ‘nsLookup envRn.v (Short "receiveloop") =
+       SOME
+         (Recclosure env' (receiveloop conf (MAP (CHR ∘ w2n) src))
+            "receiveloop") ∧
+       (bufLoc < LENGTH sRn.refs ∧ EL bufLoc sRn.refs = W8array (2w::t)) ∧
+       LENGTH t = conf.payload_size ∧
+       ffi_receives conf sRn.ffi src (DROP conf.payload_size l)’
+        by (MAP_EVERY qunabbrev_tac [‘sRn’, ‘envRn’] >>
+            fs[EL_LUPDATE,receiveloop_def,o_DEF,finalv_def] >>
+            rw[EL_APPEND_EQN,LENGTH_LUPDATE,EL_LUPDATE] >>
+            ‘∀x. LENGTH (pad conf x) = SUC conf.payload_size’
+              suffices_by (disch_then (qspec_then ‘l’ mp_tac) >>
+                           fs[]) >>
+            rw[pad_def]) >>
+      fs[] >> ntac 5 (pop_assum (K ALL_TAC)) >>
+      dxrule_then assume_tac evaluate_add_to_clock >>
+      fs[] >> pop_assum (assume_tac o REWRITE_RULE eval_sl) >>
+      fs[] >> pop_assum (assume_tac o REWRITE_RULE eval_sl) >>
+      fs[] >> rw eval_sl >> 
+      ‘nsLookup envRn.v (Short "u") = SOME (Conv NONE [])’
+        by (qunabbrev_tac ‘envRn’ >> rw eval_sl) >>
+      rw eval_sl >>
+      qmatch_asmsub_rename_tac ‘sRn with clock := ack1 + _’ >>
+      qmatch_asmsub_rename_tac ‘Rval [aulv]’ >>
+      Q.REFINE_EXISTS_TAC ‘ack1 + ck1e’ >>
+      simp[] >>
+      ntac 2 (pop_assum (K ALL_TAC)) >>
+      MAP_EVERY qunabbrev_tac [‘sRn’,‘envRn’] >>
+      qmatch_goalsub_rename_tac ‘s with <| clock := _ + (FC1 + FC2);
+                                           refs := LUPDATE _ _ _ ++ drefs2; ffi := _;
+                                           refs := LUPDATE _ _ _ ++ drefs ; ffi := _|>’ >>
+      MAP_EVERY qexists_tac [‘0’,‘FC1 + FC2’,‘bufFinl’,‘drefs ++ drefs2’] >>
+      fs[call_FFI_def,receive_events_def,update_state_def] >>
+      Cases_on ‘s.ffi.oracle "receive" s.ffi.ffi_state src bufInit’ >>
+      fs[] >>
+      rename1 ‘LENGTH rl = LENGTH bufInit’ >>
+      Cases_on ‘LENGTH rl = LENGTH bufInit’ >>
+      fs[] >>
+      rfs[LENGTH] >>
+      rw[state_component_equality] >>
+      ‘compile_message conf l = (2w::t)::compile_message conf (DROP conf.payload_size l)’
+        by (rw[Once compile_message_def] >>
+            fs[final_def])
+      >- (rw[LUPDATE_LUPDATE,LUPDATE_APPEND,LENGTH_LUPDATE,
+             LENGTH_APPEND])
+      >- (rw[ffi_state_component_equality,update_state_def] >>
+          qmatch_goalsub_abbrev_tac ‘update_state lSt _ _ = update_state rSt _ _’ >>
+          ‘lSt = rSt’ suffices_by rw[] >>
+          MAP_EVERY qunabbrev_tac [‘lSt’,‘rSt’] >>
+          ‘(MAP FST (ZIP (bufInit,2w::t)) = bufInit) ∧
+           (MAP SND (ZIP (bufInit,2w::t)) = 2w::t)’
+            by (‘∀x. LENGTH (pad conf x) = SUC conf.payload_size’
+                  suffices_by (rw[] >> metis_tac[MAP_ZIP,LENGTH]) >>
+                rw[pad_def]) >>
+          rw[] >> SELECT_ELIM_TAC >> rw[])
+      >- rw[LIST_TYPE_def,list_type_num_def])
 QED
 
 

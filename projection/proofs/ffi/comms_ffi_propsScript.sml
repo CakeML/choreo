@@ -422,16 +422,16 @@ Definition ffi_receives_def:
       valid_receive_call_format conf src s param bytes ⇒
       ∃nst nbytes.
           call_FFI st s param bytes = FFI_return nst nbytes ∧
-          ((intermediate nbytes ∧
-            TAKE conf.payload_size msg = unpad nbytes ∧
-            ffi_receives conf nst src (DROP conf.payload_size msg)) ∨
-           (final nbytes ∧
-            unpad nbytes = msg))))
+          nbytes = pad conf msg ∧
+          (final nbytes ∨
+           (intermediate nbytes ∧
+            ffi_receives conf nst src (DROP conf.payload_size msg)))))
 Termination
   WF_REL_TAC ‘measure (λ(_,_,_,msg). LENGTH msg)’ >>
   rw[]
 End
 
+(*
 Theorem ffi_receives_alt:
   ffi_receives conf st src msg =
     ((conf.payload_size > 0) ∧
@@ -442,10 +442,11 @@ Theorem ffi_receives_alt:
           call_FFI st s param bytes = FFI_return nst nbytes ∧
           ((intermediate nbytes ∧
             ∃nmsg.
+              nbytes = pad msg ∧
               msg = (unpad nbytes) ++ nmsg ∧
               ffi_receives conf nst src nmsg) ∨
            (final nbytes ∧
-            unpad nbytes = msg))))
+            nbytes = pad msg))))
 Proof
   rw[Once ffi_receives_def] >>
   rw[EQ_IMP_THM]
@@ -472,5 +473,5 @@ Proof
                      fs[] >> metis_tac[]) >>
       fs[valid_receive_call_format_def])
 QED
-
+*)
 val _ = export_theory ();
