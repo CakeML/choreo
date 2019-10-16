@@ -1,8 +1,8 @@
 open HolKernel boolLib Parse bossLib;
 open relationTheory
 	 pred_setTheory;
-open payloadLangTheory
-     payloadSemanticsTheory;
+open payloadSemanticsTheory
+     payloadLangTheory;
 
 val _ = new_theory "payloadProps";
 
