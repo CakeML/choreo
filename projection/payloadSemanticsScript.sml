@@ -124,17 +124,17 @@ Inductive trans:
              (NEndpoint p (s with bindings := s.bindings |+ (v,f(MAP (THE o FLOOKUP s.bindings) vl))) e))
 
   (* Par-L *)
-∧ (∀conf n1 n1' n2 alpha.
-    trans conf n1 alpha n1'
+∧ (∀conf n1 n1' n2 α.
+    trans conf n1 α n1'
     ⇒ trans conf (NPar n1 n2)
-             alpha
+             α
              (NPar n1' n2))
 
   (* Par-R *)
-∧ (∀conf n1 n2 n2' alpha.
-    trans conf n2 alpha n2'
+∧ (∀conf n1 n2 n2' α.
+    trans conf n2 α n2'
     ⇒ trans conf (NPar n1 n2)
-             alpha
+             α
              (NPar n1 n2'))
 End
 
