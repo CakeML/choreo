@@ -393,23 +393,6 @@ Proof
   >- metis_tac[valid_send_dest_def,strans_send_cond]
 QED
 
-(*
-Definition ffi_laccepts_def:
-  (ffi_laccepts 0 oracle ipred mpred fpred st =
-    ∀s conf bytes.
-      ipred s conf bytes ⇒
-      ∃ffi nbytes.
-          (oracle s st conf bytes = Oracle_return ffi nbytes) ∧
-          (fpred nbytes)) ∧
-  (ffi_laccepts (SUC n) oracle ipred mpred fpred st =
-    ∀s conf bytes.
-      ipred s conf bytes ⇒
-        ∃ffi nbytes.
-          (oracle s st conf bytes = Oracle_return ffi nbytes) ∧
-          (mpred nbytes) ∧
-          (ffi_laccepts n oracle ipred mpred fpred ffi))
-End
-*)
 
 (* FFI State Receive property *)
 Definition ffi_receives_def:
@@ -431,47 +414,4 @@ Termination
   rw[]
 End
 
-(*
-Theorem ffi_receives_alt:
-  ffi_receives conf st src msg =
-    ((conf.payload_size > 0) ∧
-    (LENGTH msg > 0) ∧
-    (∀s param bytes.
-      valid_receive_call_format conf src s param bytes ⇒
-      ∃nst nbytes.
-          call_FFI st s param bytes = FFI_return nst nbytes ∧
-          ((intermediate nbytes ∧
-            ∃nmsg.
-              nbytes = pad msg ∧
-              msg = (unpad nbytes) ++ nmsg ∧
-              ffi_receives conf nst src nmsg) ∨
-           (final nbytes ∧
-            nbytes = pad msg))))
-Proof
-  rw[Once ffi_receives_def] >>
-  rw[EQ_IMP_THM]
-  >- (first_x_assum (drule_all_then strip_assume_tac) >>
-      rw[] >> DISJ1_TAC >>
-      qexists_tac ‘DROP conf.payload_size msg’ >>
-      rw[] >> qpat_x_assum ‘TAKE _ _ = _’ (SUBST1_TAC o GSYM) >>
-      metis_tac[TAKE_DROP])
-  >- (first_x_assum (drule_all_then strip_assume_tac) >>
-      rw[] >> DISJ1_TAC >>
-      ‘conf.payload_size = LENGTH (unpad nbytes)’
-        suffices_by (disch_then SUBST1_TAC >>
-                     rw[DROP_APPEND,TAKE_APPEND,
-                        DROP_LENGTH_TOO_LONG]) >>
-      ‘SUC conf.payload_size = LENGTH nbytes’
-        suffices_by (Cases_on ‘nbytes’ >>
-                     fs[unpad_def,intermediate_def]) >>
-      ‘SUC conf.payload_size = LENGTH bytes’
-        suffices_by (rw[] >>
-                     fs[call_FFI_def] >>
-                     Cases_on ‘s ≠ ""’ >>
-                     Cases_on ‘st.oracle s st.ffi_state param bytes’ >>
-                     Cases_on ‘LENGTH l = LENGTH bytes’ >>
-                     fs[] >> metis_tac[]) >>
-      fs[valid_receive_call_format_def])
-QED
-*)
 val _ = export_theory ();
