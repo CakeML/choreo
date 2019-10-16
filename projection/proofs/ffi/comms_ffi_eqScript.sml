@@ -28,16 +28,6 @@ Proof
   rw [ffi_eq_def,BISIM_REL_IS_EQUIV_REL]
 QED
 
-(* Equivalence means same sending destinations *)
-Theorem ffi_eq_sendval:
-  ∀x y. ffi_eq conf x y ⇒
-    (∀rp. valid_send_dest rp x ⇔ valid_send_dest rp y)
-Proof
-  rw[EQ_IMP_THM] >>
-  metis_tac[strans_send_cond,strans_dest_check,ffi_eq_def,
-            BISIM_REL_def,BISIM_def]
-QED
-
 (* Irrelevance if queues are similar *)
 Theorem qsame_irrel_ffi_eq:
   ∀c q1 q2 N.
@@ -465,6 +455,212 @@ Proof
             output_trans_pres_wf,
             internal_trans_equiv_pres,
             internal_trans_pres_wf]
+QED
+
+(* RELATIONSHIP TO COMMUNICATION PROPS *)
+(* Equivalence means same sending destinations *)
+Theorem ffi_eq_sendval:
+  ∀conf x y. ffi_eq conf x y ⇒
+    (∀rp. valid_send_dest rp x ⇔ valid_send_dest rp y)
+Proof
+  rw[EQ_IMP_THM] >>
+  metis_tac[strans_send_cond,strans_dest_check,ffi_eq_def,
+            BISIM_REL_def,BISIM_def]
+QED
+
+(* Equivalence means same receiving capacity *)
+Theorem functional_ARecv:
+  ∀conf x x2a x2b rp msga msgb.
+    ffi_wf x ∧
+    strans conf x (ARecv rp msga) x2a ∧
+    strans conf x (ARecv rp msgb) x2b ⇒
+    msga = msgb
+Proof
+  rw[] >> MAP_EVERY PairCases_on [‘x’,‘x2a’,‘x2b’] >>
+  ‘x2a0 = x0’
+    by metis_tac [strans_pres_pnum,pairTheory.FST] >>
+  ‘x2b0 = x0’
+    by metis_tac [strans_pres_pnum,pairTheory.FST] >>
+  rw[] >>
+  fs[strans_receive_equiv] >>
+  rename [‘msga = msgb’,
+          ‘RTC (active_trans conf x0) (x1,x2) (qi1a,nia)’,
+          ‘output_trans conf x0 (qi1a,nia) (rp,msga) (qi2a,nia)’,
+          ‘RTC (active_trans conf x0) (x1,x2) (qi1b,nib)’,
+          ‘output_trans conf x0 (qi1b,nib) (rp,msgb) (qi2b,nib)’] >>
+  ‘∃qC nC. RTC (active_trans conf x0) (qi1a,nia) (qC,nC) ∧
+           RTC (active_trans conf x0) (qi1b,nib) (qC,nC)’
+    by (rw[GSYM pairTheory.EXISTS_PROD] >>
+        irule active_active_comm >>
+        metis_tac[]) >>
+  ‘∃qFA nFA. output_trans conf x0 (qC,nC) (rp,msga) (qFA,nFA) ∧
+             RTC (active_trans conf x0) (qi2a,nia) (qFA,nFA)’
+    by (rw[GSYM pairTheory.EXISTS_PROD] >>
+        irule active_rec_comm >>
+        metis_tac[active_trans_pres_wf]) >>
+  ‘∃qFB nFB. output_trans conf x0 (qC,nC) (rp,msgb) (qFB,nFB) ∧
+             RTC (active_trans conf x0) (qi2b,nib) (qFB,nFB)’
+    by (rw[GSYM pairTheory.EXISTS_PROD] >>
+        irule active_rec_comm >>
+        metis_tac[active_trans_pres_wf]) >>
+  rpt (qpat_x_assum ‘output_trans _ _ (qC,nC) _ _’ mp_tac) >>
+  rpt (pop_assum (K ALL_TAC)) >>
+  rw[output_trans_def] >>
+  pop_assum (K ALL_TAC) >>
+  last_x_assum (K ALL_TAC) >>
+  fs[finite_mapTheory.FLOOKUP_EXT,FUN_EQ_THM] >>
+  pop_assum (qspec_then ‘rp’ assume_tac) >>
+  fs[finite_mapTheory.FLOOKUP_UPDATE]
+QED
+
+Theorem ffi_eq_ARecv:
+  ∀conf x y x2 y2 rp msga msgb.
+    ffi_wf x ∧
+    ffi_eq conf x y ∧
+    strans conf x (ARecv rp msga) x2 ∧
+    strans conf y (ARecv rp msgb) y2 ⇒
+    msga = msgb
+Proof
+  CCONTR_TAC >> fs[] >>
+  ‘∃x2b. strans conf x (ARecv rp msgb) x2b’
+    suffices_by metis_tac[functional_ARecv] >>
+  metis_tac[ffi_eq_def,BISIM_REL_def,BISIM_def]
+QED
+
+Theorem some_satisfies_cond:
+  ∀P. (some x. P x) = SOME z ⇒ P z
+Proof
+  rw[some_def] >> SELECT_ELIM_TAC >>
+  metis_tac[]
+QED
+
+Theorem ffi_eq_receives:
+  ∀conf x y.
+    ffi_wf x.ffi_state ∧
+    ffi_wf y.ffi_state ∧
+    x.oracle = comms_ffi_oracle conf ∧
+    y.oracle = comms_ffi_oracle conf ∧
+    ffi_eq conf x.ffi_state y.ffi_state ⇒
+    ffi_receives conf x = ffi_receives conf y
+Proof
+  simp[FUN_EQ_THM,PULL_FORALL] >>
+  rpt gen_tac >>
+  rename1 ‘ffi_receives conf x src msg = ffi_receives conf y src msg’ >>
+  MAP_EVERY qid_spec_tac [‘y’,‘x’] >>
+  completeInduct_on ‘LENGTH msg’ >>
+  rw[Once ffi_receives_def] >>
+  qmatch_goalsub_abbrev_tac ‘LP ⇔ _’ >>
+  rw[Once ffi_receives_def] >>
+  qunabbrev_tac ‘LP’ >>
+  qmatch_goalsub_abbrev_tac ‘PA ∧ PB ∧ PCA ⇔ PA ∧ PB ∧ PCB’ >>
+  ‘PCA ⇔ PCB’
+    suffices_by rw[] >>
+  MAP_EVERY qunabbrev_tac [‘PA’,‘PB’,‘PCA’,‘PCB’] >>
+  rw[EQ_IMP_THM] >>
+  first_x_assum (drule_all_then strip_assume_tac) >>
+  rw[]
+  >- (rfs[call_FFI_def,valid_receive_call_format_def,
+         comms_ffi_oracle_def,ffi_receive_def] >>
+      DEEP_INTRO_TAC some_intro >> rw[] >>
+      Cases_on ‘some (m,ns). (strans conf x.ffi_state (ARecv param m) ns)’ >>
+      fs[] >>
+      rename1 ‘(some (m,ns). strans conf x.ffi_state (ARecv param m) ns) = SOME nsb’ >>
+      ‘(λ(m,ns). strans conf x.ffi_state (ARecv param m) ns) nsb’
+            by metis_tac[some_satisfies_cond] >>
+      PairCases_on ‘nsb’ >> fs[]
+      >- (rename1 ‘(λ(m,ns). strans conf y.ffi_state (ARecv param m) ns) ns’ >>
+          PairCases_on ‘ns’ >> 
+          Cases_on ‘LENGTH ns0 = SUC conf.payload_size’ >> fs[] >>
+          ‘nsb0 = ns0’
+            by metis_tac[ffi_eq_ARecv] >>
+          fs[])
+      >- (rw[pairTheory.EXISTS_PROD] >>
+          qexists_tac ‘nsb0’ >>
+          rw[GSYM pairTheory.EXISTS_PROD] >>
+          qabbrev_tac ‘L = ARecv param nsb0’ >>
+          qabbrev_tac ‘x2 = (nsb1,nsb2,nsb3)’ >>
+          metis_tac[ffi_eq_def,BISIM_REL_def,BISIM_def]))
+  >- (rfs[call_FFI_def,valid_receive_call_format_def,
+         comms_ffi_oracle_def,ffi_receive_def] >>
+      DEEP_INTRO_TAC some_intro >> rw[] >>
+      Cases_on ‘some (m,ns). (strans conf x.ffi_state (ARecv param m) ns)’ >>
+      fs[] >>
+      rename1 ‘(some (m,ns). strans conf x.ffi_state (ARecv param m) ns) = SOME nsb’ >>
+      ‘(λ(m,ns). strans conf x.ffi_state (ARecv param m) ns) nsb’
+            by metis_tac[some_satisfies_cond] >>
+      PairCases_on ‘nsb’ >> fs[]
+      >- (rename1 ‘(λ(m,ns). strans conf y.ffi_state (ARecv param m) ns) ns’ >>
+          PairCases_on ‘ns’ >> fs[] >>
+          ‘nsb0 = ns0’
+            by metis_tac[ffi_eq_ARecv] >>
+          fs[] >> Cases_on ‘LENGTH ns0 = SUC conf.payload_size’ >> fs[] >>
+          DISJ2_TAC >>
+          last_x_assum (qspec_then ‘LENGTH (DROP conf.payload_size msg)’ assume_tac) >>
+          rfs[] >> first_x_assum (qspec_then ‘DROP conf.payload_size msg’ assume_tac) >>
+          rfs[] >> qmatch_goalsub_abbrev_tac ‘ffi_receives _ nstY _ _’ >>
+          first_x_assum (qspecl_then [‘nst’,‘nstY’] assume_tac) >>
+          rfs[] >> pop_assum irule >>
+          qunabbrev_tac ‘nstY’ >>
+          qpat_x_assum ‘_ = nst’ (SUBST1_TAC o GSYM) >>
+          rw[] >> metis_tac[strans_pres_wf,ffi_eq_pres])
+      >- (rw[pairTheory.EXISTS_PROD] >>
+          qexists_tac ‘nsb0’ >>
+          rw[GSYM pairTheory.EXISTS_PROD] >>
+          qabbrev_tac ‘L = ARecv param nsb0’ >>
+          qabbrev_tac ‘x2 = (nsb1,nsb2,nsb3)’ >>
+          metis_tac[ffi_eq_def,BISIM_REL_def,BISIM_def]))
+  >- (rfs[call_FFI_def,valid_receive_call_format_def,
+         comms_ffi_oracle_def,ffi_receive_def] >>
+      DEEP_INTRO_TAC some_intro >> rw[] >>
+      Cases_on ‘some (m,ns). (strans conf y.ffi_state (ARecv param m) ns)’ >>
+      fs[] >>
+      rename1 ‘(some (m,ns). strans conf y.ffi_state (ARecv param m) ns) = SOME nsb’ >>
+      ‘(λ(m,ns). strans conf y.ffi_state (ARecv param m) ns) nsb’
+            by metis_tac[some_satisfies_cond] >>
+      PairCases_on ‘nsb’ >> fs[]
+      >- (rename1 ‘(λ(m,ns). strans conf x.ffi_state (ARecv param m) ns) ns’ >>
+          PairCases_on ‘ns’ >> 
+          Cases_on ‘LENGTH ns0 = SUC conf.payload_size’ >> fs[] >>
+          ‘nsb0 = ns0’
+            by metis_tac[ffi_eq_ARecv] >>
+          fs[])
+      >- (rw[pairTheory.EXISTS_PROD] >>
+          qexists_tac ‘nsb0’ >>
+          rw[GSYM pairTheory.EXISTS_PROD] >>
+          qabbrev_tac ‘L = ARecv param nsb0’ >>
+          qabbrev_tac ‘y2 = (nsb1,nsb2,nsb3)’ >>
+          metis_tac[ffi_eq_def,BISIM_REL_def,BISIM_def]))
+  >- (rfs[call_FFI_def,valid_receive_call_format_def,
+         comms_ffi_oracle_def,ffi_receive_def] >>
+      DEEP_INTRO_TAC some_intro >> rw[] >>
+      Cases_on ‘some (m,ns). (strans conf y.ffi_state (ARecv param m) ns)’ >>
+      fs[] >>
+      rename1 ‘(some (m,ns). strans conf y.ffi_state (ARecv param m) ns) = SOME nsb’ >>
+      ‘(λ(m,ns). strans conf y.ffi_state (ARecv param m) ns) nsb’
+            by metis_tac[some_satisfies_cond] >>
+      PairCases_on ‘nsb’ >> fs[]
+      >- (rename1 ‘(λ(m,ns). strans conf x.ffi_state (ARecv param m) ns) ns’ >>
+          PairCases_on ‘ns’ >> fs[] >>
+          ‘nsb0 = ns0’
+            by metis_tac[ffi_eq_ARecv] >>
+          fs[] >> Cases_on ‘LENGTH ns0 = SUC conf.payload_size’ >> fs[] >>
+          DISJ2_TAC >>
+          last_x_assum (qspec_then ‘LENGTH (DROP conf.payload_size msg)’ assume_tac) >>
+          rfs[] >> first_x_assum (qspec_then ‘DROP conf.payload_size msg’ assume_tac) >>
+          rfs[] >> qmatch_goalsub_abbrev_tac ‘ffi_receives _ nstX _ _’ >>
+          first_x_assum (qspecl_then [‘nst’,‘nstX’] assume_tac) >>
+          rfs[] >> pop_assum irule >>
+          qunabbrev_tac ‘nstX’ >>
+          qpat_x_assum ‘_ = nst’ (SUBST1_TAC o GSYM) >>
+          rw[] >>
+          metis_tac[strans_pres_wf,ffi_eq_pres,ffi_eq_equivRel,
+                    equivalence_def,symmetric_def])
+      >- (rw[pairTheory.EXISTS_PROD] >>
+          qexists_tac ‘nsb0’ >>
+          rw[GSYM pairTheory.EXISTS_PROD] >>
+          qabbrev_tac ‘L = ARecv param nsb0’ >>
+          qabbrev_tac ‘y2 = (nsb1,nsb2,nsb3)’ >>
+          metis_tac[ffi_eq_def,BISIM_REL_def,BISIM_def]))
 QED
 
 val _ = export_theory ();
