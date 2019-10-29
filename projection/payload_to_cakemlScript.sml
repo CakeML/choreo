@@ -264,24 +264,17 @@ val compile_endpoint_def = Define ‘
   )
 ∧ (compile_endpoint conf vs (Receive p v l e) =
     Let (SOME (ps2cs v))
-        (Let (SOME "buff") (App Aw8alloc [buffer_size conf;Lit(Word8 0w)])
+        (Let (SOME "buff") (App Aw8alloc [Lit(IntLit(&(conf.payload_size + 1)));
+                                          Lit(Word8 0w)])
              (Letrec
                 (receiveloop conf (MAP (CHR o w2n) p))
                 (App Opapp
                   [Var conf.concat;
                    App Opapp
-                     [
-                      App Opapp
-                        [
-                          Var conf.append;
-                          App Opapp [
-                                      Var(Short "receiveloop");
-                                      Con NONE []
-                                    ]
-                        ];
-                      convDatumList conf l
-                      ]
-                  ]
+                     [App Opapp [Var conf.append;
+                                 convDatumList conf l];
+                      App Opapp [Var(Short "receiveloop");
+                                 Con NONE []]             ]]
                 )
              )
         )
