@@ -4,6 +4,10 @@ open relationTheory
 
 val _ = new_theory "bisimulation_ext";
 
+(* This file is in an odd format because it should be
+   PRd into HOL *)
+
+(* Bisimulation Relation is equivalence relation *)
 val BISIM_REL_IS_EQUIV_REL = store_thm(
   "BISIM_REL_IS_EQUIV_REL",
   ``!ts. equivalence (BISIM_REL ts)``,
@@ -21,6 +25,8 @@ val BISIM_REL_IS_EQUIV_REL = store_thm(
       FULL_SIMP_TAC (srw_ss ()) [BISIM_def] >>
       METIS_TAC[]));
 
+(* BISIMULATION RELATION IS COINDUCTION *)
+(* Define equivalent coinduction bi *)
 val (bi_rules,bi_coind,bi_cases) =
 Hol_coreln
 ‘
@@ -28,7 +34,8 @@ Hol_coreln
         (!y' l. ts y l y' ==> ?x'. ts x l x' /\ bi ts x' y') ==>
         bi ts x y
 ’;
-
+(* Prove equivalence both ways *)
+(* -- BISIM_REL gives bi *)
 val BISIM_REL_bi = store_thm(
   "BISIM_REL_bi",
   ``!x y. BISIM_REL ts x y ==> bi ts x y``,
@@ -49,7 +56,7 @@ val BISIM_REL_bi = store_thm(
       Q.EXISTS_TAC `x'` >>
       FULL_SIMP_TAC (srw_ss ()) [BISIM_REL_def] >>
       Q.EXISTS_TAC `R` >> fs[]));
-
+(* -- bi gives BISIM_REL *)
 Theorem bi_BISIM_REL:
   !x y. bi ts x y ==> BISIM_REL ts x y
 Proof
@@ -59,7 +66,7 @@ Proof
   first_x_assum (K ALL_TAC) >>
   METIS_TAC[bi_cases]
 QED
-
+(* -- bi and BISIM_REL are equal by extensionality *)
 Theorem bi_is_BISIM_REL:
   BISIM_REL = bi
 Proof

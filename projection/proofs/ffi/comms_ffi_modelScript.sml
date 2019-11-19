@@ -4,14 +4,24 @@ open payloadSemanticsTheory;
 
 val _ = new_theory "comms_ffi_model";
 
+(* FFI MODEL *)
+(* Static Model
+    Basic model off FFI or World state at any
+    given point in time *)
+(* -- Backend Queues *)
 Type queues = “: proc |-> datum list”;
+(* -- Total FFI State model *)
 Type total_state = “: proc # queues # network”;
 
+(* Transition System
+    Describes possible transitions of the
+    static FFI type based on interaction*)
+(* -- FFI interaction actions *)
 Datatype:
  action = ASend proc datum
           | ARecv proc datum
 End
-
+(* -- Transition system on FFI states *)
 Inductive strans:
   (* ARecv *)
   (∀conf c q ms mc tl N.
@@ -42,6 +52,9 @@ Inductive strans:
      ⇒  strans conf (c,q,N) (ASend rp d) (c,q,N'))
 End
 
+(* Dynamic Model
+     Model of response to FFI calls based on transition system *)
+(* -- send call model *)
 Definition ffi_send_def:
   ffi_send conf os dest data =
   if (LENGTH data ≠ SUC conf.payload_size) then
@@ -51,14 +64,14 @@ Definition ffi_send_def:
       SOME ns =>  Oracle_return ns data
     | NONE    =>  Oracle_final FFI_diverged
 End
-
+(* -- receive call model *)
 Definition ffi_receive_def:
   ffi_receive conf os src _ =
     case some (m,ns). strans conf os (ARecv src m) ns of
       SOME (m,ns) =>  Oracle_return ns m
     | NONE        =>  Oracle_final FFI_diverged
 End
-
+(* -- total oracle *)
 Definition comms_ffi_oracle_def:
   comms_ffi_oracle conf name =
     if name = "send" then

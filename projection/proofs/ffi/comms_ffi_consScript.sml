@@ -215,7 +215,7 @@ Theorem strans_receive_construct:
     RTC (active_trans conf c) (q1,n1) (qi1,ni) ∧
     output_trans conf c (qi1,ni) (sp,d) (qi2,ni) ∧
     RTC (internal_trans conf c) (qi2,ni) (q2,n2) ⇒
-  	strans conf (c,q1,n1) (ARecv sp d) (c,q2,n2)
+    strans conf (c,q1,n1) (ARecv sp d) (c,q2,n2)
 Proof
   rw[] >>
   ‘strans conf (c,qi1,ni) (ARecv sp d) (c,qi2,ni)’

@@ -1,12 +1,33 @@
 open HolKernel boolLib Parse bossLib;
 open relationTheory
-	 pred_setTheory;
+     pred_setTheory;
 open payloadSemanticsTheory
      payloadLangTheory;
 
 val _ = new_theory "payloadProps";
 
 (* BASIC THEOREMS *)
+(* Pushing to queues makes them bigger *)
+Theorem qpush_prefix:
+  ∀qs spL spA dA.
+    isPREFIX (qlk qs spL) (qlk (qpush qs spA dA) spL)
+Proof
+  rw[qlk_def,qpush_def,fget_def] >>
+  Cases_on ‘spL = spA’ >>
+  rw[finite_mapTheory.FLOOKUP_UPDATE] >>
+  Cases_on ‘FLOOKUP qs spA’ >> rw[rich_listTheory.IS_PREFIX_SNOC] 
+QED
+(* Pushing to different sender queues is commutative *)
+Theorem qpush_commutes:
+  ∀qs spA dA spB dB.
+    spA ≠ spB ⇒
+      qpush (qpush qs spA dA) spB dB =
+      qpush (qpush qs spB dB) spA dA
+Proof
+  rw[qpush_def,qlk_def,fget_def,finite_mapTheory.FLOOKUP_UPDATE] >>
+  metis_tac[finite_mapTheory.FUPDATE_COMMUTES]
+QED
+
 (* Message can't be final and intermediate *)
 Theorem final_inter_mutexc:
   ∀d. ¬(intermediate d ∧ final d)
@@ -902,7 +923,7 @@ Theorem trans_samelab_tau_difout_diamond[local]:
       trans conf N2A LTau N3 ∧
       trans conf N2B LTau N3
 Proof
-	Induct_on ‘N1’
+  Induct_on ‘N1’
   (* NNil Case *)
   >- (rw[] >> fs[Once trans_cases])
   (* NPar Case *)

@@ -363,7 +363,8 @@ QED
 
 
 (* COMPLEX FFI STATE INVARIANTS *)
-(* Basic FFI State Invariant Definition *)
+(* Basic FFI State Invariant Definition
+   -- Note this definition alone was written by others *)
 Definition ffi_accepts_rel_def:
   ffi_accepts_rel stpred pred oracle =
   ∀st s conf bytes.

@@ -5,6 +5,10 @@ open  HolKernel
 
 val _ = new_theory "confluence";
 
+(* DIAMOND PROPERTY PROOFS *)
+(* Basic diamond Property gives diamond property with
+   one side switched to reflexive, and transitive
+   closure *)
 Theorem diam_to_srtc_diam:
   ∀tsA tsB wfP.
     (* ASSUMPTIONS *)
@@ -48,6 +52,9 @@ Proof
   metis_tac[RTC_TRANSITIVE,transitive_def,RTC_SINGLE]
 QED
 
+(* Reflexive closure diamond property gives diamond property with
+   one side switched to reflexive, and transitive
+   closure and the other still reflexive closure *)
 Theorem rc_diam_to_srtc_diam:
   ∀tsA tsB wfP.
     (* ASSUMPTIONS *)
@@ -89,6 +96,8 @@ Proof
   metis_tac[RC_DEF,RTC_TRANSITIVE,transitive_def,RTC_SINGLE]
 QED
 
+(* Reflexive closure diamond property gives complete
+   reflexive, and transitive closure diamond property. *)
 Theorem rc_diam_to_rtc_diam:
   ∀tsA tsB wfP.
     (* ASSUMPTIONS *)
