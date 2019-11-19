@@ -18,8 +18,7 @@ val _ = new_theory "payload_to_cakemlProof";
 val WORD8 = “WORD:word8 -> v -> bool”;
 val DATUM = “LIST_TYPE ^WORD8”;
 
-(* ENVIRONMENT CHECK
-  - Originally made by others, modified by me (env_asm changes)*)
+(* ENVIRONMENT CHECK *)
 (* General check environment has something defined with property *)
 Definition has_v_def:
   has_v env n cfty f =
@@ -71,8 +70,7 @@ Definition env_asm_def:
     in_module conf.toList)
 End
 
-(* LUPDATE (List Update) HELPER THEOREMS
-   - Written by others *)
+(* LUPDATE (List Update) HELPER THEOREMS *)
 Theorem LUPDATE_REPLICATE:
   ∀n m x y. n < m ⇒
    LUPDATE x n (REPLICATE m y) = REPLICATE n y ++ [x] ++ REPLICATE (m - (n + 1)) y
@@ -104,8 +102,7 @@ Proof
   metis_tac[LUPDATE_SAME]
 QED
 
-(* FFI MANIPULATION HELPERS
-   -- Written by Others *)
+(* FFI MANIPULATION HELPERS *)
 (* Construct list of chunks from desired data to send *)
 Definition compile_message_def:
   compile_message conf d =
@@ -133,8 +130,7 @@ Definition update_state_def:
                 oracle es)
 End
 
-(* SIMPLICATIONS
-   -- Written by me *)
+(* SIMPLICATIONS *)
 (* -- Unnecessary FFI update *)
 Theorem remove_ffi[simp]:
   ∀cSt: 'ffi semanticPrimitives$state.
@@ -160,11 +156,7 @@ Proof
   simp[n2w_ORD_CHR_w2n]
 QED
 
-(* SENDLOOP CORRECTNESS
-   -- Written by others with some
-      modifications I have written.
-      (sendloop_correct now uses ck_equiv_hol
-       instead of basic translation *)
+(* SENDLOOP CORRECTNESS *)
 Theorem padv_correct:
  ∀env conf l lv le s1 s2 refs.
   env_asm env conf ∧
@@ -820,7 +812,6 @@ Proof
         by (CCONTR_TAC >> fs eval_sl))
 QED
 
-(* ---- Past this point this file is entirely my contribution *)
 
 (* RECEIVELOOP CORRECT *)
 (* List of IO events to receive a piece of data *)

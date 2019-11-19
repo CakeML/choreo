@@ -1,4 +1,4 @@
-open preamble endpointLangTheory payloadLangTheory
+open preamble endpointLangTheory payloadLangTheory payloadSemanticsTheory
 
 val _ = new_theory "endpoint_to_payload";
 
