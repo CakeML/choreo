@@ -449,6 +449,47 @@ val network_consume_LExtChoice = Q.store_thm("network_consume_LExtChoice",
   \\ rw[MAP_EQ_f] \\ rw[preSel_to_queue_def]
 );
 
+val epn_conf_def = Define`
+  epn_conf p q = ∃p' q'. reduction^* p p' ∧ reduction^* q q' ∧ qcong p' q'
+`
+val _ = Parse.add_infix("≅<",425,Parse.NONASSOC);
+val _ = Parse.overload_on("≅<",``epn_conf``);
+
+Theorem conf_refl:
+  ∀epn. epn ≅< epn
+Proof
+  rw [epn_conf_def]
+  \\ map_every qexists_tac [`epn`,`epn`]
+  \\ rw [reduction_def,qcong_refl]
+QED
+
+Theorem conf_sym:
+  ∀epn epn'. epn ≅< epn' ⇒ epn' ≅< epn
+Proof
+  metis_tac [epn_conf_def,qcong_sym]
+QED
+
+Theorem conf_distinct:
+  ∀epn epn'.
+   epn ≅< epn' ∧
+   ALL_DISTINCT (MAP FST (endpoints epn))
+   ⇒ ALL_DISTINCT (MAP FST (endpoints epn'))
+Proof
+  metis_tac[ qcong_endpoints
+           , endpoint_names_reduction
+           , epn_conf_def]
+QED
+
+Theorem conf_trans:
+  ∀epn epn' epn''.
+   ALL_DISTINCT (MAP FST (endpoints epn))
+   ⇒ epn ≅< epn' ∧ epn' ≅< epn'' ⇒ epn ≅< epn''
+Proof
+  rw [epn_conf_def]
+  \\ drule
+  \\ cheat (* TODO *)
+QED
+
 val compile_network_preservation = Q.store_thm("compile_network_preservation",
   `∀s c α τ s' c'. compile_network_ok s c (procsOf c)
     ∧ trans (s,c) (α,τ) (s',c')
