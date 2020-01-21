@@ -1,5 +1,5 @@
 CAKEDIR = ../../../cakeml
-INCLUDES = $(CAKEDIR)/misc ../../semantics ../
+INCLUDES = $(CAKEDIR)/misc ../../semantics ../../semantics/proofs ../
 OPTIONS = QUIT_ON_FAILURE
 
 THYFILES = $(patsubst %Script.sml,%Theory.uo,$(wildcard *.sml))
