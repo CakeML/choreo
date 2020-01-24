@@ -140,10 +140,9 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
     ⇒ trans (s,IfThen v p c1 c2) (LTau p v,[]) (s,c2))
 
   (* Swapping transitions / Structural congruence *)
-∧ (∀s v p c1 c2 s' c1' c2' l l' alpha.
+∧ (∀s v p c1 c2 s' c1' c2' l alpha.
     trans (s,c1) (alpha,l) (s',c1')
-    ∧ trans (s,c2) (alpha,l') (s',c2')
-    ∧ l τ≅ l'
+    ∧ trans (s,c2) (alpha,l) (s',c2')
     ∧ p ∉ freeprocs alpha
     ⇒ trans (s,IfThen v p c1 c2) (alpha,l) (s',IfThen v p c1' c2'))
 ∧ (∀s c s' c' p1 v1 p2 v2 l alpha.
