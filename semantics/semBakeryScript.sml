@@ -4,83 +4,85 @@ open astBakeryTheory
 
 val _ = new_theory "semBakery";
 
-val _ = Datatype`
+Datatype:
   label = LTau proc varN
         | LCom proc varN proc varN
         | LSel proc bool proc
         | LLet varN proc (datum list -> datum) (varN list)
-`;
+End
 
-val freeprocs_def = Define`
+Definition freeprocs_def:
   freeprocs (LTau p n)         = {p}
 ∧ freeprocs (LCom p1 v1 p2 v2) = {p1;p2}
 ∧ freeprocs (LSel p1 b p2)     = {p1;p2}
 ∧ freeprocs (LSel p1 b p2)     = {p1;p2}
 ∧ freeprocs (LLet v p f vl)     = {p}
-`;
+End
 
-val sender_def = Define`
+Definition sender_def:
   sender (LTau p n)         = NONE
 ∧ sender (LCom p1 v1 p2 v2) = SOME p1
 ∧ sender (LSel p1 b p2)     = SOME p1
 ∧ sender (LLet v p f vl)     = NONE
-`;
+End
 
-val receiver_def = Define`
+Definition receiver_def:
   receiver (LTau p n)          = NONE
 ∧ receiver (LCom p1 v1 p2 v2) = SOME p2
 ∧ receiver (LSel p1 b p2)     = SOME p2
 ∧ receiver (LLet v p f vl)     = NONE
-`;
+End
 
-val written_def = Define`
+Definition written_def:
   written (LTau p n)          = NONE
 ∧ written (LCom p1 v1 p2 v2) = SOME(v2,p2)
 ∧ written (LSel p1 b p2)     = NONE
 ∧ written (LLet v p f vl)     = SOME(v,p)
-`;
+End
 
-val read_def = Define`
+Definition read_def:
   read (LTau p n)          = {(n,p)}
 ∧ read (LCom p1 v1 p2 v2) = {(v1,p1)}
 ∧ read (LSel p1 b p2)     = {}
 ∧ read (LLet v p f vl)     = set(MAP (λv. (v,p)) vl)
-`;
+End
 
 (* On ListTheory.sml *)
-val nub'_def = tDefine "nub'" `
+Definition nub'_def:
   nub' []      = []
-∧ nub' (x::xs) = x :: FILTER ($≠ x) (nub' xs)`
-(WF_REL_TAC `measure LENGTH`
-\\ rw [LENGTH]
-\\ ho_match_mp_tac LESS_EQ_LESS_TRANS
-\\ Q.EXISTS_TAC `LENGTH xs`
-\\ rw [LENGTH_FILTER_LEQ]);
+∧ nub' (x::xs) = x :: FILTER ($≠ x) (nub' xs)
+Termination
+  WF_REL_TAC `measure LENGTH`
+  \\ rw [LENGTH]
+  \\ ho_match_mp_tac LESS_EQ_LESS_TRANS
+  \\ Q.EXISTS_TAC `LENGTH xs`
+  \\ rw [LENGTH_FILTER_LEQ]
+End
 
-val all_distinct_nub' = Q.store_thm("all_distinct_nub'",
-  `∀l. ALL_DISTINCT (nub' l)`,
+Theorem all_distinct_nub':
+  ∀l. ALL_DISTINCT (nub' l)
+Proof
   rw [ALL_DISTINCT,nub'_def]
   \\ Induct_on `l`
   \\ rw [ALL_DISTINCT,nub'_def,FILTER_ALL_DISTINCT,MEM_FILTER]
-);
-
+QED
 
 (* The set of all processes in a choreography *)
-val procsOf_def = Define`
+Definition procsOf_def:
   procsOf  Nil             = []
 ∧ procsOf (IfThen _ p l r) = nub' ([p] ++ procsOf l ++ procsOf r)
 ∧ procsOf (Com p _ q _ c)  = nub' ([p;q] ++ procsOf c)
 ∧ procsOf (Sel p _ q c)    = nub' ([p;q] ++ procsOf c)
 ∧ procsOf (Let _ p _ _ c)  = nub' ([p] ++ procsOf c)
-`;
+End
 
-val procsOf_all_distinct = Q.store_thm("procsOf_all_distinct",
-  `∀c. ALL_DISTINCT (procsOf c)`,
+Theorem procsOf_all_distinct:
+  ∀c. ALL_DISTINCT (procsOf c)
+Proof
   Induct_on `c` >> rw [procsOf_def,ALL_DISTINCT,all_distinct_nub']
-);
+QED
 
-
-val (lcong_rules,lcong_ind,lcong_cases) = Hol_reln `
+Inductive lcong:
 (* Congruence rules for lists of asyncronous operations *)
 
   (* Symmetric *)
@@ -100,7 +102,7 @@ val (lcong_rules,lcong_ind,lcong_cases) = Hol_reln `
 ∧ (∀h t t1 t2.
     DISJOINT (freeprocs t1) (freeprocs t2)
     ⇒ lcong (h ++ [t1;t2] ++ t) (h ++ [t2;t1] ++ t))
-`;
+End
 
 val _ = Parse.add_infix("τ≅",425,Parse.NONASSOC);
 val _ = Parse.overload_on("τ≅",``lcong``);
@@ -109,8 +111,7 @@ val [lcong_sym,lcong_refl,lcong_trans,lcong_reord] =
     zip ["lcong_sym","lcong_refl","lcong_trans","lcong_reord"]
         (CONJUNCTS lcong_rules) |> map save_thm;
 
-val (trans_rules,trans_ind,trans_cases) = Hol_reln `
-
+Inductive trans:
   (* Communication *)
   (∀s v1 p1 v2 p2 d c.
     FLOOKUP s (v1,p1) = SOME d
@@ -173,20 +174,19 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
     ∧ p1 ∈ freeprocs alpha
     ∧ p2 ∉ freeprocs alpha
     ⇒ trans (s,Sel p1 b p2 c) (alpha,LSel p1 b p2::l) (s',Sel p1 b p2 c'))
+End
 
-`;
 
 val _ = zip ["trans_com","trans_sel","trans_let","trans_if_true","trans_if_false",
               "trans_if_swap","trans_com_swap","trans_sel_swap","trans_let_swap",
               "trans_com_async","trans_sel_async"]
             (CONJUNCTS trans_rules) |> map save_thm;
 
-val trans_pairind = save_thm("trans_pairind",
+Theorem trans_pairind =
   theorem"trans_strongind"
   |> Q.SPEC `λa0 a1 a2. P (FST a0) (SND a0) (FST a1) (SND a1)  (FST a2) (SND a2)`
   |> SIMP_RULE std_ss [FORALL_PROD]
   |> Q.GEN `P`
-);
 
 (* valid_action ensures a transition tag `alpha` and an asyncronous
    transition tag `h` are related as described in the asyncronous
@@ -200,7 +200,7 @@ val trans_pairind = save_thm("trans_pairind",
 
    * Don't have as a receiver a free process in `alpha`
 *)
-val valid_action_def = Define`
+Definition valid_action_def:
   valid_action alpha h = ((∃p1 b p2 .
                            h = LSel p1 b p2
                            ∧ p1 ∈ freeprocs alpha
@@ -209,58 +209,64 @@ val valid_action_def = Define`
                             h = LCom p1 v1 p2 v2
                             ∧ p1 ∈ freeprocs alpha
                             ∧ p2 ∉ freeprocs alpha))
-`;
+End
 
 (* Two list in a lcong relationship have the same length *)
-val lcong_length = Q.store_thm("lcong_length",
-  `∀l l'. l τ≅ l' ⇒ LENGTH l = LENGTH l'`,
+Theorem lcong_length:
+  ∀l l'. l τ≅ l' ⇒ LENGTH l = LENGTH l'
+Proof
   ho_match_mp_tac (theorem"lcong_strongind")
   \\ rw []
-);
+QED
 
 (* An empty list can't be in an lcong relationship with a non empty list *)
-val not_nil_lcong_cons = Q.store_thm("not_nil_lcong_cons",
-  `∀h l. ¬ ([] τ≅ h :: l)`,
+Theorem not_nil_lcong_cons:
+  ∀h l. ¬ ([] τ≅ h :: l)
+Proof
   rw [] >> CCONTR_TAC  >> rw []
   \\ IMP_RES_TAC lcong_length
   \\ fs [LENGTH]
-);
+QED
 
 (* `lrm l e` removes the first appearance of element `e` in `l` *)
-val lrm_def = Define `
+Definition lrm_def:
   lrm [] e      = []
 ∧ lrm (x::ls) e = (if x = e
                  then ls
                  else x :: lrm ls e)
-`;
+End
 
 (* If an element `e` is not in `l` then `lrm e l` is redundant *)
-val mem_lrm_id = Q.store_thm("mem_lrm_id",
-  `¬ MEM e l ⇒ lrm l e = l`,
+Theorem mem_lrm_id:
+  ¬ MEM e l ⇒ lrm l e = l
+Proof
   Induct_on `l` >> rw [lrm_def,MEM]
-);
+QED
 
 (* `lrm` conditionaly distributes over the first argument (`l`) of an
    append if the element you are trying to remove is in `l`
 *)
-val lrm_mem_append = Q.store_thm("lrm_mem_append",
-  `∀l e r. MEM e l ⇒ lrm (l ++ r) e = lrm l e ++ r`,
+Theorem lrm_mem_append:
+  ∀l e r. MEM e l ⇒ lrm (l ++ r) e = lrm l e ++ r
+Proof
   induct_on `l` >> rw [MEM,lrm_def]
-);
+QED
 
 (* `lrm` conditionaly distributes over the second argument (`r`) of an
    append if the element (`e`) you are trying to remove is not in the
    first argument (`l`). Note that this does not imply that `e` is in
    `r`
 *)
-val lrm_not_mem_append = Q.store_thm("lrm_not_mem_append",
-  `∀l e r. ¬ MEM e l ⇒ lrm (l ++ r) e = l ++ lrm r e`,
+Theorem lrm_not_mem_append:
+  ∀l e r. ¬ MEM e l ⇒ lrm (l ++ r) e = l ++ lrm r e
+Proof
   induct_on `l` >> rw [MEM,lrm_def]
-);
+QED
 
 (* Applying `lrm` at both sides of an lcong preserves the relation *)
-val lcong_lrm = Q.store_thm("lcong_lrm",
-  `∀e l l'. l τ≅ l' ⇒ lrm l e τ≅ lrm l' e`,
+Theorem lcong_lrm:
+  ∀e l l'. l τ≅ l' ⇒ lrm l e τ≅ lrm l' e
+Proof
   GEN_TAC
   \\ ho_match_mp_tac (theorem"lcong_strongind")
   \\ rw [lcong_rules]
@@ -273,52 +279,57 @@ val lcong_lrm = Q.store_thm("lcong_lrm",
      \\ rw [lrm_def,lcong_rules])
   >- (`¬MEM e (h ++ [t2; t1])` by fs [MEM_PERM,PERM_APPEND_IFF,PERM_SWAP_AT_FRONT]
      \\ rw [lrm_not_mem_append,lcong_rules])
-);
+QED
 
 (* [] can only be related in `lcong` with  (itself) [] *)
-val lcong_nil_simp = Q.store_thm("lcong_nil_simp",
-  `∀l. (l τ≅ [] ⇔ l = []) ∧ ([] τ≅ l ⇔ l = [])`,
+Theorem lcong_nil_simp:
+  ∀l. (l τ≅ [] ⇔ l = []) ∧ ([] τ≅ l ⇔ l = [])
+Proof
   Cases_on `l`
   >- rw [lcong_rules]
   >- (fs [] >> metis_tac [not_nil_lcong_cons,lcong_refl])
-);
+QED
 
 (* Prepending and element (`h`) preserves `lcong` *)
-val lcong_cons = Q.store_thm("lcong_cons",
-  `∀h l l'. lcong l l' ⇒ lcong (h :: l) (h :: l')`,
+Theorem lcong_cons:
+  ∀h l l'. lcong l l' ⇒ lcong (h :: l) (h :: l')
+Proof
   GEN_TAC
   \\ ho_match_mp_tac (fetch "-" "lcong_strongind")
   \\ rw [lcong_rules]
   \\ metis_tac [lcong_rules,GSYM APPEND |> CONJUNCT2]
-);
+QED
 
 (* Removing the identical heads preserves `lcong` *)
-val cons_lcong = Q.store_thm("cons_lcong",
-  `∀h l l'. h :: l τ≅ h :: l' ⇒ l τ≅ l'`,
+Theorem cons_lcong:
+  ∀h l l'. h :: l τ≅ h :: l' ⇒ l τ≅ l'
+Proof
   rw []
   \\ IMP_RES_TAC lcong_lrm
   \\ pop_assum (ASSUME_TAC o Q.SPEC `h`)
   \\ fs [lrm_def]
-);
+QED
 
 (* An slightly more specific case of `lcong_lrm` *)
-val lcong_cons_simp = Q.store_thm("lcong_cons_simp",
-  `∀h l h' l'. h ≠ h' ∧ h :: l τ≅ h' :: l'
-    ⇒ l τ≅ h' :: lrm l' h`,
+Theorem lcong_cons_simp:
+  ∀h l h' l'. h ≠ h' ∧ h :: l τ≅ h' :: l'
+   ⇒ l τ≅ h' :: lrm l' h
+Proof
   rw []
   \\ IMP_RES_TAC lcong_lrm
   \\ pop_assum (ASSUME_TAC o Q.SPEC `h`)
   \\ rfs [lrm_def]
-);
+QED
 
 (* Any valid transition ensures the relationship between the
    transition tag `t` and the head of the asyncronous transitions list
    `h` is a valid_action
 *)
-val trans_valid_action = Q.store_thm("trans_valid_action",
-  `∀s c s' c' t h l.
+Theorem trans_valid_action:
+   ∀s c s' c' t h l.
     trans (s,c) (t,h::l) (s',c')
-    ⇒ valid_action t h`,
+    ⇒ valid_action t h
+Proof
   rpt GEN_TAC
   \\ `∀s c t l' s' c'.
         trans (s,c) (t,l') (s',c')
@@ -327,16 +338,17 @@ val trans_valid_action = Q.store_thm("trans_valid_action",
      suffices_by (metis_tac [])
   \\ ho_match_mp_tac trans_pairind
   \\ rw [trans_rules,valid_action_def]
-);
+QED
 
 (* Any valid trasition with a non-empty list of asyncronous trasitions
    implies there exist a transition with the same transition tag
    and the tail of the asyncronous transition list
 *)
-val trans_async_some_trans = Q.store_thm("trans_async_some_trans",
-  `∀s c s' c' t h l.
+Theorem trans_async_some_trans:
+   ∀s c s' c' t h l.
     trans (s,c) (t,h::l) (s',c')
-    ⇒ ∃s1 c1 s1' c1'. trans (s1,c1) (t,l) (s1',c1')`,
+    ⇒ ∃s1 c1 s1' c1'. trans (s1,c1) (t,l) (s1',c1')
+Proof
   rpt GEN_TAC
   \\ `∀s c t l' s' c'.
         trans (s,c) (t,l') (s',c')
@@ -344,53 +356,55 @@ val trans_async_some_trans = Q.store_thm("trans_async_some_trans",
         ⇒ ∃s1 c1 s1' c1'. trans (s1,c1) (t,l) (s1',c1')`
      suffices_by (metis_tac [])
   \\ ho_match_mp_tac trans_pairind
-  \\ rw [trans_rules,not_nil_lcong_cons]
+  \\ rw [trans_rules]
   \\ metis_tac []
-);
+QED
 
 (* valid_actions over a list of actions *)
-val valid_actions_def   = Define`
+Definition valid_actions_def:
   valid_actions alpha l = EVERY (valid_action alpha) l
-`;
+End
 
 
 (* Any valid transition ensures that both transition tag `t` and
    asyncronous transitions list `l` satisfies valid_actions
 *)
-val trans_valid_actions = Q.store_thm("trans_valid_actions",
-  `∀s c s' c' t l.
+Theorem trans_valid_actions:
+   ∀s c s' c' t l.
     trans (s,c) (t,l) (s',c')
-    ⇒ valid_actions t l`,
+    ⇒ valid_actions t l
+Proof
   Induct_on `l` >> rw []
   >- rw [valid_actions_def]
   \\ IMP_RES_TAC trans_valid_action
   \\ IMP_RES_TAC trans_async_some_trans
   \\ `valid_actions t l` by metis_tac []
   \\ fs [valid_actions_def]
-);
+QED
 
 (* In a list of valid actions (`h`) there are no LTau actions *)
-val valid_actions_not_ltau = Q.store_thm("valid_actions_not_ltau",
-  `∀t h p v. valid_actions t h ⇒ ¬ MEM (LTau p v) h`,
+Theorem valid_actions_not_ltau:
+  ∀t h p v. valid_actions t h ⇒ ¬ MEM (LTau p v) h
+Proof
   rw []
   \\ CCONTR_TAC
   \\ fs [valid_actions_def,EVERY_MEM]
   \\ RES_TAC
   \\ fs [valid_action_def]
-);
+QED
 
 (* Reflexive transitive closure *)
-val trans_s_def = Define`
+Definition trans_s_def:
   trans_s = RTC (λp q. ∃s. trans p s q)
-`;
+End
 
 (* Give a state and a transition tag, one can generate the resulting state *)
-val state_from_tag_def = Define`
+Definition state_from_tag_def:
   state_from_tag s (LCom p1 v1 p2 v2) = (s |+ ((v2,p2),s ' (v1,p1)))
 ∧ state_from_tag s (LLet v p f vl)  =
     (s |+ ((v,p),f (MAP (THE ∘ FLOOKUP s) (MAP (λv. (v,p)) vl))))
-∧ state_from_tag s _ = s`
-
+∧ state_from_tag s _ = s
+End
 
 (* The resulting state of any transition can be described using `state_from_tag` *)
 Theorem trans_state:
@@ -475,19 +489,21 @@ Proof
   metis_tac [trans_s_submap_gen]
 QED
 
-val free_variables_def = Define `
+Definition free_variables_def:
   (free_variables (Nil) = {}) /\
   (free_variables (IfThen v p c1 c2) = {(v,p)} ∪ (free_variables c1 ∪ free_variables c2)) /\
   (free_variables (Com p1 v1 p2 v2 c) = {(v1,p1)} ∪ (free_variables c DELETE (v2,p2))) /\
   (free_variables (Let v p f vl c) = set(MAP (λv. (v,p)) vl) ∪ (free_variables c DELETE (v,p))) /\
   (free_variables (Sel p b q c) = free_variables c)
-`
+End
 
-val defined_vars_def = Define `
-  defined_vars (s,c) = FDOM s`
+Definition defined_vars_def:
+  defined_vars (s,c) = FDOM s
+End
 
-val no_undefined_vars_def = Define `
-  no_undefined_vars (s,c) = (free_variables c ⊆ FDOM s)`
+Definition no_undefined_vars_def:
+  no_undefined_vars (s,c) = (free_variables c ⊆ FDOM s)
+End
 
 Theorem defined_vars_mono:
   ∀sc alpha sc'. trans sc alpha sc' ⇒ defined_vars sc ⊆ defined_vars sc'
@@ -524,13 +540,13 @@ Proof
   >> fs[SUBSET_DEF,INSERT_DEF,DIFF_DEF] >> metis_tac[]
 QED
 
-val no_self_comunication_def = Define `
+Definition no_self_comunication_def:
   no_self_comunication (Com p _ q _ c)   = (p ≠ q ∧ no_self_comunication c)
 ∧ no_self_comunication (Sel p _ q c)     = (p ≠ q ∧ no_self_comunication c)
 ∧ no_self_comunication (IfThen _ _ c c') = (no_self_comunication c ∧
                                             no_self_comunication c')
-
 ∧ no_self_comunication (Let _ _ _ _ c)   = no_self_comunication c
 ∧ no_self_comunication _                 = T
-`
+End
+
 val _ = export_theory ()
