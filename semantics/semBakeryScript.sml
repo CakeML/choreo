@@ -20,10 +20,10 @@ Definition freeprocs_def:
 End
 
 Definition sender_def:
-  sender (LTau p n)         = NONE
-∧ sender (LCom p1 v1 p2 v2) = SOME p1
-∧ sender (LSel p1 b p2)     = SOME p1
-∧ sender (LLet v p f vl)     = NONE
+  sender (LTau p n)          = SOME p
+∧ sender (LCom p1 v1 p2 v2)  = SOME p1
+∧ sender (LSel p1 b p2)      = SOME p1
+∧ sender (LLet v p f vl)     = SOME p
 End
 
 Definition receiver_def:
@@ -135,22 +135,37 @@ Inductive trans:
   (* Asynchrony *)
 ∧ (∀s c s' c' p1 v1 p2 v2 l alpha.
     trans (s,c) (alpha,l) (s',c')
-    ∧ p1 ∈ freeprocs alpha
-    ∧ written alpha ≠ SOME (v1,p1)
+    ∧ sender alpha = SOME p1
     ∧ p2 ∉ freeprocs alpha
     ⇒ trans (s,Com p1 v1 p2 v2 c) (alpha,LCom p1 v1 p2 v2::l) (s',Com p1 v1 p2 v2 c'))
 
 ∧ (∀s c s' c' p1 b p2 l alpha.
     trans (s,c) (alpha,l) (s',c')
-    ∧ p1 ∈ freeprocs alpha
+    ∧ sender alpha = SOME p1
     ∧ p2 ∉ freeprocs alpha
     ⇒ trans (s,Sel p1 b p2 c) (alpha,LSel p1 b p2::l) (s',Sel p1 b p2 c'))
+
+∧ (∀s c s' c' p1 v1 p2 v2 l alpha.
+    trans (s,c) (alpha,l) (s',c')
+    ∧ receiver alpha = SOME p1
+    ∧ sender alpha   ≠ SOME p1
+    ∧ written alpha ≠ SOME (v1,p1)
+    ∧ p2 ∉ freeprocs alpha
+    ⇒ trans (s,Com p1 v1 p2 v2 c) (alpha,l) (s',Com p1 v1 p2 v2 c'))
+
+∧ (∀s c s' c' p1 b p2 l alpha.
+    trans (s,c) (alpha,l) (s',c')
+    ∧ receiver alpha = SOME p1
+    ∧ sender alpha   ≠ SOME p1
+    ∧ p2 ∉ freeprocs alpha
+    ⇒ trans (s,Sel p1 b p2 c) (alpha,l) (s',Sel p1 b p2 c'))
 End
 
 
 val _ = zip ["trans_com","trans_sel","trans_let","trans_if_true","trans_if_false",
               "trans_if_swap","trans_com_swap","trans_sel_swap","trans_let_swap",
-              "trans_com_async","trans_sel_async"]
+              "trans_com_send_async","trans_sel_send_async",
+              "trans_com_recv_async","trans_sel_recv_async"]
             (CONJUNCTS trans_rules) |> map save_thm;
 
 Theorem trans_pairind =
@@ -234,6 +249,7 @@ Proof
      suffices_by (metis_tac [])
   \\ ho_match_mp_tac trans_pairind
   \\ rw [trans_rules,valid_action_def]
+  \\ Cases_on ‘t’ \\ fs [sender_def,freeprocs_def]
 QED
 
 (* Any valid trasition with a non-empty list of asyncronous trasitions
@@ -444,5 +460,30 @@ Definition no_self_comunication_def:
 ∧ no_self_comunication (Let _ _ _ _ c)   = no_self_comunication c
 ∧ no_self_comunication _                 = T
 End
+
+Theorem no_freeprocs_eq:
+  ∀p1 τ. p1 ∉ freeprocs τ ⇔ (sender τ ≠ SOME p1 ∧ receiver τ ≠ SOME p1)
+Proof
+  rw [] \\ Cases_on ‘τ’
+  \\ fs [sender_def,freeprocs_def,receiver_def]
+  \\ rw [] \\ metis_tac []
+QED
+
+Theorem freeprocs_eq:
+  ∀p1 τ. p1 ∈ freeprocs τ ⇔ (sender τ = SOME p1 ∨ receiver τ = SOME p1)
+Proof
+  rw [] \\ Cases_on ‘τ’
+  \\ fs [sender_def,freeprocs_def,receiver_def]
+  \\ rw [] \\ metis_tac []
+QED
+
+Theorem send_recv_neq:
+  ∀p q τ. p ≠ q
+  ∧ sender τ = SOME p
+  ∧ receiver τ = SOME q
+  ⇒ sender τ ≠ SOME q
+Proof
+  rw [] \\ CCONTR_TAC \\ fs []
+QED
 
 val _ = export_theory ()
