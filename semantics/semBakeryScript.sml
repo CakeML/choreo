@@ -20,23 +20,23 @@ Definition freeprocs_def:
 End
 
 Definition sender_def:
-  sender (LTau p n)          = SOME p
+  sender (LTau p n)          = NONE
 ∧ sender (LCom p1 v1 p2 v2)  = SOME p1
 ∧ sender (LSel p1 b p2)      = SOME p1
-∧ sender (LLet v p f vl)     = SOME p
+∧ sender (LLet v p f vl)     = NONE
 End
 
 Definition receiver_def:
   receiver (LTau p n)          = NONE
-∧ receiver (LCom p1 v1 p2 v2) = SOME p2
-∧ receiver (LSel p1 b p2)     = SOME p2
+∧ receiver (LCom p1 v1 p2 v2)  = SOME p2
+∧ receiver (LSel p1 b p2)      = SOME p2
 ∧ receiver (LLet v p f vl)     = NONE
 End
 
 Definition written_def:
   written (LTau p n)          = NONE
-∧ written (LCom p1 v1 p2 v2) = SOME(v2,p2)
-∧ written (LSel p1 b p2)     = NONE
+∧ written (LCom p1 v1 p2 v2)  = SOME(v2,p2)
+∧ written (LSel p1 b p2)      = NONE
 ∧ written (LLet v p f vl)     = SOME(v,p)
 End
 
@@ -82,6 +82,35 @@ Proof
   Induct_on `c` >> rw [procsOf_def,ALL_DISTINCT,all_distinct_nub']
 QED
 
+Inductive lcong:
+(* Congruence rules for lists of asyncronous operations *)
+
+  (* Symmetric *)
+  (∀l. lcong l l)
+
+  (* Reflexive *)
+∧ (∀l1 l2.
+    lcong l1 l2
+    ⇒ lcong l2 l1)
+  (* Transitive *)
+∧ (∀l1 l2 l3.
+     lcong l1 l2
+     ∧ lcong l2 l3
+     ⇒ lcong l1 l3)
+
+  (* Reorder *)
+∧ (∀h t t1 t2.
+    DISJOINT (freeprocs t1) (freeprocs t2)
+    ⇒ lcong (h ++ [t1;t2] ++ t) (h ++ [t2;t1] ++ t))
+End
+
+val _ = Parse.add_infix("τ≅",425,Parse.NONASSOC);
+val _ = Parse.overload_on("τ≅",``lcong``);
+
+val [lcong_sym,lcong_refl,lcong_trans,lcong_reord] =
+    zip ["lcong_sym","lcong_refl","lcong_trans","lcong_reord"]
+        (CONJUNCTS lcong_rules) |> map save_thm;
+
 Inductive trans:
   (* Communication *)
   (∀s v1 p1 v2 p2 d c.
@@ -112,9 +141,10 @@ Inductive trans:
     ⇒ trans (s,IfThen v p c1 c2) (LTau p v,[]) (s,c2))
 
   (* Swapping transitions / Structural congruence *)
-∧ (∀s v p c1 c2 s' c1' c2' l alpha.
+∧ (∀s v p c1 c2 s' c1' c2' l l' alpha.
     trans (s,c1) (alpha,l) (s',c1')
-    ∧ trans (s,c2) (alpha,l) (s',c2')
+    ∧ trans (s,c2) (alpha,l') (s',c2')
+    ∧ l τ≅ l'
     ∧ p ∉ freeprocs alpha
     ⇒ trans (s,IfThen v p c1 c2) (alpha,l) (s',IfThen v p c1' c2'))
 ∧ (∀s c s' c' p1 v1 p2 v2 l alpha.
@@ -135,37 +165,22 @@ Inductive trans:
   (* Asynchrony *)
 ∧ (∀s c s' c' p1 v1 p2 v2 l alpha.
     trans (s,c) (alpha,l) (s',c')
-    ∧ sender alpha = SOME p1
+    ∧ p1 ∈ freeprocs alpha
+    ∧ written alpha ≠ SOME (v1,p1)
     ∧ p2 ∉ freeprocs alpha
     ⇒ trans (s,Com p1 v1 p2 v2 c) (alpha,LCom p1 v1 p2 v2::l) (s',Com p1 v1 p2 v2 c'))
 
 ∧ (∀s c s' c' p1 b p2 l alpha.
     trans (s,c) (alpha,l) (s',c')
-    ∧ sender alpha = SOME p1
+    ∧ p1 ∈ freeprocs alpha
     ∧ p2 ∉ freeprocs alpha
     ⇒ trans (s,Sel p1 b p2 c) (alpha,LSel p1 b p2::l) (s',Sel p1 b p2 c'))
-
-∧ (∀s c s' c' p1 v1 p2 v2 l alpha.
-    trans (s,c) (alpha,l) (s',c')
-    ∧ receiver alpha = SOME p1
-    ∧ sender alpha   ≠ SOME p1
-    ∧ written alpha ≠ SOME (v1,p1)
-    ∧ p2 ∉ freeprocs alpha
-    ⇒ trans (s,Com p1 v1 p2 v2 c) (alpha,l) (s',Com p1 v1 p2 v2 c'))
-
-∧ (∀s c s' c' p1 b p2 l alpha.
-    trans (s,c) (alpha,l) (s',c')
-    ∧ receiver alpha = SOME p1
-    ∧ sender alpha   ≠ SOME p1
-    ∧ p2 ∉ freeprocs alpha
-    ⇒ trans (s,Sel p1 b p2 c) (alpha,l) (s',Sel p1 b p2 c'))
 End
 
 
 val _ = zip ["trans_com","trans_sel","trans_let","trans_if_true","trans_if_false",
               "trans_if_swap","trans_com_swap","trans_sel_swap","trans_let_swap",
-              "trans_com_send_async","trans_sel_send_async",
-              "trans_com_recv_async","trans_sel_recv_async"]
+              "trans_com_async","trans_sel_async"]
             (CONJUNCTS trans_rules) |> map save_thm;
 
 Theorem trans_pairind =
@@ -196,6 +211,23 @@ Definition valid_action_def:
                             ∧ p1 ∈ freeprocs alpha
                             ∧ p2 ∉ freeprocs alpha))
 End
+
+(* Two list in a lcong relationship have the same length *)
+Theorem lcong_length:
+  ∀l l'. l τ≅ l' ⇒ LENGTH l = LENGTH l'
+Proof
+  ho_match_mp_tac (theorem"lcong_strongind")
+  \\ rw []
+QED
+
+(* An empty list can't be in an lcong relationship with a non empty list *)
+Theorem not_nil_lcong_cons:
+  ∀h l. ¬ ([] τ≅ h :: l)
+Proof
+  rw [] >> CCONTR_TAC  >> rw []
+  \\ IMP_RES_TAC lcong_length
+  \\ fs [LENGTH]
+QED
 
 (* `lrm l e` removes the first appearance of element `e` in `l` *)
 Definition lrm_def:
@@ -232,6 +264,64 @@ Proof
   induct_on `l` >> rw [MEM,lrm_def]
 QED
 
+(* Applying `lrm` at both sides of an lcong preserves the relation *)
+Theorem lcong_lrm:
+  ∀e l l'. l τ≅ l' ⇒ lrm l e τ≅ lrm l' e
+Proof
+  GEN_TAC
+  \\ ho_match_mp_tac (theorem"lcong_strongind")
+  \\ rw [lcong_rules]
+  \\ IMP_RES_TAC lcong_trans
+  \\ Cases_on `MEM e (h ++ [t1; t2])`
+  >- (`MEM e (h ++ [t2; t1])` by fs [MEM_PERM,PERM_APPEND_IFF,PERM_SWAP_AT_FRONT]
+     \\ rw [lrm_mem_append]
+     \\ Cases_on `MEM e h`
+     \\ rw [lrm_mem_append,lcong_rules,lrm_not_mem_append]
+     \\ rw [lrm_def,lcong_rules])
+  >- (`¬MEM e (h ++ [t2; t1])` by fs [MEM_PERM,PERM_APPEND_IFF,PERM_SWAP_AT_FRONT]
+     \\ rw [lrm_not_mem_append,lcong_rules])
+QED
+
+(* [] can only be related in `lcong` with  (itself) [] *)
+Theorem lcong_nil_simp:
+  ∀l. (l τ≅ [] ⇔ l = []) ∧ ([] τ≅ l ⇔ l = [])
+Proof
+  Cases_on `l`
+  >- rw [lcong_rules]
+  >- (fs [] >> metis_tac [not_nil_lcong_cons,lcong_refl])
+QED
+
+(* Prepending and element (`h`) preserves `lcong` *)
+Theorem lcong_cons:
+  ∀h l l'. lcong l l' ⇒ lcong (h :: l) (h :: l')
+Proof
+  GEN_TAC
+  \\ ho_match_mp_tac (fetch "-" "lcong_strongind")
+  \\ rw [lcong_rules]
+  \\ metis_tac [lcong_rules,GSYM APPEND |> CONJUNCT2]
+QED
+
+(* Removing the identical heads preserves `lcong` *)
+Theorem cons_lcong:
+  ∀h l l'. h :: l τ≅ h :: l' ⇒ l τ≅ l'
+Proof
+  rw []
+  \\ IMP_RES_TAC lcong_lrm
+  \\ pop_assum (ASSUME_TAC o Q.SPEC `h`)
+  \\ fs [lrm_def]
+QED
+
+(* An slightly more specific case of `lcong_lrm` *)
+Theorem lcong_cons_simp:
+  ∀h l h' l'. h ≠ h' ∧ h :: l τ≅ h' :: l'
+   ⇒ l τ≅ h' :: lrm l' h
+Proof
+  rw []
+  \\ IMP_RES_TAC lcong_lrm
+  \\ pop_assum (ASSUME_TAC o Q.SPEC `h`)
+  \\ rfs [lrm_def]
+QED
+
 (* Any valid transition ensures the relationship between the
    transition tag `t` and the head of the asyncronous transitions list
    `h` is a valid_action
@@ -249,7 +339,6 @@ Proof
      suffices_by (metis_tac [])
   \\ ho_match_mp_tac trans_pairind
   \\ rw [trans_rules,valid_action_def]
-  \\ Cases_on ‘t’ \\ fs [sender_def,freeprocs_def]
 QED
 
 (* Any valid trasition with a non-empty list of asyncronous trasitions
@@ -460,30 +549,5 @@ Definition no_self_comunication_def:
 ∧ no_self_comunication (Let _ _ _ _ c)   = no_self_comunication c
 ∧ no_self_comunication _                 = T
 End
-
-Theorem no_freeprocs_eq:
-  ∀p1 τ. p1 ∉ freeprocs τ ⇔ (sender τ ≠ SOME p1 ∧ receiver τ ≠ SOME p1)
-Proof
-  rw [] \\ Cases_on ‘τ’
-  \\ fs [sender_def,freeprocs_def,receiver_def]
-  \\ rw [] \\ metis_tac []
-QED
-
-Theorem freeprocs_eq:
-  ∀p1 τ. p1 ∈ freeprocs τ ⇔ (sender τ = SOME p1 ∨ receiver τ = SOME p1)
-Proof
-  rw [] \\ Cases_on ‘τ’
-  \\ fs [sender_def,freeprocs_def,receiver_def]
-  \\ rw [] \\ metis_tac []
-QED
-
-Theorem send_recv_neq:
-  ∀p q τ. p ≠ q
-  ∧ sender τ = SOME p
-  ∧ receiver τ = SOME q
-  ⇒ sender τ ≠ SOME q
-Proof
-  rw [] \\ CCONTR_TAC \\ fs []
-QED
 
 val _ = export_theory ()

@@ -121,38 +121,58 @@ QED
 Theorem trans_from_cong:
     ∀c1 c1'.
     c1 ≅ c1'
-    ⇒ (∀s s' τ c2 c2' l.
+    ⇒ (∀s s' τ c2 c2' l l'.
         (trans (s,c1)  (τ,l)  (s',c2)
-         ⇒ ∃c2'. trans (s,c1') (τ,l) (s',c2'))
+         ⇒ ∃l' c2'. trans (s,c1') (τ,l') (s',c2') ∧ l τ≅ l')
         ∧
-        (trans (s,c1') (τ,l) (s',c2')
-         ⇒ ∃c2. trans (s,c1) (τ,l) (s',c2)))
+        (trans (s,c1') (τ,l') (s',c2')
+               ⇒ ∃l c2. trans (s,c1) (τ,l) (s',c2) ∧ l' τ≅ l))
 Proof
   let val cases_last  = rpt (qpat_x_assum `trans _ _ _` mp_tac)
                         \\ disch_then (ASSUME_TAC o SIMP_RULE std_ss [Once trans_cases])
                         \\ rw [] >> rfs [] >> rw []
-      val cases_goal  = rw [ Once trans_cases
-                           , semBakeryTheory.freeprocs_def
-                           , semBakeryTheory.sender_def
-                           , semBakeryTheory.receiver_def]
-                        \\ fs [ semBakeryTheory.freeprocs_def
-                              , semBakeryTheory.sender_def
-                              , semBakeryTheory.receiver_def
-                              , no_freeprocs_eq]
-      val super_metis = metis_tac [trans_rules,send_recv_neq]
+      val cases_goal  = rw [Once trans_cases, semBakeryTheory.freeprocs_def]
+                           \\ fs [semBakeryTheory.freeprocs_def]
+      val super_metis = metis_tac [trans_rules, lcong_rules]
       val check_trans   = qpat_assum `trans _ _ _` (K ALL_TAC)
       val list_of_trans = [`trans (_, Com _ _ _ _ _) _ _`
                           ,`trans (_, Sel _ _ _ _) _ _`
                           ,`trans (_, Let _ _ _ _ _) _ _`
                           ,`trans (_, IfThen _ _ _ _) _ _`]
-      val check_forall = qpat_assum `∀s s' τ. (∃c2. trans _ _ _)
-                                                ⇔ ∃c2. trans _ _ _` (K ALL_TAC)
+      val check_forall = qpat_assum `∀s s' τ. (∃l c2. trans _ _ _)
+                                                ⇔ ∃l' c2. trans _ _ _` (K ALL_TAC)
+      val check_lcong = qpat_assum `_ τ≅ _` (K ALL_TAC)
       val check_chor  = FIRST (map (fn q => qpat_assum q (K ALL_TAC)) list_of_trans)
-      val l_tac    = (check_chor >> cases_last)
-                      ORELSE check_forall
-                      ORELSE (cases_goal >> super_metis)
-                      ORELSE super_metis
+      val lcong_if    = IMP_RES_TAC lcong_refl
+                        \\ IMP_RES_TAC lcong_trans
+                        \\ IMP_RES_TAC trans_if_swap
+      val lcong_if_com = IMP_RES_TAC lcong_cons
+                         \\ IMP_RES_TAC cons_lcong
+                         \\ metis_tac [trans_rules]
+      val l_tac_gen = fn lcong_tac =>
+                         (check_chor >> cases_last)
+                           ORELSE check_forall
+                           ORELSE (check_lcong >> lcong_tac >> super_metis)
+                           ORELSE (cases_goal >> super_metis)
+                           ORELSE super_metis
+      val l_tac = l_tac_gen (FAIL_TAC "Nope")
+      val l_if_tac = l_tac_gen lcong_if
+      val l_if_com_tac = l_tac_gen lcong_if_com
       val rpt_l_tac = rpt l_tac
+      val rpt_l_tac_if =  rpt l_if_tac
+      val rpt_l_tac_if_com = rpt l_if_com_tac
+      val rptn = fn tac => fn n => List.tabulate (n,K tac)
+      val tac =
+       fn (t1,t2,l) =>
+          l_tac >> l_tac >- l_tac >- l_tac >- l_tac >- l_tac >- l_tac
+          >- (Q.EXISTS_TAC `^t2::^t1::^l`
+             \\ CONV_TAC (ONCE_DEPTH_CONV EXISTS_AND_REORDER_CONV)
+             \\ rw [] >- (sg `DISJOINT (semBakery$freeprocs ^t1)
+                                       (semBakery$freeprocs ^t2)`
+                         >- rw [semBakeryTheory.freeprocs_def]
+                         >- rw [lcong_reord |> Q.SPEC `[]`
+                                            |> SIMP_RULE std_ss [APPEND]])
+           >- l_tac)
   in
   (ho_match_mp_tac scong_ind
   \\ rw []
@@ -160,16 +180,68 @@ Proof
           by (fs [INTER_DEF,EMPTY_DEF,FUN_EQ_THM] >> metis_tac [])))
   >- super_metis >- super_metis >- super_metis
   >- super_metis >- super_metis >- super_metis
-  \\ rpt_l_tac
+  >- tac (``semBakery$LCom p1 v1 p2 v2``
+         ,``semBakery$LCom p3 v3 p4 v4``
+         ,``l : semBakery$label list``)
+  >- tac (``semBakery$LCom p3 v3 p4 v4``
+         ,``semBakery$LCom p1 v1 p2 v2``
+         ,``l' : semBakery$label list``)
+  >- tac (``semBakery$LCom p1 v1 p2 v2``
+         ,``semBakery$LSel p3 v3 p4``
+         ,``l : semBakery$label list``)
+  >- tac (``semBakery$LSel p3 v3 p4``
+         ,``semBakery$LCom p1 v1 p2 v2``
+         ,``l' : semBakery$label list``)
+  >- tac (``semBakery$LSel p1 v1 p2``
+         ,``semBakery$LSel p3 v3 p4``
+         ,``l : semBakery$label list``)
+  >- tac (``semBakery$LSel p3 v3 p4``
+         ,``semBakery$LSel p1 v1 p2``
+         ,``l' : semBakery$label list``)
+  >- rpt_l_tac >- rpt_l_tac >- rpt_l_tac
+  >- rpt_l_tac >- rpt_l_tac >- rpt_l_tac
+  >- (l_tac >> l_tac >> l_tac
+     >- l_tac >- l_tac >- l_tac
+     >- l_tac >- l_tac >- l_tac
+     >- (Q.EXISTS_TAC `l` >> rw [lcong_sym] >> l_if_tac))
+  >- (l_tac >> l_tac >> l_tac
+     >- l_tac >- l_tac >- l_tac
+     >- l_tac >- l_tac >- l_tac
+     >- (Q.EXISTS_TAC `l'` >> rw [lcong_sym] >> l_if_tac))
+  >- (l_tac >> l_tac >- l_tac >- l_tac >- l_tac >- l_tac >- l_tac
+     >- (Q.EXISTS_TAC `LCom p1 v1 p2 v2 :: l'` >> rw [lcong_sym] >> l_if_com_tac))
+  >- (l_tac >> l_tac >> l_tac >- l_tac >- l_tac >- l_tac >- l_tac >- l_tac >- l_tac
+     >- (Q.EXISTS_TAC `LCom p1 v1 p2 v2 :: l` >> rw [lcong_sym] >> l_if_com_tac))
+  >- (l_tac >> l_tac >- l_tac >- l_tac >- l_tac >- l_tac >- l_tac
+     >- (Q.EXISTS_TAC `LSel p1 b p2 :: l'` >> rw [lcong_sym] >> l_if_com_tac))
+  >- (l_tac >> l_tac >> l_tac >- l_tac >- l_tac >- l_tac >- l_tac >- l_tac >- l_tac
+     >- (Q.EXISTS_TAC `LSel p1 b p2 :: l` >> rw [lcong_sym] >> l_if_com_tac))
+  >- (l_tac >> l_tac >- l_tac >- l_tac
+     >- (Q.EXISTS_TAC `l` >> rw [lcong_sym] >> l_if_tac))
+  >- (l_tac >> l_tac >> l_tac >- l_tac >- l_tac >- l_tac
+     >- (Q.EXISTS_TAC `l'` >> rw [lcong_sym] >> l_if_tac))
+  >- (l_tac >- l_tac >- l_tac
+     >- (RES_TAC >> Q.EXISTS_TAC `l'''` >> rw [lcong_sym] >> l_if_tac))
+  >- (l_tac >- l_tac >- l_tac
+     >- (RES_TAC >> Q.EXISTS_TAC `l'''` >> rw [lcong_sym] >> l_if_tac))
+  >- rpt_l_tac >- rpt_l_tac
+  >- (l_tac >- l_tac >- l_tac
+     >- (RES_TAC >> IMP_RES_TAC lcong_cons >> l_if_tac))
+  >- (l_tac >- l_tac >- l_tac
+     >- (RES_TAC >> IMP_RES_TAC lcong_cons >> l_if_tac))
+  >- (l_tac >- l_tac >- l_tac
+     >- (RES_TAC >> IMP_RES_TAC lcong_cons >> l_if_tac))
+  >- (l_tac >- l_tac >- l_tac
+     >- (RES_TAC >> IMP_RES_TAC lcong_cons >> l_if_tac))
   end
 QED
 
 (* A more human readable versin of `trans_from_cong` *)
 Theorem trans_from_cong':
-   ∀c1 c1' s s' τ l.
+   ∀c1 c1' s s' τ.
     c1 ≅ c1'
-    ⇒ (∃c2. trans (s ,c1 ) (τ,l) (s',c2 ))
-     = ∃c2'. trans (s,c1') (τ,l) (s',c2')
+    ⇒ (∃l  c2. trans (s ,c1 ) (τ,l ) (s',c2 ))
+     = ∃l' c2'. trans (s,c1') (τ,l') (s',c2')
 Proof
   rw [] >> EQ_TAC >> rw []
   \\ IMP_RES_TAC trans_from_cong
@@ -216,38 +288,30 @@ Proof
   >- (EVERY (map Q.EXISTS_TAC [`[]`,`LTau p v`,`c'`])
      \\ rw [scong_rules,trans_rules,toCong_def])
   >- (rfs []
+     \\ EVERY (map Q.EXISTS_TAC [`LCom p1 v1 p2 v2 :: l`,`τ'`,`Com p1 v1 p2 v2 c''`])
+     \\ rw [scong_rules]
      \\ `p1 ∈ freeprocs τ'` by rw [freeprocs_eq]
      \\ `p2 ∉ freeprocs τ'` by rw [freeprocs_eq]
      \\ `written τ' ≠ SOME (v1,p1)` by rw [written_eq]
-     \\ Cases_on ‘sender τ' = SOME p1’
-     >- (EVERY (map Q.EXISTS_TAC [`LCom p1 v1 p2 v2 :: l`,`τ'`,`Com p1 v1 p2 v2 c''`])
-        \\ metis_tac [scong_rules,trans_rules])
-     \\ Cases_on ‘receiver τ' = SOME p1’
-     >- (EVERY (map Q.EXISTS_TAC [`l`,`τ'`,`Com p1 v1 p2 v2 c''`])
-        \\ metis_tac [scong_rules,trans_rules])
-     \\ fs [semBakeryTheory.freeprocs_eq])
+     \\ rw [trans_rules])
   >- (rfs []
+     \\ EVERY (map Q.EXISTS_TAC [`LSel p1 b p2 :: l`,`τ'`,`Sel p1 b p2 c''`])
+     \\ rw [scong_rules]
      \\ `p1 ∈ freeprocs τ'` by rw [freeprocs_eq]
      \\ `p2 ∉ freeprocs τ'` by rw [freeprocs_eq]
-     \\ Cases_on ‘sender τ' = SOME p1’
-     >- (EVERY (map Q.EXISTS_TAC [`LSel p1 b p2 :: l`,`τ'`,`Sel p1 b p2 c''`])
-        \\ metis_tac [scong_rules,trans_rules])
-     \\ Cases_on ‘receiver τ' = SOME p1’
-     >- (EVERY (map Q.EXISTS_TAC [`l`,`τ'`,`Sel p1 b p2 c''`])
-        \\ metis_tac [scong_rules,trans_rules])
-     \\ fs [semBakeryTheory.freeprocs_eq])
-  \\ rfs []
-  \\ last_assum (ASSUME_TAC o MATCH_MP trans_from_cong)
-  \\ RES_TAC
-  \\ EVERY (map Q.EXISTS_TAC [`l`,`τ'`,`c2`])
-  \\ rw []
-  \\ IMP_RES_TAC scong_refl
-  \\ IMP_RES_TAC scong_trans
-  \\ IMP_RES_TAC trans_imp_chorTrm
-  \\ rw []
-  \\ match_mp_tac scong_trans
-  \\ Q.EXISTS_TAC `chorTrm s τ' c''`
-  \\ rw [chorTrm_scong]
+     \\ rw [trans_rules])
+  >- (rfs []
+     \\ last_assum (ASSUME_TAC o MATCH_MP trans_from_cong)
+     \\ RES_TAC
+     \\ EVERY (map Q.EXISTS_TAC [`l'`,`τ'`,`c2`])
+     \\ rw []
+     \\IMP_RES_TAC scong_refl
+     \\ IMP_RES_TAC scong_trans
+     \\ IMP_RES_TAC trans_imp_chorTrm
+     \\ rw []
+     \\ match_mp_tac scong_trans
+     \\ Q.EXISTS_TAC `chorTrm s τ' c''`
+     \\ rw [chorTrm_scong])
 QED
 
 val _ = export_theory()
