@@ -589,6 +589,22 @@ Definition no_self_comunication_def:
 ∧ no_self_comunication _                 = T
 End
 
+(* Transitions preserve ‘no_self_comunication’ since they change
+   the shape of the choreography aside from consuming its operations
+*)
+Theorem no_self_comunication_trans_pres:
+  ∀s c τ l s' c'.
+   no_self_comunication c ∧ trans (s,c) (τ,l) (s',c')
+   ⇒ no_self_comunication c'
+Proof
+  rpt gen_tac \\ disch_then(MAP_EVERY assume_tac o CONJUNCTS)
+  \\ qpat_x_assum `no_self_comunication _` mp_tac
+  \\ qpat_x_assum `trans _ _ _` mp_tac
+  \\ MAP_EVERY (W(curry Q.SPEC_TAC)) (rev [‘s’,‘c’,‘τ’,‘l’,‘s'’,‘c'’])
+  \\ ho_match_mp_tac (theorem "trans_pairind")
+  \\ rw [no_self_comunication_def]
+QED
+
 (* Check if a tag matches the head of a choreography *)
 Definition chor_match_def:
   chor_match (LCom p v q x)  (Com p' v' q' x' c)  = ((p,v,q,x)  = (p',v',q',x'))
@@ -677,6 +693,28 @@ Proof
      \\  fs [theorem"trans_let"])
   \\ fs [theorem"trans_sel"]
 QED
+
+(* ‘syncTrm’ preserves does not remove any variable from the state *)
+Theorem no_undefined_syncTrm:
+  ∀s c τ. no_undefined_vars (s,c) ⇒ no_undefined_vars (syncTrm (s,c) τ)
+Proof
+  ho_match_mp_tac syncTrm_pairind
+  \\ rw [syncTrm_def,chor_tl_def,
+         no_undefined_vars_def,
+         free_variables_def,
+         DELETE_SUBSET_INSERT]
+QED
+
+(* ‘syncTrm’ does not add self communicating operation into the choreography *)
+Theorem no_self_comunication_syncTrm:
+  ∀s c τ q r. no_self_comunication c ∧ syncTrm (s,c) τ = (q,r) ⇒ no_self_comunication r
+Proof
+  ho_match_mp_tac syncTrm_pairind
+  \\ rw [syncTrm_def,chor_tl_def,
+         no_self_comunication_def]
+  \\ rw [no_self_comunication_def]
+QED
+
 
 (* A synchronous version of ‘trans_s’ *)
 Definition trans_sync_def:
