@@ -1,27 +1,27 @@
-open preamble bakery_to_halfTheory congProofTheory
-open astBakeryTheory semBakeryTheory
-open astHalfBakeryTheory semHalfBakeryTheory
+open preamble chor_to_pchorTheory congProofTheory
+open chorLangTheory chorSemTheory
+open pchorLangTheory pchorSemTheory
 open confluenceTheory
 
 
-val _ = new_theory "bakery_to_halfProof"
+val _ = new_theory "chor_to_pchorProof"
 
 Triviality RTC_TRANS =
   RTC_RULES |> CONV_RULE FORALL_AND_CONV |> CONJUNCTS |> el 2
 
 Definition ptag_def:
-  ptag (semBakery$LTau p n)      = (semHalfBakery$LTau p n)
-∧ ptag (semBakery$LCom p v q x)  = (semHalfBakery$LCom p v q x)
-∧ ptag (semBakery$LSel p b q)    = (semHalfBakery$LSel p b q)
-∧ ptag (semBakery$LLet v p f vl) = (semHalfBakery$LLet v p f vl)
+  ptag (chorSem$LTau p n)      = (pchorSem$LTau p n)
+∧ ptag (chorSem$LCom p v q x)  = (pchorSem$LCom p v q x)
+∧ ptag (chorSem$LSel p b q)    = (pchorSem$LSel p b q)
+∧ ptag (chorSem$LLet v p f vl) = (pchorSem$LLet v p f vl)
 End
 
 Theorem freeprocs_p_eq:
   ∀τ. freeprocs τ = freeprocs (ptag τ)
 Proof
   Cases
-  \\ fs [semHalfBakeryTheory.freeprocs_def,
-         semBakeryTheory.freeprocs_def,
+  \\ fs [pchorSemTheory.freeprocs_def,
+         chorSemTheory.freeprocs_def,
          ptag_def]
 QED
 
@@ -275,7 +275,7 @@ Proof
       \\ rw [lSyncTrm_def]
       >- (Cases_on ‘τ’
           \\ fs [state_from_tag_def,
-                 semBakeryTheory.freeprocs_def,
+                 chorSemTheory.freeprocs_def,
                  FLOOKUP_UPDATE] \\ rfs [])
       >- metis_tac [IN_LIST_TO_BAG,trans_l_not_tau]
       >- (rfs [LIST_TO_BAG_EQ_EMPTY] \\ rveq
@@ -293,7 +293,7 @@ Proof
               by (UNABBREV_ALL_TAC
                   \\ Cases_on ‘τ’
                   \\ fs [state_from_tag_def,
-                         semBakeryTheory.freeprocs_def,
+                         chorSemTheory.freeprocs_def,
                          FLOOKUP_UPDATE]
                   \\ rfs [])
           \\ rw [lSyncTrm_def,chor_tl_def]
@@ -310,7 +310,7 @@ Proof
           by (UNABBREV_ALL_TAC
               \\ Cases_on ‘τ’
               \\ fs [state_from_tag_def,
-                     semBakeryTheory.freeprocs_def,
+                     chorSemTheory.freeprocs_def,
                      FLOOKUP_UPDATE]
               \\ rfs [])
       \\ rw [lSyncTrm_def,chor_tl_def]
@@ -342,7 +342,7 @@ Proof
           by (UNABBREV_ALL_TAC
               \\ Cases_on ‘τ’
               \\ fs [state_from_tag_def,
-                     semBakeryTheory.freeprocs_def,
+                     chorSemTheory.freeprocs_def,
                      FLOOKUP_UPDATE]
               \\ rfs [])
       \\ rw [chor_tl_def,FLOOKUP_UPDATE]
@@ -369,8 +369,8 @@ Proof
               by (UNABBREV_ALL_TAC
                   \\ Cases_on ‘τ’
                   \\ fs [state_from_tag_def,
-                         semBakeryTheory.freeprocs_def,
-                         semBakeryTheory.written_def,
+                         chorSemTheory.freeprocs_def,
+                         chorSemTheory.written_def,
                          FLOOKUP_UPDATE]
                   \\ rfs [])
       \\ ho_match_mp_tac trans_sync_step
@@ -382,9 +382,9 @@ Proof
       \\ qexists_tac ‘τ’
       \\ irule semantics_add_irrelevant_state2 \\ fs []
       \\ Cases_on ‘τ’
-      \\ fs [semBakeryTheory.written_def,
-             semBakeryTheory.read_def,
-             semBakeryTheory.freeprocs_def] \\ rfs []
+      \\ fs [chorSemTheory.written_def,
+             chorSemTheory.read_def,
+             chorSemTheory.freeprocs_def] \\ rfs []
       \\ qpat_x_assum ‘l ≠ l'’ mp_tac
       \\ rpt (last_x_assum (K ALL_TAC))
       \\ Induct_on ‘l0'’ \\ fs [])
@@ -423,7 +423,7 @@ Proof
          (UNABBREV_ALL_TAC
           \\ Cases_on ‘τ’
           \\ fs [state_from_tag_def,
-                 semBakeryTheory.freeprocs_def,
+                 chorSemTheory.freeprocs_def,
                  FLOOKUP_UPDATE]
           \\ rfs []
           \\ qpat_x_assum ‘l0 ≠ _'’ mp_tac
@@ -432,9 +432,9 @@ Proof
      \\ fs [] \\ irule semantics_add_irrelevant_state2
      \\ fs []
      \\ Cases_on ‘τ’
-     \\ fs [semBakeryTheory.written_def,
-            semBakeryTheory.read_def,
-            semBakeryTheory.freeprocs_def] \\ rfs []
+     \\ fs [chorSemTheory.written_def,
+            chorSemTheory.read_def,
+            chorSemTheory.freeprocs_def] \\ rfs []
      \\ qpat_x_assum ‘l0 ≠ l''’ mp_tac
      \\ rpt (last_x_assum (K ALL_TAC))
      \\ Induct_on ‘l0'’ \\ fs [])

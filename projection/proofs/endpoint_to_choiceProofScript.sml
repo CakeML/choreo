@@ -25,9 +25,10 @@
    simplifies inductive arguments about semantics reflection, by allowing us to concentrate on
    only one reduction at a time.
  *)
-open preamble endpointLangTheory endpointSemanticsTheory endpointPropsTheory endpoint_choiceTheory
+open preamble endpointLangTheory endpointSemTheory
+     endpointPropsTheory endpoint_to_choiceTheory
 
-val _ = new_theory "endpoint_choiceProof";
+val _ = new_theory "endpoint_to_choiceProof";
 
 val compile_network_preservation_send = Q.store_thm("compile_network_preservation_send",
   `∀p1 p2 q1 d q2 fv.
@@ -154,7 +155,7 @@ val compile_network_preservation_int_choice_T = Q.store_thm(
   rpt strip_tac
   >> qmatch_asmsub_abbrev_tac `trans _ alpha _`
   >> pop_assum (mp_tac o REWRITE_RULE[markerTheory.Abbrev_def])
-  >> qpat_x_assum `ALL_DISTINCT _` mp_tac  
+  >> qpat_x_assum `ALL_DISTINCT _` mp_tac
   >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`q1`,`d`,`q2`,`fv`]
   >> pop_assum mp_tac
   >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`n2`,`alpha`,`n1`]
@@ -202,7 +203,7 @@ val compile_network_preservation_int_choice_F = Q.store_thm(
   rpt strip_tac
   >> qmatch_asmsub_abbrev_tac `trans _ alpha _`
   >> pop_assum (mp_tac o REWRITE_RULE[markerTheory.Abbrev_def])
-  >> qpat_x_assum `ALL_DISTINCT _` mp_tac  
+  >> qpat_x_assum `ALL_DISTINCT _` mp_tac
   >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`q1`,`d`,`q2`,`fv`]
   >> pop_assum mp_tac
   >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`n2`,`alpha`,`n1`]
@@ -249,7 +250,7 @@ val compile_network_preservation_ext_choice_T = Q.store_thm("compile_network_pre
   rpt strip_tac
   >> qmatch_asmsub_abbrev_tac `trans _ alpha _`
   >> pop_assum (mp_tac o REWRITE_RULE[markerTheory.Abbrev_def])
-  >> qpat_x_assum `ALL_DISTINCT _` mp_tac  
+  >> qpat_x_assum `ALL_DISTINCT _` mp_tac
   >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`q1`,`d`,`q2`,`fv`]
   >> pop_assum mp_tac
   >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`n2`,`alpha`,`n1`]
@@ -276,7 +277,7 @@ val compile_network_preservation_ext_choice_F = Q.store_thm("compile_network_pre
   rpt strip_tac
   >> qmatch_asmsub_abbrev_tac `trans _ alpha _`
   >> pop_assum (mp_tac o REWRITE_RULE[markerTheory.Abbrev_def])
-  >> qpat_x_assum `ALL_DISTINCT _` mp_tac  
+  >> qpat_x_assum `ALL_DISTINCT _` mp_tac
   >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`q1`,`d`,`q2`,`fv`]
   >> pop_assum mp_tac
   >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`n2`,`alpha`,`n1`]
@@ -621,7 +622,7 @@ val closing_distance_zero_IMP = Q.store_thm("closing_distance_zero_IMP",
   >> ho_match_mp_tac choice_rel_ind
   >> rpt strip_tac
   >- (* choice_rel_eq_junk *)
-     first_x_assum ACCEPT_TAC  
+     first_x_assum ACCEPT_TAC
   >- (* choice_rel_eq_par *)
      fs[closing_distance_def,ADD_EQ_0,compile_network_fv_def,junkcong_par]
   >- (* choice_rel_int_choice_true *)
@@ -1066,7 +1067,7 @@ val junkcong_compile_closing_distance = Q.store_thm("junkcong_compile_closing_di
   `!fv n1 n2. junkcong {fv} (compile_network_fv fv n1) n2 ==> closing_distance fv n1 n2 = 0`,
   Induct_on `n1`
   >> rpt strip_tac >> fs[compile_network_fv_def]
-  >- (imp_res_tac junkcong_nil_rel_nil >> fs[closing_distance_def]) 
+  >- (imp_res_tac junkcong_nil_rel_nil >> fs[closing_distance_def])
   >- (imp_res_tac junkcong_par_rel_par >> fs[closing_distance_def])
   >- (imp_res_tac junkcong_endpoint_rel_endpoint >> fs[closing_distance_def]));
 
@@ -1119,14 +1120,14 @@ val closing_distance_SUC_IMP_tau = Q.store_thm("closing_distance_SUC_IMP_tau",
   >> rpt strip_tac
   >> imp_res_tac choice_rel_endpoints
   >> fs[] >> rfs[]
-  >> imp_res_tac closed_network_choice_rel  
+  >> imp_res_tac closed_network_choice_rel
   >> imp_res_tac closed_network_receiver_mem
   >> fs[bool2w_def]
   >> qpat_x_assum `trans n1 _ _` assume_tac
   >> qmatch_asmsub_abbrev_tac `trans _ _ a1`
   >> qexists_tac `a1`
   >> qpat_x_assum `trans n2 _ _` assume_tac
-  >> qmatch_asmsub_abbrev_tac `trans _ _ a2` 
+  >> qmatch_asmsub_abbrev_tac `trans _ _ a2`
   >> qexists_tac `a2`
   >> unabbrev_all_tac
   >> fs[closing_distance_add_queue,choice_rel_add_queue]
@@ -1240,7 +1241,7 @@ val choice_rel_trans_pres = Q.prove(
           >> qmatch_goalsub_abbrev_tac `choice_rel _ _ (NPar a3 a4)`
           >> qpat_x_assum `choice_rel _ _ a3` mp_tac
           >> qpat_x_assum `choice_rel _ _ a4` mp_tac
-          >> rpt strip_tac 
+          >> rpt strip_tac
           >> drule choice_rel_par >> pop_assum(fn thm => disch_then drule >> assume_tac thm)
           >> strip_tac >> PURE_ONCE_REWRITE_TAC [CONJ_SYM]
           >> asm_exists_tac >> simp[]
@@ -1269,7 +1270,7 @@ val choice_rel_trans_pres = Q.prove(
               >> rveq
               >> every_case_tac
               >> fs[endpoint_sends_fv_def,endpoints_def,FIND_def,INDEX_FIND_def,sends_fv_def]
-              >> imp_res_tac choice_rel_endpoint_eq_junk              
+              >> imp_res_tac choice_rel_endpoint_eq_junk
               >> PURE_ONCE_REWRITE_TAC [CONJ_SYM]
               >> asm_exists_tac
               >> simp[]
@@ -1352,7 +1353,7 @@ val choice_rel_trans_pres = Q.prove(
               >> rveq
               >> every_case_tac
               >> fs[endpoint_sends_fv_def,endpoints_def,FIND_def,INDEX_FIND_def,sends_fv_def]
-              >> imp_res_tac choice_rel_endpoint_eq_junk              
+              >> imp_res_tac choice_rel_endpoint_eq_junk
               >> PURE_ONCE_REWRITE_TAC [CONJ_SYM]
               >> asm_exists_tac
               >> simp[]
@@ -1368,7 +1369,7 @@ val choice_rel_trans_pres = Q.prove(
               >> rveq
               >> every_case_tac
               >> fs[endpoint_sends_fv_def,endpoints_def,FIND_def,INDEX_FIND_def,sends_fv_def]
-              >> imp_res_tac choice_rel_endpoint_eq_junk              
+              >> imp_res_tac choice_rel_endpoint_eq_junk
               >> PURE_ONCE_REWRITE_TAC [CONJ_SYM]
               >> asm_exists_tac
               >> simp[]
@@ -1408,7 +1409,7 @@ val choice_rel_trans_pres = Q.prove(
       >> qmatch_goalsub_abbrev_tac `choice_rel _ _ (NPar a1 a2)`
       >> qpat_x_assum `choice_rel _ _ a1` assume_tac
       >> drule choice_rel_par
-      >> qpat_x_assum `choice_rel _ _ a2` assume_tac      
+      >> qpat_x_assum `choice_rel _ _ a2` assume_tac
       >> disch_then drule >> strip_tac
       >> unabbrev_all_tac
       >> PURE_ONCE_REWRITE_TAC [CONJ_SYM]
@@ -1596,7 +1597,7 @@ val choice_rel_exit = Q.store_thm("choice_rel_exit",
       >> fs[GSYM reduction_def]
       >> Q.ISPEC_THEN `reduction` (imp_res_tac o CONJUNCT2) RTC_RULES
       >> metis_tac[]));
-  
+
 val compile_network_reflection = Q.store_thm("compile_network_reflection",
   `∀n1 n2 q1 d q2 fv.
     ALL_DISTINCT (MAP FST (endpoints n1)) ∧

@@ -1,8 +1,8 @@
-open preamble endpointLangTheory bakery_to_endpointTheory
-              endpointSemanticsTheory endpointPropsTheory
-              endpointCongTheory semBakeryTheory;
+open preamble endpointLangTheory chor_to_endpointTheory
+              endpointSemTheory endpointPropsTheory
+              endpointCongTheory chorSemTheory;
 
-val _ = new_theory "bakery_to_endpointProof";
+val _ = new_theory "chor_to_endpointProof";
 
 val RTC_TRANS = save_thm ("RTC_TRANS",
   RTC_RULES |> CONV_RULE FORALL_AND_CONV |> CONJUNCTS |> el 2);
@@ -62,7 +62,7 @@ val trans_let_gen = Q.store_thm("trans_let_gen",
     ⇒ trans (NEndpoint p s (Let v f vl e))
              LTau
              (NEndpoint p s' e)`,
-  rw [endpointSemanticsTheory.trans_let]
+  rw [endpointSemTheory.trans_let]
 );
 
 val cut_sel_upto_def = Define`
@@ -486,8 +486,7 @@ Theorem conf_trans:
    ⇒ epn ≅< epn' ∧ epn' ≅< epn'' ⇒ epn ≅< epn''
 Proof
   rw [epn_conf_def]
-  \\ drule
-  \\ cheat (* TODO *)
+  \\ cheat
 QED
 
 val compile_network_preservation = Q.store_thm("compile_network_preservation",
@@ -669,7 +668,7 @@ val compile_network_preservation = Q.store_thm("compile_network_preservation",
                            (compile_network s (IfThen v p c' c2) l)`
      \\ rw [reduction_def]
      >- (ho_match_mp_tac trans_par_l
-        \\ ho_match_mp_tac endpointSemanticsTheory.trans_if_true
+        \\ ho_match_mp_tac endpointSemTheory.trans_if_true
         \\ rw [Abbr `sq`,lookup_projectS])
      \\ `¬MEM p l` by rw [Abbr `l`,MEM_FILTER]
      \\ rw [prefix_project_eq]
@@ -848,7 +847,7 @@ val compile_network_preservation = Q.store_thm("compile_network_preservation",
                            (compile_network s (IfThen v p c1 c') l)`
      \\ rw [reduction_def]
      >- (ho_match_mp_tac trans_par_l
-        \\ ho_match_mp_tac endpointSemanticsTheory.trans_if_false
+        \\ ho_match_mp_tac endpointSemTheory.trans_if_false
         \\ rw [Abbr `sq`,lookup_projectS]
         \\ METIS_TAC [lookup_projectS])
      \\ `¬MEM p l` by rw [Abbr `l`,MEM_FILTER]

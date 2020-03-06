@@ -1,6 +1,6 @@
-open preamble endpointLangTheory bakery_to_endpointTheory
-              endpointSemanticsTheory endpointPropsTheory
-              semBakeryTheory;
+open preamble endpointLangTheory chor_to_endpointTheory
+              endpointSemTheory  endpointPropsTheory
+              chorSemTheory;
 
 val _ = new_theory"endpointCong"
 
@@ -115,8 +115,8 @@ val epn_rcong_imp_trans = Q.store_thm("epn_rcong_imp_trans",
     n1 θ≅ n1'
     ⇒ ∀t.(∀n2'. trans n1' t n2' ⇒ ∃n2.  trans n1  t n2  ∧ n2 θ≅ n2')
        ∧ (∀n2.  trans n1  t n2  ⇒ ∃n2'. trans n1' t n2' ∧ n2' θ≅ n2)`,
-  let val trans_metis = metis_tac [epn_rcong_rules,endpointSemanticsTheory.trans_rules]
-      val asm_epn_cases = (ASSUME_TAC o ONCE_REWRITE_RULE [endpointSemanticsTheory.trans_cases])
+  let val trans_metis = metis_tac [epn_rcong_rules,endpointSemTheory.trans_rules]
+      val asm_epn_cases = (ASSUME_TAC o ONCE_REWRITE_RULE [endpointSemTheory.trans_cases])
       val epn_rcong_tac  =
           fn (asm,g) =>
              let val is_trans = (curry op = "trans") o term_to_string o fst o strip_comb
@@ -390,7 +390,7 @@ val compile_network_rcong = Q.store_thm("compile_network_rcong",
 (* Networks preserve the number of process over transitions *)
 val network_procs_trans = Q.store_thm("network_procs_trans",
   `∀ep t ep'. trans ep t ep' ⇒ network_procs ep' = network_procs ep`,
-  ho_match_mp_tac endpointSemanticsTheory.trans_ind
+  ho_match_mp_tac endpointSemTheory.trans_ind
   \\ rw [network_procs_def]
 );
 
