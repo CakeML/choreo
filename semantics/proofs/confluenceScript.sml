@@ -1,6 +1,4 @@
-open preamble
-
-open semBakeryTheory
+open preamble chorSemTheory
 
 val _ = new_theory "confluence";
 

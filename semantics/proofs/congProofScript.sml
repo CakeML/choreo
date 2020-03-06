@@ -1,10 +1,10 @@
 open preamble
 
-open semBakeryTheory semCongBakeryTheory astBakeryTheory
+open chorSemTheory chorCongSemTheory chorLangTheory
 
 val _ = new_theory "congProof";
 
-(* semBakery$label to semCongBakery$label conversion *)
+(* chorSem$label to chorCongSem$label conversion *)
 Definition toCong_def:
   toCong (LTau p v)      = LTau p NONE
 ∧ toCong (LCom p v q v') = LCom p v q v'
@@ -86,7 +86,7 @@ Proof
   \\ Cases_on `τ`
   \\ ho_match_mp_tac trans_pairind
   \\ rw [chorTrm_def,trans_rules]
-  \\ rfs [trans_rules,semBakeryTheory.freeprocs_def]
+  \\ rfs [trans_rules,chorSemTheory.freeprocs_def]
   \\ metis_tac []
 QED
 
@@ -131,8 +131,8 @@ Proof
   let val cases_last  = rpt (qpat_x_assum `trans _ _ _` mp_tac)
                         \\ disch_then (ASSUME_TAC o SIMP_RULE std_ss [Once trans_cases])
                         \\ rw [] >> rfs [] >> rw []
-      val cases_goal  = rw [Once trans_cases, semBakeryTheory.freeprocs_def]
-                           \\ fs [semBakeryTheory.freeprocs_def]
+      val cases_goal  = rw [Once trans_cases, chorSemTheory.freeprocs_def]
+                           \\ fs [chorSemTheory.freeprocs_def]
       val super_metis = metis_tac [trans_rules, lcong_rules]
       val check_trans   = qpat_assum `trans _ _ _` (K ALL_TAC)
       val list_of_trans = [`trans (_, Com _ _ _ _ _) _ _`
@@ -167,9 +167,9 @@ Proof
           l_tac >> l_tac >- l_tac >- l_tac >- l_tac >- l_tac >- l_tac
           >- (Q.EXISTS_TAC `^t2::^t1::^l`
              \\ CONV_TAC (ONCE_DEPTH_CONV EXISTS_AND_REORDER_CONV)
-             \\ rw [] >- (sg `DISJOINT (semBakery$freeprocs ^t1)
-                                       (semBakery$freeprocs ^t2)`
-                         >- rw [semBakeryTheory.freeprocs_def]
+             \\ rw [] >- (sg `DISJOINT (chorSem$freeprocs ^t1)
+                                       (chorSem$freeprocs ^t2)`
+                         >- rw [chorSemTheory.freeprocs_def]
                          >- rw [lcong_reord |> Q.SPEC `[]`
                                             |> SIMP_RULE std_ss [APPEND]])
            >- l_tac)
@@ -180,24 +180,24 @@ Proof
           by (fs [INTER_DEF,EMPTY_DEF,FUN_EQ_THM] >> metis_tac [])))
   >- super_metis >- super_metis >- super_metis
   >- super_metis >- super_metis >- super_metis
-  >- tac (``semBakery$LCom p1 v1 p2 v2``
-         ,``semBakery$LCom p3 v3 p4 v4``
-         ,``l : semBakery$label list``)
-  >- tac (``semBakery$LCom p3 v3 p4 v4``
-         ,``semBakery$LCom p1 v1 p2 v2``
-         ,``l' : semBakery$label list``)
-  >- tac (``semBakery$LCom p1 v1 p2 v2``
-         ,``semBakery$LSel p3 v3 p4``
-         ,``l : semBakery$label list``)
-  >- tac (``semBakery$LSel p3 v3 p4``
-         ,``semBakery$LCom p1 v1 p2 v2``
-         ,``l' : semBakery$label list``)
-  >- tac (``semBakery$LSel p1 v1 p2``
-         ,``semBakery$LSel p3 v3 p4``
-         ,``l : semBakery$label list``)
-  >- tac (``semBakery$LSel p3 v3 p4``
-         ,``semBakery$LSel p1 v1 p2``
-         ,``l' : semBakery$label list``)
+  >- tac (``chorSem$LCom p1 v1 p2 v2``
+         ,``chorSem$LCom p3 v3 p4 v4``
+         ,``l : chorSem$label list``)
+  >- tac (``chorSem$LCom p3 v3 p4 v4``
+         ,``chorSem$LCom p1 v1 p2 v2``
+         ,``l' : chorSem$label list``)
+  >- tac (``chorSem$LCom p1 v1 p2 v2``
+         ,``chorSem$LSel p3 v3 p4``
+         ,``l : chorSem$label list``)
+  >- tac (``chorSem$LSel p3 v3 p4``
+         ,``chorSem$LCom p1 v1 p2 v2``
+         ,``l' : chorSem$label list``)
+  >- tac (``chorSem$LSel p1 v1 p2``
+         ,``chorSem$LSel p3 v3 p4``
+         ,``l : chorSem$label list``)
+  >- tac (``chorSem$LSel p3 v3 p4``
+         ,``chorSem$LSel p1 v1 p2``
+         ,``l' : chorSem$label list``)
   >- rpt_l_tac >- rpt_l_tac >- rpt_l_tac
   >- rpt_l_tac >- rpt_l_tac >- rpt_l_tac
   >- (l_tac >> l_tac >> l_tac
@@ -248,20 +248,20 @@ Proof
   \\ metis_tac []
 QED
 
-(* Equality of semBakery$freeprocs and semCongBakery$freeprocs *)
+(* Equality of chorSem$freeprocs and chorTrm$freeprocs *)
 Theorem freeprocs_eq:
   ∀τ. freeprocs τ = freeprocs (toCong τ)
 Proof
   Cases_on `τ`
-  >> rw [freeprocs_def,semBakeryTheory.freeprocs_def,toCong_def]
+  >> rw [freeprocs_def,chorSemTheory.freeprocs_def,toCong_def]
 QED
 
-(* Equality of semBakery$written and semCongBakery$written *)
+(* Equality of chorSem$written and chorTrm$written *)
 Theorem written_eq:
   ∀τ. written τ = written (toCong τ)
 Proof
   Cases_on `τ`
-  >> rw [written_def,semBakeryTheory.written_def,toCong_def]
+  >> rw [written_def,chorSemTheory.written_def,toCong_def]
 QED
 
 (* `transCong` implies `trans` up to `≅` on the resulting choreography *)

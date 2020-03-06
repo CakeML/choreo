@@ -1,9 +1,7 @@
-open preamble
-
-open astBakeryTheory
+open preamble chorLangTheory
 
 (* Semantics with build-in congruence *)
-val _ = new_theory "semCongBakery";
+val _ = new_theory "chorCongSem";
 
 val _ = Datatype`
   label = LTau proc (varN option)

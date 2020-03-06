@@ -1,6 +1,6 @@
 open preamble;
 
-val _ = new_theory "astBakery";
+val _ = new_theory "chorLang";
 
 val _ = type_abbrev( "varN" , ``: string``);
 

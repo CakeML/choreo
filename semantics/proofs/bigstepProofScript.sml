@@ -1,4 +1,4 @@
-open preamble bigstepSemTheory semBakeryTheory confluenceTheory;
+open preamble bigstepSemTheory chorSemTheory confluenceTheory;
 
 val _ = new_theory "bigstepProof";
 

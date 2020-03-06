@@ -1,8 +1,6 @@
-open preamble
+open preamble pchorLangTheory
 
-open astHalfBakeryTheory
-
-val _ = new_theory "semHalfBakery";
+val _ = new_theory "pchorSem";
 
 Datatype:
   label = LTau proc varN

@@ -1,8 +1,8 @@
 open preamble
 
-open astBakeryTheory
+open chorLangTheory
 
-val _ = new_theory "semBakery";
+val _ = new_theory "chorSem";
 
 Datatype:
   label = LTau proc varN
@@ -629,7 +629,7 @@ End
    Its equivalent to one synchronous step in the semantics.
 *)
 Definition chor_tl_def:
-  chor_tl s astBakery$Nil   = (s,astBakery$Nil)
+  chor_tl s Nil             = (s,Nil)
 ∧ chor_tl s (Com p v q x c) = (s |+ ((x,q),(THE o FLOOKUP s) (v,p)),c)
 ∧ chor_tl s (Sel p b q c)   = (s,c)
 ∧ chor_tl s (Let v p f l c) =

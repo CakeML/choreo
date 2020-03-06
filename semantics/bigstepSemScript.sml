@@ -1,4 +1,4 @@
-open preamble astBakeryTheory;
+open preamble chorLangTheory;
 
 val _ = new_theory "bigstepSem";
 
@@ -28,5 +28,5 @@ val evaluate_def = Define `
          evaluate s c1
        else
          evaluate s c2)`
-                                
+
 val _ = export_theory ()
