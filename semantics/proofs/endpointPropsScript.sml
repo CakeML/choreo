@@ -1,4 +1,4 @@
-open preamble endpointSemanticsTheory endpointLangTheory;
+open preamble endpointSemTheory endpointLangTheory;
 
 val _ = new_theory "endpointProps"
 
@@ -140,7 +140,7 @@ val trans_let' = Q.store_thm("trans_let'",
   >> qmatch_goalsub_abbrev_tac `trans (NEndpoint _ s1 _) _ (NEndpoint _ s2 _)`
   >> `s2 = s1 with bindings := s1.bindings |+ (v,f (MAP (THE ∘ FLOOKUP s1.bindings) vl))`
      by(unabbrev_all_tac >> simp[])
-  >> pop_assum (fn thm => PURE_ONCE_REWRITE_TAC [thm])  
+  >> pop_assum (fn thm => PURE_ONCE_REWRITE_TAC [thm])
   >> unabbrev_all_tac
   >> match_mp_tac trans_let
   >> simp[]);
@@ -234,7 +234,7 @@ val reduction_nil = Q.store_thm("reduction_nil",
   >> PURE_ONCE_REWRITE_TAC [AND_IMP_INTRO]
   >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`n`,`a1`]
   >> ho_match_mp_tac RTC_lifts_invariants
-  >> simp[endpointSemanticsTheory.reduction_def,trans_nil_false]);
+  >> simp[endpointSemTheory.reduction_def,trans_nil_false]);
 
 val endpoints_def = Define `
    (endpoints endpointLang$NNil = [])
@@ -345,13 +345,13 @@ val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
   >- metis_tac[junkcong_rules]
   >- (* junkcong_add_junk *)
      (qpat_x_assum `trans _ _ _` (assume_tac
-                                    o REWRITE_RULE [Once endpointSemanticsTheory.trans_cases])
+                                    o REWRITE_RULE [Once endpointSemTheory.trans_cases])
       >> fs[] >> rveq
       >> TRY(qmatch_goalsub_abbrev_tac `junkcong fvs (NEndpoint a1 a2 a3)`
              >> qexists_tac `NEndpoint a1 (a2 with bindings := a2.bindings |+ (v,d)) a3`
              >> conj_tac
              >- (unabbrev_all_tac
-                 >> MAP_FIRST match_mp_tac (CONJUNCTS endpointSemanticsTheory.trans_rules)
+                 >> MAP_FIRST match_mp_tac (CONJUNCTS endpointSemTheory.trans_rules)
                  >> fs[FLOOKUP_UPDATE,free_var_names_endpoint_def])
              >- (`¬MEM v (free_var_names_endpoint a3)`
                    by(unabbrev_all_tac >> fs[free_var_names_endpoint_def])
@@ -432,13 +432,13 @@ val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
   >- (* junkcong_add_junk, symmetric case *)
      (PURE_ONCE_REWRITE_TAC [junkcong_sym_eq]
       >> qpat_x_assum `trans _ _ _` (assume_tac
-                                       o REWRITE_RULE [Once endpointSemanticsTheory.trans_cases])
+                                       o REWRITE_RULE [Once endpointSemTheory.trans_cases])
       >> fs[] >> rveq
       >> TRY(qmatch_goalsub_abbrev_tac `junkcong fvs (NEndpoint a1 (a2 with bindings := _) a3)`
              >> qexists_tac `NEndpoint a1 a2 a3`
              >> conj_tac
              >- (unabbrev_all_tac
-                 >> MAP_FIRST match_mp_tac (CONJUNCTS endpointSemanticsTheory.trans_rules)
+                 >> MAP_FIRST match_mp_tac (CONJUNCTS endpointSemTheory.trans_rules)
                  >> fs[FLOOKUP_UPDATE,free_var_names_endpoint_def] >> rfs[])
              >- (`¬MEM v (free_var_names_endpoint a3)`
                    by(unabbrev_all_tac >> fs[free_var_names_endpoint_def])
@@ -487,7 +487,7 @@ val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
                  >> metis_tac[junkcong_rules,junkcong_add_junk'])))
   >- (* par-l *)
      (qpat_x_assum `trans (NPar _ _) _ _` (assume_tac
-                                    o REWRITE_RULE [Once endpointSemanticsTheory.trans_cases])
+                                    o REWRITE_RULE [Once endpointSemTheory.trans_cases])
       >> fs[] >> rveq
       >> EVERY_ASSUM imp_res_tac
       >> imp_res_tac trans_com_l
@@ -499,7 +499,7 @@ val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
       >> metis_tac[junkcong_rules])
   >- (* par-r *)
      (qpat_x_assum `trans (NPar _ _) _ _` (assume_tac
-                                    o REWRITE_RULE [Once endpointSemanticsTheory.trans_cases])
+                                    o REWRITE_RULE [Once endpointSemTheory.trans_cases])
       >> fs[] >> rveq
       >> EVERY_ASSUM imp_res_tac
       >> imp_res_tac trans_com_l
@@ -619,12 +619,12 @@ val (qrel_rules, qrel_ind, qrel_cases) = Hol_reln `
     p1 ≠ p2
     ⇒ qrel (q1 ++ [(p1,d1);(p2,d2)] ++ q2) (q1 ++ [(p2,d2);(p1,d1)] ++ q2))`
 
-val qrel_strongind = fetch "-" "qrel_strongind"  
+val qrel_strongind = fetch "-" "qrel_strongind"
 
 val [qrel_refl,qrel_sym,qrel_trans,qrel_queue_reorder]
     = zip ["qrel_refl","qrel_sym","qrel_trans","qrel_queue_reorder"]
           (CONJUNCTS qrel_rules) |> map save_thm;
-                           
+
 val qcong_queue_reorder' = Q.store_thm("qcong_queue_reorder'",
   `∀p s e p1 d1 p2 d2 q1 q2.
      p1 ≠ p2
@@ -830,7 +830,7 @@ val qrel_snoc_IMP = Q.prove(
   >> dxrule qrel_snoc_IMP_lemma >> rw[]);
 
 val qrel_consE = Q.store_thm("qrel_consE",
-  `!q1 q2 qe. qrel (qe::q1) (qe::q2) ==> qrel q1 q2`,  
+  `!q1 q2 qe. qrel (qe::q1) (qe::q2) ==> qrel q1 q2`,
   `!qq1 qq2. qrel qq1 qq2 ==> (!q1 q2 qe. qq1 = (qe::q1) /\ qq2 = (qe::q2) ==> qrel q1 q2)`
     suffices_by metis_tac[qrel_refl]
   >> ho_match_mp_tac qrel_strongind >> rpt strip_tac
@@ -850,7 +850,7 @@ val qrel_consE = Q.store_thm("qrel_consE",
       >> match_mp_tac qrel_queue_reorder >> rw[]));
 
 val qrel_snocE = Q.store_thm("qrel_snocE",
-  `!q1 q2 qe. qrel (SNOC qe q1) (SNOC qe q2) ==> qrel q1 q2`,  
+  `!q1 q2 qe. qrel (SNOC qe q1) (SNOC qe q2) ==> qrel q1 q2`,
   `!qq1 qq2. qrel qq1 qq2 ==> (!q1 q2 qe. qq1 = (SNOC qe q1) /\ qq2 = (SNOC qe q2) ==> qrel q1 q2)`
     suffices_by metis_tac[qrel_refl]
   >> ho_match_mp_tac qrel_strongind >> rpt strip_tac
@@ -1157,14 +1157,14 @@ val list_trans_par_l = Q.store_thm("list_trans_par_l",
   Induct_on `alpha`
   >- simp[list_trans_def]
   >> rpt strip_tac
-  >> fs[list_trans_def] >> metis_tac[endpointSemanticsTheory.trans_par_l]);
+  >> fs[list_trans_def] >> metis_tac[endpointSemTheory.trans_par_l]);
 
 val list_trans_par_r = Q.store_thm("list_trans_par_r",
   `∀conf p alpha q r. list_trans p alpha q ==> list_trans (NPar r p) alpha (NPar r q)`,
   Induct_on `alpha`
   >- simp[list_trans_def]
   >> rpt strip_tac
-  >> fs[list_trans_def] >> metis_tac[endpointSemanticsTheory.trans_par_r]);
+  >> fs[list_trans_def] >> metis_tac[endpointSemTheory.trans_par_r]);
 
 val endpoint_names_trans = Q.store_thm("endpoint_names_trans",
   `!n1 alpha n2. trans n1 alpha n2 ==> MAP FST (endpoints n2) = MAP FST(endpoints n1)`,
@@ -1883,7 +1883,7 @@ Theorem prunes_example:
     (NPar (NEndpoint p1 ARB (IntChoice F p2 Nil))
           (NEndpoint p2 ARB (ExtChoice p1 Nil (Send ARB ARB Nil))))
     (NPar (NEndpoint p1 ARB (IntChoice F p2 Nil))
-          (NEndpoint p2 ARB (ExtChoice p1 (Receive ARB ARB Nil) (Send ARB ARB Nil))))  
+          (NEndpoint p2 ARB (ExtChoice p1 (Receive ARB ARB Nil) (Send ARB ARB Nil))))
 Proof
   strip_tac \\
   qmatch_goalsub_abbrev_tac `prunes a1 a2` \\
@@ -1990,7 +1990,7 @@ Proof
   fs[MAP2_MAP] \\
   qpat_x_assum `endpoints _ = MAP _ _` (fn thm => PURE_ONCE_REWRITE_TAC [thm]) \\
   rw[MAP_MAP_o,ELIM_UNCURRY,o_DEF] \\
-  simp[GSYM o_DEF] \\ metis_tac[o_ASSOC,MAP_ZIP]  
+  simp[GSYM o_DEF] \\ metis_tac[o_ASSOC,MAP_ZIP]
 QED
-  
+
 val _ = export_theory ()

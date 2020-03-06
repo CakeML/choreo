@@ -1,6 +1,6 @@
 open preamble endpointLangTheory
 
-val _ = new_theory "endpointSemantics";
+val _ = new_theory "endpointSem";
 
 val _ = Datatype `
  label = LSend proc datum proc

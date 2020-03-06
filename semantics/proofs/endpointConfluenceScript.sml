@@ -1,4 +1,4 @@
-open preamble endpointSemanticsTheory endpointLangTheory endpointPropsTheory;
+open preamble endpointSemTheory endpointLangTheory endpointPropsTheory;
 
 val _ = new_theory "endpointConfluence";
 
@@ -437,7 +437,7 @@ Proof
           >- (rveq >>
               dxrule_all_then strip_assume_tac trans_same_sender_choice_determ >>
               rveq >> fs[]
-             ) >>          
+             ) >>
           dxrule(GEN_ALL trans_distinct_residual) >>
           disch_then drule >>
           impl_tac >- simp[label_rel_def,receive_ext_choice_rel_def] >>
@@ -1001,7 +1001,7 @@ Proof
           metis_tac[trans_com_l,qcong_par,qcong_sym,qcong_refl])
       >- (qmatch_asmsub_abbrev_tac `trans _ (LSend s1 _ _)` >>
           qpat_x_assum `trans _ (LSend _ _ _) _` mp_tac >>
-          qmatch_asmsub_abbrev_tac `trans _ (LSend s2 _ _)` >>         
+          qmatch_asmsub_abbrev_tac `trans _ (LSend s2 _ _)` >>
           strip_tac >>
           rpt(qhdtm_x_assum `Abbrev` kall_tac) >>
           Cases_on `s1 = s2` >-
@@ -1081,7 +1081,7 @@ Proof
                          asm_exists_tac >> rw[] >> asm_exists_tac >>
                          rw[label_rel_def,receive_ext_choice_rel_def]) >>
                        metis_tac[]) >>
-          metis_tac[trans_com_l,trans_com_choice_l,qcong_par,qcong_sym,qcong_refl])      
+          metis_tac[trans_com_l,trans_com_choice_l,qcong_par,qcong_sym,qcong_refl])
       >- (imp_res_tac sender_is_endpoint >>
           imp_res_tac receiver_is_endpoint >>
           imp_res_tac choice_sender_is_endpoint >>
@@ -1192,7 +1192,7 @@ Proof
           strip_tac >> first_x_assum dxrule >>
           impl_tac >- (simp[] >> metis_tac[]) >>
           rpt strip_tac >>
-          metis_tac[trans_com_l,trans_com_r,qcong_par,qcong_sym,qcong_refl])      
+          metis_tac[trans_com_l,trans_com_r,qcong_par,qcong_sym,qcong_refl])
       >- (qmatch_asmsub_abbrev_tac `trans _ (LSend s1 _ _)` >>
           qpat_x_assum `trans _ (LSend _ _ _) _` mp_tac >>
           qmatch_asmsub_abbrev_tac `trans _ (LSend s2 _ _)` >>
@@ -1359,7 +1359,7 @@ Proof
           imp_res_tac sender_is_endpoint >>
           imp_res_tac receiver_is_endpoint >>
           imp_res_tac choice_sender_is_endpoint >>
-          imp_res_tac choice_receiver_is_endpoint >>          
+          imp_res_tac choice_receiver_is_endpoint >>
           dxrule endpoint_local_confluence_send_rotated >>
           disch_then dxrule >>
           impl_tac >- (simp[] >> metis_tac[]) >>
@@ -1637,7 +1637,7 @@ Proof
           imp_res_tac sender_is_endpoint >>
           imp_res_tac receiver_is_endpoint >>
           imp_res_tac choice_sender_is_endpoint >>
-          imp_res_tac choice_receiver_is_endpoint >>          
+          imp_res_tac choice_receiver_is_endpoint >>
           dxrule endpoint_local_confluence_send_rotated >>
           disch_then dxrule >>
           impl_tac >- (simp[] >> metis_tac[]) >>
@@ -2022,7 +2022,7 @@ Proof
           simp[qcong_sym]) >>
       disj2_tac >>
       imp_res_tac endpoint_names_trans >>
-      imp_res_tac endpoint_names_list_trans >>      
+      imp_res_tac endpoint_names_list_trans >>
       dxrule endpoint_local_confluence_tau >>
       disch_then dxrule >>
       impl_tac >- simp[] >>
@@ -2065,7 +2065,7 @@ Proof
   >> strip_tac
   >- (asm_exists_tac >> simp[] >> asm_exists_tac >> simp[] >> metis_tac[qcong_rules])
   >> qhdtm_x_assum `qcong` mp_tac
-  >> drule qcong_trans_pres  
+  >> drule qcong_trans_pres
   >> disch_then drule
   >> strip_tac
   >> `list_trans p3 (REPLICATE (SUC m') LTau) q2` (* TODO: (mild) generated names *)

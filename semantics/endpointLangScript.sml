@@ -1,4 +1,6 @@
-open preamble astBakeryTheory (* todo: shouldn't have to depend on astBakery *)
+open preamble
+(* TODO: shouldn't have to depend on chorLangTheory *)
+open chorLangTheory
 
 val _ = new_theory "endpointLang";
 

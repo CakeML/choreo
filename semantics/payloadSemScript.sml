@@ -1,6 +1,6 @@
 open preamble payloadLangTheory
 
-val _ = new_theory "payloadSemantics";
+val _ = new_theory "payloadSem";
 
 val _ = Datatype `
  label = LSend proc datum proc
@@ -51,7 +51,7 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
 ∧ (∀conf s v p1 p2 e q1 q2 d ds.
     s.queue = q1 ++ [(p1,d)] ++ q2
     ∧ p1 ≠ p2
-    ∧ EVERY (λ(p,_). p ≠ p1) q1 
+    ∧ EVERY (λ(p,_). p ≠ p1) q1
     ∧ final d
     ⇒ trans conf (NEndpoint p2 s (Receive p1 v ds e))
              LTau
@@ -62,7 +62,7 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
 ∧ (∀conf s v p1 p2 e q1 q2 d ds.
     s.queue = q1 ++ [(p1,d)] ++ q2
     ∧ p1 ≠ p2
-    ∧ EVERY (λ(p,_). p ≠ p1) q1 
+    ∧ EVERY (λ(p,_). p ≠ p1) q1
     ∧ intermediate d
     ⇒ trans conf (NEndpoint p2 s (Receive p1 v ds e))
              LTau

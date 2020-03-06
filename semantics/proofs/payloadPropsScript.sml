@@ -1,4 +1,4 @@
-open preamble payloadSemanticsTheory payloadLangTheory;
+open preamble payloadSemTheory payloadLangTheory;
 
 val _ = new_theory "payloadProps";
 
@@ -30,7 +30,7 @@ val final_pad_LENGTH = Q.store_thm("final_pad_LENGTH",
 val final_pad_TAKE = Q.store_thm("final_pad_TAKE",
   `!conf d. final(pad conf d) ==> TAKE conf.payload_size d = d`,
   metis_tac[final_pad_LENGTH,TAKE_LENGTH_TOO_LONG])
-                                  
+
 val intermediate_pad_LENGTH = Q.store_thm("intermediate_pad_LENGTH",
   `!conf d. intermediate(pad conf d) <=> conf.payload_size < LENGTH d`,
   rw[pad_def,intermediate_def])
@@ -99,12 +99,12 @@ val (qrel_rules, qrel_ind, qrel_cases) = Hol_reln `
     p1 ≠ p2
     ⇒ qrel (q1 ++ [(p1,d1);(p2,d2)] ++ q2) (q1 ++ [(p2,d2);(p1,d1)] ++ q2))`
 
-val qrel_strongind = fetch "-" "qrel_strongind"  
+val qrel_strongind = fetch "-" "qrel_strongind"
 
 val [qrel_refl,qrel_sym,qrel_trans,qrel_queue_reorder]
     = zip ["qrel_refl","qrel_sym","qrel_trans","qrel_queue_reorder"]
           (CONJUNCTS qrel_rules) |> map save_thm;
-                           
+
 val qcong_queue_reorder' = Q.store_thm("qcong_queue_reorder'",
   `∀p s e p1 d1 p2 d2 q1 q2.
      p1 ≠ p2
@@ -310,7 +310,7 @@ val qrel_snoc_IMP = Q.prove(
   >> dxrule qrel_snoc_IMP_lemma >> rw[]);
 
 val qrel_consE = Q.store_thm("qrel_consE",
-  `!q1 q2 qe. qrel (qe::q1) (qe::q2) ==> qrel q1 q2`,  
+  `!q1 q2 qe. qrel (qe::q1) (qe::q2) ==> qrel q1 q2`,
   `!qq1 qq2. qrel qq1 qq2 ==> (!q1 q2 qe. qq1 = (qe::q1) /\ qq2 = (qe::q2) ==> qrel q1 q2)`
     suffices_by metis_tac[qrel_refl]
   >> ho_match_mp_tac qrel_strongind >> rpt strip_tac
@@ -330,7 +330,7 @@ val qrel_consE = Q.store_thm("qrel_consE",
       >> match_mp_tac qrel_queue_reorder >> rw[]));
 
 val qrel_snocE = Q.store_thm("qrel_snocE",
-  `!q1 q2 qe. qrel (SNOC qe q1) (SNOC qe q2) ==> qrel q1 q2`,  
+  `!q1 q2 qe. qrel (SNOC qe q1) (SNOC qe q2) ==> qrel q1 q2`,
   `!qq1 qq2. qrel qq1 qq2 ==> (!q1 q2 qe. qq1 = (SNOC qe q1) /\ qq2 = (SNOC qe q2) ==> qrel q1 q2)`
     suffices_by metis_tac[qrel_refl]
   >> ho_match_mp_tac qrel_strongind >> rpt strip_tac
@@ -484,7 +484,7 @@ val trans_let' = Q.store_thm("trans_let'",
   >> qmatch_goalsub_abbrev_tac `trans _ (NEndpoint _ s1 _) _ (NEndpoint _ s2 _)`
   >> `s2 = s1 with bindings := s1.bindings |+ (v,f (MAP (THE ∘ FLOOKUP s1.bindings) vl))`
      by(unabbrev_all_tac >> simp[])
-  >> pop_assum (fn thm => PURE_ONCE_REWRITE_TAC [thm])  
+  >> pop_assum (fn thm => PURE_ONCE_REWRITE_TAC [thm])
   >> unabbrev_all_tac
   >> match_mp_tac trans_let
   >> simp[]);
@@ -513,13 +513,13 @@ val qcong_trans_eq = Q.store_thm("qcong_trans_eq",
   >- metis_tac[qcong_rules]
   >- (* qcong_queue_reorder *)
      (qpat_x_assum `trans _ _ _ _` (assume_tac
-                                    o REWRITE_RULE [Once payloadSemanticsTheory.trans_cases])
+                                    o REWRITE_RULE [Once payloadSemTheory.trans_cases])
       >> fs[] >> rveq
       >> TRY(qmatch_goalsub_abbrev_tac `qcong (NEndpoint a1 a2 a3)`
              >> qexists_tac `NEndpoint a1 (a2 with queue := q1 ⧺ [(p2,d2); (p1,d1)] ⧺ q2) a3`
              >> conj_tac
              >- (unabbrev_all_tac
-                 >> MAP_FIRST match_mp_tac (CONJUNCTS payloadSemanticsTheory.trans_rules)
+                 >> MAP_FIRST match_mp_tac (CONJUNCTS payloadSemTheory.trans_rules)
                  >> fs[])
              >- metis_tac[qcong_rules])
       >> TRY(qmatch_goalsub_abbrev_tac `qcong (NEndpoint a1 (a2 with queue := SNOC a3 _) a4)`
@@ -651,15 +651,15 @@ val qcong_trans_eq = Q.store_thm("qcong_trans_eq",
       >> qpat_x_assum `Abbrev _` kall_tac
       >> rename1 `s with queue := _ ++ [(p3,d3); (p4,d4)] ++ _`
       >> rename1 `_ with queue := _ ++ [(p2,d2); (p1,d1)] ++ _`
-      >> PURE_ONCE_REWRITE_TAC [qcong_sym_eq]      
+      >> PURE_ONCE_REWRITE_TAC [qcong_sym_eq]
       >> qpat_x_assum `trans _ _ _ _` (assume_tac
-                                    o REWRITE_RULE [Once payloadSemanticsTheory.trans_cases])
+                                       o REWRITE_RULE [Once payloadSemTheory.trans_cases])
       >> fs[] >> rveq
       >> TRY(qmatch_goalsub_abbrev_tac `qcong (NEndpoint a1 a2 a3)`
              >> qexists_tac `NEndpoint a1 (a2 with queue := q1 ⧺ [(p2,d2); (p1,d1)] ⧺ q2) a3`
              >> conj_tac
              >- (unabbrev_all_tac
-                 >> MAP_FIRST match_mp_tac (CONJUNCTS payloadSemanticsTheory.trans_rules)
+                 >> MAP_FIRST match_mp_tac (CONJUNCTS payloadSemTheory.trans_rules)
                  >> fs[])
              >- metis_tac[qcong_rules])
       >> TRY(qmatch_goalsub_abbrev_tac `qcong (NEndpoint a1 (a2 with queue := SNOC a3 _) a4)`
@@ -783,7 +783,7 @@ val qcong_trans_eq = Q.store_thm("qcong_trans_eq",
                         >> simp[])
                     >> metis_tac[qcong_queue_reorder',APPEND_ASSOC])))
   >- (qpat_x_assum `trans _ (NPar _ _) _ _` (assume_tac
-                                    o REWRITE_RULE [Once payloadSemanticsTheory.trans_cases])
+                                             o REWRITE_RULE [Once payloadSemTheory.trans_cases])
       >> fs[] >> rveq
       >> EVERY_ASSUM imp_res_tac
       >> imp_res_tac trans_com_l
@@ -792,7 +792,7 @@ val qcong_trans_eq = Q.store_thm("qcong_trans_eq",
       >> imp_res_tac trans_par_r
       >> metis_tac[qcong_rules])
   >- (qpat_x_assum `trans _ (NPar _ _) _ _` (assume_tac
-                                             o REWRITE_RULE [Once payloadSemanticsTheory.trans_cases])
+                                             o REWRITE_RULE [Once payloadSemTheory.trans_cases])
       >> fs[] >> rveq
       >> EVERY_ASSUM imp_res_tac
       >> imp_res_tac trans_com_l
@@ -800,7 +800,7 @@ val qcong_trans_eq = Q.store_thm("qcong_trans_eq",
       >> imp_res_tac trans_par_l
       >> imp_res_tac trans_par_r
       >> metis_tac[qcong_rules]));
-  
+
 val qcong_trans_pres = Q.store_thm("qcong_trans_pres",
   `∀p1 q1 conf alpha p2.
      qcong p1 q1 ∧ trans conf p1 alpha p2
@@ -843,7 +843,7 @@ val reduction_nil = Q.store_thm("reduction_nil",
   >> PURE_ONCE_REWRITE_TAC [AND_IMP_INTRO]
   >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`n`,`a1`]
   >> ho_match_mp_tac RTC_lifts_invariants
-  >> simp[payloadSemanticsTheory.reduction_def,trans_nil_false]);
+  >> simp[payloadSemTheory.reduction_def,trans_nil_false]);
 
 val reduction_par_l = Q.store_thm("reduction_par_l",
   `∀p q r conf. (reduction conf)^* p q ==> (reduction conf)^* (NPar p r) (NPar q r)`,
@@ -881,7 +881,7 @@ val reduction_nil = Q.store_thm("reduction_nil",
   >> PURE_ONCE_REWRITE_TAC [AND_IMP_INTRO]
   >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`n`,`a1`]
   >> ho_match_mp_tac RTC_lifts_invariants
-  >> simp[payloadSemanticsTheory.reduction_def,trans_nil_false]);
+  >> simp[payloadSemTheory.reduction_def,trans_nil_false]);
 
 val list_trans_def = Define `
     (list_trans conf p [] q = (p = q))
@@ -898,14 +898,14 @@ val list_trans_par_l = Q.store_thm("list_trans_par_l",
   Induct_on `alpha`
   >- simp[list_trans_def]
   >> rpt strip_tac
-  >> fs[list_trans_def] >> metis_tac[payloadSemanticsTheory.trans_par_l]);
+  >> fs[list_trans_def] >> metis_tac[payloadSemTheory.trans_par_l]);
 
 val list_trans_par_r = Q.store_thm("list_trans_par_r",
   `∀conf p alpha q r. list_trans conf p alpha q ==> list_trans conf (NPar r p) alpha (NPar r q)`,
   Induct_on `alpha`
   >- simp[list_trans_def]
   >> rpt strip_tac
-  >> fs[list_trans_def] >> metis_tac[payloadSemanticsTheory.trans_par_r]);
+  >> fs[list_trans_def] >> metis_tac[payloadSemTheory.trans_par_r]);
 
 val endpoint_names_trans = Q.store_thm("endpoint_names_trans",
   `!conf n1 alpha n2. trans conf n1 alpha n2 ==> MAP FST (endpoints n2) = MAP FST(endpoints n1)`,

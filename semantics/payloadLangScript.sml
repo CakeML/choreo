@@ -1,5 +1,8 @@
-open preamble astBakeryTheory (* todo: shouldn't have to depend on astBakery *)
-     endpointLangTheory (*for state*)
+open preamble
+(* TODO: shouldn't have to depend on chorLangTheory *)
+open chorLangTheory
+open endpointLangTheory (*for state*)
+
 val _ = new_theory "payloadLang";
 
 val _ = Datatype`
@@ -55,7 +58,7 @@ val intermediate_def = Define `
 
 val pad_def = Define `
   pad conf d =
-  if LENGTH d = conf.payload_size then       
+  if LENGTH d = conf.payload_size then
     7w::d
   else if LENGTH d < conf.payload_size then
     6w::REPLICATE ((conf.payload_size - LENGTH d) - 1) (0w:word8) ++ [1w] ++ d
@@ -65,7 +68,7 @@ val pad_def = Define `
 
 val unpad_def = Define `
   (unpad (w::d) =
-    if w = 7w \/ w = 2w then d     
+    if w = 7w \/ w = 2w then d
     else if w = 6w then
       case SPLITP ($= 1w) d of
         (_,_::d) => d
