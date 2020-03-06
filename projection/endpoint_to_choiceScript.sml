@@ -1,6 +1,6 @@
 open preamble endpointLangTheory
 
-val _ = new_theory "endpoint_choice";
+val _ = new_theory "endpoint_to_choice";
 
 val gen_fresh_name_def = Define `
    (gen_fresh_name [] = "a")

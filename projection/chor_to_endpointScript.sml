@@ -1,6 +1,6 @@
-open preamble semBakeryTheory endpointLangTheory
+open preamble chorSemTheory endpointLangTheory
 
-val _ = new_theory "bakery_to_endpoint";
+val _ = new_theory "chor_to_endpoint";
 
 val split_sel_def = Define `
   (split_sel proc p (Sel p1 b p2 c) =

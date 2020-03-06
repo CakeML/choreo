@@ -1,9 +1,9 @@
-open preamble semBakeryTheory semHalfBakeryTheory
+open preamble chorSemTheory pchorSemTheory
 
-val _ = new_theory "bakery_to_half"
+val _ = new_theory "chor_to_pchor"
 
 Definition project_def:
-  project astBakery$Nil      = astHalfBakery$Nil
+  project chorLang$Nil       = pchorLang$Nil
 ∧ project (Com p v q x c)    = Com p v q x (project c)
 ∧ project (Sel p b q c)      = Sel p b q (project c)
 ∧ project (Let e p f a c)    = Let e p f a (project c)
