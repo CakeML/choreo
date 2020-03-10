@@ -1,6 +1,7 @@
 open preamble endpointLangTheory chor_to_endpointTheory
               endpointSemTheory endpointPropsTheory
-              endpointCongTheory chorSemTheory;
+              endpointCongTheory chorSemTheory
+              endpointConfluenceTheory;
 
 val _ = new_theory "chor_to_endpointProof";
 
@@ -100,6 +101,46 @@ val compile_network_ok_dest_sel = Q.store_thm("compile_network_ok_dest_sel",
   \\ rw [compile_network_gen_def,project_def]
   \\ metis_tac []
 );
+
+Theorem compile_network_ok_dest_sel':
+  ∀s c l p b q.
+    compile_network_ok s (Sel p b q c) l
+    ⇒ (p <> q \/ (~MEM p l /\ ~MEM q l))
+Proof
+  Induct_on `l`
+  \\ rw [compile_network_gen_def,project_def]
+  \\ metis_tac []
+QED
+
+Theorem compile_network_ok_selI:
+  ∀s c l p b q.
+    compile_network_ok s c l /\ (p <> q \/ (~MEM p l /\ ~MEM q l))
+    ⇒ compile_network_ok s (Sel p b q c) l
+Proof
+  Induct_on `l`
+  \\ rw [compile_network_gen_def,project_def]
+  \\ metis_tac[]
+QED
+
+Theorem compile_network_ok_dest_com:
+  ∀s p1 v1 p2 v2 c l.
+    compile_network_ok s (Com p1 v1 p2 v2 c) l
+    ⇒ compile_network_ok (s |+ ((v2,p2),d)) c l
+Proof
+  Induct_on `l`
+  \\ rw [compile_network_gen_def,project_def]
+  \\ metis_tac []
+QED
+
+Theorem compile_network_ok_dest_com_asynch:
+  ∀s p1 v1 p2 v2 c l.
+    compile_network_ok s (Com p1 v1 p2 v2 c) l
+    ⇒ compile_network_ok s c l
+Proof
+  Induct_on `l`
+  \\ rw [compile_network_gen_def,project_def]
+  \\ metis_tac []
+QED
 
 val project_if_l_eq = Q.store_thm("project_if_l_eq",
   `∀v p q c1 c2.
@@ -1014,5 +1055,186 @@ val compile_network_preservation = Q.store_thm("compile_network_preservation",
 
   \\ cheat (* TODO *)
 );
+
+
+Theorem compile_network_reflection_single:
+  ∀s c pn p2 conf.
+    compile_network_ok s c pn
+    ∧ reduction (compile_network s c pn) p2
+    ∧ ALL_DISTINCT pn
+    ∧ set(procsOf c) ⊆ set pn
+    ==> ∃s'' c'' p3.
+             reduction^* p2 p3
+             ∧ trans_s (s,c) (s'',c'')
+             ∧ p3 = compile_network s'' c'' pn
+Proof
+  cheat
+QED
+
+Theorem compile_network_ok_trans_pres:
+  ∀s c alpha l s' c' pn.
+    trans (s,c) (alpha,l) (s',c') ∧
+    compile_network_ok s c pn
+    ==> compile_network_ok s' c' pn
+Proof
+  Ho_Rewrite.PURE_REWRITE_TAC[GSYM AND_IMP_INTRO,GSYM PULL_FORALL] >>
+  ho_match_mp_tac trans_pairind >>
+  rw[]
+  >- (metis_tac[compile_network_ok_dest_com])
+  >- (metis_tac[compile_network_ok_dest_sel])
+  >- cheat
+  >- cheat
+  >- cheat
+  >- cheat
+  >- (imp_res_tac compile_network_ok_dest_com_asynch >>
+      res_tac >>
+      cheat
+     )
+  >- cheat
+  >- cheat
+  >- cheat
+  >- (imp_res_tac compile_network_ok_dest_sel' >>
+      imp_res_tac compile_network_ok_dest_sel >>
+      res_tac >>
+      drule_then match_mp_tac compile_network_ok_selI >>
+      simp[]
+     )
+QED
+
+Theorem compile_network_ok_trans_s_pres:
+  ∀s c s' c' pn.
+    trans_s (s,c) (s',c') ∧
+    compile_network_ok s c pn
+    ==> compile_network_ok s' c' pn
+Proof
+  rw[trans_s_def] >>
+  Q.ISPECL_THEN [`(λp q. ∃s. trans p s q)`,
+                 `(λp. compile_network_ok (FST p) (SND p) pn)`
+                ] assume_tac (GEN_ALL RTC_lifts_invariants) >>
+  fs[PULL_EXISTS] >>
+  pop_assum(mp_tac o MP_CANON) >>
+  disch_then(qspecl_then [`(s,c)`,`(s',c')`] mp_tac) >>
+  simp[] >>
+  disch_then match_mp_tac >>
+  rpt Cases >>
+  metis_tac[compile_network_ok_trans_pres,FST,SND]
+QED
+
+Theorem reduction_list_trans:
+  reduction^* p q = ?n. list_trans p (REPLICATE n LTau) q
+Proof
+  simp[EQ_IMP_THM] >>
+  conj_tac
+  >- (MAP_EVERY qid_spec_tac [`q`,`p`] >>
+      ho_match_mp_tac RTC_INDUCT >>
+      rw[]
+      >- (qexists_tac `0` >> simp[list_trans_def])
+      >- (fs[reduction_def] >>
+          qexists_tac `SUC n` >>
+          simp[list_trans_def] >>
+          asm_exists_tac >> simp[]))
+  >- (rpt strip_tac >> pop_assum mp_tac >>
+      MAP_EVERY qid_spec_tac [`q`,`p`,`n`] >>
+      Induct >>
+      rw[list_trans_def] >>
+      fs[GSYM reduction_def] >>
+      metis_tac[RTC_RULES])
+QED
+
+Theorem procsOf_trans_mono:
+  ∀p alpha q.
+    trans p alpha q
+    ==> set(procsOf(SND q)) ⊆ set(procsOf(SND p))
+Proof
+  ho_match_mp_tac trans_ind >> rw[procsOf_def,set_nub',SUBSET_DEF] >>
+  metis_tac[]
+QED
+
+Theorem procsOf_trans_s_mono:
+  ∀p q.
+    trans_s p q
+    ==> set(procsOf(SND q)) ⊆ set(procsOf(SND p))
+Proof
+  rw[trans_s_def] >>
+  Q.ISPECL_THEN [`λ(p:(string # word8 list |-> word8 list) # chor). set(procsOf(SND p))`,
+                 `(λp q. ∃s. trans p s q)`
+                ] assume_tac (GEN_ALL RTC_lifts_reflexive_transitive_relations) >>
+  pop_assum(qspec_then `combin$C ($SUBSET)` (mp_tac o MP_CANON)) >>
+  simp[] >>
+  disch_then match_mp_tac >>
+  rw[transitive_def,reflexive_def] >>
+  metis_tac[SUBSET_TRANS,procsOf_trans_mono]
+QED
+
+Theorem qcong_list_trans_pres:
+  ∀p1 q1 alpha p2.
+            qcong p1 q1 ∧ list_trans p1 alpha p2 ⇒
+            ∃q2. list_trans q1 alpha q2 ∧ qcong p2 q2
+Proof
+ Induct_on `alpha` >>
+ rw[list_trans_def] >> metis_tac[qcong_trans_pres]
+QED
+
+Theorem compile_network_reflection:
+   ∀s c p2.
+    compile_network_ok s c (procsOf c)
+    ∧ reduction^* (compile_network s c (procsOf c)) p2
+    ==> ∃s'' c'' p3.
+              reduction^* p2 p3
+              ∧ trans_s (s,c) (s'',c'')
+              ∧ qcong p3 (compile_network s'' c'' (procsOf c))
+Proof
+  `∀s c c' p2.
+    compile_network_ok s c (procsOf c')
+    ∧ reduction^* (compile_network s c (procsOf c')) p2
+    ∧ set(procsOf c) ⊆ set(procsOf c')
+    ==> ∃s'' c'' p3.
+              reduction^* p2 p3
+              ∧ trans_s (s,c) (s'',c'')
+              ∧ qcong p3 (compile_network s'' c'' (procsOf c'))`
+    suffices_by(metis_tac[SUBSET_REFL]) >>
+  simp[reduction_list_trans,PULL_EXISTS] >>
+  CONV_TAC(RESORT_FORALL_CONV rev) >>
+  ho_match_mp_tac COMPLETE_INDUCTION >>
+  Cases
+  >- (rw[list_trans_def] >>
+      CONV_TAC(RESORT_EXISTS_CONV rev) >>
+      qexists_tac `0` >> rw[list_trans_def] >>
+      metis_tac[trans_s_def,RTC_REFL,qcong_refl])
+  >- (rw[list_trans_def,GSYM reduction_def] >>
+      drule(compile_network_reflection_single
+            |> REWRITE_RULE[PULL_EXISTS,reduction_list_trans]) >>
+      disch_then drule >>
+      impl_tac >- simp[procsOf_all_distinct] >>
+      strip_tac >>
+      rveq >>
+      dxrule endpoint_confluence_weak_contract >>
+      disch_then drule >>
+      impl_tac
+      >- (metis_tac[reduction_def,endpoint_names_trans,FST_endpoints_compile_network,
+                    procsOf_all_distinct]) >>
+      strip_tac >>
+      rename1 `list_trans (compile_network _ _ _) (REPLICATE stepcount _) _` >>
+      first_x_assum(qspec_then `stepcount` mp_tac ) >>
+      impl_tac >- simp[] >>
+      imp_res_tac compile_network_ok_trans_s_pres >>
+      disch_then drule >>
+      disch_then drule >>
+      impl_tac >- (metis_tac[procsOf_trans_s_mono,FST,SND,SUBSET_TRANS]) >>
+      strip_tac >>
+      qhdtm_x_assum `qcong` mp_tac >>
+      drule_all_then strip_assume_tac qcong_list_trans_pres >>
+      strip_tac >>
+      rename1 `list_trans p2 (REPLICATE sc1 _) p5` >>
+      rename1 `list_trans p5 (REPLICATE sc2 _) t` >>
+      `list_trans p2 (REPLICATE (sc1 + sc2) LTau) t`
+        by(simp[GSYM REPLICATE_APPEND,list_trans_append] >>
+           metis_tac[]) >>
+      asm_exists_tac >>
+      fs[trans_s_def] >>
+      drule_all_then assume_tac (MP_CANON RTC_RTC) >>
+      asm_exists_tac >>
+      metis_tac[qcong_rules])
+QED
 
 val _ = export_theory ()
