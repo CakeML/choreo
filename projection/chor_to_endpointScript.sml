@@ -11,6 +11,29 @@ val split_sel_def = Define `
    else NONE)
 ∧ (split_sel proc _ _ = NONE)`
 
+val top_sels_def = Define `
+  (top_sel proc p (Sel p1 b p2 c) =
+   if p1 = p then
+     if proc = p2 then
+       SOME(b,c)
+     else split_sel proc p c
+   else NONE)
+∧ (top_sels proc _ _ = NONE)`
+
+Definition pre_sel_def:
+  pre_sel p (Sel p1 b p2 c) =
+    (if p1 = p then
+       let (l,c) = pre_sel p c in
+         ((b,p2)::l,c)      
+     else ([],Sel p1 b p2 c))
+∧ pre_sel _ c = ([],c)
+End
+
+val projPre_def = Define`
+  projPre p ((b,q)::l) ep = IntChoice b q (projPre p l ep)
+∧ projPre p [] ep = ep
+`
+
 val mapRPair_def = Define `
   mapRPair f p = (FST p,f (SND p))
 `;
@@ -31,56 +54,69 @@ val chor_size_def = Define`
 ∧ chor_size (IfThen _ _ c1 c2) = 1 + chor_size c1 + chor_size c2
 `;
 
+Theorem chor_size_pre_sel:
+  !p c. chor_size(SND(pre_sel p c)) <= chor_size c
+Proof
+  strip_tac >> Induct_on `c` >> rw[pre_sel_def,chor_size_def,ELIM_UNCURRY]
+QED
+
 val project_def = tDefine "project" `
-   project proc Nil = (T,Nil)
-∧ (project proc (Com p1 v1 p2 v2 c) =
+   project proc banlist Nil = (T,Nil)
+∧ (project proc banlist (Com p1 v1 p2 v2 c) =
     if proc = p1 ∧ proc = p2 then
       (F,Nil)
     else if proc = p1 then
-      Send p2 v1 <Γ> project proc c
+      Send p2 v1 <Γ> project proc banlist c
     else if proc = p2 then
-      Receive p1 v2 <Γ> project proc c
+      Receive p1 v2 <Γ> project proc banlist c
     else
-      project proc c)
-∧ (project proc (Let v p1 f vs c) =
+      project proc banlist c)
+∧ (project proc banlist (Let v p1 f vs c) =
     if proc = p1 then
-      Let v f vs <Γ> project proc c
+      Let v f vs <Γ> project proc banlist c
     else
-      project proc c)
-∧ (project proc (IfThen v p1 c1 c2) =
-    if proc = p1 then
-      mapRPP (IfThen v) (project proc c1) (project proc c2)
-    else
-      case (split_sel proc p1 c1,split_sel proc p1 c2) of
-        | (SOME(T,c1'),SOME(F,c2')) =>
-           mapRPP (ExtChoice p1) (project proc c1') (project proc c2')
-        | (NONE,NONE) =>
-          if project proc c1 = project proc c2 then
-            project proc c1
+      project proc banlist c)
+∧ (project proc banlist (IfThen v p1 c1 c2) =
+   let (ps1,c1') = pre_sel p1 c1;
+        (ps2,c2') = pre_sel p1 c2
+      in
+        if EVERY FST ps1 /\ EVERY ($¬ o FST) ps2 /\ MAP SND ps1 = MAP SND ps2 /\
+           ALL_DISTINCT(MAP SND ps2)
+        then
+          if proc = p1 then
+            mapRPP (IfThen v)
+                   (projPre p1 ps1 <Γ> project p1 (p1::banlist) c1')
+                   (projPre p1 ps2 <Γ> project p1 (p1::banlist) c2')
+          else if MEM proc (MAP SND ps2) then
+            mapRPP (ExtChoice p1)
+                   (project proc (p1::banlist) c1')
+                   (project proc (p1::banlist) c2')
+          else if project proc (p1::banlist) c1' = project proc (p1::banlist) c2' then
+            project proc (p1::banlist) c2'
           else
             (F,Nil)
-        | _ => (F,Nil)) (* shouldn't happen *)
-∧ (project proc (Sel p1 b p2 c) =
-    if proc = p1 ∧ proc = p2 then
+        else
+          (F,Nil)) (* shouldn't happen *)
+∧ (project proc banlist (Sel p1 b p2 c) =
+    if MEM proc banlist then
+      (F,Nil)
+    else if proc = p1 ∧ proc = p2 then
       (F,Nil)
     else if proc = p1 then
-      IntChoice b p2 <Γ> project proc c
+      IntChoice b p2 <Γ> project proc banlist c
     else if proc = p2 then
       if b then
-        (λx. ExtChoice p1 x Nil) <Γ> project proc c
+        (λx. ExtChoice p1 x Nil) <Γ> project proc banlist c
       else
-        ExtChoice p1 Nil <Γ> project proc c
+        ExtChoice p1 Nil <Γ> project proc banlist c
    else
-     project proc c)`
-(WF_REL_TAC `measure (chor_size o SND)`
+     project proc banlist c)`
+(WF_REL_TAC `measure (chor_size o SND o SND)`
 \\ rw [chor_size_def]
->- (`chor_size p_2 ≤ chor_size c1`suffices_by rw []
-   \\ Induct_on `c1` >> fs [split_sel_def,chor_size_def]
-   \\ rw [] >> fs [])
->- (`chor_size p_2' ≤ chor_size c2`suffices_by rw []
-   \\ Induct_on `c2` >> fs [split_sel_def,chor_size_def]
-   \\ rw [] >> fs []))
-;
+\\ rpt(qpat_x_assum `(_,_) = _` (assume_tac o GSYM))
+\\ qspecl_then [`p1`,`c1`] assume_tac chor_size_pre_sel
+\\ qspecl_then [`p1`,`c2`] assume_tac chor_size_pre_sel
+\\ rfs[]);
 
 (* Project a global state `(proc,var) |-> val` into a single process
    state `var |-> val`
@@ -155,7 +191,7 @@ val compile_network_gen_def = Define`
 ∧ compile_network_gen s c (p::lp) =
        let mkState = (λp. <| bindings := projectS p s;
                              queue    := [] |>);
-           mkEP    = (λp. project p c);
+           mkEP    = (λp. project p [] c);
            mkNEP   = (λp. NEndpoint p (mkState p) <Γ> mkEP p)
        in  mapRPP NPar (mkNEP p)  (compile_network_gen s c lp)
 `;
@@ -169,11 +205,11 @@ val _ = overload_on("compile_network_ok",
 );
 
 val _ = overload_on("project'",
-  ``(λp c. SND (project p c))``
+  ``(λp banlist c. SND (project p banlist c))``
 );
 
 val _ = overload_on("project_ok",
-  ``(λp c. FST (project p c))``
+  ``(λp banlist c. FST (project p banlist c))``
 );
 
 (* TODO: Comments! *)
