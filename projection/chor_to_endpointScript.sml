@@ -176,7 +176,9 @@ val _ = overload_on("project_ok",
   ``(λp c. FST (project p c))``
 );
 
-(* TODO: Comments! *)
+(* Network projection can ignore communications that do not involve
+   processes in (pl) the process list
+*)
 val cn_ignore_com = Q.store_thm("cn_ignore_com",
   `∀p1 v1 p2 v2 s c' pl.
     ¬MEM p1 pl ∧ ¬MEM p2 pl
@@ -186,7 +188,9 @@ val cn_ignore_com = Q.store_thm("cn_ignore_com",
         , project_def,projectS_def]
 );
 
-(* TODO: Comments! *)
+(* Network projection can ignore selections that do not involve
+   processes in (pl) the process list
+*)
 val cn_ignore_sel = Q.store_thm("cn_ignore_sel",
   `∀p1 b p2 s c' pl.
     ¬MEM p1 pl ∧ ¬MEM p2 pl
@@ -197,7 +201,9 @@ val cn_ignore_sel = Q.store_thm("cn_ignore_sel",
         , FLOOKUP_UPDATE]
 );
 
-(* TODO: Comments! *)
+(* Network projection can ignore let bindings that do not involve
+   processes in (pl) the process list
+*)
 val cn_ignore_let = Q.store_thm("cn_ignore_let",
   `∀p s v f vl c pl.
     ¬MEM p pl
@@ -207,7 +213,9 @@ val cn_ignore_let = Q.store_thm("cn_ignore_let",
         , FLOOKUP_UPDATE]
 );
 
-(* TODO: Comments! *)
+(* Network projection can ignore update to the state that do not
+   involve processes in (pl) the process list
+*)
 val cn_ignore_state_update = Q.store_thm("cn_ignore_state_update",
   `∀p v d s c pl.
     ¬MEM p pl
