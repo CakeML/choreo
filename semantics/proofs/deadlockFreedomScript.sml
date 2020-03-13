@@ -1,4 +1,4 @@
-open preamble chorSemTheory
+open preamble chorSemTheory chorPropsTheory
 
 val _ = new_theory "deadlockFreedom";
 

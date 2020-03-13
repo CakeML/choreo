@@ -1,6 +1,6 @@
 open preamble
 
-open chorSemTheory chorCongSemTheory chorLangTheory
+open chorSemTheory chorPropsTheory chorCongSemTheory chorLangTheory
 
 val _ = new_theory "congProof";
 

@@ -1,5 +1,5 @@
 open preamble chor_to_pchorTheory congProofTheory
-open chorLangTheory chorSemTheory
+open chorLangTheory chorSemTheory chorPropsTheory
 open pchorLangTheory pchorSemTheory
 open confluenceTheory
 
