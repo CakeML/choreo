@@ -5,6 +5,10 @@ open preamble endpointLangTheory chor_to_endpointTheory
 
 val _ = new_theory "chor_to_endpointProof";
 
+val _ = set_grammar_ancestry
+  ["endpointProps","endpointLang","endpointConfluence",
+   "chor_to_endpointProof","chorSem","chorLang"];
+
 val RTC_TRANS = save_thm ("RTC_TRANS",
   RTC_RULES |> CONV_RULE FORALL_AND_CONV |> CONJUNCTS |> el 2);
 
