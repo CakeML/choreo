@@ -1,8 +1,8 @@
 open preamble choreoUtilsTheory
               endpointLangTheory chor_to_endpointTheory
               endpointSemTheory endpointPropsTheory
-              endpointCongTheory chorSemTheory
-              endpointConfluenceTheory;
+              endpointCongTheory chorSemTheory chorPropsTheory
+              endpointConfluenceTheory confluenceTheory;
 
 val _ = new_theory "chor_to_endpointProof";
 
@@ -1059,20 +1059,155 @@ val compile_network_preservation = Q.store_thm("compile_network_preservation",
 );
 
 
-Theorem compile_network_reflection_single:
+Theorem compile_network_reflection_lemma:
   ∀s c pn p2 conf.
     compile_network_ok s c pn
-    ∧ reduction (compile_network s c pn) p2
     ∧ ALL_DISTINCT pn
     ∧ set(procsOf c) ⊆ set pn
-    ==> ∃s'' c'' p3.
-             reduction^* p2 p3
-             ∧ trans_s (s,c) (s'',c'')
-             ∧ p3 = compile_network s'' c'' pn
+    ∧ no_undefined_vars (s,c)
+    ∧ no_self_comunication c
+    ==> ∃s'' p2.
+             reduction^* (compile_network s c pn) p2
+             ∧ trans_s (s,c) (s'',Nil)
+             ∧ p2 = compile_network s'' Nil pn
 Proof
-  cheat
+  `∀cs s c pn p2 conf.
+    cs = chor_to_endpoint$chor_size c
+    ∧ compile_network_ok s c pn
+    ∧ ALL_DISTINCT pn
+    ∧ set(procsOf c) ⊆ set pn
+    ∧ no_undefined_vars (s,c)
+    ∧ no_self_comunication c
+    ==> ∃s'' c'' p2.
+             reduction^* (compile_network s c pn) p2
+             ∧ trans_s (s,c) (s'',Nil)
+             ∧ p2 = compile_network s'' Nil pn`
+    suffices_by metis_tac[] >>
+  ho_match_mp_tac COMPLETE_INDUCTION >>
+  rpt strip_tac >>
+  Cases_on `c` >-
+    (cheat) >-
+    (cheat) >-
+    (cheat) >-
+    (cheat) >-
+    (cheat)
 QED
 
+Theorem reduction_list_trans:
+  reduction^* p1 p2 ==>
+  ?n. list_trans p1 (REPLICATE n LTau) p2
+Proof
+  rw[RTC_eq_NRC] >>
+  qexists_tac `n` >>
+  pop_assum mp_tac >>
+  MAP_EVERY qid_spec_tac [`p1`,`p2`] >>
+  Induct_on `n` >>
+  rw[list_trans_def,NRC,reduction_def] >>
+  res_tac >> goal_assum drule >> rw[]
+QED
+
+Theorem list_trans_reduction:
+  !n p1 p2.
+  list_trans p1 (REPLICATE n LTau) p2 ==>
+  reduction^* p1 p2
+Proof
+  Induct >>
+  rw[list_trans_def] >>
+  match_mp_tac RTC_TRANS >>
+  simp[reduction_def] >>
+  res_tac >> goal_assum drule >>
+  simp[]
+QED
+
+Theorem trans_Send_compile_network_Nil:
+  !ps s'' alpha p1 p2 d p3.
+  trans (compile_network s'' Nil ps) (LSend p2 d p3) p1 ==> F
+Proof
+  Induct >>
+  rw[compile_network_gen_def,project_def] >-
+    (spose_not_then strip_assume_tac >>
+     fs[Once endpointSemTheory.trans_cases]) >>
+  spose_not_then (strip_assume_tac o REWRITE_RULE[Once endpointSemTheory.trans_cases]) >>
+  fs[] >>
+  rveq >>
+  rfs[] >>
+  pop_assum(strip_assume_tac o REWRITE_RULE[Once endpointSemTheory.trans_cases]) >>
+  fs[] >> rveq
+QED
+
+Theorem trans_IntChoice_compile_network_Nil:
+  !ps s'' alpha p1 p2 b p3.
+  trans (compile_network s'' Nil ps) (LIntChoice p2 b p3) p1 ==> F
+Proof
+  Induct >>
+  rw[compile_network_gen_def,project_def] >-
+    (spose_not_then strip_assume_tac >>
+     fs[Once endpointSemTheory.trans_cases]) >>
+  spose_not_then (strip_assume_tac o REWRITE_RULE[Once endpointSemTheory.trans_cases]) >>
+  fs[] >>
+  rveq >>
+  rfs[] >>
+  pop_assum(strip_assume_tac o REWRITE_RULE[Once endpointSemTheory.trans_cases]) >>
+  fs[] >> rveq
+QED
+
+Theorem trans_compile_network_Nil:
+  !ps s'' alpha p1.
+  trans (compile_network s'' Nil ps) LTau p1 ==> F
+Proof
+  Induct >>
+  rw[compile_network_gen_def,project_def] >-
+    (spose_not_then strip_assume_tac >>
+     fs[Once endpointSemTheory.trans_cases]) >>
+  spose_not_then (strip_assume_tac o REWRITE_RULE[Once endpointSemTheory.trans_cases]) >>
+  fs[] >>
+  rveq >>
+  rfs[] >>
+  imp_res_tac trans_Send_compile_network_Nil >> imp_res_tac trans_IntChoice_compile_network_Nil >> fs[] >>
+  qpat_x_assum ` trans (NEndpoint _ _ _) _ _` (strip_assume_tac o ONCE_REWRITE_RULE[endpointSemTheory.trans_cases]) >>
+  fs[] >> rveq
+QED
+
+Theorem reduction_compile_network_Nil:
+  !s'' ps p1.
+  reduction^* (compile_network s'' Nil ps) p1 ==> p1 = compile_network s'' Nil ps
+Proof
+  rw[Once RTC_cases,reduction_def] >>
+  imp_res_tac trans_compile_network_Nil
+QED
+
+Theorem compile_network_reflection:
+   ∀s c p2.
+    compile_network_ok s c (procsOf c)
+    ∧ reduction^* (compile_network s c (procsOf c)) p2
+    ∧ no_undefined_vars (s,c)
+    ∧ no_self_comunication c
+    ==> ∃s'' c'' p3.
+              reduction^* p2 p3
+              ∧ trans_s (s,c) (s'',c'')
+              ∧ qcong p3 (compile_network s'' c'' (procsOf c))
+Proof
+  rw[] >>
+  drule compile_network_reflection_lemma >>
+  simp[procsOf_all_distinct] >>
+  strip_tac >>
+  qexists_tac `s''` >>
+  qexists_tac `Nil` >>
+  simp[] >>
+  rpt(dxrule_then strip_assume_tac reduction_list_trans) >>
+  drule endpoint_confluence_weak_contract >>
+  qpat_x_assum `list_trans _ _ (compile_network _ _ _)` assume_tac >>
+  disch_then drule >>
+  impl_tac >- simp[FST_endpoints_compile_network,procsOf_all_distinct] >>
+  strip_tac >>
+  rpt(dxrule_then strip_assume_tac list_trans_reduction) >>
+  goal_assum drule >>
+  imp_res_tac reduction_compile_network_Nil >>
+  rveq >>
+  simp[]
+QED
+
+(*
 Theorem compile_network_ok_trans_pres:
   ∀s c alpha l s' c' pn.
     trans (s,c) (alpha,l) (s',c') ∧
@@ -1238,5 +1373,6 @@ Proof
       asm_exists_tac >>
       metis_tac[qcong_rules])
 QED
+*)
 
 val _ = export_theory ()
