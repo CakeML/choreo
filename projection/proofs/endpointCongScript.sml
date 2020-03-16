@@ -700,7 +700,7 @@ Proof
        by rw [Abbr `l'`,ALL_DISTINCT,MEM_FILTER,FILTER_ALL_DISTINCT]
     \\ `MEM p l ∧ MEM q l`
        by (`MEM p (procsOf (Com  p x q y c)) ∧ MEM q (procsOf (Com  p x q y c))`
-          by rw [MEM,pchorSemTheory.procsOf_def,nub_def]
+          by rw [MEM,pchorSemTheory.procsOf_def,nub'_def]
           \\ metis_tac [MEM_PERM])
     \\ `PERM l' l`
        by (ho_match_mp_tac PERM_ALL_DISTINCT
@@ -758,7 +758,7 @@ Proof
        by rw [Abbr `l'`,ALL_DISTINCT,MEM_FILTER,FILTER_ALL_DISTINCT]
     \\ `MEM p l ∧ MEM q l`
        by (`MEM p (procsOf (Sel  p b q c)) ∧ MEM q (procsOf (Sel p b q c))`
-          by rw [MEM,pchorSemTheory.procsOf_def,nub_def]
+          by rw [MEM,pchorSemTheory.procsOf_def,nub'_def]
           \\ metis_tac [MEM_PERM])
     \\ `PERM l' l`
        by (ho_match_mp_tac PERM_ALL_DISTINCT

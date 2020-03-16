@@ -1,4 +1,4 @@
-open preamble pchorLangTheory
+open preamble choreoUtilsTheory pchorLangTheory
 
 val _ = new_theory "pchorSem";
 
@@ -72,21 +72,21 @@ End
 (* The set of all processes in a choreography *)
 Definition procsOf_def:
   procsOf  Nil               = []
-∧ procsOf (IfThen _ p l r)   = nub ([p] ++ procsOf l ++ procsOf r)
-∧ procsOf (Com p _ q _ c)    = nub ([p;q] ++ procsOf c)
-∧ procsOf (PCom q _ (p,_) c) = nub ([p;q] ++ procsOf c)
-∧ procsOf (Sel p _ q c)      = nub ([p;q] ++ procsOf c)
-∧ procsOf (PSel q (p,_) c)   = nub ([p;q] ++ procsOf c)
-∧ procsOf (Let _ p _ _ c)    = nub ([p]   ++ procsOf c)
+∧ procsOf (IfThen _ p l r)   = nub' ([p] ++ procsOf l ++ procsOf r)
+∧ procsOf (Com p _ q _ c)    = nub' ([p;q] ++ procsOf c)
+∧ procsOf (PCom q _ (p,_) c) = nub' ([p;q] ++ procsOf c)
+∧ procsOf (Sel p _ q c)      = nub' ([p;q] ++ procsOf c)
+∧ procsOf (PSel q (p,_) c)   = nub' ([p;q] ++ procsOf c)
+∧ procsOf (Let _ p _ _ c)    = nub' ([p]   ++ procsOf c)
 End
 
 Theorem procsOf_all_distinct:
   ∀c. ALL_DISTINCT (procsOf c)
 Proof
   Induct_on `c`
-  \\ rw [procsOf_def,ALL_DISTINCT,all_distinct_nub]
+  \\ rw [procsOf_def,ALL_DISTINCT,all_distinct_nub']
   \\ PairCases_on `p0`
-  \\ rw [procsOf_def,ALL_DISTINCT,all_distinct_nub]
+  \\ rw [procsOf_def,ALL_DISTINCT,all_distinct_nub']
 QED
 
 Inductive ptrans:
