@@ -1,4 +1,4 @@
-open preamble
+open preamble choreoUtilsTheory
 
 open chorLangTheory
 
@@ -46,26 +46,6 @@ Definition read_def:
 ∧ read (LSel p1 b p2)     = {}
 ∧ read (LLet v p f vl)     = set(MAP (λv. (v,p)) vl)
 End
-
-(* On ListTheory.sml *)
-Definition nub'_def:
-  nub' []      = []
-∧ nub' (x::xs) = x :: FILTER ($≠ x) (nub' xs)
-Termination
-  WF_REL_TAC `measure LENGTH`
-  \\ rw [LENGTH]
-  \\ ho_match_mp_tac LESS_EQ_LESS_TRANS
-  \\ Q.EXISTS_TAC `LENGTH xs`
-  \\ rw [LENGTH_FILTER_LEQ]
-End
-
-Theorem all_distinct_nub':
-  ∀l. ALL_DISTINCT (nub' l)
-Proof
-  rw [ALL_DISTINCT,nub'_def]
-  \\ Induct_on `l`
-  \\ rw [ALL_DISTINCT,nub'_def,FILTER_ALL_DISTINCT,MEM_FILTER]
-QED
 
 (* The set of all processes in a choreography *)
 Definition procsOf_def:

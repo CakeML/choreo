@@ -1,4 +1,4 @@
-open preamble chorSemTheory chorLangTheory;
+open preamble choreoUtilsTheory chorSemTheory chorLangTheory;
 
 val _ = new_theory "chorProps";
 
@@ -264,9 +264,6 @@ Proof
   \\ local_metis
   end
 QED
-
-val RTC_TRANS =  RTC_RULES |> CONV_RULE FORALL_AND_CONV
-                           |> CONJUNCTS |> el 2;
 
 (* RTC version of `trans_submap` *)
 Theorem trans_s_submap_gen:

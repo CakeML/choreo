@@ -1,4 +1,5 @@
-open preamble endpointLangTheory chor_to_endpointTheory
+open preamble choreoUtilsTheory
+              endpointLangTheory chor_to_endpointTheory
               endpointSemTheory endpointPropsTheory
               endpointCongTheory chorSemTheory
               endpointConfluenceTheory;
@@ -8,9 +9,6 @@ val _ = new_theory "chor_to_endpointProof";
 val _ = set_grammar_ancestry
   ["endpointProps","endpointLang","endpointConfluence",
    "chor_to_endpointProof","chorSem","chorLang"];
-
-val RTC_TRANS = save_thm ("RTC_TRANS",
-  RTC_RULES |> CONV_RULE FORALL_AND_CONV |> CONJUNCTS |> el 2);
 
 val trans_dequeue_gen = Q.store_thm("trans_dequeue_gen",
   `∀d s s' v p1 p2 e q1 q2.

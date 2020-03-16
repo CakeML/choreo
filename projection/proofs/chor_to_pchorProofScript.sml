@@ -1,13 +1,9 @@
 open preamble chor_to_pchorTheory congProofTheory
 open chorLangTheory chorSemTheory chorPropsTheory
 open pchorLangTheory pchorSemTheory
-open confluenceTheory
-
+open confluenceTheory choreoUtilsTheory
 
 val _ = new_theory "chor_to_pchorProof"
-
-Triviality RTC_TRANS =
-  RTC_RULES |> CONV_RULE FORALL_AND_CONV |> CONJUNCTS |> el 2
 
 Definition ptag_def:
   ptag (chorSem$LTau p n)      = (pchorSem$LTau p n)

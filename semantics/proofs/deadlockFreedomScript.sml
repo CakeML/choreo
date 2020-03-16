@@ -1,9 +1,6 @@
-open preamble chorSemTheory chorPropsTheory
+open preamble choreoUtilsTheory chorSemTheory chorPropsTheory
 
 val _ = new_theory "deadlockFreedom";
-
-val RTC_TRANS =  RTC_RULES |> CONV_RULE FORALL_AND_CONV
-                           |> CONJUNCTS |> el 2;
 
 Theorem chor_deadlock_freedom:
   ∀c s.
