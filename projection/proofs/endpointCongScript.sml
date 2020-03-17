@@ -581,12 +581,12 @@ QED
       `trans (compile_network s c l1) t (compile_network s c' l1)`
       however I'm including it for completeness
 *)
-Theorem chor_PERM_compile_network_trans:
+Theorem chor_PERM_compile_network_trans':
    ∀s c (c' : chor) t l1 l2.
     PERM l1 l2
     ∧ ALL_DISTINCT l1
-    ∧ trans (compile_network s ^chor l1) t (compile_network s c' l1)
-    ⇒ trans (compile_network s ^chor l2) t (compile_network s c' l2)
+    ∧ trans (compile_network s ^chor l1) t (compile_network s' c' l1)
+    ⇒ trans (compile_network s ^chor l2) t (compile_network s' c' l2)
 Proof
     rw []
     \\ `compile_network s c l1 θ≅ compile_network s c l2`
@@ -596,6 +596,16 @@ Proof
     \\ IMP_RES_TAC chor_compile_network_rcong
     \\ rfs [network_procs_chor_compile_id]
     \\ rw []
+QED
+
+Theorem chor_PERM_compile_network_trans:
+   ∀s c (c' : chor) t l1 l2.
+    PERM l1 l2
+    ∧ ALL_DISTINCT l1
+    ∧ trans (compile_network s ^chor l1) t (compile_network s c' l1)
+    ⇒ trans (compile_network s ^chor l2) t (compile_network s c' l2)
+Proof
+    metis_tac[chor_PERM_compile_network_trans']
 QED
 
 (* See ‘chor_PERM_compile_network_trans’ (above) for a nice explanation *)
@@ -617,12 +627,12 @@ Proof
 QED
 
 (* An RTC variant of `PERM_chor_compile_network_trans`, way more relevant and useful *)
-Theorem PERM_chor_compile_network_reduction:
+Theorem PERM_chor_compile_network_reduction':
    ∀s c (c' : chor) l1 l2.
     PERM l1 l2
     ∧ ALL_DISTINCT l1
-    ∧ reduction^* (compile_network s ^chor l1) (compile_network s c' l1)
-    ⇒ reduction^* (compile_network s ^chor l2) (compile_network s c' l2)
+    ∧ reduction^* (compile_network s ^chor l1) (compile_network s' c' l1)
+    ⇒ reduction^* (compile_network s ^chor l2) (compile_network s' c' l2)
 Proof
     rw []
     \\ `compile_network s c l1 θ≅ compile_network s c l2`
@@ -632,6 +642,16 @@ Proof
     \\ IMP_RES_TAC chor_compile_network_rcong
     \\ rfs [network_procs_chor_compile_id]
     \\ rw []
+QED
+
+Theorem PERM_chor_compile_network_reduction:
+   ∀s c (c' : chor) l1 l2.
+    PERM l1 l2
+    ∧ ALL_DISTINCT l1
+    ∧ reduction^* (compile_network s ^chor l1) (compile_network s c' l1)
+    ⇒ reduction^* (compile_network s ^chor l2) (compile_network s c' l2)
+Proof
+    metis_tac[PERM_chor_compile_network_reduction']
 QED
 
 (* An RTC variant of `PERM_pchor_compile_network_trans`, way more relevant and useful *)
@@ -678,7 +698,27 @@ Proof
           \\ rw [Abbr `l'`]
           \\ Cases_on `p ≠ x'` \\ Cases_on `q ≠ x'`
           \\ rw [MEM_FILTER])
-    \\ metis_tac [PERM_chor_compile_network_reduction]
+    \\ metis_tac [PERM_chor_compile_network_reduction']
+QED
+
+Theorem chor_compile_network_COM':
+  ∀s ^chor p x q y l s'.
+   MEM p l ∧ MEM q l ∧ ALL_DISTINCT l
+   ∧ p ≠ q
+   ∧ reduction^* (compile_network s (Com  p x q y c) (p::q::FILTER (λx. p ≠ x ∧ q ≠ x) l))
+                 (compile_network s'               c  (p::q::FILTER (λx. p ≠ x ∧ q ≠ x) l))
+   ⇒ reduction^* (compile_network s (Com  p x q y c) l) (compile_network s' c l)
+Proof
+    rw []
+    \\ Q.ABBREV_TAC `l' = p::q::FILTER (λx. p ≠ x ∧ q ≠ x) l`
+    \\ `ALL_DISTINCT l'`
+       by rw [Abbr `l'`,ALL_DISTINCT,MEM_FILTER,FILTER_ALL_DISTINCT]
+    \\ `PERM l' l`
+       by (ho_match_mp_tac PERM_ALL_DISTINCT
+          \\ rw [Abbr `l'`]
+          \\ Cases_on `p ≠ x'` \\ Cases_on `q ≠ x'`
+          \\ rw [MEM_FILTER])
+    \\ metis_tac [PERM_chor_compile_network_reduction']
 QED
 
 (* `Com` instance of `PERM_pchor_compile_network_reduction` with more
@@ -737,6 +777,26 @@ Proof
           \\ Cases_on `p ≠ x` \\ Cases_on `q ≠ x`
           \\ rw [MEM_FILTER])
     \\ metis_tac [PERM_chor_compile_network_reduction]
+QED
+
+Theorem chor_compile_network_Sel':
+  ∀s ^chor p x q y l s'.
+   MEM p l ∧ MEM q l ∧ ALL_DISTINCT l
+   ∧ p ≠ q
+   ∧ reduction^* (compile_network s (Sel p b q c) (p::q::FILTER (λx. p ≠ x ∧ q ≠ x) l))
+                 (compile_network s'               c  (p::q::FILTER (λx. p ≠ x ∧ q ≠ x) l))
+   ⇒ reduction^* (compile_network s (Sel p b q c) l) (compile_network s' c l)
+Proof
+    rw []
+    \\ Q.ABBREV_TAC `l' = p::q::FILTER (λx. p ≠ x ∧ q ≠ x) l`
+    \\ `ALL_DISTINCT l'`
+       by rw [Abbr `l'`,ALL_DISTINCT,MEM_FILTER,FILTER_ALL_DISTINCT]
+    \\ `PERM l' l`
+       by (ho_match_mp_tac PERM_ALL_DISTINCT
+          \\ rw [Abbr `l'`]
+          \\ Cases_on `p ≠ x` \\ Cases_on `q ≠ x`
+          \\ rw [MEM_FILTER])
+    \\ metis_tac [PERM_chor_compile_network_reduction']
 QED
 
 (* `Sel` instance of `PERM_pchor_compile_network_reduction` with more
