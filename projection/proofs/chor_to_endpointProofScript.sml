@@ -2007,6 +2007,7 @@ Theorem compile_network_preservation:
     ==> ∃s''' c''' p2.
               reduction^* (compile_network s c (procsOf c)) p2
               ∧ trans_s (s'',c'') (s''',c''')
+              /\ p2 = (compile_network s''' c''' (procsOf c))
 Proof
   rw[] >>
   drule compile_network_reflection_lemma >>
@@ -2021,7 +2022,6 @@ Proof
   disch_then drule >>
   strip_tac >>
   rpt(dxrule_then strip_assume_tac list_trans_reduction) >>
-  goal_assum drule >>
   imp_res_tac trans_s_nil >>
   rveq >> simp[qcong_refl]
 QED
