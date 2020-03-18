@@ -54,6 +54,8 @@ Definition procsOf_def:
 ∧ procsOf (Com p _ q _ c)  = nub' ([p;q] ++ procsOf c)
 ∧ procsOf (Sel p _ q c)    = nub' ([p;q] ++ procsOf c)
 ∧ procsOf (Let _ p _ _ c)  = nub' ([p] ++ procsOf c)
+∧ procsOf (Letrec _ c1 c2) = nub' (procsOf c1 ++ procsOf c2)
+∧ procsOf (Call _)         = []
 End
 
 Theorem procsOf_all_distinct:
@@ -109,6 +111,24 @@ val _ = Parse.overload_on("τ≅",``lcong``);
 val [lcong_sym,lcong_refl,lcong_trans,lcong_reord] =
     zip ["lcong_sym","lcong_refl","lcong_trans","lcong_reord"]
         (CONJUNCTS lcong_rules) |> map save_thm;
+
+Definition dsubst:
+  dsubst Nil dn c'               = Nil
+∧ dsubst (IfThen v p l r) dn c' = IfThen v p (dsubst l dn c') (dsubst r dn c')
+∧ dsubst (Com p v1 q v2 c) dn c'  = Com p v1 q v2 (dsubst c dn c')
+∧ dsubst (Sel p v q c) dn c'    = Sel p v q (dsubst c dn c')
+∧ dsubst (Let v p f l c) dn c'  = Let v p f l (dsubst c dn c')
+∧ dsubst (Letrec dn' c1 c2) dn c' =
+   (if dn = dn' then
+      Letrec dn' c1 c2
+    else
+      Letrec dn' (dsubst c1 dn c') (dsubst c2 dn c'))
+∧ dsubst (Call dn') dn c'          =
+   (if dn = dn' then
+      c'
+    else
+      Call dn')
+End
 
 Inductive trans:
   (* Communication *)
@@ -174,12 +194,17 @@ Inductive trans:
     ∧ p1 ∈ freeprocs alpha
     ∧ p2 ∉ freeprocs alpha
     ⇒ trans (s,Sel p1 b p2 c) (alpha,LSel p1 b p2::l) (s',Sel p1 b p2 c'))
+
+   (* Recursion *)
+∧ (∀s c1 c2 s' c' dn l alpha.
+    trans (s,dsubst c2 dn c1) (alpha,l) (s',c')
+    ⇒ trans (s,Letrec dn c1 c2) (alpha,l) (s',c'))
 End
 
 
 val _ = zip ["trans_com","trans_sel","trans_let","trans_if_true","trans_if_false",
               "trans_if_swap","trans_com_swap","trans_sel_swap","trans_let_swap",
-              "trans_com_async","trans_sel_async"]
+              "trans_com_async","trans_sel_async","trans_letrec"]
             (CONJUNCTS trans_rules) |> map save_thm;
 
 Theorem trans_pairind =
