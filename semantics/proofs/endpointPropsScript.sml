@@ -460,6 +460,37 @@ val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
       >> imp_res_tac trans_par_r
       >> metis_tac[junkcong_rules]));
 
+val junkcong_reduction_eq = Q.store_thm("junkcong_reduction_eq",
+  `∀fvs p1 q1.
+     junkcong fvs p1 q1
+     ⇒ ∀ p2 q2.
+         ((reduction^* p1 p2 ⇒ (∃q2. reduction^* q1 q2 ∧ junkcong fvs p2 q2))
+         ∧ (reduction^* q1 q2 ⇒ (∃p2. reduction^* p1 p2 ∧ junkcong fvs p2 q2)))`,
+  rw []
+  >- (last_x_assum mp_tac
+      \\ MAP_EVERY (W(curry Q.SPEC_TAC)) [`q2`,`q1`,`fvs`]
+      \\ first_x_assum mp_tac
+      \\ MAP_EVERY (W(curry Q.SPEC_TAC)) [`p2`,`p1`]
+      \\ ho_match_mp_tac RTC_ind \\ rw []
+      >- (qexists_tac ‘q1’ \\ fs [junkcong_rules])
+      \\ fs [reduction_def]
+      \\ drule_then (qspecl_then [‘LTau’,‘p1'’,‘q1'’] assume_tac) junkcong_trans_eq
+      \\ rfs [] \\ first_x_assum drule \\ rw [] \\ qexists_tac ‘q2'’ \\ rw []
+      \\ rw [reduction_def] \\ irule RTC_TRANS \\ qexists_tac ‘q2’ \\ rw []
+      \\ rw [reduction_def])
+  \\ last_x_assum mp_tac
+  \\ MAP_EVERY (W(curry Q.SPEC_TAC)) [`p2`,`p1`,`fvs`]
+  \\ first_x_assum mp_tac
+  \\ MAP_EVERY (W(curry Q.SPEC_TAC)) [`q2`,`q1`]
+  \\ ho_match_mp_tac RTC_ind \\ rw []
+  >- (qexists_tac ‘p1’ \\ fs [junkcong_rules])
+  \\ fs [reduction_def]
+  \\ drule_then (qspecl_then [‘LTau’,‘p1'’,‘q1'’] assume_tac) junkcong_trans_eq
+  \\ rfs [] \\ first_x_assum drule \\ rw [] \\ qexists_tac ‘p2'’ \\ rw []
+  \\ rw [reduction_def] \\ irule RTC_TRANS \\ qexists_tac ‘p2’ \\ rw []
+  \\ rw [reduction_def]
+);
+
 val junkcong_has_fv_eq = Q.store_thm("junkcong_has_fv_eq",
   `!fv e l s e2. junkcong {fv} (NEndpoint l s e) e2
    /\ MEM fv (free_var_names_endpoint e)

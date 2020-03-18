@@ -323,7 +323,7 @@ val compile_network_support = Q.store_thm("compile_network_support",
   >> fs[compile_network_fv_def,free_var_names_network_def,
         compile_endpoint_support]);
 
-val compile_network_preservation = Q.store_thm("compile_network_preservation",
+val compile_network_preservation_trans = Q.store_thm("compile_network_preservation_trans",
   `∀n1 n2 q1 d q2 fv.
     ALL_DISTINCT (MAP FST (endpoints n1)) ∧
     ¬MEM fv (var_names_network n1) ∧
@@ -523,6 +523,42 @@ val compile_network_preservation = Q.store_thm("compile_network_preservation",
       >> asm_exists_tac >> simp[] >> match_mp_tac junkcong_par
       >> fs[junkcong_refl])
   );
+
+val compile_network_preservation = Q.store_thm("compile_network_preservation",
+  `∀n1 n2 fv.
+    ALL_DISTINCT (MAP FST (endpoints n1)) ∧
+    ¬MEM fv (var_names_network n1) ∧
+    reduction^* n1 n2
+    ==> ?n3. reduction^* (compile_network_fv fv n1) n3 ∧
+             junkcong {fv} (compile_network_fv fv n2) n3`,
+
+    `∀n1 n2.
+        reduction^* n1 n2
+        ==> ∀fv.
+             ALL_DISTINCT (MAP FST (endpoints n1)) ∧
+             ¬MEM fv (var_names_network n1)
+             ==> ?n3. reduction^* (compile_network_fv fv n1) n3 ∧
+                      junkcong {fv} (compile_network_fv fv n2) n3`
+    suffices_by metis_tac []
+    \\ ho_match_mp_tac RTC_ind
+    \\ rw [reduction_def]
+    >- (qexists_tac ‘compile_network_fv fv n1’ \\ fs [junkcong_rules])
+    \\ drule compile_network_preservation_trans
+    \\ rpt (disch_then drule) \\ strip_tac \\ fs []
+    \\ ‘~MEM fv (var_names_network n1')’
+       by (CCONTR_TAC \\ fs []
+           \\ drule_then drule trans_var_names_mono \\ fs [])
+    \\ drule_then (assume_tac o GSYM) endpoint_names_trans \\ fs []
+    \\ first_x_assum (drule_then assume_tac) \\ fs []
+    \\ qmatch_asmsub_abbrev_tac ‘reduction^* cn1  n3’
+    \\ qmatch_asmsub_abbrev_tac ‘reduction^* cn1' n3'’
+    \\ qspecl_then [‘{fv}’,‘cn1'’,‘n3’] assume_tac junkcong_reduction_eq
+    \\ rfs [] \\ first_x_assum (qspecl_then [‘n3'’,‘q2’] assume_tac) \\ fs []
+    \\ rfs [] \\ qexists_tac ‘q2'’
+    \\ conj_tac
+    >- (irule RTC_SPLIT \\ asm_exists_tac \\ fs [])
+    \\ irule junkcong_trans \\ asm_exists_tac \\ fs []
+);
 
 val (choice_rel_rules,choice_rel_ind,choice_rel_cases) = Hol_reln `
   (* choice_rel_eq_junk *)
