@@ -54,7 +54,7 @@ val _ = Datatype`
         *)
 
        (* Process definition *)
-       | Letrec dvarN chor chor
+       | Fix dvarN chor
 
        (* Process call*)
        | Call dvarN

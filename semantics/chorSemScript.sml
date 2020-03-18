@@ -54,7 +54,7 @@ Definition procsOf_def:
 ∧ procsOf (Com p _ q _ c)  = nub' ([p;q] ++ procsOf c)
 ∧ procsOf (Sel p _ q c)    = nub' ([p;q] ++ procsOf c)
 ∧ procsOf (Let _ p _ _ c)  = nub' ([p] ++ procsOf c)
-∧ procsOf (Letrec _ c1 c2) = nub' (procsOf c1 ++ procsOf c2)
+∧ procsOf (Fix _ c) = nub' (procsOf c)
 ∧ procsOf (Call _)         = []
 End
 
@@ -118,11 +118,11 @@ Definition dsubst:
 ∧ dsubst (Com p v1 q v2 c) dn c'  = Com p v1 q v2 (dsubst c dn c')
 ∧ dsubst (Sel p v q c) dn c'    = Sel p v q (dsubst c dn c')
 ∧ dsubst (Let v p f l c) dn c'  = Let v p f l (dsubst c dn c')
-∧ dsubst (Letrec dn' c1 c2) dn c' =
+∧ dsubst (Fix dn' c) dn c' =
    (if dn = dn' then
-      Letrec dn' c1 c2
+      Fix dn' c
     else
-      Letrec dn' (dsubst c1 dn c') (dsubst c2 dn c'))
+      Fix dn' (dsubst c dn c'))
 ∧ dsubst (Call dn') dn c'          =
    (if dn = dn' then
       c'
@@ -196,9 +196,9 @@ Inductive trans:
     ⇒ trans (s,Sel p1 b p2 c) (alpha,LSel p1 b p2::l) (s',Sel p1 b p2 c'))
 
    (* Recursion *)
-∧ (∀s c1 c2 s' c' dn l alpha.
-    trans (s,dsubst c2 dn c1) (alpha,l) (s',c')
-    ⇒ trans (s,Letrec dn c1 c2) (alpha,l) (s',c'))
+∧ (∀s c s' c' dn l alpha.
+    trans (s,dsubst c dn (Fix dn c)) (alpha,l) (s',c')
+    ⇒ trans (s,Fix dn c) (alpha,l) (s',c'))
 End
 
 
