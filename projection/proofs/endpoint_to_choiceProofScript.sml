@@ -25,7 +25,7 @@
    simplifies inductive arguments about semantics reflection, by allowing us to concentrate on
    only one reduction at a time.
  *)
-open preamble endpointLangTheory endpointSemTheory
+open preamble choreoUtilsTheory endpointLangTheory endpointSemTheory
      endpointPropsTheory endpoint_to_choiceTheory
 
 val _ = new_theory "endpoint_to_choiceProof";

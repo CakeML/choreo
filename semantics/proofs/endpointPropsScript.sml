@@ -1,56 +1,6 @@
-open preamble endpointSemTheory endpointLangTheory;
+open preamble choreoUtilsTheory endpointSemTheory endpointLangTheory;
 
 val _ = new_theory "endpointProps"
-
-(* todo: lemmas that have nothing to do with endpointLang, move? *)
-val RTC_SANDWICH = Q.store_thm("RTC_SANDWICH",
-  `!R a b c d. R^* a b /\ R b c /\ R^* c d ==> R^* a d`,
-  metis_tac[RTC_RTC,RTC_SINGLE])
-
-val RTC_SPLIT = Q.store_thm("RTC_SPLIT",
-  `∀R x y z. R^* x z ∧ R^* z y ⇒ R^* x y`,
-  metis_tac[RTC_RTC,RTC_SINGLE])
-
-val INDEX_FIND_normalize = Q.store_thm("INDEX_FIND_normalize",
-  `!l n. OPTION_MAP SND (INDEX_FIND n f l) = OPTION_MAP SND (INDEX_FIND 0 f l)`,
-  Induct_on `l` >> rpt strip_tac >> rw[INDEX_FIND_def]);
-
-val INDEX_FIND_normalize' = Q.store_thm("INDEX_FIND_normalize'",
-  `!l n. (INDEX_FIND n f l = NONE) = (INDEX_FIND 0 f l = NONE)`,
-  Induct_on `l` >> rpt strip_tac >> rw[INDEX_FIND_def]);
-
-val INDEX_FIND_normalize'' = Q.store_thm("INDEX_FIND_normalize''",
-  `!n f l z. (INDEX_FIND (SUC n) f l = SOME z) = (FST z > 0 /\ INDEX_FIND n f l = SOME (FST z - 1, SND z))`,
-  Induct_on `l` >> rpt strip_tac
-  >> rw[INDEX_FIND_def,EQ_IMP_THM]
-  >> fs[] >> Cases_on `z` >> fs[]);
-
-val FIND_APPEND = Q.store_thm("FIND_APPEND",
-  `FIND f (l1 ++ l2) =
-   case FIND f l1 of NONE => FIND f l2
-      | SOME e => SOME e`,
-  Induct_on `l1` >> fs[FIND_def,INDEX_FIND_def]
-  >> rw[INDEX_FIND_normalize]);
-
-val FIND_NOT_MEM = Q.store_thm("FIND_NOT_MEM",
-  `!e l. FIND ($= e) l = NONE <=> ¬MEM e l`,
-  Induct_on `l` >> rw[FIND_def,INDEX_FIND_def] >> fs[FIND_def,INDEX_FIND_normalize']);
-
-val FIND_o_NOT_MEM = Q.store_thm("FIND_o_NOT_MEM",
-  `!e f l. FIND ($= e o f) l = NONE <=> ¬MEM e (MAP f l)`,
-  Induct_on `l` >> rw[FIND_def,INDEX_FIND_def] >> fs[FIND_def,INDEX_FIND_normalize']);
-
-val FIND_o_MEM = Q.store_thm("FIND_o_MEM",
-  `!e f l. FIND ($= e o f) l <> NONE <=> MEM e (MAP f l)`,
-  Induct_on `l` >> rw[FIND_def,INDEX_FIND_def] >> fs[FIND_def,INDEX_FIND_normalize']);
-
-val FIND_MEM = Q.store_thm("FIND_MEM",
-  `!f l z. FIND f l = SOME z
-   ==> MEM z l /\ f z`,
-  Induct_on `l` >> rpt strip_tac
-  >> fs[FIND_def,INDEX_FIND_def] >> every_case_tac
-  >> rveq >> fs[INDEX_FIND_normalize'' |> Q.SPEC `0` |> REWRITE_RULE [GSYM ONE]]
-  >> metis_tac[FST,SND]);
 
 val trans_enqueue' = Q.store_thm("trans_enqueue'",
   `∀s d p1 p2 e q.
