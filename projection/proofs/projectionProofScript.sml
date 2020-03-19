@@ -32,7 +32,24 @@ QED
 Theorem gen_fresh_name_same:
   ∀l. ¬MEM (gen_fresh_name l) l
 Proof
-  cheat
+  Cases >- fs[gen_fresh_name_def] >>
+  rename1 `s::l` >>
+  simp[] >>
+  `STRLEN s < STRLEN(gen_fresh_name (s::l))`
+    by(simp[gen_fresh_name_def] >>
+       qid_spec_tac `s` >>
+       Induct_on `l` >> rw[] >>
+       first_x_assum(qspec_then `s` mp_tac) >> intLib.COOPER_TAC) >>
+  conj_tac >- (spose_not_then strip_assume_tac >> fs[]) >>
+  pop_assum kall_tac >>
+  `!s'. MEM s' l ==> STRLEN s' < STRLEN(gen_fresh_name (s::l))`
+    by(simp[gen_fresh_name_def] >>
+       qid_spec_tac `s` >>
+       Induct_on `l` >> rw[] >> rw[] >>
+       res_tac >>
+       first_x_assum(qspec_then `s` mp_tac) >> intLib.COOPER_TAC) >>
+  spose_not_then strip_assume_tac >> res_tac >>
+  fs[]
 QED
 
 Theorem choice_free_network_compile_network_fv:
