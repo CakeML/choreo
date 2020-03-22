@@ -21,7 +21,7 @@ val to_endpoint_preservation =
 val to_payload_preservation =
   endpoint_to_payloadProofTheory.compile_network_preservation;
 
-Theorem endpoints_compile_network:
+Theorem endpoints_compile_network_chor:
   ∀s c l. MAP FST (endpointProps$endpoints (compile_network s (c : chor) l)) = l
 Proof
   rw [] \\ Induct_on ‘l’
@@ -85,7 +85,7 @@ Proof
   \\ qmatch_goalsub_abbrev_tac ‘junkcong {fv}’
   \\ disch_then (qspec_then ‘fv’ mp_tac)
   \\ impl_tac \\ rw []
-  >- rw [Abbr‘to_epn’, endpoints_compile_network,procsOf_all_distinct]
+  >- rw [Abbr‘to_epn’,endpoints_compile_network_chor,procsOf_all_distinct]
   >- rw [Abbr‘fv’,gen_fresh_name_same]
   \\ fs [projection_def,endpoint_to_choiceTheory.compile_network_def]
   \\ drule_then assume_tac junkcong_sym \\  asm_exists_tac
