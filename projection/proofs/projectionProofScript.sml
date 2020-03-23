@@ -1,4 +1,4 @@
-open preamble choreoUtilsTheory
+open preamble choreoUtilsTheory chorPropsTheory
      projectionTheory endpointPropsTheory
 
 open chorSemTheory endpointLangTheory
@@ -134,21 +134,33 @@ QED
 Triviality MEM_partners_endpoint_split_sel:
   ∀(c : chor) p l b x r.
    split_sel p l c = SOME (b,r) ∧
-   project_ok p c ∧
+   no_self_comunication c ∧
    MEM x (partners_endpoint (project' p r))
    ⇒ MEM x (partners_endpoint (project' p c))
 Proof
   Induct
   \\ fs [project_def,partners_endpoint_def,
+         no_self_comunication_def,
          split_sel_def]
   \\ rw [partners_endpoint_def]
   >- (Cases_on ‘x = l’ \\ fs [] \\ metis_tac [])
   \\ metis_tac []
 QED
 
+(* TODO: move to chorPropstheory *)
+Theorem split_sel_no_self_comunication:
+  ∀c p l b r.
+    split_sel p l c = SOME (b,r) ∧
+    no_self_comunication c
+    ⇒ no_self_comunication r
+Proof
+  Induct \\ rw [split_sel_def,no_self_comunication_def] \\ fs []
+  \\ metis_tac []
+QED
+
 Theorem MEM_partners_endpoint_imp_procsOf:
   ∀(c : chor) p x.
-    project_ok p c ∧
+    no_self_comunication c ∧
     MEM x (partners_endpoint (project' p c))
     ⇒ MEM x (procsOf c)
 Proof
@@ -161,19 +173,17 @@ Proof
       goal
       |> dest_disj |> fst
       |> (fn t => (ASM_CASES_TAC t \\ fs []) (asms,goal)))
-  \\ fs [MEM_FILTER,MEM_nub']
+  \\ fs [MEM_FILTER,MEM_nub',no_self_comunication_def]
   >- metis_tac [] >- metis_tac []
   >- (EVERY_CASE_TAC \\ fs [partners_endpoint_def]
       >- metis_tac []
       >- metis_tac []
       \\ disj2_tac \\ first_x_assum irule
-      \\ imp_res_tac split_sel_project_ok
-      \\ asm_exists_tac \\ fs []
-      \\ metis_tac [MEM_partners_endpoint_split_sel])
+      \\ imp_res_tac MEM_partners_endpoint_split_sel
+      \\ metis_tac [])
   >- let val d_tac = first_x_assum irule
-                     \\ imp_res_tac split_sel_project_ok
-                     \\ asm_exists_tac \\ fs []
-                     \\ metis_tac [MEM_partners_endpoint_split_sel]
+                     \\ imp_res_tac MEM_partners_endpoint_split_sel
+                     \\ metis_tac []
      in EVERY_CASE_TAC \\ fs [partners_endpoint_def]
         >- (disj2_tac \\ d_tac)
         >- (disj1_tac \\ d_tac)
@@ -225,8 +235,7 @@ QED
 
 Theorem partners_network_compile_network:
   ∀l (c : chor) s.
-  compile_network_ok s c l
-  ⇒ partners_network (compile_network s c l)
+    partners_network (compile_network s c l)
     = FLAT (MAP (\proc. partners_endpoint (project' proc c)) l)
 Proof
   Induct
@@ -236,20 +245,37 @@ QED
 
 Theorem closed_network_from_chor:
   ∀s (c : chor).
-   compile_network_ok s c (procsOf c)
+   no_self_comunication c
    ⇒ closed_network (compile_network s c (procsOf c))
 Proof
   rw [closed_network_def,
       closed_under_def,
       endpoints_compile_network_chor,
+      partners_network_compile_network,
       SUBSET_DEF]
-  \\ drule_then assume_tac partners_network_compile_network
-  \\ fs [] \\ pop_assum (K ALL_TAC)
-  \\ fs [MEM_FLAT,MEM_MAP] \\ rveq
-  \\ irule MEM_partners_endpoint_imp_procsOf
-  \\ fs [compile_network_ok_project_ok]
-  \\ first_x_assum (drule_then assume_tac)
+  \\ fs [MEM_FLAT,MEM_MAP,no_self_comunication_def] \\ rveq
+  \\ irule MEM_partners_endpoint_imp_procsOf \\ fs []
   \\ asm_exists_tac \\ fs []
+QED
+
+Theorem endpoints_ok_compile_network:
+  ∀l (c : chor) s.
+   EVERY endpoint_ok (endpoints (compile_network s c l))
+   = EVERY I (MAP (λp . ¬MEM p (partners_endpoint (project' p c))) l)
+Proof
+  Induct \\ rw [chor_to_endpointTheory.compile_network_gen_def,
+                endpoint_ok_def,
+                endpoints_def]
+QED
+
+Theorem MEM_partners_endpoint_project:
+  ∀(c : chor) p. no_self_comunication c ⇒ ¬MEM p (partners_endpoint (project' p c))
+Proof
+ Induct
+ \\ rw [partners_endpoint_def, chor_to_endpointTheory.project_def,no_self_comunication_def]
+ \\ EVERY_CASE_TAC \\ rw [partners_endpoint_def]
+ \\ CCONTR_TAC \\ fs []
+ \\ imp_res_tac MEM_partners_endpoint_split_sel \\ rfs []
 QED
 
 Theorem projection_reflection:
@@ -274,12 +300,21 @@ Proof
          endpoint_to_choiceTheory.compile_network_def]
   \\ fs [endpoint_to_choiceTheory.compile_network_def]
   \\ first_x_assum (mp_then Any mp_tac from_choice_reflection)
-  \\ impl_tac \\ rw [gen_fresh_name_same]
-  >- rw [endpoints_compile_network_chor,
-         procsOf_all_distinct]
-  >- rw [closed_network_from_chor]
-  \\ cheat
-QED
+  \\ impl_tac
+  >- (rw [gen_fresh_name_same,
+          endpoints_compile_network_chor,
+          closed_network_from_chor,
+          procsOf_all_distinct,
+          endpoints_ok_compile_network,
+          MEM_partners_endpoint_project]
+      \\ qmatch_goalsub_abbrev_tac ‘MAP _ l’
+      \\ rpt (pop_assum (K ALL_TAC))
+      \\ Induct_on ‘l’ \\ rw [])
+  \\ rw []
+  \\ first_x_assum (mp_then Any mp_tac from_endpoint_reflection)
+  \\ rw []
+  \\ cheat (* TODO *)
 
+QED
 
 val _ = export_theory ()
