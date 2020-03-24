@@ -28,7 +28,7 @@ Proof
   \\ rw [endpoints_def,compile_network_gen_def]
 QED
 
-
+(* gen_fresh_name generates a fresh name that is not in the initial list *)
 Theorem gen_fresh_name_same:
   ∀l. ¬MEM (gen_fresh_name l) l
 Proof
@@ -52,6 +52,7 @@ Proof
   fs[]
 QED
 
+(* endpoint_to_choice compilation step generates a choice_free_network *)
 Theorem choice_free_network_compile_network_fv:
   ∀epn fv. choice_free_network (compile_network_fv fv epn)
 Proof
@@ -106,6 +107,9 @@ val from_payload_reflection =
   endpoint_to_payloadProofTheory.compile_network_reflection;
 
 
+(* Enpoints names are preserved over the endpoint_to_choice
+   compilation step (generic version)
+*)
 Theorem endpoints_compile_network_epn_aux:
   ∀epn fv.
    MAP FST (endpoints (endpoint_to_choice$compile_network_fv fv epn))
@@ -116,6 +120,9 @@ Proof
          endpoints_def]
 QED
 
+(* Enpoints names are preserved over the endpoint_to_choice
+   compilation step
+*)
 Theorem endpoints_compile_network_epn:
   ∀epn.
    MAP FST (endpoints (endpoint_to_choice$compile_network epn)) = MAP FST (endpoints epn)
@@ -123,6 +130,7 @@ Proof
   rw [endpoint_to_choiceTheory.compile_network_def,endpoints_compile_network_epn_aux]
 QED
 
+(* nub' preserves membership *)
 Theorem MEM_nub':
   ∀l x. MEM x (nub' l) = MEM x l
 Proof
@@ -131,6 +139,7 @@ Proof
   \\ Cases_on ‘x=h’ \\ fs [MEM_FILTER]
 QED
 
+(* split_sel can only remove processes *)
 Triviality MEM_partners_endpoint_split_sel:
   ∀(c : chor) p l b x r.
    split_sel p l c = SOME (b,r) ∧
@@ -148,6 +157,7 @@ Proof
 QED
 
 (* TODO: move to chorPropstheory *)
+(* split_sel preserves no_self_comunication_def *)
 Theorem split_sel_no_self_comunication:
   ∀c p l b r.
     split_sel p l c = SOME (b,r) ∧
@@ -158,6 +168,9 @@ Proof
   \\ metis_tac []
 QED
 
+(* projecting a process does not remove/change any other process
+   when compared with the choreography (procsOf)
+*)
 Theorem MEM_partners_endpoint_imp_procsOf:
   ∀(c : chor) p x.
     no_self_comunication c ∧
@@ -233,6 +246,9 @@ Proof
   \\ metis_tac []
 QED
 
+(* Simplification of the traversal of partners_network when
+   using a projected network
+*)
 Theorem partners_network_compile_network:
   ∀l (c : chor) s.
     partners_network (compile_network s c l)
@@ -243,6 +259,9 @@ Proof
          partners_network_def]
 QED
 
+(* Projected networks are closed
+   (only mentions processes withing the network)
+*)
 Theorem closed_network_from_chor:
   ∀s (c : chor).
    no_self_comunication c
@@ -258,6 +277,9 @@ Proof
   \\ asm_exists_tac \\ fs []
 QED
 
+(* Simplification of the traversal of endpoints when
+   using a projected network
+*)
 Theorem endpoints_ok_compile_network:
   ∀l (c : chor) s.
    EVERY endpoint_ok (endpoints (compile_network s c l))
@@ -268,6 +290,9 @@ Proof
                 endpoints_def]
 QED
 
+(* The projected process is not mentioned withing its code
+   (because no self-communication is allowed)
+*)
 Theorem MEM_partners_endpoint_project:
   ∀(c : chor) p. no_self_comunication c ⇒ ¬MEM p (partners_endpoint (project' p c))
 Proof
