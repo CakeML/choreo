@@ -1,4 +1,4 @@
-open preamble payloadSemTheory payloadLangTheory;
+open preamble payloadSemTheory payloadLangTheory choreoUtilsTheory;
 
 val _ = new_theory "payloadProps";
 
@@ -414,6 +414,19 @@ val qcong_IMP_qrel = Q.store_thm("qcong_IMP_qrel",
   >> rveq >> fs[] >> rveq >> simp[]
   >> metis_tac[qrel_rules,qcong_endpoint_rel_endpoint]);
 
+val qcong_bindings_eq = Q.store_thm("qcong_bindings_eq",
+  `!p1 s1 e1 p2 s2 e2.
+    qcong (NEndpoint p1 s1 e1) (NEndpoint p2 s2 e2)
+    ==> s1.bindings = s2.bindings`,
+  `!n1 n2.
+    qcong n1 n2 ==>
+    !p1 s1 e1 p2 s2 e2.
+    n1 = NEndpoint p1 s1 e1 /\ n2 = NEndpoint p2 s2 e2
+    ==> s1.bindings = s2.bindings` suffices_by metis_tac[]
+  >> ho_match_mp_tac qcong_strongind >> rpt strip_tac
+  >> rveq >> fs[] >> rveq >> simp[]
+  >> metis_tac[qrel_rules,qcong_endpoint_rel_endpoint]);
+
 val qcong_queue_reorder'' = Q.store_thm("qcong_queue_reorder''",
   `∀p e p1 d1 p2 d2 b q1 q2.
      p1 ≠ p2
@@ -801,11 +814,47 @@ val qcong_trans_eq = Q.store_thm("qcong_trans_eq",
       >> imp_res_tac trans_par_r
       >> metis_tac[qcong_rules]));
 
+val qcong_reduction_eq = Q.store_thm("qcong_reduction_eq",
+  `∀p1 q1 .
+     qcong p1 q1
+     ⇒ ∀ conf p2 q2.
+            (((reduction conf)^* p1 p2 ⇒ (∃q2. (reduction conf)^* q1 q2 ∧ qcong p2 q2))
+         ∧ ((reduction conf)^* q1 q2 ⇒ (∃p2. (reduction conf)^* p1 p2 ∧ qcong p2 q2)))`,
+  rw []
+  >- (last_x_assum mp_tac
+      \\ MAP_EVERY (W(curry Q.SPEC_TAC)) [‘q1’]
+      \\ last_x_assum mp_tac
+      \\ MAP_EVERY (W(curry Q.SPEC_TAC)) [‘p2’,‘p1’]
+      \\ ho_match_mp_tac RTC_ind \\ rw []
+      >- (qexists_tac ‘q1’ \\ fs [qcong_rules])
+      \\ fs [reduction_def]
+      \\ drule_then (qspecl_then [‘conf’,‘LTau’,‘p1'’,‘q1'’] assume_tac) qcong_trans_eq
+      \\ rfs [] \\ first_x_assum drule \\ rw [] \\ qexists_tac ‘q2'’ \\ rw []
+      \\ rw [reduction_def] \\ irule RTC_TRANS \\ qexists_tac ‘q2’  \\  rw []
+      \\ rw [reduction_def])
+  \\ last_x_assum mp_tac
+  \\ MAP_EVERY (W(curry Q.SPEC_TAC)) [‘p1’]
+  \\ last_x_assum mp_tac
+  \\ MAP_EVERY (W(curry Q.SPEC_TAC)) [‘q2’,‘q1’]
+  \\ ho_match_mp_tac RTC_ind \\ rw []
+  >- (qexists_tac ‘p1’ \\ fs [qcong_rules])
+  \\ fs [reduction_def]
+  \\ drule_then (qspecl_then [‘conf’,‘LTau’,‘p1'’,‘q1'’] assume_tac) qcong_trans_eq
+  \\ rfs [] \\ first_x_assum drule \\ rw [] \\ qexists_tac ‘p2'’ \\ rw []
+  \\ rw [reduction_def] \\ irule RTC_TRANS \\ qexists_tac ‘p2’  \\  rw []
+  \\ rw [reduction_def]);
+
 val qcong_trans_pres = Q.store_thm("qcong_trans_pres",
   `∀p1 q1 conf alpha p2.
      qcong p1 q1 ∧ trans conf p1 alpha p2
      ⇒ ∃q2. trans conf q1 alpha q2 ∧ qcong p2 q2`,
   metis_tac[qcong_trans_eq])
+
+val qcong_reduction_pres = Q.store_thm("qcong_reduction_pres",
+  `∀p1 q1 conf p2.
+     qcong p1 q1 ∧ (reduction conf)^* p1 p2
+     ⇒ ∃q2. (reduction conf)^* q1 q2 ∧ qcong p2 q2`,
+  metis_tac[qcong_reduction_eq])
 
 val reduction_par_l = Q.store_thm("reduction_par_l",
   `∀p q r conf. (reduction conf)^* p q ==> (reduction conf)^* (NPar p r) (NPar q r)`,

@@ -538,6 +538,18 @@ val junkcong_endpoint_rel_endpoint = Q.store_thm("junkcong_endpoint_rel_endpoint
   >> ho_match_mp_tac junkcong_strongind
   >> rpt strip_tac >> fs[]);
 
+val junkcong_endpoint_queue_eq = Q.store_thm("junkcong_endpoint_queue_eq",
+  `!fvs p1 s1 s2 e1 .
+   junkcong fvs (NEndpoint p1 s1 e1) (NEndpoint p1 s2 e1) ==> s1.queue = s2.queue`,
+  `!fvs n1 n2.
+    junkcong fvs n1 n2
+    ==> (!p1 s1 s2 e1. n1 = NEndpoint p1 s1 e1 /\ n2 = NEndpoint p1 s2 e1
+          ==> s1.queue = s2.queue)`
+    suffices_by metis_tac[]
+  >> ho_match_mp_tac junkcong_strongind
+  >> rpt strip_tac >> fs[] >> rveq
+  >> simp[] >> metis_tac [junkcong_rules,junkcong_endpoint_rel_endpoint]);
+
 val junkcong_endpoints = Q.store_thm("junkcong_endpoints",
   `!fvs n1 n2. junkcong fvs n1 n2 ==> MAP FST (endpoints n1) = MAP FST (endpoints n2)`,
   ho_match_mp_tac junkcong_ind
@@ -548,6 +560,12 @@ val junkcong_trans_pres = Q.store_thm("junkcong_trans_pres",
      junkcong fv p1 q1 ∧ trans p1 alpha p2
      ⇒ ∃q2. trans q1 alpha q2 ∧ junkcong fv p2 q2`,
   metis_tac[junkcong_trans_eq])
+
+val junkcong_reduction_pres = Q.store_thm("junkcong_reduction_pres",
+  `∀p1 q1 fv alpha p2.
+     junkcong fv p1 q1 ∧ reduction^* p1 p2
+     ⇒ ∃q2. reduction^* q1 q2 ∧ junkcong fv p2 q2`,
+  metis_tac[junkcong_reduction_eq])
 
 val (qcong_rules, qcong_ind, qcong_cases) = Hol_reln `
   (* Reflexive *)
@@ -901,6 +919,19 @@ val qcong_par_rel_par_sym = Q.store_thm("qcong_par_rel_par_sym",
     qcong n1 (NPar n2 n3)
     ==> ?n4 n5. n1 = (NPar n4 n5) /\ qcong n4 n2 /\ qcong n5 n3`,
   metis_tac[qcong_par_rel_par,qcong_sym]);
+
+val qcong_bindings_eq = Q.store_thm("qcong_bindings_eq",
+  `!p1 s1 e1 p2 s2 e2.
+    qcong (NEndpoint p1 s1 e1) (NEndpoint p2 s2 e2)
+    ==> s1.bindings = s2.bindings`,
+  `!n1 n2.
+    qcong n1 n2 ==>
+    !p1 s1 e1 p2 s2 e2.
+    n1 = NEndpoint p1 s1 e1 /\ n2 = NEndpoint p2 s2 e2
+    ==> s1.bindings = s2.bindings` suffices_by metis_tac[]
+  >> ho_match_mp_tac qcong_strongind >> rpt strip_tac
+  >> rveq >> fs[] >> rveq >> simp[]
+  >> metis_tac[qrel_rules,qcong_endpoint_rel_endpoint]);
 
 val qcong_IMP_qrel = Q.store_thm("qcong_IMP_qrel",
   `!p1 s1 e1 p2 s2 e2.
