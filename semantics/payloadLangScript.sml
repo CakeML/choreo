@@ -125,4 +125,19 @@ Definition intermediate_def:
   ∧ intermediate _ = F
 End
 
+Definition normalise_queues_def:
+  normalise_queues q =
+  DRESTRICT q (λp. FLOOKUP q p ≠ SOME [])
+End
+
+Definition normalised_def:
+  normalised q = (normalise_queues q = q)
+End
+
+Definition normalised_network_def:
+   (normalised_network NNil = T)
+∧ (normalised_network (NEndpoint p s e) = normalised(s.queues))
+∧ (normalised_network (NPar n1 n2) ⇔ normalised_network n1 ∧ normalised_network n2)
+End        
+
 val _ = export_theory ()

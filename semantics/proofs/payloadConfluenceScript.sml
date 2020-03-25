@@ -147,7 +147,7 @@ Theorem qpush_commute:
 Proof
   rw[qpush_def,qlk_def,fget_def,fmap_eq_flookup,FLOOKUP_UPDATE] >> rw[]
 QED
-        
+
 Theorem payload_local_confluence_receive:
   ∀conf p1 s1 d1 r1 p2 p3 s2 d2 r2.
   trans conf p1 (LReceive s1 d1 r1) p2 /\ trans conf p1 (LReceive s2 d2 r2) p3 /\ s1 <> s2
@@ -287,10 +287,15 @@ Proof
       rename1 ‘qpush _ p3 d2’ >>
       (Cases_on ‘p1 = p3’ >-
          (dep_rewrite.DEP_REWRITE_TAC[trans_dequeue_last_payload'] >>
-          fs[qpush_def,qlk_def,fget_def,FLOOKUP_UPDATE,CaseEq"option",SNOC_APPEND]) >>
+          fs[qpush_def,qlk_def,fget_def,FLOOKUP_UPDATE,CaseEq"option",SNOC_APPEND,
+             normalise_queues_FUPDATE_NONEMPTY] >>
+          rw[fmap_eq_flookup,FLOOKUP_UPDATE] >> rw[DRESTRICT_normalise_queues,FLOOKUP_DRESTRICT]
+         ) >>
        dep_rewrite.DEP_REWRITE_TAC[trans_dequeue_last_payload'] >>
        fs[qpush_def,qlk_def,fget_def,FLOOKUP_UPDATE,CaseEq"option",SNOC_APPEND] >>
-       fs[FUPDATE_COMMUTES]))
+       fs[FUPDATE_COMMUTES] >>
+       rw[normalise_queues_FUPDATE_NONEMPTY]
+      ))
   >- (* Dequeue-intermediate-payload *)
      (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
       fs[] >> rveq >> fs[] >> rveq >> fs[] >>
@@ -301,10 +306,15 @@ Proof
       rename1 ‘qpush _ p3 d2’ >>
       (Cases_on ‘p1 = p3’ >-
          (dep_rewrite.DEP_REWRITE_TAC[trans_dequeue_intermediate_payload'] >>
-          fs[qpush_def,qlk_def,fget_def,FLOOKUP_UPDATE,CaseEq"option",SNOC_APPEND]) >>
+          fs[qpush_def,qlk_def,fget_def,FLOOKUP_UPDATE,CaseEq"option",SNOC_APPEND] >>
+          rw[fmap_eq_flookup,FLOOKUP_UPDATE] >> rw[DRESTRICT_normalise_queues,FLOOKUP_DRESTRICT] >>
+          fs[FLOOKUP_normalise_queues_FUPDATE] >> rw[]
+          ) >>
        dep_rewrite.DEP_REWRITE_TAC[trans_dequeue_intermediate_payload'] >>
        fs[qpush_def,qlk_def,fget_def,FLOOKUP_UPDATE,CaseEq"option",SNOC_APPEND] >>
-       fs[FUPDATE_COMMUTES])
+       fs[FUPDATE_COMMUTES] >> rw[normalise_queues_FUPDATE_NONEMPTY] >>
+       rw[fmap_eq_flookup,FLOOKUP_UPDATE] >> rw[DRESTRICT_normalise_queues,FLOOKUP_DRESTRICT] >>
+       fs[FLOOKUP_normalise_queues] >> every_case_tac >> fs[])
      )
   >- (* If-L *)
      (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>

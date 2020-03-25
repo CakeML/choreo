@@ -2,6 +2,86 @@ open preamble payloadSemTheory payloadLangTheory choreoUtilsTheory;
 
 val _ = new_theory "payloadProps";
 
+Theorem normalise_queues_idem[simp]:
+  normalise_queues(normalise_queues q) = normalise_queues q
+Proof
+  rw[normalise_queues_def,fmap_eq_flookup,FLOOKUP_DRESTRICT]
+QED
+
+Theorem normalised_normalise_queues[simp]:
+  normalised(normalise_queues q)
+Proof
+  rw[normalised_def]
+QED
+
+Theorem qlk_normalise_queues[simp]:
+  qlk (normalise_queues q) p = qlk q p
+Proof
+  rw[normalise_queues_def,qlk_def,fget_def,FLOOKUP_DRESTRICT] >> rw[]
+QED
+
+Theorem normalise_queues_qpush[simp]:
+  normalise_queues (qpush q p d) = qpush (normalise_queues q) p d
+Proof
+  rw[normalise_queues_def,qlk_def,fget_def,FLOOKUP_DRESTRICT,qpush_def,fmap_eq_flookup,
+     FLOOKUP_UPDATE]
+QED
+
+Theorem DRESTRICT_normalise_queues:
+  normalise_queues (DRESTRICT q f) = DRESTRICT (normalise_queues q) f
+Proof
+  rw[normalise_queues_def,fmap_eq_flookup,FLOOKUP_DRESTRICT] >> rw[] >> fs[]
+QED
+        
+Theorem normalised_qpush[simp]:
+  normalised q ⇒ normalised(qpush q p d)
+Proof
+  rw[normalised_def]
+QED
+
+Theorem normalise_queues_FUPDATE_NONEMPTY:
+  normalise_queues(q |+ (p,l)) =
+  (if l = [] then
+     normalise_queues (DRESTRICT q (COMPL {p}))
+   else
+     normalise_queues q |+ (p,l))
+Proof
+  rw[normalise_queues_def,fmap_eq_flookup,FLOOKUP_DRESTRICT,FLOOKUP_UPDATE] >>
+  rw[] >> fs[] >> fs[] >> every_case_tac >> fs[]
+QED
+
+Theorem FLOOKUP_normalise_queues_FUPDATE:
+  FLOOKUP(normalise_queues(q |+ (p1,l))) p2 =
+  if p1 = p2 then
+    if l = [] then
+      NONE
+    else
+      SOME l
+  else
+    FLOOKUP(normalise_queues q) p2
+Proof
+  rw[normalise_queues_def,fmap_eq_flookup,FLOOKUP_DRESTRICT,FLOOKUP_UPDATE]
+QED
+
+Theorem FLOOKUP_normalise_queues:
+  FLOOKUP (normalise_queues q) p =
+  case FLOOKUP q p of
+    NONE => NONE
+  | SOME l => if l = [] then NONE else SOME l
+Proof
+  rw[normalise_queues_def,fmap_eq_flookup,FLOOKUP_DRESTRICT,FLOOKUP_UPDATE] >>
+  TOP_CASE_TAC >> fs[]
+QED
+
+Theorem payload_trans_normalised:
+  ∀conf p1 alpha p2.
+  trans conf p1 alpha p2 ∧ normalised_network p1 ⇒ normalised_network p2
+Proof
+  simp[GSYM AND_IMP_INTRO] >>
+  ho_match_mp_tac trans_ind >>
+  rw[normalised_network_def]
+QED
+        
 (* todo: move? *)
 val EXISTS_REPLICATE = Q.store_thm("EXISTS_REPLICATE",
   `!f n d. EXISTS f (REPLICATE n d) = (n > 0 /\ f d)`,
@@ -69,7 +149,7 @@ Theorem trans_dequeue_last_payload':
   ∀conf s1 s2 v p1 p2 e d tl ds q.
      p1 ≠ p2 ∧ qlk s1.queues p1 = d::tl ∧ final d ∧
      s2.bindings = s1.bindings |+ (v,FLAT (SNOC (unpad d) ds)) ∧
-     s2.queues = s1.queues |+ (p1,tl)
+     s2.queues = normalise_queues(s1.queues |+ (p1,tl))
      ⇒
      trans conf (NEndpoint p2 s1 (Receive p1 v ds e)) LTau
        (NEndpoint p2 s2 e)
@@ -88,7 +168,7 @@ Theorem trans_dequeue_intermediate_payload':
   ∀conf s1 s2 v p1 p2 e d ds tl.
      p1 ≠ p2 ∧ qlk s1.queues p1 = d::tl ∧ intermediate d ∧
      s2.bindings = s1.bindings ∧
-     s2.queues = s1.queues |+ (p1,tl)
+     s2.queues = normalise_queues(s1.queues |+ (p1,tl))
       ⇒
      trans conf (NEndpoint p2 s1 (Receive p1 v ds e)) LTau
        (NEndpoint p2 s2

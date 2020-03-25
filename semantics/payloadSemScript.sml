@@ -57,7 +57,7 @@ Inductive trans:
              LTau
              (NEndpoint p2
                         (s with <|queues :=
-                                    s.queues   |+ (p1,tl);
+                                    normalise_queues(s.queues   |+ (p1,tl));
                                   bindings :=
                                     s.bindings |+ (v,FLAT(SNOC (unpad d) ds))
                                   |>)
@@ -71,7 +71,7 @@ Inductive trans:
     ⇒ trans conf (NEndpoint p2 s (Receive p1 v ds e))
              LTau
              (NEndpoint p2 (s with queues :=
-                                    s.queues |+ (p1,tl))
+                                    normalise_queues(s.queues |+ (p1,tl)))
                            (Receive p1 v (SNOC (unpad d) ds) e))) ∧
 
   (* If-L *)
