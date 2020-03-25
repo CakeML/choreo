@@ -23,17 +23,24 @@ val compile_message_def = tDefine "compile_message" `
    >> fs[LENGTH_DROP,final_def,pad_def]
    >> every_case_tac >> fs[final_def]);
 
-val compile_queue_def = Define `
-   compile_queue conf [] = []
+Definition compile_queue_def:
+   compile_queue conf [] = FEMPTY (* TODO: should this be more concrete? *)
 ∧ (compile_queue conf ((p,d)::q) =
-    MAP (λd. (p,d)) (compile_message conf d) ++ compile_queue conf q)
-`
+   (compile_queue conf q) |+ (p,compile_message conf d ++ qlk (compile_queue conf q) p))
+End
 
-val compile_network_def = Define `
+Definition compile_state_def:
+   compile_state conf s =
+   <| bindings := s.bindings;
+      queues := compile_queue conf s.queue |>
+End
+        
+Definition compile_network_def:
    (compile_network conf endpointLang$NNil = payloadLang$NNil)
 ∧ (compile_network conf (NPar n1 n2) = NPar (compile_network conf n1) (compile_network conf n2))
 ∧ (compile_network conf (NEndpoint p s e) = NEndpoint p
-                                                       (s with queue := compile_queue conf s.queue)
-                                                       (compile_endpoint e))`
+                                                       (compile_state conf s)
+                                                       (compile_endpoint e))
+End
 
 val _ = export_theory ()

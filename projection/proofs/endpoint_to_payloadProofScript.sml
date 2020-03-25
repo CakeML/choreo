@@ -5,19 +5,54 @@ open preamble endpointLangTheory payloadLangTheory endpoint_to_payloadTheory
 
 val _ = new_theory "endpoint_to_payloadProof";
 
+(* TODO: move *)
+Theorem qlk_update[simp]:
+  qlk (q |+ (p,x)) p = x
+Proof
+  EVAL_TAC
+QED
+
+Theorem qlk_update2[simp]:
+  p1 ≠ p2 ⇒ qlk (q |+ (p1,x)) p2 = qlk q p2
+Proof
+  EVAL_TAC >> rw[]
+QED
+
+Theorem qlk_FEMPTY[simp]:
+  qlk FEMPTY p = []
+Proof
+  EVAL_TAC
+QED
+
+Theorem compile_queue_SNOC:
+  ∀q p d conf.
+        compile_queue conf (SNOC (p,d) q) =
+        compile_queue conf q |+ (p, qlk(compile_queue conf q) p ++ compile_message conf d)
+Proof
+  Induct >- rw[compile_queue_def]
+  >> Cases >> fs[compile_queue_def]
+  >> rw[fmap_eq_flookup,FLOOKUP_UPDATE]
+  >> rw[]
+QED
+                                        );
+    
+(*
 val compile_queue_append = Q.store_thm("compile_queue_append",
-  `∀q1 q2 conf. compile_queue conf (q1 ++ q2) = compile_queue conf q1 ++ compile_queue conf q2`,
+  `∀q1 q2 conf. compile_queue conf (q1 ++ q2) = compile_queue conf q2 |++ compile_queue conf q2`,
   Induct
   >- fs[compile_queue_def]
   >> Cases >> fs[compile_queue_def]);
-
+*)
 val compile_queue_lift_ineq = Q.store_thm("compile_queue_lift_ineq",
-  `∀conf q1 p1. EVERY (λ(p,_). p ≠ p1) q1 ==> EVERY (λ(p,_). p ≠ p1) (compile_queue conf q1)`,
+  `∀conf q1 p1. EVERY (λ(p,_). p ≠ p1) q1 ==> qlk (compile_queue conf q1) p1 = []`,
   recInduct compile_queue_ind
   >> rpt strip_tac
-  >> fs[compile_queue_def]
-  >> simp[EVERY_MAP]);
-
+  >> fs[compile_queue_def,qlk_def,fget_def]
+  >> rename1 ‘FOLDR _ _ l’
+  >> Induct_on ‘l’
+  >> fs[]
+  >> rw[FLOOKUP_UPDATE]);
+(*
 val compile_queue_unlift_ineq = Q.store_thm("compile_queue_unlift_ineq",
   `∀conf q1 p1. EVERY (λ(p,_). p ≠ p1) (compile_queue conf q1)
                  /\ conf.payload_size > 0
@@ -28,7 +63,7 @@ val compile_queue_unlift_ineq = Q.store_thm("compile_queue_unlift_ineq",
   >> simp[EVERY_MAP]
   >> fs[Once compile_message_def]
   >> every_case_tac >> fs[]);
-
+*)
 val list_trans_par_l = Q.store_thm("list_trans_par_l",
   `∀conf p alpha q r. list_trans conf p alpha q ==> list_trans conf (NPar p r) alpha (NPar q r)`,
   Induct_on `alpha`
@@ -107,37 +142,40 @@ val compile_network_preservation_send = Q.store_thm("compile_network_preservatio
   >> fs[] >> rveq
   >- ((* trans_send *)
       simp[compile_network_def,compile_endpoint_def,list_trans_def]
-      >> match_mp_tac compile_message_preservation_send0 >> simp[])
+      >> match_mp_tac compile_message_preservation_send0 >> simp[compile_state_def])
   >- ((* trans_par_l *)
       first_x_assum drule >> simp[compile_network_def] >> MATCH_ACCEPT_TAC list_trans_par_l)
   >- ((* trans_par_r *)
       first_x_assum drule >> simp[compile_network_def] >> MATCH_ACCEPT_TAC list_trans_par_r));
 
-val compile_message_preservation_enqueue = Q.store_thm("compile_message_preservation_enqueue",
-  `∀conf d q p1 p2 e s.
+Theorem compile_message_preservation_enqueue:
+  ∀conf d q p1 p2 e s.
     conf.payload_size > 0
     ∧ p1 ≠ p2
     ==> list_trans conf
-  (NEndpoint p2 (s with queue := q) e)
+  (NEndpoint p2 (s with queues := q) e)
   (MAP (λm. LReceive p1 m p2) (compile_message conf d))
   (NEndpoint p2
-     (s with queue := q ⧺ MAP (λd. (p1,d)) (compile_message conf d)) e)
-  `,
+     (s with queues := q |+ (p1, qlk q p1 ++ compile_message conf d)) e)
+Proof
   recInduct compile_message_ind
   >> rpt strip_tac
   >> PURE_ONCE_REWRITE_TAC [compile_message_def]
   >> simp[]
   >> IF_CASES_TAC
-  >- (simp[list_trans_def] >> drule payloadSemTheory.trans_enqueue >> simp[SNOC_APPEND]
-      >> disch_then(qspecl_then [`conf`,`s with queue := q`] mp_tac)
-      >> simp[])
+  >- (simp[list_trans_def] >> drule payloadSemTheory.trans_enqueue
+      >> disch_then(qspecl_then [`conf`,`s with queues := q`] mp_tac)
+      >> simp[qpush_def,SNOC_APPEND])
   >- (fs[list_trans_def,NOT_LESS_EQUAL,pad_not_final]
       >> drule payloadPropsTheory.trans_enqueue'
       >> disch_then (qspecl_then [`conf`,`s`,`pad conf d`,`e`,`q`] assume_tac)
       >> asm_exists_tac >> simp[]
       >> first_x_assum drule
-      >> disch_then (qspec_then `q ++ [(p1,pad conf d)]` assume_tac)
-      >> full_simp_tac std_ss [GSYM APPEND_ASSOC,APPEND,SNOC_APPEND]));
+      >> disch_then (qspec_then `qpush q p1 (pad conf d)` assume_tac)
+      >> full_simp_tac std_ss [GSYM APPEND_ASSOC,APPEND,SNOC_APPEND,qlk_qpush]
+      >> full_simp_tac std_ss [qpush_def,FUPDATE_EQ]
+      )
+QED
 
 val compile_network_preservation_receive = Q.store_thm("compile_network_preservation_receive",
   `∀p1 p2 q1 d q2 conf.
@@ -158,8 +196,11 @@ val compile_network_preservation_receive = Q.store_thm("compile_network_preserva
   >> rpt strip_tac
   >> fs[] >> rveq
   >- ((* trans_enqueue *)
-      simp[compile_network_def,compile_endpoint_def,SNOC_APPEND,compile_queue_append,
-           compile_queue_def,compile_message_preservation_enqueue])
+      simp[compile_network_def,compile_endpoint_def,compile_state_def,
+           compile_queue_def,compile_message_preservation_enqueue]
+           
+           simp[compile_state_def]]
+     )
   >- ((* trans_par_l *)
       first_x_assum drule >> simp[compile_network_def] >> MATCH_ACCEPT_TAC list_trans_par_l)
   >- ((* trans_par_r *)
