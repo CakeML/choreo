@@ -1262,6 +1262,20 @@ val trans_var_names_mono = Q.store_thm("trans_var_names_mono",
   >> rpt strip_tac
   >> fs[var_names_network_def,var_names_endpoint_def]);
 
+val reduction_var_names_mono = Q.store_thm("reduction_var_names_mono",
+  `!n1 n2 fv.
+    reduction^* n1 n2
+    ∧ MEM fv (var_names_network n2) ==> MEM fv (var_names_network n1)`,
+  rpt strip_tac
+  >> qpat_x_assum `MEM _ _` mp_tac
+  >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`fv`]
+  >> pop_assum mp_tac
+  >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`n2`,`n1`]
+  >> ho_match_mp_tac RTC_ind
+  >> rpt strip_tac
+  >> fs [reduction_def] >> drule trans_var_names_mono
+  >> rw []);
+
 val partners_endpoint_def = Define `
    (partners_endpoint Nil = [])
 ∧ (partners_endpoint (Send p v e) = p::(partners_endpoint e))

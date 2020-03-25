@@ -489,7 +489,12 @@ Proof
   \\ qmatch_asmsub_abbrev_tac ‘junkcong {fv}’
   \\ disch_then (qspec_then ‘fv’ mp_tac)
   \\ impl_tac
-  >- cheat (* TODO: propagation of invatiants *)
+  >- metis_tac [endpoints_compile_network_chor,
+                procsOf_all_distinct,
+                endpoint_names_reduction,
+                Abbr‘fv’,
+                gen_fresh_name_same,
+                reduction_var_names_mono]
   \\ rw []
   \\ qspecl_then [‘compile_network_fv fv n4’,‘n3’] mp_tac junkcong_reduction_pres
   \\ disch_then (drule_then drule) \\ rw []
