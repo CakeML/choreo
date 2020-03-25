@@ -132,14 +132,6 @@ Proof
   rw [endpoint_to_choiceTheory.compile_network_def,endpoints_compile_network_epn_aux]
 QED
 
-(* nub' preserves membership *)
-Theorem MEM_nub':
-  ∀l x. MEM x (nub' l) = MEM x l
-Proof
-  Induct
-  \\ rw [nub'_def]
-  \\ Cases_on ‘x=h’ \\ fs [MEM_FILTER]
-QED
 
 (* split_sel can only remove processes *)
 Triviality MEM_partners_endpoint_split_sel:
@@ -158,7 +150,6 @@ Proof
   \\ metis_tac []
 QED
 
-(* TODO: move to chorPropstheory *)
 (* split_sel preserves no_self_comunication_def *)
 Theorem split_sel_no_self_comunication:
   ∀c p l b r.
@@ -305,106 +296,20 @@ Proof
  \\ imp_res_tac MEM_partners_endpoint_split_sel \\ rfs []
 QED
 
-(* Makes sure a network has every message queue empty (epn version) *)
-Definition empty_q_epn_def:
-  empty_q_epn endpointLang$NNil = T
-∧ empty_q_epn (NPar n1 n2)     = (empty_q_epn n1 ∧ empty_q_epn n2)
-∧ empty_q_epn (NEndpoint _ s _) = (s.queue = [])
-End
-
-(* Makes sure a network has every message queue empty (payload version) *)
-Definition empty_q_payload_def:
-  empty_q_payload payloadLang$NNil = T
-∧ empty_q_payload (NPar n1 n2)     = (empty_q_payload n1 ∧ empty_q_payload n2)
-∧ empty_q_payload (NEndpoint _ s _) = (s.queue = [])
-End
-
-(* If all queues are empty a network is only queue congruent (qcong)
-   with itself (epn version)
-*)
-Theorem empty_queue_qcong_epn:
-  ∀epn epn'.
-   qcong epn epn' ∧
-   empty_q_epn epn
-   ⇒ epn' = epn
-Proof
-  Induct
-  \\ ONCE_REWRITE_TAC [endpointPropsTheory.qcong_cases] \\ rw [empty_q_epn_def]
-  >- (metis_tac [endpointPropsTheory.qcong_rules,qcong_nil_rel_nil])
-  >- (metis_tac [endpointPropsTheory.qcong_rules,qcong_nil_rel_nil])
-  >- (drule qcong_par_rel_par_sym \\ rw []
-      \\ imp_res_tac endpointPropsTheory.qcong_sym
-      \\ fs [])
-  >- (drule_then drule endpointPropsTheory.qcong_trans
-      \\ disch_then (mp_then Any mp_tac qcong_par_rel_par)
-      \\ rw [])
-  >- (drule endpointPropsTheory.qcong_sym
-      \\ disch_then (mp_then Any mp_tac qcong_endpoint_rel_endpoint)
-      \\ rw [] \\ drule qcong_IMP_qrel
-      \\ rw [] \\ drule qrel_LENGTH \\ rw []
-      \\ rw [state_component_equality]
-      \\ drule qcong_bindings_eq \\ fs [])
-  >- (drule_then drule endpointPropsTheory.qcong_trans
-      \\ disch_then (mp_then Any mp_tac qcong_endpoint_rel_endpoint)
-      \\ rw [] \\ drule_then drule endpointPropsTheory.qcong_trans
-      \\ rw [] \\ drule qcong_IMP_qrel
-      \\ rw [] \\ drule qrel_LENGTH \\ rw []
-      \\ rw [state_component_equality]
-      \\ drule qcong_bindings_eq \\ fs [])
-  \\ fs []
-QED
-
-(* If all queues are empty a network is only queue congruent (qcong)
-   with itself (payload version)
-*)
-Theorem empty_queue_qcong_payload:
-  ∀epn epn'.
-   qcong epn epn' ∧
-   empty_q_payload epn
-   ⇒ epn' = epn
-Proof
-  Induct
-  \\ ONCE_REWRITE_TAC [payloadPropsTheory.qcong_cases] \\ rw [empty_q_payload_def]
-  >- metis_tac [payloadPropsTheory.qcong_rules,
-                payloadPropsTheory.qcong_nil_rel_nil]
-  >- metis_tac [payloadPropsTheory.qcong_rules,
-                payloadPropsTheory.qcong_nil_rel_nil]
-  >- (drule payloadPropsTheory.qcong_par_rel_par_sym \\ rw []
-      \\ imp_res_tac payloadPropsTheory.qcong_sym
-      \\ fs [])
-  >- (drule_then drule payloadPropsTheory.qcong_trans
-      \\ disch_then (mp_then Any mp_tac payloadPropsTheory.qcong_par_rel_par)
-      \\ rw [])
-  >- (drule payloadPropsTheory.qcong_sym
-      \\ disch_then (mp_then Any mp_tac payloadPropsTheory.qcong_endpoint_rel_endpoint)
-      \\ rw [] \\ drule payloadPropsTheory.qcong_IMP_qrel
-      \\ rw [] \\ drule payloadPropsTheory.qrel_LENGTH \\ rw []
-      \\ rw [state_component_equality]
-      \\ drule payloadPropsTheory.qcong_bindings_eq \\ fs [])
-  >- (drule_then drule payloadPropsTheory.qcong_trans
-      \\ disch_then (mp_then Any mp_tac payloadPropsTheory.qcong_endpoint_rel_endpoint)
-      \\ rw [] \\ drule_then drule payloadPropsTheory.qcong_trans
-      \\ rw [] \\ drule payloadPropsTheory.qcong_IMP_qrel
-      \\ rw [] \\ drule payloadPropsTheory.qrel_LENGTH \\ rw []
-      \\ rw [state_component_equality]
-      \\ drule payloadPropsTheory.qcong_bindings_eq \\ fs [])
-  \\ fs []
-QED
-
 (* projected networks always have empty queues *)
 Theorem compile_network_empty_q:
-  ∀l s (c : chor). empty_q_epn (compile_network s c l)
+  ∀l s (c : chor). empty_q (compile_network s c l)
 Proof
   Induct
   \\ rw [chor_to_endpointTheory.compile_network_gen_def,
-         empty_q_epn_def]
+         endpointPropsTheory.empty_q_def]
 QED
 
 (* projected choice-free networks preserve empty_q_epn *)
 Theorem compile_network_fv_empty_q:
   ∀epn fv.
-  empty_q_epn epn
-  ⇒ empty_q_epn (compile_network_fv fv epn)
+   empty_q epn
+   ⇒ empty_q (compile_network_fv fv epn)
 Proof
   Induct \\ gen_tac
   \\ EVAL_TAC \\ rw []
@@ -412,42 +317,12 @@ Proof
 QED
 
 (* projected payload networks preserve empty_q_* *)
-Theorem empty_q_epn_to_payload:
-  ∀epn conf. empty_q_epn epn ⇒ empty_q_payload (compile_network conf epn)
+Theorem empty_q_to_payload:
+  ∀epn conf. empty_q epn ⇒ empty_q (compile_network conf epn)
 Proof
   Induct \\ gen_tac
   \\ EVAL_TAC \\ rw []
   \\ EVAL_TAC
-QED
-
-(* If a network is empty_q_epn it can only be junkcong with
-   other empty_q_epn networks *)
-Theorem empty_q_epn_junkcong:
-  ∀epn fv epn'. junkcong fv epn epn' ∧ empty_q_epn epn
-  ⇒ empty_q_epn epn'
-Proof
-  Induct
-  \\ ONCE_REWRITE_TAC [junkcong_cases]
-  \\ rw [empty_q_epn_def]
-  \\ rw [empty_q_epn_def]
-  >- metis_tac[empty_q_epn_def,junkcong_nil_rel_nil,junkcong_sym]
-  >- metis_tac[empty_q_epn_def,junkcong_nil_rel_nil,junkcong_sym]
-  >- (drule junkcong_sym
-      \\ disch_then (mp_then Any mp_tac junkcong_par_rel_par)
-      \\ rw [] \\ fs [empty_q_epn_def] \\ metis_tac [])
-  >- (drule_then drule junkcong_trans
-      \\ disch_then (mp_then Any mp_tac junkcong_par_rel_par)
-      \\ rw [] \\ fs [empty_q_epn_def] \\ metis_tac [])
-  >- metis_tac []
-  >- metis_tac []
-  >- (drule junkcong_sym
-      \\ disch_then (mp_then Any mp_tac junkcong_endpoint_rel_endpoint)
-      \\ rw [] \\ rw [empty_q_epn_def]
-      \\ drule junkcong_endpoint_queue_eq \\ fs [])
-  \\ drule_then (drule_then assume_tac) junkcong_trans
-  \\ drule junkcong_endpoint_rel_endpoint
-  \\ rw [] \\ rw [empty_q_epn_def]
-  \\ drule junkcong_endpoint_queue_eq \\ fs []
 QED
 
 Theorem projection_reflection:
@@ -511,15 +386,15 @@ Proof
   \\ rw []
   \\ qpat_assum ‘(reduction conf)^* epn _’ (mp_then Any (drule_then assume_tac) RTC_SPLIT)
   \\ qspec_then ‘p3'’ drule endpointPropsTheory.qcong_sym
-  \\ disch_then (mp_then Any mp_tac empty_queue_qcong_epn)
+  \\ disch_then (mp_then Any mp_tac endpointPropsTheory.empty_queue_qcong)
   \\ rw [compile_network_empty_q]
   \\ first_x_assum (mp_then Any drule junkcong_trans)
-  \\ rw [] \\ drule empty_q_epn_junkcong
+  \\ rw [] \\ drule empty_q_junkcong
   \\ impl_tac
   >- rw [compile_network_fv_empty_q,compile_network_empty_q]
   \\ rw []
-  \\ drule_then (qspec_then ‘conf’ assume_tac) empty_q_epn_to_payload
-  \\ drule_then drule empty_queue_qcong_payload \\ rw []
+  \\ drule_then (qspec_then ‘conf’ assume_tac) empty_q_to_payload
+  \\ drule_then drule payloadPropsTheory.empty_queue_qcong \\ rw []
   \\ asm_exists_tac \\ fs []
   \\ asm_exists_tac \\ fs []
 QED

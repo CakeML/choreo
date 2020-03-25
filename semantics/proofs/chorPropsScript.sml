@@ -583,4 +583,13 @@ Proof
   \\ fs [no_undefined_vars_def,DELETE_SUBSET_INSERT]
 QED
 
+(* nub' preserves membership *)
+Theorem MEM_nub':
+  ∀l x. MEM x (nub' l) = MEM x l
+Proof
+  Induct
+  \\ rw [nub'_def]
+  \\ Cases_on ‘x=h’ \\ fs [MEM_FILTER]
+QED
+
 val _ = export_theory ()
