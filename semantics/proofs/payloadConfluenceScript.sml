@@ -2,7 +2,6 @@ open preamble payloadSemTheory payloadLangTheory payloadPropsTheory;
 
 val _ = new_theory "payloadConfluence";
 
-(* TODO: conclusion can probably be weakend from qcong to syntactic equality *)
 Theorem payload_local_confluence_send:
   ∀conf p1 alpha p2 p3 s d r.
   trans conf p1 alpha p2 /\ trans conf p1 (LSend s d r) p3 /\ p2 <> p3 /\
@@ -11,8 +10,7 @@ Theorem payload_local_confluence_send:
   conf.payload_size > 0
   ==>
   ?p4 p5. trans conf p2 (LSend s d r) p4 /\
-        trans conf p3 alpha p5 /\
-        qcong p4 p5
+        trans conf p3 alpha p4
 Proof
   simp[GSYM AND_IMP_INTRO, GSYM PULL_FORALL]
   >> ho_match_mp_tac trans_strongind
@@ -35,7 +33,7 @@ Proof
            disch_then(qspec_then `e1` assume_tac) >>
            asm_exists_tac >> simp[] >>
            drule trans_enqueue >>
-           metis_tac[qcong_refl])
+           metis_tac[])
        >- (qmatch_goalsub_abbrev_tac `NEndpoint _ s1` >>
            rename1 `FLOOKUP s.bindings v = SOME data` >>
            `FLOOKUP s1.bindings v = SOME data` by simp[Abbr`s1`] >>
@@ -45,7 +43,7 @@ Proof
            disch_then(qspec_then `e1` assume_tac) >>
            asm_exists_tac >> simp[] >>
            drule trans_enqueue >>
-           metis_tac[qcong_refl])
+           metis_tac[])
        >- (qmatch_goalsub_abbrev_tac `NEndpoint _ s1` >>
            rename1 `FLOOKUP s.bindings v = SOME data` >>
            `FLOOKUP s1.bindings v = SOME data` by simp[Abbr`s1`] >>
@@ -55,13 +53,13 @@ Proof
            disch_then(qspec_then `e1` assume_tac) >>
            asm_exists_tac >> simp[] >>
            drule trans_enqueue >>
-           metis_tac[qcong_refl]))
+           metis_tac[]))
   >- (* Com-L *)
      (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
       fs[] >> rveq >> fs[] >> rveq >> fs[]
       >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
           first_x_assum(drule_all_then strip_assume_tac) >>
-          metis_tac[trans_com_l,qcong_par,qcong_refl,trans_par_l])
+          metis_tac[trans_com_l,trans_par_l])
       >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
           first_x_assum drule >>
           imp_res_tac sender_is_endpoint >>
@@ -72,31 +70,31 @@ Proof
           qpat_x_assum `trans _ _ (LSend _ _ _) _` mp_tac >>
           pop_assum drule >> impl_tac >- simp[] >>
           ntac 2 strip_tac >> impl_tac >- simp[] >>
-          strip_tac >> metis_tac[trans_par_l,trans_com_l,qcong_refl,qcong_par])
+          strip_tac >> metis_tac[trans_par_l,trans_com_l])
       >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
           first_x_assum drule >>
           imp_res_tac sender_is_endpoint >>
           imp_res_tac receiver_is_endpoint >>
           impl_tac >- metis_tac[trans_send_receive_distinct] >>
-          strip_tac >> metis_tac[trans_par_r,trans_com_l,qcong_refl,qcong_par])
+          strip_tac >> metis_tac[trans_par_r,trans_com_l])
       >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
           first_x_assum drule >>
           imp_res_tac sender_is_endpoint >>
           imp_res_tac receiver_is_endpoint >>
           impl_tac >- metis_tac[trans_send_receive_distinct] >>
-          strip_tac >> metis_tac[trans_par_r,trans_com_l,qcong_refl,qcong_par]))
+          strip_tac >> metis_tac[trans_par_r,trans_com_l]))
   >- (* Com-R *)
      (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
       fs[] >> rveq >> fs[] >> rveq >> fs[]
       >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
           first_x_assum(drule_all_then strip_assume_tac) >>
-          metis_tac[trans_com_r,qcong_par,qcong_refl,trans_par_l])
+          metis_tac[trans_com_r,trans_par_l])
       >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
           last_x_assum drule >>
           imp_res_tac sender_is_endpoint >>
           imp_res_tac receiver_is_endpoint >>
           impl_tac >- metis_tac[trans_send_receive_distinct] >>
-          strip_tac >> metis_tac[trans_par_l,trans_com_r,qcong_refl,qcong_par])
+          strip_tac >> metis_tac[trans_par_l,trans_com_r])
       >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
           last_x_assum drule >>
           imp_res_tac sender_is_endpoint >>
@@ -107,13 +105,13 @@ Proof
           qpat_x_assum `trans _ _ (LSend _ _ _) _` mp_tac >>
           pop_assum drule >> impl_tac >- simp[] >>
           ntac 2 strip_tac >> impl_tac >- simp[] >>
-          strip_tac >> metis_tac[trans_par_r,trans_com_r,qcong_refl,qcong_par])
+          strip_tac >> metis_tac[trans_par_r,trans_com_r])
       >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
           last_x_assum drule >>
           imp_res_tac sender_is_endpoint >>
           imp_res_tac receiver_is_endpoint >>
           impl_tac >- metis_tac[trans_send_receive_distinct] >>
-          strip_tac >> metis_tac[trans_par_r,trans_com_r,qcong_refl,qcong_par]))
+          strip_tac >> metis_tac[trans_par_r,trans_com_r]))
   >- (* Dequeue-last-payload *)
      (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
       fs[] >> rveq >> fs[] >> rveq >> fs[])
@@ -133,32 +131,36 @@ Proof
      (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
       fs[] >> rveq >> fs[] >> rveq >> fs[]
       >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
-          metis_tac[qcong_refl,qcong_par,trans_par_l])
-      >- (metis_tac[trans_par_l,trans_par_r,qcong_refl,qcong_par])
-      >- (metis_tac[trans_par_l,trans_par_r,qcong_refl,qcong_par]))
+          metis_tac[trans_par_l])
+      >- (metis_tac[trans_par_l,trans_par_r])
+      >- (metis_tac[trans_par_l,trans_par_r]))
   >- (* Par-R *)
      (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
       fs[] >> rveq >> fs[] >> rveq >> fs[]
-      >- metis_tac[trans_par_l,trans_par_r,qcong_refl,qcong_par] >>
+      >- metis_tac[trans_par_l,trans_par_r] >>
       fs[endpoints_def,ALL_DISTINCT_APPEND] >>
-      metis_tac[qcong_refl,qcong_par,trans_par_r,trans_par_l])
+      metis_tac[trans_par_r,trans_par_l])
 QED
 
+Theorem qpush_commute:
+  p1 ≠ p2 ⇒ qpush (qpush q p1 d1) p2 d2 = qpush (qpush q p2 d2) p1 d1
+Proof
+  rw[qpush_def,qlk_def,fget_def,fmap_eq_flookup,FLOOKUP_UPDATE] >> rw[]
+QED
+        
 Theorem payload_local_confluence_receive:
   ∀conf p1 s1 d1 r1 p2 p3 s2 d2 r2.
   trans conf p1 (LReceive s1 d1 r1) p2 /\ trans conf p1 (LReceive s2 d2 r2) p3 /\ s1 <> s2
   ==>
-  ?p4 p5. trans conf p2 (LReceive s2 d2 r2) p4 /\
-        trans conf p3 (LReceive s1 d1 r1) p5 /\
-        qcong p4 p5
+  ?p4. trans conf p2 (LReceive s2 d2 r2) p4 /\
+        trans conf p3 (LReceive s1 d1 r1) p4
 Proof
   `∀conf p1 alpha p2 s1 d1 r1 p3 s2 d2 r2.
   trans conf p1 alpha p2 /\ alpha = LReceive s1 d1 r1 /\
   trans conf p1 (LReceive s2 d2 r2) p3 /\ s1 <> s2
   ==>
-  ?p4 p5. trans conf p2 (LReceive s2 d2 r2) p4 /\
-        trans conf p3 (LReceive s1 d1 r1) p5 /\
-        qcong p4 p5` suffices_by metis_tac[] >>
+  ?p4. trans conf p2 (LReceive s2 d2 r2) p4 /\
+        trans conf p3 (LReceive s1 d1 r1) p4` suffices_by metis_tac[] >>
   Ho_Rewrite.PURE_REWRITE_TAC[GSYM AND_IMP_INTRO, GSYM PULL_FORALL]
   >> ho_match_mp_tac trans_strongind
   >> rpt strip_tac >> fs[] >> rveq
@@ -173,20 +175,15 @@ Proof
       qpat_x_assum `_ <> _` mp_tac >>
       dxrule trans_enqueue >> disch_then(qspecl_then [`conf`,`s1`,`d`,`e`] mp_tac) >>
       unabbrev_all_tac >> rpt strip_tac >>
-      asm_exists_tac >> simp[] >>
-      simp[SNOC_APPEND] >> PURE_REWRITE_TAC[GSYM APPEND_ASSOC,APPEND] >>
-      match_mp_tac (qcong_queue_reorder'
-                    |> CONV_RULE(RESORT_FORALL_CONV rev)
-                    |> Q.SPEC `[]` |> REWRITE_RULE[APPEND_NIL]) >>
-      first_x_assum ACCEPT_TAC)
+      simp[] >> fs[qpush_commute])
   >- (* Par-L *)
      (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
       fs[] >> rveq >> fs[] >> rveq >> fs[] >>
-      metis_tac[trans_par_l,trans_par_r,qcong_refl,qcong_par])
+      metis_tac[trans_par_l,trans_par_r])
   >- (* Par-R *)
      (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
       fs[] >> rveq >> fs[] >> rveq >> fs[] >>
-      metis_tac[trans_par_l,trans_par_r,qcong_refl,qcong_par])
+      metis_tac[trans_par_l,trans_par_r])
 QED
 
 Theorem payload_local_confluence_tau_receive:
@@ -196,9 +193,8 @@ Theorem payload_local_confluence_tau_receive:
   ~MEM s (MAP FST (endpoints p1)) /\
   conf.payload_size > 0
   ==>
-  ?p4 p5. trans conf p2 (LReceive s d r) p4 /\
-        trans conf p3 LTau p5 /\
-        qcong p4 p5
+  ?p4. trans conf p2 (LReceive s d r) p4 /\
+        trans conf p3 LTau p4
 Proof
   `∀conf p1 alpha p2 p3 s d r.
   trans conf p1 alpha p2 /\ alpha = LTau /\ trans conf p1 (LReceive s d r) p3 /\ p2 <> p3 /\
@@ -206,9 +202,8 @@ Proof
   ~MEM s (MAP FST (endpoints p1)) /\
   conf.payload_size > 0
   ==>
-  ?p4 p5. trans conf p2 (LReceive s d r) p4 /\
-        trans conf p3 LTau p5 /\
-        qcong p4 p5` suffices_by metis_tac[]
+  ?p4. trans conf p2 (LReceive s d r) p4 /\
+        trans conf p3 LTau p4` suffices_by metis_tac[]
   >> Ho_Rewrite.PURE_REWRITE_TAC[GSYM AND_IMP_INTRO, GSYM PULL_FORALL]
   >> ho_match_mp_tac trans_strongind
   >> rpt strip_tac >> fs[] >> rveq
@@ -220,7 +215,7 @@ Proof
           impl_tac >-
             (simp[] >> metis_tac[sender_is_endpoint,receiver_is_endpoint]) >>
           strip_tac >>
-          metis_tac[trans_com_l,trans_par_l,qcong_refl,qcong_sym,qcong_par])
+          metis_tac[trans_com_l,trans_par_l])
       >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
           drule payload_local_confluence_send >> disch_then drule >>
           impl_tac >-
@@ -228,7 +223,7 @@ Proof
              metis_tac[trans_distinct_residual,sender_is_endpoint,
                        receiver_is_endpoint,label_distinct]) >>
           strip_tac >>
-          metis_tac[trans_com_l,trans_par_l,qcong_refl,qcong_sym,qcong_par]
+          metis_tac[trans_com_l,trans_par_l]
          )
       >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
           imp_res_tac receiver_is_endpoint >>
@@ -237,7 +232,7 @@ Proof
           disch_then dxrule >>
           impl_tac >- metis_tac[] >>
           strip_tac >>
-          metis_tac[trans_com_l,trans_par_r,qcong_refl,qcong_sym,qcong_par])
+          metis_tac[trans_com_l,trans_par_r])
       >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
           imp_res_tac receiver_is_endpoint >>
           imp_res_tac sender_is_endpoint >>
@@ -245,7 +240,7 @@ Proof
           disch_then dxrule >>
           impl_tac >- metis_tac[] >>
           strip_tac >>
-          metis_tac[trans_com_l,trans_par_r,qcong_refl,qcong_sym,qcong_par]))
+          metis_tac[trans_com_l,trans_par_r]))
   >- (* Com-R *)
      (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
       fs[] >> rveq >> fs[] >> rveq >> fs[]
@@ -256,7 +251,7 @@ Proof
           disch_then dxrule >>
           impl_tac >- metis_tac[] >>
           strip_tac >>
-          metis_tac[trans_com_r,trans_par_l,qcong_refl,qcong_sym,qcong_par])
+          metis_tac[trans_com_r,trans_par_l])
       >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
           imp_res_tac receiver_is_endpoint >>
           imp_res_tac sender_is_endpoint >>
@@ -264,7 +259,7 @@ Proof
           disch_then dxrule >>
           impl_tac >- metis_tac[] >>
           strip_tac >>
-          metis_tac[trans_com_r,trans_par_l,qcong_refl,qcong_sym,qcong_par])
+          metis_tac[trans_com_r,trans_par_l])
       >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
           drule payload_local_confluence_send >> disch_then drule >>
           impl_tac >-
@@ -272,7 +267,7 @@ Proof
              metis_tac[sender_is_endpoint,receiver_is_endpoint,trans_distinct_residual,
                        label_distinct]) >>
           strip_tac >>
-          metis_tac[trans_com_r,trans_par_r,qcong_refl,qcong_sym,qcong_par])
+          metis_tac[trans_com_r,trans_par_r])
       >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
           drule payload_local_confluence_send >> disch_then drule >>
           impl_tac >-
@@ -280,7 +275,7 @@ Proof
              metis_tac[sender_is_endpoint,receiver_is_endpoint,trans_distinct_residual,
                        label_distinct]) >>
           strip_tac >>
-          metis_tac[trans_com_r,trans_par_r,qcong_refl,qcong_sym,qcong_par]))
+          metis_tac[trans_com_r,trans_par_r]))
   >- (* Dequeue-last-payload *)
      (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
       fs[] >> rveq >> fs[] >> rveq >> fs[] >>
@@ -288,15 +283,14 @@ Proof
       dxrule trans_enqueue >>
       disch_then(qspecl_then [`conf`,`s1`,`data`,`e`] assume_tac) >>
       asm_exists_tac >> simp[] >> unabbrev_all_tac >>
-      qmatch_goalsub_abbrev_tac `qcong a1` >>
-      qexists_tac `a1` >>
-      simp[qcong_refl] >>
-      qunabbrev_tac `a1` >>
-      simp[SNOC_APPEND] >>
-      PURE_ONCE_REWRITE_TAC[GSYM APPEND_ASSOC] >>
-      match_mp_tac(trans_dequeue_last_payload'
-                   |> REWRITE_RULE[SNOC_APPEND,FLAT_APPEND,FLAT,APPEND_NIL]) >>
-      simp[])
+      fs[endpoints_def] >>
+      rename1 ‘qpush _ p3 d2’ >>
+      (Cases_on ‘p1 = p3’ >-
+         (dep_rewrite.DEP_REWRITE_TAC[trans_dequeue_last_payload'] >>
+          fs[qpush_def,qlk_def,fget_def,FLOOKUP_UPDATE,CaseEq"option",SNOC_APPEND]) >>
+       dep_rewrite.DEP_REWRITE_TAC[trans_dequeue_last_payload'] >>
+       fs[qpush_def,qlk_def,fget_def,FLOOKUP_UPDATE,CaseEq"option",SNOC_APPEND] >>
+       fs[FUPDATE_COMMUTES]))
   >- (* Dequeue-intermediate-payload *)
      (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
       fs[] >> rveq >> fs[] >> rveq >> fs[] >>
@@ -304,15 +298,13 @@ Proof
       dxrule trans_enqueue >>
       disch_then(qspecl_then [`conf`,`s1`,`data`,`e1`] assume_tac) >>
       asm_exists_tac >> simp[] >> unabbrev_all_tac >>
-      qmatch_goalsub_abbrev_tac `qcong a1` >>
-      qexists_tac `a1` >>
-      simp[qcong_refl] >>
-      qunabbrev_tac `a1` >>
-      simp[SNOC_APPEND] >>
-      PURE_ONCE_REWRITE_TAC[GSYM APPEND_ASSOC] >>
-      match_mp_tac(trans_dequeue_intermediate_payload'
-                   |> REWRITE_RULE[SNOC_APPEND,FLAT_APPEND,FLAT,APPEND_NIL]) >>
-      simp[]
+      rename1 ‘qpush _ p3 d2’ >>
+      (Cases_on ‘p1 = p3’ >-
+         (dep_rewrite.DEP_REWRITE_TAC[trans_dequeue_intermediate_payload'] >>
+          fs[qpush_def,qlk_def,fget_def,FLOOKUP_UPDATE,CaseEq"option",SNOC_APPEND]) >>
+       dep_rewrite.DEP_REWRITE_TAC[trans_dequeue_intermediate_payload'] >>
+       fs[qpush_def,qlk_def,fget_def,FLOOKUP_UPDATE,CaseEq"option",SNOC_APPEND] >>
+       fs[FUPDATE_COMMUTES])
      )
   >- (* If-L *)
      (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
@@ -321,10 +313,6 @@ Proof
       dxrule trans_enqueue >>
       disch_then(qspecl_then [`conf`,`s1`,`data`,`e1`] assume_tac) >>
       asm_exists_tac >> simp[] >> unabbrev_all_tac >>
-      qmatch_goalsub_abbrev_tac `qcong a1` >>
-      qexists_tac `a1` >>
-      simp[qcong_refl] >>
-      unabbrev_all_tac >>
       match_mp_tac trans_if_true >>
       simp[]
      )
@@ -335,10 +323,6 @@ Proof
       dxrule trans_enqueue >>
       disch_then(qspecl_then [`conf`,`s1`,`data`,`ee`] assume_tac) >>
       asm_exists_tac >> simp[] >> unabbrev_all_tac >>
-      qmatch_goalsub_abbrev_tac `qcong a1` >>
-      qexists_tac `a1` >>
-      simp[qcong_refl] >>
-      unabbrev_all_tac >>
       match_mp_tac trans_if_false >>
       simp[]
      )
@@ -349,10 +333,6 @@ Proof
       dxrule trans_enqueue >>
       disch_then(qspecl_then [`conf`,`s1`,`data`,`ee`] assume_tac) >>
       asm_exists_tac >> simp[] >> unabbrev_all_tac >>
-      qmatch_goalsub_abbrev_tac `qcong a1` >>
-      qexists_tac `a1` >>
-      simp[qcong_refl] >>
-      unabbrev_all_tac >>
       simp[] >>
       match_mp_tac trans_let' >>
       simp[]
@@ -361,15 +341,15 @@ Proof
      (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
       fs[] >> rveq >> fs[] >> rveq >> fs[]
       >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
-          metis_tac[qcong_refl,qcong_par,trans_par_l])
-      >- (metis_tac[trans_par_l,trans_par_r,qcong_refl,qcong_par])
-      >- (metis_tac[trans_par_l,trans_par_r,qcong_refl,qcong_par]))
+          metis_tac[trans_par_l])
+      >- (metis_tac[trans_par_l,trans_par_r])
+      >- (metis_tac[trans_par_l,trans_par_r]))
   >- (* Par-R *)
      (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
       fs[] >> rveq >> fs[] >> rveq >> fs[]
-      >- metis_tac[trans_par_l,trans_par_r,qcong_refl,qcong_par] >>
+      >- metis_tac[trans_par_l,trans_par_r] >>
       fs[endpoints_def,ALL_DISTINCT_APPEND] >>
-      metis_tac[qcong_refl,qcong_par,trans_par_r,trans_par_l])
+      metis_tac[trans_par_r,trans_par_l])
 QED
 
 Theorem payload_local_confluence_tau:
@@ -378,17 +358,15 @@ Theorem payload_local_confluence_tau:
   ALL_DISTINCT (MAP FST (endpoints p1)) /\
   conf.payload_size > 0
   ==>
-  ?p4 p5. trans conf p2 LTau p4 /\
-        trans conf p3 LTau p5 /\
-        qcong p4 p5
+  ?p4. trans conf p2 LTau p4 /\
+        trans conf p3 LTau p4
 Proof
   `∀conf p1 alpha p2.
     trans conf p1 alpha p2 ==> !p3. alpha = LTau /\ trans conf p1 LTau p3 /\ p2 <> p3 /\
     ALL_DISTINCT (MAP FST (endpoints p1)) /\ conf.payload_size > 0
     ==>
-    ?p4 p5. trans conf p2 LTau p4 /\
-            trans conf p3 LTau p5 /\
-            qcong p4 p5` suffices_by metis_tac[]
+    ?p4. trans conf p2 LTau p4 /\
+            trans conf p3 LTau p4` suffices_by metis_tac[]
   >> ho_match_mp_tac trans_strongind
   >> rpt strip_tac >> fs[] >> rveq
   >- (* Com-L *)
@@ -411,7 +389,7 @@ Proof
           impl_tac >- (simp[] >> metis_tac[]) >>
           strip_tac >>
           dxrule_all_then strip_assume_tac payload_local_confluence_receive >>
-          metis_tac[trans_com_l,qcong_par,qcong_sym])
+          metis_tac[trans_com_l])
       >- (qmatch_asmsub_abbrev_tac `trans _ _ (LSend s1 _ _)` >>
           qpat_x_assum `trans _ _ (LSend _ _ _) _` mp_tac >>
           qmatch_asmsub_abbrev_tac `trans _ _ (LSend s2 _ _)` >>
@@ -433,7 +411,7 @@ Proof
           impl_tac >- (simp[] >> metis_tac[]) >>
           strip_tac >>
           dxrule_all_then strip_assume_tac payload_local_confluence_receive >>
-          metis_tac[trans_com_l,qcong_par,qcong_sym])
+          metis_tac[trans_com_l])
       >- (imp_res_tac sender_is_endpoint >>
           imp_res_tac receiver_is_endpoint >>
           drule(GEN_ALL trans_send_receive_distinct) >>
@@ -448,7 +426,7 @@ Proof
           strip_tac >> first_x_assum dxrule >>
           impl_tac >- simp[] >>
           rpt strip_tac >>
-          metis_tac[trans_com_l,trans_com_r,qcong_par,qcong_sym])
+          metis_tac[trans_com_l,trans_com_r])
       >- (imp_res_tac sender_is_endpoint >>
           imp_res_tac receiver_is_endpoint >>
           qpat_x_assum `trans _ _ (LSend _ _ _) _` mp_tac >>
@@ -463,14 +441,14 @@ Proof
           strip_tac >> first_x_assum dxrule >>
           impl_tac >- simp[] >>
           rpt strip_tac >>
-          metis_tac[trans_com_l,trans_com_r,qcong_par,qcong_sym])
+          metis_tac[trans_com_l,trans_com_r])
       >- (imp_res_tac sender_is_endpoint >>
           imp_res_tac receiver_is_endpoint >>
           dxrule payload_local_confluence_send >>
           disch_then dxrule >>
           impl_tac >- (simp[] >> metis_tac[]) >>
           strip_tac >>
-          metis_tac[trans_com_l,trans_par_l,qcong_par,qcong_refl,qcong_sym])
+          metis_tac[trans_com_l,trans_par_l])
       >- (imp_res_tac sender_is_endpoint >>
           imp_res_tac receiver_is_endpoint >>
           drule_then assume_tac trans_distinct_residual >>
@@ -481,7 +459,7 @@ Proof
           disch_then dxrule >>
           impl_tac >- (simp[] >> metis_tac[]) >>
           strip_tac >>
-          metis_tac[trans_com_l,trans_par_l,qcong_par,qcong_refl,qcong_sym])
+          metis_tac[trans_com_l,trans_par_l])
       >- (imp_res_tac sender_is_endpoint >>
           imp_res_tac receiver_is_endpoint >>
           drule_then assume_tac trans_distinct_residual >>
@@ -492,7 +470,7 @@ Proof
           disch_then dxrule >>
           impl_tac >- (simp[] >> metis_tac[]) >>
           strip_tac >>
-          metis_tac[trans_com_l,trans_par_r,qcong_par,qcong_refl,qcong_sym])
+          metis_tac[trans_com_l,trans_par_r])
       >- (imp_res_tac sender_is_endpoint >>
           imp_res_tac receiver_is_endpoint >>
           drule_then assume_tac trans_distinct_residual >>
@@ -503,7 +481,7 @@ Proof
           disch_then dxrule >>
           impl_tac >- (simp[] >> metis_tac[]) >>
           strip_tac >>
-          metis_tac[trans_com_l,trans_par_r,qcong_par,qcong_refl,qcong_sym]))
+          metis_tac[trans_com_l,trans_par_r]))
   >- (* Com-R *)
      (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
       fs[] >> rveq >> fs[] >> rveq >> fs[endpoints_def,ALL_DISTINCT_APPEND]
@@ -521,7 +499,7 @@ Proof
           strip_tac >> first_x_assum dxrule >>
           impl_tac >- (simp[] >> metis_tac[]) >>
           rpt strip_tac >>
-          metis_tac[trans_com_l,trans_com_r,qcong_par,qcong_sym])
+          metis_tac[trans_com_l,trans_com_r])
       >- (imp_res_tac sender_is_endpoint >>
           imp_res_tac receiver_is_endpoint >>
           drule(GEN_ALL trans_send_receive_distinct) >>
@@ -536,7 +514,7 @@ Proof
           strip_tac >> first_x_assum dxrule >>
           impl_tac >- (simp[] >> metis_tac[]) >>
           rpt strip_tac >>
-          metis_tac[trans_com_l,trans_com_r,qcong_par,qcong_sym])
+          metis_tac[trans_com_l,trans_com_r])
       >- (qmatch_asmsub_abbrev_tac `trans _ _ (LSend s1 _ _)` >>
           qpat_x_assum `trans _ _ (LSend _ _ _) _` mp_tac >>
           qmatch_asmsub_abbrev_tac `trans _ _ (LSend s2 _ _)` >>
@@ -560,7 +538,7 @@ Proof
           impl_tac >- (simp[] >> metis_tac[]) >>
           strip_tac >>
           dxrule_all_then strip_assume_tac payload_local_confluence_receive >>
-          metis_tac[trans_com_r,qcong_par,qcong_sym])
+          metis_tac[trans_com_r])
       >- (qmatch_asmsub_abbrev_tac `trans _ _ (LSend s1 _ _)` >>
           qpat_x_assum `trans _ _ (LSend _ _ _) _` mp_tac >>
           qmatch_asmsub_abbrev_tac `trans _ _ (LSend s2 _ _)` >>
@@ -584,14 +562,14 @@ Proof
           impl_tac >- (simp[] >> metis_tac[]) >>
           strip_tac >>
           dxrule_all_then strip_assume_tac payload_local_confluence_receive >>
-          metis_tac[trans_com_r,qcong_par,qcong_sym])
+          metis_tac[trans_com_r])
       >- (imp_res_tac sender_is_endpoint >>
           imp_res_tac receiver_is_endpoint >>
           dxrule payload_local_confluence_tau_receive >>
           disch_then dxrule >>
           impl_tac >- (simp[] >> metis_tac[]) >>
           strip_tac >>
-          metis_tac[trans_com_r,trans_par_l,qcong_par,qcong_refl,qcong_sym]
+          metis_tac[trans_com_r,trans_par_l]
          )
       >- (imp_res_tac sender_is_endpoint >>
           imp_res_tac receiver_is_endpoint >>
@@ -603,7 +581,7 @@ Proof
           disch_then dxrule >>
           impl_tac >- (simp[] >> metis_tac[]) >>
           strip_tac >>
-          metis_tac[trans_com_r,trans_par_l,qcong_par,qcong_refl,qcong_sym])
+          metis_tac[trans_com_r,trans_par_l])
       >- (imp_res_tac sender_is_endpoint >>
           imp_res_tac receiver_is_endpoint >>
           drule_then assume_tac trans_distinct_residual >>
@@ -614,7 +592,7 @@ Proof
           disch_then dxrule >>
           impl_tac >- (simp[] >> metis_tac[]) >>
           strip_tac >>
-          metis_tac[trans_com_r,trans_par_r,qcong_par,qcong_refl,qcong_sym])
+          metis_tac[trans_com_r,trans_par_r])
       >- (imp_res_tac sender_is_endpoint >>
           imp_res_tac receiver_is_endpoint >>
           drule_then assume_tac trans_distinct_residual >>
@@ -625,7 +603,7 @@ Proof
           disch_then dxrule >>
           impl_tac >- (simp[] >> metis_tac[]) >>
           strip_tac >>
-          metis_tac[trans_com_r,trans_par_r,qcong_par,qcong_refl,qcong_sym]))
+          metis_tac[trans_com_r,trans_par_r]))
   >- (* Dequeue-last-payload *)
      (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
       fs[] >> rveq >> fs[] >> rveq >> fs[] >>
@@ -658,7 +636,7 @@ Proof
           disch_then drule >>
           impl_tac >- metis_tac[receiver_is_endpoint] >>
           strip_tac >>
-          metis_tac[trans_com_l,trans_par_l,qcong_par,qcong_refl])
+          metis_tac[trans_com_l,trans_par_l])
       >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
           qpat_x_assum `_ _ _ LTau _` assume_tac >>
           drule payload_local_confluence_send >>
@@ -666,7 +644,7 @@ Proof
           impl_tac >- (simp[] >> metis_tac[trans_distinct_residual,label_distinct,
                                            sender_is_endpoint,receiver_is_endpoint]) >>
           strip_tac >>
-          metis_tac[trans_com_l,trans_par_l,qcong_par,qcong_refl])
+          metis_tac[trans_com_l,trans_par_l])
       >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
           imp_res_tac sender_is_endpoint >>
           imp_res_tac receiver_is_endpoint >>
@@ -674,7 +652,7 @@ Proof
           disch_then drule >>
           impl_tac >- (simp[] >> metis_tac[]) >>
           strip_tac >>
-          metis_tac[trans_com_r,trans_par_l,qcong_par,qcong_refl])
+          metis_tac[trans_com_r,trans_par_l])
       >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
           imp_res_tac sender_is_endpoint >>
           imp_res_tac receiver_is_endpoint >>
@@ -682,13 +660,13 @@ Proof
           disch_then drule >>
           impl_tac >- (simp[] >> metis_tac[trans_distinct_residual,label_distinct]) >>
           strip_tac >>
-          metis_tac[trans_com_r,trans_par_l,qcong_par,qcong_refl])
+          metis_tac[trans_com_r,trans_par_l])
       >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
-          metis_tac[trans_par_l,qcong_par,qcong_refl])
+          metis_tac[trans_par_l])
       >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
-          metis_tac[trans_par_r,trans_par_l,qcong_par,qcong_refl])
+          metis_tac[trans_par_r,trans_par_l])
       >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
-          metis_tac[trans_par_r,trans_par_l,qcong_par,qcong_refl]))
+          metis_tac[trans_par_r,trans_par_l]))
   >- (* Par-R *)
      (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
       fs[] >> rveq >> fs[] >> rveq >> fs[]
@@ -699,7 +677,7 @@ Proof
           disch_then drule >>
           impl_tac >- (simp[] >> metis_tac[trans_distinct_residual,label_distinct]) >>
           strip_tac >>
-          metis_tac[trans_com_l,trans_par_r,qcong_par,qcong_refl])
+          metis_tac[trans_com_l,trans_par_r])
       >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
           imp_res_tac sender_is_endpoint >>
           imp_res_tac receiver_is_endpoint >>
@@ -707,7 +685,7 @@ Proof
           disch_then drule >>
           impl_tac >- (simp[] >> metis_tac[trans_distinct_residual,label_distinct]) >>
           strip_tac >>
-          metis_tac[trans_com_l,trans_par_r,qcong_par,qcong_refl])
+          metis_tac[trans_com_l,trans_par_r])
       >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
           qpat_x_assum `_ _ _ LTau _` assume_tac >>
           drule payload_local_confluence_send >>
@@ -715,7 +693,7 @@ Proof
           impl_tac >- (simp[] >> metis_tac[trans_distinct_residual,label_distinct,
                                            sender_is_endpoint,receiver_is_endpoint]) >>
           strip_tac >>
-          metis_tac[trans_com_r,trans_par_r,qcong_par,qcong_refl])
+          metis_tac[trans_com_r,trans_par_r])
       >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
           qpat_x_assum `_ _ _ LTau _` assume_tac >>
           drule payload_local_confluence_send >>
@@ -723,23 +701,23 @@ Proof
           impl_tac >- (simp[] >> metis_tac[trans_distinct_residual,label_distinct,
                                            sender_is_endpoint,receiver_is_endpoint]) >>
           strip_tac >>
-          metis_tac[trans_com_r,trans_par_r,qcong_par,qcong_refl])
+          metis_tac[trans_com_r,trans_par_r])
       >- (dxrule_then (qspec_then `p2` assume_tac) trans_par_l >>
           asm_exists_tac >> simp[] >> pop_assum kall_tac >>
           rename1 `NPar q` >>
           dxrule_then (qspec_then `q` assume_tac) trans_par_r >>
-          asm_exists_tac >> simp[qcong_refl])
+          asm_exists_tac >> simp[])
       >- (dxrule_then (qspec_then `p2` assume_tac) trans_par_l >>
           asm_exists_tac >> simp[] >> pop_assum kall_tac >>
           rename1 `NPar q` >>
           dxrule_then (qspec_then `q` assume_tac) trans_par_r >>
-          asm_exists_tac >> simp[qcong_refl])
+          asm_exists_tac >> simp[])
       >- (fs[endpoints_def,ALL_DISTINCT_APPEND] >>
           first_x_assum(drule_all_then strip_assume_tac) >>
           imp_res_tac trans_par_r >>
           rpt(first_x_assum(qspec_then `n1` assume_tac)) >>
           ntac 2 (asm_exists_tac >> simp[]) >>
-          metis_tac[qcong_rules]))
+          metis_tac[]))
 QED
 
 (* TODO: move? *)
@@ -761,33 +739,28 @@ Theorem payload_confluence_contract:
    ALL_DISTINCT (MAP FST (endpoints p1)) /\
    conf.payload_size > 0
    ==>
+   (?n. list_trans conf p2 (REPLICATE n LTau) p3 /\
+        n <= m) \/
    (?n p4. list_trans conf p2 (REPLICATE n LTau) p4 /\
-        n <= m /\
-        qcong p3 p4) \/
-   (?n p4 p5. list_trans conf p2 (REPLICATE n LTau) p4 /\
-        trans conf p3 LTau p5 /\
-        n <= m /\
-        qcong p4 p5)
+        trans conf p3 LTau p4 /\
+        n <= m)
 Proof
   Induct >> rpt strip_tac
   >- (fs[list_trans_def] >> rveq >>
-      disj2_tac >> asm_exists_tac >> simp[qcong_refl])
+      disj2_tac >> asm_exists_tac >> simp[])
   >> FULL_SIMP_TAC bool_ss [REPLICATE_SUC_SNOC]
   >> fs[list_trans_append,list_trans_def]
   >> first_x_assum drule_all
   >> strip_tac
-  >- (drule qcong_trans_pres >>
-      disch_then drule >> strip_tac >>
-      `list_trans conf p2 (REPLICATE (SUC n) LTau) q2`
-        by(PURE_REWRITE_TAC[REPLICATE_SUC_SNOC] >>
-           rw[list_trans_append,list_trans_def] >>
-           metis_tac[]) >>
-      disj1_tac >>
-      asm_exists_tac >> simp[])
-  >- (Cases_on `p3 = p5`
+  >- (disj1_tac >>
+      qexists_tac ‘SUC n’ >>
+      PURE_REWRITE_TAC[REPLICATE_SUC_SNOC] >>
+      rw[list_trans_append,list_trans_def] >>
+      metis_tac[])
+  >- (Cases_on `p3 = p4`
       >- (rveq >>
           disj1_tac >> asm_exists_tac >>
-          simp[qcong_sym]) >>
+          simp[]) >>
       disj2_tac >>
       imp_res_tac endpoint_names_trans >>
       imp_res_tac endpoint_names_list_trans >>
@@ -795,15 +768,10 @@ Proof
       disch_then dxrule >>
       impl_tac >- simp[] >>
       strip_tac >>
-      qhdtm_x_assum `qcong` mp_tac >>
-      drule_all(qcong_trans_pres |> PURE_ONCE_REWRITE_RULE [qcong_sym_eq]) >>
-      rpt strip_tac >>
-      `list_trans conf p2 (REPLICATE (SUC n) LTau) q2`
-        by(PURE_ONCE_REWRITE_TAC [REPLICATE_SUC_SNOC] >>
-           rw[list_trans_def,list_trans_append] >> metis_tac[]) >>
-      asm_exists_tac >> simp[] >>
-      asm_exists_tac >> simp[] >>
-      metis_tac[qcong_trans])
+      qexists_tac ‘SUC n’ >>
+      PURE_REWRITE_TAC[REPLICATE_SUC_SNOC] >>
+      rw[list_trans_append,list_trans_def] >>
+      metis_tac[])
 QED
 
 Theorem payload_confluence_weak_contract:
@@ -813,14 +781,13 @@ Theorem payload_confluence_weak_contract:
    ALL_DISTINCT (MAP FST (endpoints p1)) /\
    conf.payload_size > 0
    ==>
-   (?n' m' p4 p5. list_trans conf p2 (REPLICATE n' LTau) p4 /\
-        list_trans conf p3 (REPLICATE m' LTau) p5 /\
-        n' <= m /\ m' <= n /\
-        qcong p4 p5)
+   (?n' m' p4. list_trans conf p2 (REPLICATE n' LTau) p4 /\
+        list_trans conf p3 (REPLICATE m' LTau) p4 /\
+        n' <= m /\ m' <= n)
 Proof
   Induct >> rpt strip_tac
   >- (fs[list_trans_def] >> rveq >>
-      asm_exists_tac >> simp[qcong_refl])
+      asm_exists_tac >> simp[])
   >> FULL_SIMP_TAC bool_ss [REPLICATE_SUC_SNOC]
   >> fs[list_trans_append,list_trans_def]
   >> first_x_assum drule_all
@@ -832,19 +799,12 @@ Proof
       imp_res_tac endpoint_names_list_trans >>
       fs[])
   >> strip_tac
-  >- (asm_exists_tac >> simp[] >> asm_exists_tac >> simp[] >> metis_tac[qcong_rules])
-  >> qhdtm_x_assum `qcong` mp_tac
-  >> drule qcong_trans_pres
-  >> disch_then drule
-  >> strip_tac
-  >> `list_trans conf p3 (REPLICATE (SUC m') LTau) q2` (* TODO: (mild) generated names *)
-        by(PURE_REWRITE_TAC[REPLICATE_SUC_SNOC] >>
-           rw[list_trans_append,list_trans_def] >>
-           metis_tac[])
-  >> strip_tac
-  >> asm_exists_tac >> simp[]
-  >> asm_exists_tac >> simp[]
-  >> metis_tac[qcong_rules]
+  >- (asm_exists_tac >> simp[] >> asm_exists_tac >> simp[] >> metis_tac[])
+  >> goal_assum drule >> simp[]
+  >> qexists_tac ‘SUC m'’
+  >> PURE_REWRITE_TAC[REPLICATE_SUC_SNOC]
+  >> rw[list_trans_append,list_trans_def]
+  >> metis_tac[]
 QED
 
 val _ = export_theory();
