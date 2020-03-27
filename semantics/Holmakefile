@@ -1,4 +1,4 @@
-ifndef CAKEMLDIR
+ifndef CAKEDIR
 CAKEDIR = ../../cakeml
 endif
 
