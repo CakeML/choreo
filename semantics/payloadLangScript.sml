@@ -2,23 +2,44 @@ open preamble
 (* TODO: shouldn't have to depend on chorLangTheory *)
 open chorLangTheory
 open endpointLangTheory (*for state*)
+open astTheory; (* for CakeML syntax-related types in the conf *)
 
 val _ = new_theory "payloadLang";
 
-val _ = Datatype`
-endpoint = Nil
-         | Send proc varN num endpoint
-         | Receive proc varN (datum list) endpoint
-         | IfThen varN endpoint endpoint
-         | Let varN (datum list -> datum) (varN list) endpoint`
+Datatype:
+  state = <| bindings : varN |-> datum;
+             queues : proc |-> datum list  |>
+End
 
-val _ = Datatype `config = <| payload_size : num  |>`;
+Datatype:
+  endpoint = Nil
+           | Send proc varN num endpoint
+           | Receive proc varN (datum list) endpoint
+           | IfThen varN endpoint endpoint
+           | Let varN (datum list -> datum) (varN list) endpoint
+End
 
-val _ = Datatype`
-network = NNil
-        | NPar network network
-        | NEndpoint proc state endpoint
-`
+Datatype:
+  network = NNil
+          | NPar network network
+          | NEndpoint proc state endpoint
+End
+
+Datatype:
+  config = <| payload_size : num;
+              length : (modN,varN) id;
+              null : (modN,varN) id;
+              take : (modN,varN) id;
+              drop : (modN,varN) id;
+              toList : (modN,varN) id;
+              fromList : (modN,varN) id;
+              concat : (modN,varN) id;
+              append : (modN,varN) id;
+              cons : (modN,conN) id;
+              nil : (modN,conN) id;
+              letModule : modN;
+              |>
+End
 
 val var_names_endpoint_def = Define `
    (var_names_endpoint Nil = [])
@@ -56,7 +77,23 @@ val intermediate_def = Define `
   /\ intermediate _ = F
 `
 
-val pad_def = Define `
+Definition fget_def:
+  fget fm dv k =
+    case FLOOKUP fm k of
+      SOME kv => kv
+    | NONE    => dv
+End
+
+Definition qlk_def:
+  qlk qs p = fget qs [] p
+End
+
+Definition qpush_def:
+  qpush qs sp d =
+    qs |+ (sp,SNOC d (qlk qs sp))
+End
+
+Definition pad_def:
   pad conf d =
   if LENGTH d = conf.payload_size then
     7w::d
@@ -64,18 +101,43 @@ val pad_def = Define `
     6w::REPLICATE ((conf.payload_size - LENGTH d) - 1) (0w:word8) ++ [1w] ++ d
   else
     2w::TAKE conf.payload_size d
-`
+End
 
-val unpad_def = Define `
+Definition unpad_def:
   (unpad (w::d) =
-    if w = 7w \/ w = 2w then d
+    if w = 7w ∨ w = 2w then d
     else if w = 6w then
       case SPLITP ($= 1w) d of
         (_,_::d) => d
       | _ => []
     else []
   )
-  /\ (unpad _ = [])
-  `
+  ∧ (unpad _ = [])
+End
+
+Definition final_def:
+    final (w::d) = (w = 7w:word8 ∨ w = 6w:word8)
+  ∧ final _ = F
+End
+
+Definition intermediate_def:
+  intermediate (w::d) = (w = 2w:word8)
+  ∧ intermediate _ = F
+End
+
+Definition normalise_queues_def:
+  normalise_queues q =
+  DRESTRICT q (λp. FLOOKUP q p ≠ SOME [])
+End
+
+Definition normalised_def:
+  normalised q = (normalise_queues q = q)
+End
+
+Definition normalised_network_def:
+   (normalised_network NNil = T)
+∧ (normalised_network (NEndpoint p s e) = normalised(s.queues))
+∧ (normalised_network (NPar n1 n2) ⇔ normalised_network n1 ∧ normalised_network n2)
+End        
 
 val _ = export_theory ()
