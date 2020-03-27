@@ -272,7 +272,7 @@ Theorem normalise_queues_FUPDATE_idem[simp]:
 Proof
   rw[normalise_queues_FUPDATE_NONEMPTY,DRESTRICT_normalise_queues]
 QED
-  
+
 Theorem compile_message_preservation_dequeue:
   !conf d ds p1 p2 q1 e s v.
    p1 ≠ p2 /\ conf.payload_size > 0 ∧
@@ -374,7 +374,7 @@ Proof
   simp[compile_message_nonempty] >>
   simp[qlk_compile_queue_MAP_FILTER,FILTER_APPEND]
 QED
-        
+
 val compile_network_preservation_trans = Q.store_thm("compile_network_preservation_trans",
   `∀p1 p2 conf.
     conf.payload_size > 0
@@ -472,60 +472,45 @@ val compile_network_preservation = Q.store_thm("compile_network_preservation",
   >> drule compile_network_preservation_trans >> simp[Once CONJ_SYM]
   >> rpt(disch_then drule) >> strip_tac >> metis_tac[RTC_RTC]);
 
-Theorem compile_queue_split_init:
-  compile_queue conf q = (p1,d)::q2 /\ conf.payload_size > 0
-  ==> ?ds q22. q = (p1,ds)::q22 /\ LENGTH(compile_message conf ds) > 0 /\
-        HD(compile_message conf ds) = d
+Theorem qlk_update_eq:
+  qlk (q |+ (p1,x)) p2 = if p1 = p2 then x else qlk q p2
 Proof
-  Cases_on `q`
-  >- rw[compile_queue_def]
-  >> Cases_on `h` >> rw[compile_queue_def]
-  >> fs[Once compile_message_def]
-  >> every_case_tac >> fs[]
+  rw[]
 QED
 
 Theorem compile_queue_split:
-  !q1 q p1 d q2 conf.
-  compile_queue conf q = q1 ++ [(p1,d)] ++ q2
-  /\ EVERY (λ(p,_). p ≠ p1) q1
-  /\ conf.payload_size > 0
-  ==> ?q11 ds q22. q = q11 ++ [(p1,ds)] ++ q22 /\ LENGTH(compile_message conf ds) > 0 /\
+  ∀q p1 d q2 conf.
+  qlk(compile_queue conf q) p1 = d::q2 /\ conf.payload_size > 0
+  ==> ?ds q11 q22. q = q11 ++ [(p1,ds)] ++ q22 /\ LENGTH(compile_message conf ds) > 0 /\
         HD(compile_message conf ds) = d /\ EVERY (λ(p,_). p ≠ p1) q11
 Proof
-  Induct_on `q`
-  >- rw[compile_queue_def]
-  >> Cases >> Cases
-  >- (rw[] >> qexists_tac `[]` >> PURE_REWRITE_TAC[APPEND,EVERY_DEF] >>
-      metis_tac[compile_queue_split_init])
-  >> rw[compile_queue_def,Once compile_message_def]
-  >> fs[]
-  >- (first_x_assum drule
-      >> disch_then drule
-      >> impl_tac >- simp[]
-      >> strip_tac
-      >> Q.REFINE_EXISTS_TAC `(_,_)::q11`
-      >> rw[])
-  >> fs[APPEND_EQ_APPEND_MID |> CONV_RULE(LHS_CONV SYM_CONV)]
-  >> fs[MAP_EQ_APPEND]
-  >> rveq
-  >> fs[EVERY_APPEND]
-  >> first_x_assum drule
-  >> disch_then drule
-  >> impl_tac >- simp[]
-  >> strip_tac
-  >> Q.REFINE_EXISTS_TAC `(_,_)::q11`
-  >> rw[]
+  Induct_on ‘q’ >- (rw[compile_queue_def]) >>
+  Cases >>
+  rw[compile_queue_def,qlk_update_eq] >-
+   (rename1 ‘compile_message _ ds’ >>
+    MAP_EVERY qexists_tac [‘ds’,‘[]’] >>
+    simp[] >>
+    fs[Once compile_message_def] >>
+    rw[] >>
+    simp[Once compile_message_def] >>
+    rw[] >>
+    fs[]) >>
+  first_x_assum (drule_all_then strip_assume_tac) >>
+  rename1 ‘(q1,dd)::q’ >>
+  MAP_EVERY qexists_tac [‘ds’,‘(q1,dd)::q11’] >>
+  simp[]
 QED
 
-val compile_network_reflection_single_send = Q.store_thm("compile_network_reflection_single_send",
-  `∀p1 p2 conf s d r.
+Theorem compile_network_reflection_single_send:
+  ∀p1 p2 conf s d r.
     conf.payload_size > 0
     ∧ trans conf (compile_network conf p1) (LSend s d r) p2
     ==> ∃p3 od ds.
       HD(compile_message conf od) = d /\
       trans p1 (LSend s od r) p3 /\
       list_trans conf p2 (MAP (λd. LSend s d r) (TL(compile_message conf od)))
-                 (compile_network conf p3)`,
+                 (compile_network conf p3)
+Proof
   Induct_on `p1` >> rw[compile_network_def]
   >- (* NNil *)
      fs[payloadSemTheory.reduction_def,trans_nil_false]
@@ -562,30 +547,33 @@ val compile_network_reflection_single_send = Q.store_thm("compile_network_reflec
           rename1 `pad _ d` >> rename1 `NEndpoint l s (Send p v e)` >>
           qexists_tac `NEndpoint l s e` >> qexists_tac `d` >>
           conj_tac >- rw[Once compile_message_def] >>
-          conj_tac >- metis_tac[trans_send] >>
-          rw[compile_network_def,Once compile_message_def,list_trans_def,DROP_LENGTH_TOO_LONG] >>
+          conj_tac >- (fs[compile_state_def] >> metis_tac[trans_send]) >>
+          fs[compile_state_def] >>
+          rw[compile_network_def,Once compile_message_def,list_trans_def,DROP_LENGTH_TOO_LONG,
+             compile_state_def] >>
           fs[final_pad_LENGTH])
       >- (* Send-intermediate-payload *)
          (Cases_on `e` >> fs[compile_endpoint_def] >> rveq >> fs[] >>
           rename1 `pad _ d` >> rename1 `NEndpoint l s (Send p v e)` >>
           qexists_tac `NEndpoint l s e` >> qexists_tac `d` >>
           conj_tac >- rw[Once compile_message_def] >>
-          conj_tac >- metis_tac[trans_send] >>
+          conj_tac >- (fs[compile_state_def] >> metis_tac[trans_send]) >>
           rw[compile_network_def,Once compile_message_def,list_trans_def,DROP_LENGTH_TOO_LONG] >>
           fs[final_pad_LENGTH] >>
           match_mp_tac compile_message_preservation_send >>
           simp[])
      )
-  );
+QED
 
-val compile_network_reflection_single_receive = Q.store_thm("compile_network_reflection_single_receive",
-  `∀p1 p2 conf s d r.
+Theorem compile_network_reflection_single_receive:
+  ∀p1 p2 conf s d r.
     conf.payload_size > 0
     ∧ trans conf (compile_network conf p1) (LReceive s (HD(compile_message conf d)) r) p2
     ==> ∃p3.
       trans p1 (LReceive s d r) p3 /\
       list_trans conf p2 (MAP (λd. LReceive s d r) (TL(compile_message conf d)))
-                 (compile_network conf p3)`,
+                 (compile_network conf p3)
+Proof
   Induct_on `p1` >> rw[compile_network_def]
   >- (* NNil *)
      fs[payloadSemTheory.reduction_def,trans_nil_false]
@@ -619,31 +607,33 @@ val compile_network_reflection_single_receive = Q.store_thm("compile_network_ref
       rw[trans_enqueue] >>
       fs[compile_network_def] >>
       rw[Once compile_message_def] >-
-        (rw[Once compile_message_def,list_trans_def] >>
-         simp[SNOC_APPEND,compile_queue_def,compile_queue_append] >>
+        (rw[Once compile_message_def,list_trans_def,compile_state_def] >>
+         simp[compile_queue_SNOC,qpush_def |> REWRITE_RULE[SNOC_APPEND]] >>
          rw[Once compile_message_def]) >>
-      rw[Once compile_message_def] >>
+      rw[Once compile_message_def,compile_state_def] >>
       drule_all compile_message_preservation_enqueue >>
-      qmatch_goalsub_abbrev_tac `sa with queue := qa` >>
+      simp[compile_queue_SNOC] >>
+      qmatch_goalsub_abbrev_tac `_ with queues := qa` >>
       disch_then(qspecl_then [`DROP conf.payload_size d`,
-                              `qa`,`compile_endpoint e`,`sa`] mp_tac) >>
-      qmatch_goalsub_abbrev_tac `list_trans _ _ _ (NEndpoint _ (_ with queue := q1) _)
-                                 ==> list_trans _ _ _ (NEndpoint _ (_ with queue := q2) _)` >>
-      `q1 = q2` suffices_by metis_tac[] >>
-      unabbrev_all_tac >>
-      rw[compile_queue_def,compile_queue_append] >>
+                              `qa`,`compile_endpoint e`,`<|bindings := s.bindings|>`] mp_tac) >>
+      fs[] >>
+      match_mp_tac(DECIDE “∀x y. x = y ⇒ (x ⇒ y)”) >>
+      rpt(AP_TERM_TAC ORELSE AP_THM_TAC) >>
+      rw[Abbr ‘qa’,qpush_def] >>
+      rpt AP_TERM_TAC >>
       simp[SimpR ``$=``,Once compile_message_def])
-  );
+QED
 
-val compile_network_reflection_single = Q.store_thm("compile_network_reflection_single",
-  `∀p1 p2 conf.
+Theorem compile_network_reflection_single:
+  ∀p1 p2 conf.
     conf.payload_size > 0
     ∧ reduction conf (compile_network conf p1) p2
     ∧ ALL_DISTINCT (MAP FST (endpoints p1))
     ∧ choice_free_network p1
     ==> ∃p3 p4. (reduction conf)^* p2 p3
              ∧ reduction p1 p4
-             ∧ p3 = compile_network conf p4`,
+             ∧ p3 = compile_network conf p4
+Proof
   Induct_on `p1` >> rw[compile_network_def]
   >- (* NNil *)
      fs[payloadSemTheory.reduction_def,trans_nil_false]
@@ -698,17 +688,15 @@ val compile_network_reflection_single = Q.store_thm("compile_network_reflection_
       qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once payloadSemTheory.trans_cases]) >>
       fs[] >> rveq >> fs[] >> rveq >> fs[]
       >- (* Dequeue-last-payload *)
-         (Cases_on `e` >> fs[compile_endpoint_def] >> rveq >>
+         (Cases_on `e` >> fs[compile_endpoint_def,compile_state_def] >> rveq >>
           drule_all_then strip_assume_tac compile_queue_split >>
           `compile_message conf ds = [d]`
-            by(fs[compile_queue_append,compile_queue_def,Once compile_message_def] >>
+            by(fs[compile_queue_SNOC,compile_queue_def,Once compile_message_def] >>
                rw[] >> rw[Once compile_message_def] >>
                rfs[] >> fs[]) >>
-          fs[compile_queue_append,compile_queue_def] >>
-          fs[APPEND_EQ_APPEND_MID] >> rveq >> fs[APPEND_EQ_SING |> CONV_RULE(LHS_CONV SYM_CONV)] >>
-          rveq >> fs[] >> rveq >> fs[] >>
-          drule compile_queue_lift_ineq >> disch_then(qspec_then `conf` assume_tac) >>
-          rfs[] >>
+          fs[compile_queue_SNOC,compile_queue_def] >>
+          FULL_SIMP_TAC std_ss [GSYM APPEND_ASSOC,compile_queue_lift_ineq'] >>
+          fs[compile_queue_def] >>
           rename1 `Receive _ _ ec` >>
           `ds = unpad d`
            by(Cases_on `d` >> fs[final_def,unpad_def] >>
@@ -722,12 +710,12 @@ val compile_network_reflection_single = Q.store_thm("compile_network_reflection_
           rveq >>
           qexists_tac `NEndpoint l <|bindings := s.bindings |+ (s', unpad d);
                                      queue := q11 ++ q22|> ec` >>
-          simp[compile_network_def,compile_queue_append,reduction_def] >>
+          simp[compile_network_def,compile_queue_SNOC,reduction_def,compile_state_def] >>
+          conj_tac >- simp[compile_queue_midskip_lemma] >>
           match_mp_tac(trans_dequeue |> SIMP_RULE (srw_ss()) []) >>
-          rw[] >>
-          metis_tac[compile_queue_unlift_ineq])
+          rw[])
       >- (* Dequeue-intermediate-payload *)
-         (Cases_on `e` >> fs[compile_endpoint_def] >> rveq >>
+         (Cases_on `e` >> fs[compile_endpoint_def,compile_state_def] >> rveq >>
           drule_all_then strip_assume_tac compile_queue_split >>
           rename1 `endpointLang$Receive p v exp` >>
           qexists_tac `NEndpoint l <|queue := q11 ++ q22;bindings:=s.bindings |+ (v,ds)|> exp` >>
@@ -737,50 +725,51 @@ val compile_network_reflection_single = Q.store_thm("compile_network_reflection_
              rw[]) >>
           simp[] >>
           `compile_message conf ds = d::compile_message conf(DROP conf.payload_size ds)`
-            by(fs[compile_queue_append,compile_queue_def,Once compile_message_def] >>
+            by(fs[compile_queue_SNOC,compile_queue_def,Once compile_message_def] >>
                rw[] >> rw[Once compile_message_def] >>
                rfs[] >> fs[] >> metis_tac[pad_not_final]) >>
-          fs[compile_network_def,compile_queue_append,compile_queue_def] >>
-          fs[APPEND_EQ_APPEND_MID] >> rveq >> fs[APPEND_EQ_SING |> CONV_RULE(LHS_CONV SYM_CONV)] >>
-          rveq >> fs[] >> rveq >> fs[] >>
-          drule compile_queue_lift_ineq >> disch_then(qspec_then `conf` assume_tac) >>
-          rfs[] >>
-          drule compile_message_preservation_dequeue >>
-          disch_then drule >>
-          qpat_x_assum `EVERY _ (compile_queue _ _)` assume_tac >>
-          disch_then drule >>
+          fs[compile_network_def,compile_queue_SNOC,compile_state_def,compile_queue_def] >>
+          FULL_SIMP_TAC std_ss [GSYM APPEND_ASSOC, compile_queue_lift_ineq'] >>
+          fs[compile_queue_def] >>
+          rveq >>
+          simp[normalise_queues_FUPDATE_NONEMPTY,compile_message_nonempty,compile_queue_normalise] >>
+          drule_then drule compile_message_preservation_dequeue >>
+          qmatch_goalsub_abbrev_tac ‘<|bindings := ba; queues := qa|>’ >>
           disch_then(qspecl_then [`DROP conf.payload_size ds`,
-                                  `[unpad d]`,`compile_queue conf q22`,
+                                  `[unpad d]`,`qlk(compile_queue conf q22) p`,
                                   `compile_endpoint exp`,
-                                  `s`,`v`] mp_tac) >>
-          simp[] >>
+                                  `<|bindings := ba; queues := qa|>`,`v`] mp_tac) >>
+          simp[Abbr ‘qa’,Abbr‘ba’] >>
+          match_mp_tac(DECIDE “x = y ⇒ (x ⇒ y)”) >>
+          rpt(AP_TERM_TAC ORELSE AP_THM_TAC) >>
+          rw[compile_queue_midskip_lemma] >>
           `ds = unpad d ++ DROP conf.payload_size ds` suffices_by metis_tac[] >>
           qpat_x_assum `compile_message _ _ = _` mp_tac >>
           rw[Once compile_message_def]
           >- (fs[Once compile_message_def] >> every_case_tac >> fs[])
           >> fs[unpad_pad])
       >- (* If-L *)
-         (Cases_on `e` >> fs[compile_endpoint_def] >> rveq >>
+         (Cases_on `e` >> fs[compile_endpoint_def,compile_state_def] >> rveq >>
           rename1 `compile_endpoint e1` >>
           qexists_tac `NEndpoint l s e1` >>
           simp[compile_network_def] >>
-          simp[reduction_def] >>
+          simp[reduction_def,compile_state_def] >>
           metis_tac[trans_if_true])
       >- (* If-R *)
-         (Cases_on `e` >> fs[compile_endpoint_def] >> rveq >>
+         (Cases_on `e` >> fs[compile_endpoint_def,compile_state_def] >> rveq >>
           rename1 `compile_endpoint e1` >>
           qexists_tac `NEndpoint l s e1` >>
           simp[compile_network_def] >>
-          simp[reduction_def] >>
+          simp[reduction_def,compile_state_def] >>
           metis_tac[trans_if_false])
       >- (* Let *)
-         (Cases_on `e` >> fs[compile_endpoint_def] >> rveq >>
+         (Cases_on `e` >> fs[compile_endpoint_def,compile_state_def] >> rveq >>
           rename1 `compile_endpoint e1` >>
           qexists_tac `NEndpoint l (s with bindings := s.bindings |+ (s',f (MAP (THE ∘ FLOOKUP s.bindings) l'))) e1` >> (* TODO: generated names*)
           simp[compile_network_def] >>
-          simp[reduction_def] >>
+          simp[reduction_def,compile_state_def] >>
           metis_tac[trans_let]))
-  );
+QED
 
 Theorem reduction_list_trans:
   (reduction conf)^* p q = ?n. list_trans conf p (REPLICATE n LTau) q
@@ -811,15 +800,15 @@ Proof
      compile_network_def]
 QED
 
-val compile_network_reflection = Q.store_thm("compile_network_reflection",
-  `∀p1 p2 conf.
+Theorem compile_network_reflection:
+  ∀p1 p2 conf.
     conf.payload_size > 0
     ∧ (reduction conf)^* (compile_network conf p1) p2
     ∧ ALL_DISTINCT (MAP FST (endpoints p1))
     ∧ choice_free_network p1
-    ==> ∃p3 p4. (reduction conf)^* p2 p3
-             ∧ reduction^* p1 p4
-             ∧ qcong p3 (compile_network conf p4)`,
+    ==> ∃p3. (reduction conf)^* p2 (compile_network conf p3)
+             ∧ reduction^* p1 p3
+Proof
   simp[reduction_list_trans,PULL_EXISTS] >>
   CONV_TAC(RESORT_FORALL_CONV rev) >>
   ho_match_mp_tac COMPLETE_INDUCTION >>
@@ -827,7 +816,7 @@ val compile_network_reflection = Q.store_thm("compile_network_reflection",
   >- (rw[list_trans_def] >>
       CONV_TAC(RESORT_EXISTS_CONV rev) >>
       qexists_tac `0` >> rw[list_trans_def] >>
-      metis_tac[qcong_refl,RTC_REFL])
+      metis_tac[RTC_REFL])
   >- (rw[list_trans_def,GSYM payloadSemTheory.reduction_def] >>
       drule_all(compile_network_reflection_single
                 |> REWRITE_RULE[PULL_EXISTS,reduction_list_trans]) >>
@@ -850,18 +839,7 @@ val compile_network_reflection = Q.store_thm("compile_network_reflection",
                    fs[reduction_def] >>
                    imp_res_tac choice_free_trans_pres) >>
       strip_tac >>
-      qhdtm_x_assum `qcong` mp_tac >>
-      drule_all_then strip_assume_tac qcong_list_trans_pres >>
-      strip_tac >>
-      rename1 `list_trans conf p2 (REPLICATE sc1 _) r` >>
-      rename1 `list_trans conf r (REPLICATE sc2 _) t` >>
-      `list_trans conf p2 (REPLICATE (sc1 + sc2) LTau) t`
-        by(simp[GSYM REPLICATE_APPEND,list_trans_append] >>
-           metis_tac[]) >>
-      asm_exists_tac >>
-      drule_all_then assume_tac (RTC_RULES |> SPEC_ALL |> CONJUNCT2) >>
-      simp[] >> asm_exists_tac >>
-      metis_tac[qcong_rules])
-  );
+      metis_tac[choreoUtilsTheory.RTC_TRANS,list_trans_append,REPLICATE_APPEND])
+QED
 
 val _ = export_theory ()
