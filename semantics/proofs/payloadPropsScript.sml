@@ -2192,40 +2192,7 @@ QED
 Definition empty_q_def:
   empty_q NNil = T
 ∧ empty_q (NPar n1 n2)     = (empty_q n1 ∧ empty_q n2)
-∧ empty_q (NEndpoint _ s _) = (s.queue = [])
+∧ empty_q (NEndpoint _ s _) = (s.queues = FEMPTY)
 End
-
-(* If all queues are empty a network is only queue congruent (qcong)
-   with itself (payload version)
-*)
-Theorem empty_queue_qcong:
-  ∀epn epn'.
-   qcong epn epn' ∧
-   empty_q epn
-   ⇒ epn' = epn
-Proof
-  Induct
-  \\ ONCE_REWRITE_TAC [qcong_cases] \\ rw [empty_q_def]
-  >- metis_tac [qcong_rules,qcong_nil_rel_nil]
-  >- metis_tac [qcong_rules,qcong_nil_rel_nil]
-  >- (drule qcong_par_rel_par_sym \\ rw []
-      \\ imp_res_tac qcong_sym \\ fs [])
-  >- (drule_then drule qcong_trans
-      \\ disch_then (mp_then Any mp_tac qcong_par_rel_par) \\ rw [])
-  >- (drule qcong_sym
-      \\ disch_then (mp_then Any mp_tac qcong_endpoint_rel_endpoint)
-      \\ rw [] \\ drule qcong_IMP_qrel
-      \\ rw [] \\ drule qrel_LENGTH \\ rw []
-      \\ rw [endpointLangTheory.state_component_equality]
-      \\ drule qcong_bindings_eq \\ fs [])
-  >- (drule_then drule qcong_trans
-      \\ disch_then (mp_then Any mp_tac qcong_endpoint_rel_endpoint)
-      \\ rw [] \\ drule_then drule qcong_trans
-      \\ rw [] \\ drule qcong_IMP_qrel
-      \\ rw [] \\ drule qrel_LENGTH \\ rw []
-      \\ rw [endpointLangTheory.state_component_equality]
-      \\ drule qcong_bindings_eq \\ fs [])
-  \\ fs []
-QED
 
 val _ = export_theory ();

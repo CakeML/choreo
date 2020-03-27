@@ -379,10 +379,6 @@ Proof
   \\ impl_tac
   >- (fs [] \\ irule choice_free_reduction
       \\ metis_tac [choice_free_network_compile_network_fv])
-  \\ disch_then (mp_then Any mp_tac qcong_reduction_pres)
-  \\ disch_then (qspec_then ‘p3’ mp_tac)
-  \\ impl_tac
-  >- fs [payloadPropsTheory.qcong_sym]
   \\ rw []
   \\ qpat_assum ‘(reduction conf)^* epn _’ (mp_then Any (drule_then assume_tac) RTC_SPLIT)
   \\ qspec_then ‘p3'’ drule endpointPropsTheory.qcong_sym
@@ -394,9 +390,7 @@ Proof
   >- rw [compile_network_fv_empty_q,compile_network_empty_q]
   \\ rw []
   \\ drule_then (qspec_then ‘conf’ assume_tac) empty_q_to_payload
-  \\ drule_then drule payloadPropsTheory.empty_queue_qcong \\ rw []
-  \\ asm_exists_tac \\ fs []
-  \\ asm_exists_tac \\ fs []
+  \\ rpt(goal_assum drule)
 QED
 
 val _ = export_theory ()
