@@ -1,4 +1,7 @@
+ifndef CAKEMLDIR
 CAKEDIR = ../../cakeml
+endif
+
 INCLUDES = $(CAKEDIR)/misc $(CAKEDIR)/semantics ../semantics ../semantics/proofs
 OPTIONS = QUIT_ON_FAILURE
 
