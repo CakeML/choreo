@@ -5,25 +5,6 @@ open preamble endpointLangTheory payloadLangTheory endpoint_to_payloadTheory
 
 val _ = new_theory "endpoint_to_payloadProof";
 
-(* TODO: move *)
-Theorem qlk_update[simp]:
-  qlk (q |+ (p,x)) p = x
-Proof
-  EVAL_TAC
-QED
-
-Theorem qlk_update2[simp]:
-  p1 ≠ p2 ⇒ qlk (q |+ (p1,x)) p2 = qlk q p2
-Proof
-  EVAL_TAC >> rw[]
-QED
-
-Theorem qlk_FEMPTY[simp]:
-  qlk FEMPTY p = []
-Proof
-  EVAL_TAC
-QED
-
 Theorem compile_queue_SNOC:
   ∀q p d conf.
         compile_queue conf (SNOC (p,d) q) =
