@@ -777,7 +777,7 @@ Theorem compile_network_endpoints:
   MAP FST(endpoints(compile_network conf p1)) = MAP FST (endpoints p1)
 Proof
   Induct_on `p1` >>
-  rw[payloadPropsTheory.endpoints_def,endpointPropsTheory.endpoints_def,
+  rw[payloadLangTheory.endpoints_def,endpointPropsTheory.endpoints_def,
      compile_network_def]
 QED
 
