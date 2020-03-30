@@ -141,11 +141,6 @@ val pad_not_intermediate = Q.store_thm("pad_not_intermediate",
   `!conf d. ¬intermediate (pad conf d) <=> final(pad conf d)`,
   metis_tac[pad_not_final]);
 
-val endpoints_def = Define `
-   (endpoints NNil = [])
-/\ (endpoints (NEndpoint p1 s e1) = [(p1,s,e1)])
-/\ (endpoints (NPar n1 n2) = endpoints n1 ++ endpoints n2)`
-
 val trans_enqueue' = Q.store_thm("trans_enqueue'",
   `∀conf s d p1 p2 e q.
      p1 ≠ p2

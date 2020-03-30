@@ -140,4 +140,10 @@ Definition normalised_network_def:
 ∧ (normalised_network (NPar n1 n2) ⇔ normalised_network n1 ∧ normalised_network n2)
 End        
 
+Definition endpoints_def:
+   (endpoints NNil = [])
+∧ (endpoints (NEndpoint p1 s e1) = [(p1,s,e1)])
+∧ (endpoints (NPar n1 n2) = endpoints n1 ++ endpoints n2)
+End
+           
 val _ = export_theory ()

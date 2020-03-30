@@ -2,9 +2,24 @@ ifndef CAKEDIR
 CAKEDIR = ../../../cakeml
 endif
 
-INCLUDES = $(CAKEDIR)/misc $(CAKEDIR)/semantics ../../semantics ../../projection $(CAKEDIR)/basis
+INCLUDES = $(CAKEDIR)/misc $(CAKEDIR)/semantics ../../semantics ../../projection $(CAKEDIR)/basis $(CAKEDIR)/unverified/sexpr-bootstrap $(CAKEDIR)/compiler/parsing
 OPTIONS = QUIT_ON_FAILURE
+
+all: $(DEFAULT_TARGETS) exec
+.PHONY: all
 
 THYFILES = $(patsubst %Script.sml,%Theory.uo,$(wildcard *.sml))
 TARGETS0 = $(patsubst %Theory.sml,,$(THYFILES))
 TARGETS = $(patsubst %.sml,%.uo,$(TARGETS0))
+
+ifndef CC
+CC=gcc
+endif
+ping.sexp: *pingpongScript.sml
+ping.S: ping.sexp
+	cake --exclude_prelude="true" --sexp=true < ping.sexp > $@
+ping: ping.S
+	$(CC) ping.S ping_ffi.c $(GCCFLAGS) -o $@
+
+exec: ping
+.PHONY: exec
