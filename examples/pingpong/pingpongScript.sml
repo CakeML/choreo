@@ -1,4 +1,4 @@
-open preamble chorLangTheory chorSemTheory projectionTheory basisProgTheory;
+open preamble chorLangTheory chorSemTheory projectionTheory basisProgTheory ml_translatorLib ml_progLib;
 
 val _ = new_theory "pingpong";
 
