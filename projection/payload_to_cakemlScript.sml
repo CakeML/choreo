@@ -1,5 +1,5 @@
 open preamble payloadLangTheory astTheory;
-     
+
 
 val _ = new_theory "payload_to_cakeml";
 
@@ -25,7 +25,7 @@ Definition buffer_size_def:
 End
 
 (* Payload Helper *)
-(* -- Returns the list of HOL functions used in Let statements 
+(* -- Returns the list of HOL functions used in Let statements
         in Payload endpoint code *)
 Definition letfuns_def:
   (letfuns payloadLang$Nil = []) ∧
@@ -48,20 +48,20 @@ End
 Definition convDatum_def:
   (convDatum conf []      = Con (SOME conf.nil) []) ∧
   (convDatum conf (x::xs) = Con (SOME conf.cons) [Lit (Word8 x);
-                                                  convDatum conf xs]) 
+                                                  convDatum conf xs])
 End
 (* -- Converts datum list ((word8 list) list) to CakeML list of
         lists of Word8 literals *)
 Definition convDatumList_def:
   (convDatumList conf []      = Con (SOME conf.nil) []) ∧
   (convDatumList conf (x::xs) = Con (SOME conf.cons) [convDatum conf x;
-                                                      convDatumList conf xs]) 
+                                                      convDatumList conf xs])
 End
 
 (* -- Converts exp list (HOL list of CakeML AST) to CakeML list of AST *)
 Definition convList_def:
   (convList conf []    = Con (SOME conf.nil) []) ∧
-  (convList conf (x::xs) = Con (SOME conf.cons) [x; convList conf xs]) 
+  (convList conf (x::xs) = Con (SOME conf.cons) [x; convList conf xs])
 End
 
 (* COMMUNICATION PRIMITIVES *)
@@ -73,7 +73,7 @@ Definition padv_def:
     (Let (SOME "y")
           (App Aw8alloc [buffer_size conf;Lit(Word8 0w)])
           (If (App Equality [App Opapp [Var conf.length;Var(Short "x")];payload_size conf])
-           (Let NONE (App Aw8update [Var(Short "y");Lit(IntLit 0);Lit(Word8 7w)])      
+           (Let NONE (App Aw8update [Var(Short "y");Lit(IntLit 0);Lit(Word8 7w)])
              (Let
                (SOME "z")
                (App Opapp [Var conf.fromList;
@@ -138,7 +138,7 @@ End
       function definition. Has a one-to-one correspondence between #(send) FFI
       calls and LSend labels. *)
 Definition sendloop_def:
-  sendloop conf dest = 
+  sendloop conf dest =
    [("sendloop","x",
      Let (SOME "y")
        (App Opapp [padv conf;Var(Short "x")])
@@ -192,7 +192,7 @@ End
 
 (* -- CakeML deep embedding of the unpad function. *)
 Definition unpadv_def:
-  unpadv conf = 
+  unpadv conf =
    Fun "x"
    (If (validv "x")
    (Let (SOME "n")
@@ -272,14 +272,14 @@ End
    Instead, assumes that the i:th element of vs is a CakeML expression
    whose value refines the i:th element of letfuns(e).
    It is expected that these will be obtained by translating the letfuns.
-         
+
    The compilation depends on some functions from the CakeML basis library,
    mostly for routine list operations. In order to avoid this directory
    having to depend on basis, we assume that, eg., conf.append is the name
    of a function that refines APPEND.
  *)
 Definition compile_endpoint_def:
-    (compile_endpoint conf vs payloadLang$Nil = Con NONE []) ∧ 
+    (compile_endpoint conf vs payloadLang$Nil = Con NONE []) ∧
     (compile_endpoint conf vs (Send p v n e) =
       let vv = Var(Short (ps2cs v)) in
         If (App (Opb Leq) [App Opapp [Var conf.length; vv]; Lit(IntLit(&n))])
@@ -294,7 +294,7 @@ Definition compile_endpoint_def:
              )
              (compile_endpoint conf vs e)
            )
-    ) ∧ 
+    ) ∧
     (compile_endpoint conf vs (Receive p v l e) =
       Let (SOME (ps2cs v))
           (Let (SOME "buff") (App Aw8alloc [Lit(IntLit(&(conf.payload_size + 1)));
@@ -312,12 +312,12 @@ Definition compile_endpoint_def:
                )
           )
           (compile_endpoint conf vs e)
-     ) ∧ 
+     ) ∧
     (compile_endpoint conf vs (IfThen v e1 e2) =
      let vn = LENGTH(letfuns e1) in
        If (App Equality [Var(Short (ps2cs v)); w1ckV conf])
           (compile_endpoint conf (TAKE vn vs) e1)
-          (compile_endpoint conf (DROP vn vs) e2)) ∧ 
+          (compile_endpoint conf (DROP vn vs) e2)) ∧
     (compile_endpoint conf (hv::vs) (payloadLang$Let v f vl e) =
      ast$Let (SOME (ps2cs v))
          (App Opapp [((ast$Var o (getLetID conf)) hv);
