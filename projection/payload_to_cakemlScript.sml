@@ -282,8 +282,6 @@ Definition compile_endpoint_def:
     (compile_endpoint conf vs payloadLang$Nil = Con NONE []) ∧
     (compile_endpoint conf vs (Send p v n e) =
       let vv = Var(Short (ps2cs v)) in
-        If (App (Opb Leq) [App Opapp [Var conf.length; vv]; Lit(IntLit(&n))])
-           (compile_endpoint conf vs e)
            (Let NONE
              (Letrec
                 (sendloop conf (MAP (CHR o w2n) p))
