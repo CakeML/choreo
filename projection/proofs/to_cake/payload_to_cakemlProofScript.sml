@@ -2498,7 +2498,7 @@ QED
 
 (* FORWARD CORRECTNESS
     Just the spec :) *)
-Theorem forward_correctness:
+Theorem endpoint_forward_correctness:
   ∀conf p pSt1 pCd1 L pSt2 pCd2
         vs1 cEnv1 cSt1 vs2 cEnv2 cSt2.
     trans conf (NEndpoint p pSt1 pCd1) L (NEndpoint p pSt2 pCd2) ∧
@@ -2514,5 +2514,68 @@ Proof
   cheat
 QED
 
+Theorem network_forward_correctness:
+  ∀conf p s c n p s' c' n' st1 vs1 env1 st2.
+  trans conf (NPar (NEndpoint p s c) n) LTau (NPar (NEndpoint p s' c') n') ∧
+
+  (* These assumptions should be dischargable by the static part of the compiler *)
+  net_wf n ∧ (* equivalent to ALL_DISTINCT(MAP FST(endpoints n)) *)
+  ~net_has_node n p ∧
+  conf.payload_size > 0 ∧
+  st1.ffi.oracle = comms_ffi_oracle conf ∧
+  st1.ffi.ffi_state = (p,s.queues,n) ∧
+  st2.ffi.oracle = comms_ffi_oracle conf ∧
+  st2.ffi.ffi_state = (p,s'.queues,n') ∧
+  pSt_pCd_corr s c ∧
+
+  (* These assumptions can only be discharged by the dynamic part of the compiler *)
+  sem_env_cor conf s env1 ∧
+  env_asm env1 conf ∧
+  enc_ok conf env1 (letfuns c) vs1
+  ⇒
+  ∃mc env2 vs2.
+    sem_env_cor conf s' env2 ∧
+    env_asm env2 conf ∧
+    enc_ok conf env2 (letfuns c') vs2 ∧
+    cEval_equiv conf
+      (evaluate (st1 with clock := mc) env1
+                      [compile_endpoint conf vs1 c])
+      (evaluate (st2 with clock := mc) env2
+                      [compile_endpoint conf vs2 c'])
+Proof
+  cheat
+QED
+
+Theorem network_forward_correctness_reduction:
+  ∀conf p s c n p s' c' n' st1 vs1 env1 st2.
+  (reduction conf)⃰ (NPar (NEndpoint p s c) n) (NPar (NEndpoint p s' c') n') ∧
+
+  (* These assumptions should be dischargable by the static part of the compiler *)
+  net_wf n ∧
+  ~net_has_node n p ∧
+  conf.payload_size > 0 ∧
+  st1.ffi.oracle = comms_ffi_oracle conf ∧
+  st1.ffi.ffi_state = (p,s.queues,n) ∧
+  st2.ffi.oracle = comms_ffi_oracle conf ∧
+  st2.ffi.ffi_state = (p,s'.queues,n') ∧
+  pSt_pCd_corr s c ∧
+
+  (* These assumptions can only be discharged by the dynamic part of the compiler *)
+  sem_env_cor conf s env1 ∧
+  env_asm env1 conf ∧
+  enc_ok conf env1 (letfuns c) vs1
+  ⇒
+  ∃mc env2 vs2.
+    sem_env_cor conf s' env2 ∧
+    env_asm env2 conf ∧
+    enc_ok conf env2 (letfuns c') vs2 ∧
+    cEval_equiv conf
+      (evaluate (st1 with clock := mc) env1
+                      [compile_endpoint conf vs1 c])
+      (evaluate (st2 with clock := mc) env2
+                      [compile_endpoint conf vs2 c'])
+Proof
+  cheat
+QED
 
 val _ = export_theory ();
