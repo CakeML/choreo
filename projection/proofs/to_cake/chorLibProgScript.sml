@@ -106,32 +106,6 @@ Proof
   rw[FUN_EQ_THM,mllistTheory.take_def,mllistTheory.drop_def]
 QED
 
-Triviality tabulate_lemma:
-  store_lookup ll s1.refs = SOME(W8array l) ∧
-  nsLookup env.v (Short "arr") = Loc ll ⇒
-  ∃ck1 ck2. evaluate (st with clock := ck) env
-    [App Opapp
-      [App Opapp
-       [Var(Long "List" (Short "tabulate"));
-       App Aw8length [Var(Short "arr")]];
-     Fun "index" (App Aw8sub [Var(Short "arr"); Var(Short "index")])]] =
-    (st with clock := ck2, Rval [lv]) ∧ LIST_TYPE WORD8 lv
-Proof
-  tabulate_1_v_def
-QED
-
-Theorem reverse_no_change_refs:
-  ∀ck v env exp s s' res.
-  do_opapp [reverse_v; v] = SOME (env,exp) ∧
-  evaluate (s with clock := ck) env [exp] = (s',res) ⇒
-  s'.refs = s.refs
-Proof
-  ho_match_mp_tac COMPLETE_INDUCTION >> rw[ListProgTheory.reverse_v_def,semanticPrimitivesTheory.do_opapp_def] >> pop_assum mp_tac >>
-  rw[terminationTheory.evaluate_def] >> rw[] >>
-  fs[CaseEq "prod",CaseEq "option",CaseEq "result",CaseEq "bool"] >> rveq >> fs[] >> rveq >> fs[] >>
-  fs[CaseEq "prod"]
-QED
-
 Triviality evaluate_rev_v_refs:
   ∀ck v env exp s s' res env' exp' v v' v''.
   evaluate (s with clock := ck) env [exp] = (s with clock := ck,Rval [v']) ∧
@@ -198,6 +172,76 @@ Proof
   fs[terminationTheory.evaluate_def] >> rveq >> fs[] >> rveq >> fs[evaluateTheory.dec_clock_def] >>
   match_mp_tac evaluate_rev_v_refs >>
   fs[ListProgTheory.rev_v_def,semanticPrimitivesTheory.do_opapp_def, Once semanticPrimitivesTheory.find_recfun_def] >>
+  simp[Once terminationTheory.evaluate_def] >>
+  goal_assum drule
+QED
+
+Triviality length_aux_no_change_refs:
+  ∀ck v env exp s s' res env' exp' v v' v''.
+  evaluate (s with clock := ck) env [exp] = (s with clock := ck,Rval [v']) ∧
+  do_opapp [length_aux_v; v] = SOME (env,exp) ∧
+  do_opapp [v'; v''] = SOME (env',exp') ∧
+  evaluate (s with clock := ck) env' [exp'] = (s',res)
+  ⇒
+  s'.refs = s.refs
+Proof
+  ho_match_mp_tac COMPLETE_INDUCTION >>
+  rw[ListProgTheory.length_aux_v_def,semanticPrimitivesTheory.do_opapp_def] >>
+  fs[Once semanticPrimitivesTheory.find_recfun_def] >> rveq >>
+  rpt(qpat_x_assum ‘evaluate _ _ _ = _’ mp_tac) >>
+  rw[terminationTheory.evaluate_def] >> rw[] >>
+  fs[] >> rveq >>
+  last_x_assum mp_tac >>
+  simp[Once terminationTheory.evaluate_def] >>
+  strip_tac >>
+  last_x_assum mp_tac >>
+  EVAL_TAC >>
+  rw[semanticPrimitivesTheory.can_pmatch_all_def] >> rw[] >>
+  qpat_x_assum ‘evaluate_match _ _ _ _  _ = _’ mp_tac >>
+  simp[terminationTheory.evaluate_def] >>
+  rw[CaseEq "match_result",CaseEq "option",CaseEq "prod", CaseEq "result",astTheory.pat_bindings_def,semanticPrimitivesTheory.do_app_def] >> rw[] >>
+  fs[CaseEq "bool"] >> rveq >> fs[] >>
+  fs[CaseEq "prod",CaseEq "option",CaseEq "result"] >> rveq >> fs[] >>
+  rveq >> fs[] >>
+  Cases_on ‘v’ >> fs[terminationTheory.pmatch_def] >>
+  rename1 ‘Conv stmp vss’ >> Cases_on ‘stmp’ >> fs[terminationTheory.pmatch_def] >>
+  fs[CaseEq "option",CaseEq "prod", CaseEq "result",CaseEq "bool"] >> rveq >> fs[] >>
+  Cases_on ‘vss’ >> fs[terminationTheory.pmatch_def] >>
+  fs[quantHeuristicsTheory.LIST_LENGTH_1] >> rveq >> fs[terminationTheory.pmatch_def] >>
+  rveq >> fs[] >> rveq >> fs[] >>
+  fs[semanticPrimitivesTheory.do_opapp_def, Once semanticPrimitivesTheory.find_recfun_def] >>
+  rveq >> fs[] >> fs[CaseEq "v",CaseEq"lit"] >> rveq >> fs[] >>
+  qpat_x_assum ‘evaluate _ _ [Fun _ _] = _’ mp_tac >>
+  rw[terminationTheory.evaluate_def] >> fs[evaluateTheory.dec_clock_def] >>
+  rveq >> fs[] >>
+  first_x_assum(qspec_then ‘ck - 2’ mp_tac) >>
+  impl_tac >- simp[] >>
+  disch_then(qspecl_then [‘s’,‘s'’,‘res’] mp_tac) >>
+  pop_assum (assume_tac o GSYM) >>
+  simp[] >>
+  disch_then match_mp_tac >>
+  rename1 ‘nsBind _ vv (nsBind _ vvv _)’ >>
+  qexists_tac ‘vvv’ >> qexists_tac ‘vv’ >>
+  rpt(AP_TERM_TAC ORELSE AP_THM_TAC) >>
+  EVAL_TAC >>
+  rw[namespacePropsTheory.nsAppend_nsEmpty |> REWRITE_RULE [namespaceTheory.nsEmpty_def]]
+QED
+
+Theorem length_no_change_refs:
+  ∀ck v env exp s s' res.
+  do_opapp [length_v; v] = SOME (env,exp) ∧
+  evaluate (s with clock := ck) env [exp] = (s',res) ⇒
+  s'.refs = s.refs
+Proof
+  rw[ListProgTheory.length_v_def,semanticPrimitivesTheory.do_opapp_def] >> pop_assum mp_tac >>
+  rw[terminationTheory.evaluate_def] >> rw[] >>
+  fs[CaseEq "prod",CaseEq "option",CaseEq "result",CaseEq "bool"] >> rveq >> fs[] >> rveq >> fs[] >>
+  qpat_x_assum ‘nsLookup _ _ = _’ mp_tac >> EVAL_TAC >> strip_tac >> rveq >> fs[] >>
+  fs[ListProgTheory.length_aux_v_def,semanticPrimitivesTheory.do_opapp_def, Once semanticPrimitivesTheory.find_recfun_def] >>
+  rveq >> fs[] >>
+  fs[terminationTheory.evaluate_def] >> rveq >> fs[] >> rveq >> fs[evaluateTheory.dec_clock_def] >>
+  match_mp_tac length_aux_no_change_refs >>
+  fs[ListProgTheory.length_aux_v_def,semanticPrimitivesTheory.do_opapp_def, Once semanticPrimitivesTheory.find_recfun_def] >>
   simp[Once terminationTheory.evaluate_def] >>
   goal_assum drule
 QED
@@ -459,6 +503,243 @@ Proof
       EVAL_TAC >>
       rw[namespacePropsTheory.nsAppend_nsEmpty |> REWRITE_RULE [namespaceTheory.nsEmpty_def]] >>
       NO_TAC) >>
+  TRY(rename1 ‘base_conf.fromList’ >>
+      CONV_TAC(STRIP_QUANT_CONV(RATOR_CONV(RAND_CONV(LHS_CONV EVAL)))) >>
+      rw[fetch "-" "ChorLib_fromList_v_def",semanticPrimitivesTheory.do_opapp_def] >>
+      ntac 8 (simp[Once terminationTheory.evaluate_def,semanticPrimitivesTheory.do_app_def]) >>
+      qpat_abbrev_tac ‘a1 = nsLookup _ _’ >>
+      pop_assum (mp_tac o PURE_REWRITE_RULE[markerTheory.Abbrev_def]) >>
+      disch_then(assume_tac o CONV_RULE(RHS_CONV EVAL)) >>
+      rveq >>
+      simp[] >>
+      Q.ISPEC_THEN ‘WORD8’ assume_tac (GEN_ALL(ListProgTheory.length_v_thm)) >>
+      fs[ml_translatorTheory.Arrow_def,ml_translatorTheory.AppReturns_def] >>
+      first_x_assum drule >> disch_then(qspec_then ‘s1.refs’ strip_assume_tac) >>
+      dxrule ml_translatorTheory.evaluate_empty_state_IMP >> strip_tac >>
+      fs[ml_progTheory.eval_rel_def] >>
+      Q.REFINE_EXISTS_TAC ‘SUC ck11’ >>
+      simp[evaluateTheory.dec_clock_def] >>
+      dxrule evaluatePropsTheory.evaluate_set_clock >> impl_tac >- simp[] >>
+      disch_then(qspec_then ‘0’ mp_tac) >> simp[] >> strip_tac >>
+      rename1 ‘evaluate (_ with clock := ck1)’ >>
+      drule evaluatePropsTheory.evaluate_add_to_clock >>
+      impl_tac >- simp[] >>
+      simp[] >> strip_tac >>
+      Q.REFINE_EXISTS_TAC ‘ck1 + ck11’ >>
+      simp[] >>
+      fs[ml_translatorTheory.NUM_def,ml_translatorTheory.INT_def] >>
+      ‘refs' = []’
+        by(drule_then drule length_no_change_refs >> fs[]) >>
+      rveq >> fs[] >>
+      simp[semanticPrimitivesTheory.store_alloc_def] >>
+      ntac 8 (simp[Once terminationTheory.evaluate_def]) >>
+      qpat_abbrev_tac ‘a1 = nsLookup _ _’ >>
+      pop_assum (mp_tac o PURE_REWRITE_RULE[markerTheory.Abbrev_def]) >>
+      disch_then(assume_tac o CONV_RULE(RHS_CONV EVAL)) >>
+      rveq >>
+      simp[] >>
+      qpat_abbrev_tac ‘a1 = nsLookup _ _’ >>
+      pop_assum (mp_tac o PURE_REWRITE_RULE[markerTheory.Abbrev_def]) >>
+      disch_then(assume_tac o CONV_RULE(RHS_CONV EVAL)) >>
+      rveq >>
+      simp[] >>
+      simp[ListProgTheory.mapi_1_v_def,semanticPrimitivesTheory.do_opapp_def] >>
+      ntac 2 (pop_assum kall_tac) >>
+      Q.REFINE_EXISTS_TAC ‘SUC ck1’ >>
+      simp[evaluateTheory.dec_clock_def] >>
+      simp[Once terminationTheory.evaluate_def] >>
+      Q.REFINE_EXISTS_TAC ‘SUC ck1’ >>
+      simp[evaluateTheory.dec_clock_def] >>
+      ntac 10 (simp[Once terminationTheory.evaluate_def]) >>
+      qpat_abbrev_tac ‘a1 = nsLookup _ _’ >>
+      pop_assum (mp_tac o PURE_REWRITE_RULE[markerTheory.Abbrev_def]) >>
+      disch_then(assume_tac o CONV_RULE(RHS_CONV EVAL)) >>
+      rveq >>
+      simp[] >>
+      simp[semanticPrimitivesTheory.do_opapp_def,ListProgTheory.mapi_v_def,
+           Once semanticPrimitivesTheory.find_recfun_def] >>
+      Q.REFINE_EXISTS_TAC ‘SUC ck1’ >>
+      simp[evaluateTheory.dec_clock_def] >>
+      simp[Once terminationTheory.evaluate_def] >>
+      Q.REFINE_EXISTS_TAC ‘SUC ck1’ >>
+      simp[evaluateTheory.dec_clock_def] >>
+      simp[Once terminationTheory.evaluate_def] >>
+      Q.REFINE_EXISTS_TAC ‘SUC ck1’ >>
+      simp[evaluateTheory.dec_clock_def] >>
+      pop_assum kall_tac >>
+      ‘∃index. index = 0:num’ by simp[] >>
+      ‘Litv (IntLit 0) = Litv (IntLit(&index))’ by simp[] >>
+      pop_assum SUBST_ALL_TAC >>
+      ‘REPLICATE (LENGTH l) 0w = TAKE index l ++ REPLICATE (LENGTH l - index) 0w’
+        by simp[] >>
+      pop_assum SUBST_ALL_TAC >>
+      ‘∃tlv. LIST_TYPE WORD8 (DROP index l) tlv ∧ lv = tlv’ by simp[] >>
+      pop_assum (fn thm => PURE_ONCE_REWRITE_TAC [Once thm]) >>
+      ‘index ≤ LENGTH l’ by simp[] >>
+      qpat_x_assum ‘_ = _’ kall_tac >>
+      rpt(pop_assum mp_tac) >>
+      MAP_EVERY qid_spec_tac [‘lv’,‘s1’,‘tlv’] >>
+      Induct_on ‘LENGTH l - index’ >-
+        (rw[] >> drule_all_then strip_assume_tac LESS_EQUAL_ANTISYM >>
+         rveq >>
+         fs[DROP_LENGTH_TOO_LONG] >>
+         ntac 3 (simp[Once terminationTheory.evaluate_def]) >>
+         fs[ml_translatorTheory.LIST_TYPE_def] >> rveq >>
+         simp[semanticPrimitivesTheory.can_pmatch_all_def,
+              terminationTheory.pmatch_def] >>
+         qpat_abbrev_tac ‘a1 = nsLookup _ _’ >>
+         pop_assum (mp_tac o PURE_REWRITE_RULE[markerTheory.Abbrev_def]) >>
+         disch_then(assume_tac o CONV_RULE(RHS_CONV EVAL)) >>
+         rveq >>
+         simp[] >>
+         qpat_abbrev_tac ‘a1 = nsLookup _ _’ >>
+         pop_assum (mp_tac o PURE_REWRITE_RULE[markerTheory.Abbrev_def]) >>
+         disch_then(assume_tac o CONV_RULE(RHS_CONV EVAL)) >>
+         rveq >>
+         simp[] >>
+         simp[semanticPrimitivesTheory.same_type_def,semanticPrimitivesTheory.same_ctor_def,
+              astTheory.pat_bindings_def] >>
+         simp[Once terminationTheory.evaluate_def] >>
+         simp[semanticPrimitivesTheory.do_con_check_def] >>
+         qpat_abbrev_tac ‘a1 = nsLookup _ _’ >>
+         pop_assum (mp_tac o PURE_REWRITE_RULE[markerTheory.Abbrev_def]) >>
+         disch_then(assume_tac o CONV_RULE(RHS_CONV EVAL)) >>
+         rveq >>
+         simp[] >>
+         simp[semanticPrimitivesTheory.build_conv_def] >>
+         qpat_abbrev_tac ‘a1 = nsLookup _ _’ >>
+         pop_assum (mp_tac o PURE_REWRITE_RULE[markerTheory.Abbrev_def]) >>
+         disch_then(assume_tac o CONV_RULE(RHS_CONV EVAL)) >>
+         rveq >>
+         simp[] >>
+         simp[terminationTheory.evaluate_def] >>
+         qpat_abbrev_tac ‘a1 = nsLookup _ _’ >>
+         pop_assum (mp_tac o PURE_REWRITE_RULE[markerTheory.Abbrev_def]) >>
+         disch_then(assume_tac o CONV_RULE(RHS_CONV EVAL)) >>
+         rveq >>
+         simp[] >>
+         simp[semanticPrimitivesTheory.state_component_equality]) >>
+      rw[] >>
+      qpat_x_assum ‘SUC _ = _’ (assume_tac o GSYM) >>
+      ntac 3 (simp[Once terminationTheory.evaluate_def]) >>
+      fs[DROP_EL_CONS] >>
+      fs[ml_translatorTheory.LIST_TYPE_def] >> rveq >>
+      simp[semanticPrimitivesTheory.can_pmatch_all_def,
+           terminationTheory.pmatch_def] >>
+      qpat_abbrev_tac ‘a1 = nsLookup _ _’ >>
+      pop_assum (mp_tac o PURE_REWRITE_RULE[markerTheory.Abbrev_def]) >>
+      disch_then(assume_tac o CONV_RULE(RHS_CONV EVAL)) >>
+      rveq >>
+      simp[] >>
+      simp[semanticPrimitivesTheory.same_type_def,semanticPrimitivesTheory.same_ctor_def,
+           astTheory.pat_bindings_def] >>
+      qpat_abbrev_tac ‘a1 = nsLookup _ _’ >>
+      pop_assum (mp_tac o PURE_REWRITE_RULE[markerTheory.Abbrev_def]) >>
+      disch_then(assume_tac o CONV_RULE(RHS_CONV EVAL)) >>
+      rveq >>
+      simp[] >>
+      simp[Once terminationTheory.evaluate_def,astTheory.pat_bindings_def,
+          terminationTheory.pmatch_def] >>
+      qpat_abbrev_tac ‘a1 = nsLookup _ _’ >>
+      pop_assum (mp_tac o PURE_REWRITE_RULE[markerTheory.Abbrev_def]) >>
+      disch_then(assume_tac o CONV_RULE(RHS_CONV EVAL)) >>
+      rveq >>
+      simp[] >>
+      ntac 8 (simp[Once terminationTheory.evaluate_def]) >>
+      simp[semanticPrimitivesTheory.do_opapp_def] >>
+      Q.REFINE_EXISTS_TAC ‘SUC ck1’ >>
+      simp[evaluateTheory.dec_clock_def] >>
+      simp[Once terminationTheory.evaluate_def] >>
+      Q.REFINE_EXISTS_TAC ‘SUC ck1’ >>
+      simp[evaluateTheory.dec_clock_def] >>
+      ntac 6 (simp[Once terminationTheory.evaluate_def]) >>
+      qpat_abbrev_tac ‘a1 = nsLookup _ _’ >>
+      pop_assum (mp_tac o PURE_REWRITE_RULE[markerTheory.Abbrev_def]) >>
+      disch_then(assume_tac o CONV_RULE(RHS_CONV EVAL)) >>
+      rveq >>
+      simp[] >>
+      fs[ml_translatorTheory.WORD_def] >>
+      simp[semanticPrimitivesTheory.do_app_def] >>
+      simp[semanticPrimitivesTheory.store_lookup_def,EL_APPEND_EQN] >>
+      simp[semanticPrimitivesTheory.store_assign_def,EL_APPEND_EQN,
+           semanticPrimitivesTheory.store_v_same_type_def] >>
+      simp[LUPDATE_APPEND] >>
+      simp[LUPDATE_def] >>
+      ntac 5 (simp[Once terminationTheory.evaluate_def]) >>
+      simp[semanticPrimitivesTheory.do_con_check_def] >>
+      qpat_abbrev_tac ‘a1 = nsLookup _ _’ >>
+      pop_assum (mp_tac o PURE_REWRITE_RULE[markerTheory.Abbrev_def]) >>
+      disch_then(assume_tac o CONV_RULE(RHS_CONV EVAL)) >>
+      rveq >>
+      simp[] >>
+      qpat_abbrev_tac ‘a1 = nsLookup _ _’ >>
+      pop_assum (mp_tac o PURE_REWRITE_RULE[markerTheory.Abbrev_def]) >>
+      disch_then(assume_tac o CONV_RULE(RHS_CONV EVAL)) >>
+      rveq >>
+      simp[] >>
+      ntac 6 (simp[Once terminationTheory.evaluate_def]) >>
+      qpat_abbrev_tac ‘a1 = nsLookup _ _’ >>
+      pop_assum (mp_tac o PURE_REWRITE_RULE[markerTheory.Abbrev_def]) >>
+      disch_then(assume_tac o CONV_RULE(RHS_CONV EVAL)) >>
+      rveq >>
+      simp[] >>
+      simp[semanticPrimitivesTheory.do_app_def] >>
+      ntac 3 (simp[Once terminationTheory.evaluate_def]) >>
+      qpat_abbrev_tac ‘a1 = nsLookup _ _’ >>
+      pop_assum (mp_tac o PURE_REWRITE_RULE[markerTheory.Abbrev_def]) >>
+      disch_then(assume_tac o CONV_RULE(RHS_CONV EVAL)) >>
+      rveq >>
+      simp[] >>
+      simp[Once terminationTheory.evaluate_def] >>
+      qpat_abbrev_tac ‘a1 = nsLookup _ _’ >>
+      pop_assum (mp_tac o PURE_REWRITE_RULE[markerTheory.Abbrev_def]) >>
+      disch_then(assume_tac o CONV_RULE(RHS_CONV EVAL)) >>
+      rveq >>
+      simp[] >>
+      simp[semanticPrimitivesTheory.do_opapp_def] >>
+      simp[Once semanticPrimitivesTheory.find_recfun_def] >>
+      Q.REFINE_EXISTS_TAC ‘SUC ck1’ >>
+      simp[evaluateTheory.dec_clock_def] >>
+      simp[Once terminationTheory.evaluate_def] >>
+      Q.REFINE_EXISTS_TAC ‘SUC ck1’ >>
+      simp[evaluateTheory.dec_clock_def] >>
+      simp[Once terminationTheory.evaluate_def] >>
+      Q.REFINE_EXISTS_TAC ‘SUC ck1’ >>
+      simp[evaluateTheory.dec_clock_def] >>
+      simp[semanticPrimitivesTheory.opn_lookup_def] >>
+      first_x_assum(qspecl_then [‘l’,‘index + 1’] mp_tac) >>
+      impl_tac >- fs[] >>
+      disch_then drule >> disch_then drule >>
+      impl_tac >- fs[] >>
+      disch_then(qspec_then ‘s1’ strip_assume_tac) >>
+      qexists_tac ‘ck1’ >> qexists_tac ‘ck2'’ >>
+      pop_assum mp_tac >>
+      simp[SimpL “$==>”,CaseEq"prod",CaseEq"option",CaseEq "result",PULL_EXISTS] >>
+      rpt strip_tac >>
+      pop_assum mp_tac >>
+      simp[SimpL “$==>”,Once terminationTheory.evaluate_def] >>
+      qpat_abbrev_tac ‘a1 = nsLookup _ _’ >>
+      pop_assum (mp_tac o PURE_REWRITE_RULE[markerTheory.Abbrev_def]) >>
+      disch_then(assume_tac o CONV_RULE(RHS_CONV EVAL)) >>
+      rveq >>
+      simp[] >>
+      strip_tac >> rveq >>
+      simp[CaseEq"prod",CaseEq"option",CaseEq "result",PULL_EXISTS] >>
+      simp[SimpR “$/\”,Once terminationTheory.evaluate_def] >>
+      simp[SimpR “$/\”,namespaceTheory.nsOptBind_def] >>
+      qmatch_asmsub_abbrev_tac ‘evaluate as1 ae1’ >>
+      qmatch_goalsub_abbrev_tac ‘evaluate as2 ae2’ >>
+      ‘ae1 = ae2 ∧ as1 = as2’
+        by(unabbrev_all_tac >> EVAL_TAC >>
+           simp[] >>
+           simp[integerTheory.INT |> REWRITE_RULE[ADD1]] >>
+           simp[semanticPrimitivesTheory.state_component_equality] >>
+           simp[TAKE_EL_SNOC] >>
+           rpt(AP_TERM_TAC ORELSE AP_THM_TAC) >>
+           rw[]) >>
+      fs[] >>
+      unabbrev_all_tac >>
+      EVAL_TAC >> simp[] >> NO_TAC) >>
   cheat
 QED
 
