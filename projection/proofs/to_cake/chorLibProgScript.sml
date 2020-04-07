@@ -739,8 +739,7 @@ Proof
            rw[]) >>
       fs[] >>
       unabbrev_all_tac >>
-      EVAL_TAC >> simp[] >> NO_TAC) >>
-  cheat
+      EVAL_TAC >> simp[] >> NO_TAC)
 QED
 
 val _ = export_theory ();

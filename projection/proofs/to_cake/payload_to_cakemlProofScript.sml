@@ -60,8 +60,6 @@ Definition env_asm_def:
            ⇒ ∀s1: unit semanticPrimitives$state. ∃env' exp ck1 ck2. do_opapp [v; lv] = SOME(env',exp)
                ∧ evaluate (s1 with clock := ck1) env' [exp] =
                   (s1 with <|clock := ck2; refs := s1.refs ++ [W8array l]|>,Rval [Loc(LENGTH s1.refs)]))) ∧
-    in_module conf.nil ∧
-    in_module conf.cons ∧
     in_module conf.append ∧
     in_module conf.concat ∧
     in_module conf.length ∧
