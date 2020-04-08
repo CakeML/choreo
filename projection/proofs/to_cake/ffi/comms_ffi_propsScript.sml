@@ -389,25 +389,4 @@ Proof
   >- metis_tac[valid_send_dest_def,strans_send_cond]
 QED
 
-
-(* FFI State Receive property *)
-Definition ffi_receives_def:
-  ffi_receives conf st src msg =
-    ((conf.payload_size > 0) ∧
-    (LENGTH msg > 0) ∧
-    (∀s param bytes.
-      conf.payload_size > 0 ∧
-      LENGTH msg > 0 ∧
-      valid_receive_call_format conf src s param bytes ⇒
-      ∃nst nbytes.
-          call_FFI st s param bytes = FFI_return nst nbytes ∧
-          nbytes = pad conf msg ∧
-          (final nbytes ∨
-           (intermediate nbytes ∧
-            ffi_receives conf nst src (DROP conf.payload_size msg)))))
-Termination
-  WF_REL_TAC ‘measure (λ(_,_,_,msg). LENGTH msg)’ >>
-  rw[]
-End
-
 val _ = export_theory ();
