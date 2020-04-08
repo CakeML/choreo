@@ -2,9 +2,8 @@ ifndef CAKEDIR
 CAKEDIR = ../../cakeml
 endif
 
-INCLUDES = $(CAKEDIR)/misc $(CAKEDIR)/semantics ../semantics ../semantics/proofs
-OPTIONS = QUIT_ON_FAILURE
+INCLUDES = $(CAKEDIR)/misc $(CAKEDIR)/semantics \
+           $(CHOREODIR)/semantics $(CHOREODIR)/semantics/proofs
 
-THYFILES = $(patsubst %Script.sml,%Theory.uo,$(wildcard *.sml))
-TARGETS0 = $(patsubst %Theory.sml,,$(THYFILES))
-TARGETS = $(patsubst %.sml,%.uo,$(TARGETS0))
+all: $(DEFAULT_TARGETS)
+.PHONY: all

@@ -62,6 +62,25 @@ Proof
   Induct_on `c` >> rw [procsOf_def,ALL_DISTINCT,all_distinct_nub']
 QED
 
+(* The set of all processes in a choreography that need to receive from a specific process *)
+Definition receiversOf_def:
+  receiversOf pn  Nil               = []
+∧ receiversOf pn (IfThen _ p l r)   = nub' (receiversOf pn l ++ receiversOf pn r)
+∧ (receiversOf pn (Com p _ q _ c)    = if p = pn then nub' (q::receiversOf pn c)
+                                       else nub' (receiversOf pn c))
+∧ (receiversOf pn (Sel p _ q c)      = if p = pn then nub' (q::receiversOf pn c)
+                                       else nub' (receiversOf pn c))
+∧ receiversOf pn (Let _ p _ _ c)    = nub' (receiversOf pn c)
+End
+
+Definition letfunsOf_def:
+  letfunsOf pn  Nil               = []
+∧ letfunsOf pn (IfThen _ p l r)   = letfunsOf pn l ++ letfunsOf pn r
+∧ letfunsOf pn (Com p _ q _ c)    = letfunsOf pn c
+∧ letfunsOf pn (Sel p _ q c)      = letfunsOf pn c
+∧ letfunsOf pn (Let _ p f _ c)    = (if p = pn then f::letfunsOf pn c else  letfunsOf pn c)
+End
+        
 Inductive lcong:
 (* Congruence rules for lists of asyncronous operations *)
 
