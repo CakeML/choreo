@@ -16,7 +16,7 @@ val ping = “MAP (^n2w8 o ORD) "ping"” |> EVAL |> concl |> rhs;
 val pong = “MAP (^n2w8 o ORD) "pong"” |> EVAL |> concl |> rhs;
 
 Definition KNil_def :
-  KNil = K []
+  KNil args = []
 End
 
 val _ = ml_prog_update (open_module "pingpong");
@@ -36,8 +36,7 @@ Definition pingpong_def:
    )
 End
 
-val (ping_to_cake_thm,ping_to_cake_wholeprog) =
-  project_to_cake_with_letfuns “pingpong” "ping" 1 "pingpong" ["KNil"]
+val (ping_to_cake_thm,ping_to_cake_wholeprog) = project_to_cake ``pingpong`` "ping" 1
 
 val _ = astToSexprLib.write_ast_to_file "ping.sexp" ping_to_cake_wholeprog;
 

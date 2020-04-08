@@ -7,8 +7,8 @@ struct
   open fromSexpTheory;
   open astToSexprLib;
 
-  val n2w8 = “n2w:num -> word8”;  
-  
+  val n2w8 = “n2w:num -> word8”;
+
   fun pnames chor =
       “MAP (MAP (CHR o w2n)) (procsOf ^chor)”
      |> EVAL
@@ -38,7 +38,7 @@ struct
      |> map pairSyntax.dest_pair
      |> map (fn (n,l) => (stringSyntax.fromHOLstring n,
                           map stringSyntax.fromHOLstring(fst(listSyntax.dest_list l))))
-     
+
   fun mk_camkes_assembly chor =
       let
         val rectbl = rectbl chor
@@ -71,7 +71,7 @@ struct
           "        component Producer producer;\n",
           String.concat decls,
           "\n",
-          String.concat connections,          
+          String.concat connections,
           "    }\n",
           "}\n"
         ]
@@ -123,7 +123,7 @@ struct
         TextIO.output(st,contents);
         TextIO.closeOut st
       end
-        
+
   fun mk_camkes_boilerplate builddir chorname chor =
       let
         val _ = mkdir builddir
@@ -156,7 +156,7 @@ struct
 
       val letfuns_tm =
           listSyntax.mk_list(map stringSyntax.fromMLstring letfuns, “:string”)
-          
+
 
       val to_cake_thm = “compile_endpoint ^conf ^letfuns_tm ^p_code” |> EVAL
 
@@ -166,5 +166,69 @@ struct
     in
       (to_cake_thm,to_cake_wholeprog)
     end
-      
+
+  fun obtain_letfun tm =
+      if can lookup_v_thm tm then
+        let
+          val vname = lookup_v_thm tm |> concl |> rator |> rand |> rand;
+        in
+          if term_eq (rator vname) “Short:(string -> (string,string) id)” then
+            NONE
+          else
+            SOME(rand(rator vname),rand(rand vname))
+        end
+       else
+        NONE
+
+  fun project_to_cake chor p payload_size =
+    let
+      val ptm = “MAP (^n2w8 o ORD) ^(stringSyntax.fromMLstring p)” |> EVAL |> concl |> rhs
+
+      val letfun_names = “letfunsOf ^ptm ^chor” |> EVAL |> concl |> rhs |> listSyntax.dest_list |> fst
+
+      val letfuns = map obtain_letfun letfun_names
+
+      val _ = if all isSome letfuns then
+                ()
+              else
+                (print "Error: there are untranslated functions\n"; raise Domain);
+
+      val letfuns = map valOf letfuns;
+
+      val letmodule = if null letfuns then “ARB:string”
+                      else if all (term_eq (fst(hd letfuns)) o fst) letfuns then
+                        fst(hd letfuns)
+                      else
+                        (print "Error: all letfuns must inhabit the same module\n"; raise Domain);
+
+      val conf =
+          “base_conf with <|payload_size := ^(numSyntax.term_of_int payload_size);
+                            letModule := ^letmodule|>”
+      val compile_to_payload_thm =
+          “projection ^conf FEMPTY ^chor (procsOf ^chor)”
+           |> EVAL |> PURE_REWRITE_RULE [DRESTRICT_FEMPTY,MAP_KEYS_FEMPTY]
+      val (p_state,p_code) =
+          “THE(ALOOKUP (endpoints ^(compile_to_payload_thm |> concl |> rhs)) ^ptm)”
+          |> EVAL |> concl |> rhs |> pairSyntax.dest_pair
+
+      val letfun_names = “letfuns ^p_code” |> EVAL |> concl |> rhs |> listSyntax.dest_list |> fst
+
+      val letfuns = map obtain_letfun letfun_names
+
+      val _ = if all isSome letfuns then
+                ()
+              else
+                (print "Error: there are untranslated functions\n"; raise Domain);
+
+      val letfuns_tm = listSyntax.mk_list(map (snd o valOf) letfuns, “:string”)
+
+      val to_cake_thm = “compile_endpoint ^conf ^letfuns_tm ^p_code” |> EVAL
+
+      val to_cake_wholeprog =
+          “SNOC (Dlet unknown_loc Pany ^(to_cake_thm |> concl |> rhs))
+           ^(ml_progLib.get_prog (get_ml_prog_state()))” |> EVAL |> concl |> rhs
+    in
+      (to_cake_thm,to_cake_wholeprog)
+    end
+
 end
