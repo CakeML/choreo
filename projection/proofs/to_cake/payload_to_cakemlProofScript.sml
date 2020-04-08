@@ -2740,6 +2740,41 @@ Proof
      cheat
 QED
 
+Theorem NPar_trans_l_cases:
+  ∀p s c s' c' conf n n'.
+   trans conf (NPar (NEndpoint p s c) n) LTau (NPar (NEndpoint p s' c') n')
+   ⇒ (s = s' ∧ c = c') ∨
+     ∃L. trans conf (NEndpoint p s c) L (NEndpoint p s' c')
+Proof
+  rw []
+  \\ qpat_x_assum `trans _ _ _ _` (mp_tac o PURE_ONCE_REWRITE_RULE [trans_cases])
+  \\ rw [] \\ metis_tac []
+QED
+
+Theorem trans_not_same:
+  ∀conf n1 l n2 . trans conf n1 l n2 ∧ conf.payload_size > 0 ⇒ n1 ≠ n2
+Proof
+  cheat
+QED
+
+Theorem trans_ffi_eq_same:
+  ∀p s c l conf n n'.
+   ffi_wf (p,s,n) ∧
+   conf.payload_size > 0 ∧
+   trans conf (NPar (NEndpoint p s c) n ) LTau
+              (NPar (NEndpoint p s c) n')
+   ⇒ ffi_eq conf (p,s.queues,n) (p,s.queues,n')
+Proof
+  rw []
+  \\ irule internal_trans_equiv_irrel
+  \\ fs [ffi_wf_def]
+  \\ irule RTC_SINGLE
+  \\ fs [comms_ffi_consTheory.internal_trans_def]
+  \\ ntac 2 (last_x_assum (K ALL_TAC))
+  \\ pop_assum (assume_tac o ONCE_REWRITE_RULE [trans_cases]) \\ fs []
+  \\ IMP_RES_TAC trans_not_same \\ rw [] \\ fs []
+QED
+
 Theorem network_forward_correctness:
   ∀conf p s c n p s' c' n' st1 vs1 env1 st2.
   trans conf (NPar (NEndpoint p s c) n) LTau (NPar (NEndpoint p s' c') n') ∧
@@ -2769,7 +2804,20 @@ Theorem network_forward_correctness:
       (evaluate (st2 with clock := mc) env2
                       [compile_endpoint conf vs2 c'])
 Proof
-  cheat
+   rw []
+   \\ drule_then assume_tac NPar_trans_l_cases
+   \\ fs [] \\ rveq
+   >- (asm_exists_tac \\ fs []
+       \\ asm_exists_tac \\ fs []
+       \\ irule ffi_irrel \\ fs []
+       \\ conj_tac
+       >- metis_tac [ffi_wf_def,trans_ffi_eq_same]
+       \\ MAP_EVERY qexists_tac [‘p’,‘s’]
+       \\ rw [cpEval_valid_def,ffi_state_cor_def,ffi_wf_def]
+       (* Show that ffi_wf is preserver through trans *)
+       \\  cheat)
+   \\ cheat
+
 QED
 
 Theorem network_forward_correctness_reduction:
