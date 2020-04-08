@@ -4,6 +4,8 @@ open chorLibProgTheory;
 open fromSexpTheory;
 open astToSexprLib;
 
+open projectionLib;
+
 val _ = new_theory "pingpong";
 
 val _ = translation_extends "chorLibProg";
@@ -18,7 +20,6 @@ Definition KNil_def :
 End
 
 val _ = ml_prog_update (open_module "pingpong");
-
 
 val _ = next_ml_names := ["KNil"];
 Theorem KNil_v_thm = translate KNil_def;
@@ -35,24 +36,8 @@ Definition pingpong_def:
    )
 End
 
-Definition pingpong_conf:
-  pingpong_conf = base_conf with letModule := "pingpong"
-End
-
-Theorem compile_to_payload_thm =
-  “projection pingpong_conf FEMPTY pingpong [^ping; ^pong]”
-  |> EVAL |> PURE_REWRITE_RULE [DRESTRICT_FEMPTY,MAP_KEYS_FEMPTY];
-
-val [(ping_state,ping_code), (pong_state,pong_code)] =
-  “endpoints ^(compile_to_payload_thm |> concl |> rhs)” |> EVAL |> concl |> rhs |>
-  listSyntax.dest_list |> fst |> map pairSyntax.dest_pair |>
-  map snd |> map pairSyntax.dest_pair
-
-Theorem ping_to_cake_thm = “compile_endpoint pingpong_conf ["KNil"] ^ping_code” |> EVAL
-
-val ping_to_cake_wholeprog =
-  “SNOC (Dlet unknown_loc Pany ^(ping_to_cake_thm |> concl |> rhs))
-        ^(ml_progLib.get_prog (get_ml_prog_state()))” |> EVAL |> concl |> rhs
+val (ping_to_cake_thm,ping_to_cake_wholeprog) =
+  project_to_cake_with_letfuns “pingpong” "ping" 1 "pingpong" ["KNil"]
 
 val _ = astToSexprLib.write_ast_to_file "ping.sexp" ping_to_cake_wholeprog;
 

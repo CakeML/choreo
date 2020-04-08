@@ -1,7 +1,14 @@
-structure projectionLib =
+structure projectionLib :> projectionLib =
 struct
   (* TODO: open local parse context like a good boy *)
+  open preamble chorLangTheory chorSemTheory projectionTheory
+     payload_to_cakemlTheory basisProgTheory ml_translatorLib ml_progLib basisFunctionsLib;
+  open chorLibProgTheory;
+  open fromSexpTheory;
+  open astToSexprLib;
 
+  val n2w8 = “n2w:num -> word8”;  
+  
   fun pnames chor =
       “MAP (MAP (CHR o w2n)) (procsOf ^chor)”
      |> EVAL
@@ -10,6 +17,16 @@ struct
      |> listSyntax.dest_list
      |> fst
      |> map stringSyntax.fromHOLstring
+
+  fun letfunstbl chor =
+     “MAP (λp. (MAP (CHR o w2n) p, letfunsOf p ^chor)) (procsOf ^chor)”
+     |> EVAL
+     |> concl
+     |> rhs
+     |> listSyntax.dest_list
+     |> fst
+     |> map pairSyntax.dest_pair
+     |> map (fn (n,l) => (stringSyntax.fromHOLstring n,fst(listSyntax.dest_list l)))
 
   fun rectbl chor =
      “MAP (λp. (MAP (CHR o w2n) p, MAP (MAP (CHR o w2n)) (receiversOf p ^chor))) (procsOf ^chor)”
@@ -21,7 +38,7 @@ struct
      |> map pairSyntax.dest_pair
      |> map (fn (n,l) => (stringSyntax.fromHOLstring n,
                           map stringSyntax.fromHOLstring(fst(listSyntax.dest_list l))))
-
+     
   fun mk_camkes_assembly chor =
       let
         val rectbl = rectbl chor
@@ -123,4 +140,31 @@ struct
       in
         ()
       end
+
+  fun project_to_cake_with_letfuns chor p payload_size letmodule letfuns =
+    let
+      val ptm = “MAP (^n2w8 o ORD) ^(stringSyntax.fromMLstring p)” |> EVAL |> concl |> rhs
+      val conf =
+          “base_conf with <|payload_size := ^(numSyntax.term_of_int payload_size);
+                            letModule := ^(stringSyntax.fromMLstring letmodule)|>”
+      val compile_to_payload_thm =
+          “projection ^conf FEMPTY ^chor (procsOf ^chor)”
+           |> EVAL |> PURE_REWRITE_RULE [DRESTRICT_FEMPTY,MAP_KEYS_FEMPTY]
+      val (p_state,p_code) =
+          “THE(ALOOKUP (endpoints ^(compile_to_payload_thm |> concl |> rhs)) ^ptm)”
+          |> EVAL |> concl |> rhs |> pairSyntax.dest_pair
+
+      val letfuns_tm =
+          listSyntax.mk_list(map stringSyntax.fromMLstring letfuns, “:string”)
+          
+
+      val to_cake_thm = “compile_endpoint ^conf ^letfuns_tm ^p_code” |> EVAL
+
+      val to_cake_wholeprog =
+          “SNOC (Dlet unknown_loc Pany ^(to_cake_thm |> concl |> rhs))
+           ^(ml_progLib.get_prog (get_ml_prog_state()))” |> EVAL |> concl |> rhs
+    in
+      (to_cake_thm,to_cake_wholeprog)
+    end
+      
 end

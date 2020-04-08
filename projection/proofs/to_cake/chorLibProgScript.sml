@@ -74,8 +74,7 @@ val _ = ml_prog_update (close_module NONE);
 
 Definition base_conf_def:
   base_conf =
-  <| payload_size := 1;
-     length := ^(get_fun_name ``LENGTH``);
+  <| length := ^(get_fun_name ``LENGTH``);
      null := ^(get_fun_name ``NULL``);
      take := ^(get_fun_name ``mllist$take``);
      drop := ^(get_fun_name ``mllist$drop``);

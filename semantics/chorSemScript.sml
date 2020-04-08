@@ -72,6 +72,14 @@ Definition receiversOf_def:
                                        else nub' (receiversOf pn c))
 ∧ receiversOf pn (Let _ p _ _ c)    = nub' (receiversOf pn c)
 End
+
+Definition letfunsOf_def:
+  letfunsOf pn  Nil               = []
+∧ letfunsOf pn (IfThen _ p l r)   = letfunsOf pn l ++ letfunsOf pn r
+∧ letfunsOf pn (Com p _ q _ c)    = letfunsOf pn c
+∧ letfunsOf pn (Sel p _ q c)      = letfunsOf pn c
+∧ letfunsOf pn (Let _ p f _ c)    = (if p = pn then f::letfunsOf pn c else  letfunsOf pn c)
+End
         
 Inductive lcong:
 (* Congruence rules for lists of asyncronous operations *)
