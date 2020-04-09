@@ -40,12 +40,18 @@ struct
      |> map (fn (n,l) => (stringSyntax.fromHOLstring n,
                           map stringSyntax.fromHOLstring(fst(listSyntax.dest_list l))))
 
+  val transfer_string =
+      String.concat [
+        "procedure TransferString {\n",
+        "    void transfer_string(in string s);\n",
+        "};\n"]
+
   fun mk_camkes_assembly chor =
       let
         val rectbl = rectbl chor
         val pns = map fst rectbl
         fun mk_import name =
-            String.concat ["import \"components/",name,"/",name,"/",name,".camkes\";\n"]
+            String.concat ["import \"components/",name,"/",name,".camkes\";\n"]
         fun mk_component_decl name =
             String.concat ["        component ",name," ",name,";\n"]
         fun mk_connections (p,qs) =
@@ -69,7 +75,6 @@ struct
           "\n",
           "assembly {\n",
           "    composition {\n",
-          "        component Producer producer;\n",
           String.concat decls,
           "\n",
           String.concat connections,
@@ -89,7 +94,7 @@ struct
                       "add_custom_command(\n",
                       "  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/"^p^".S\n",
                       String.concat [
-                        "  COMMAND ${CAKEML_COMPILER} --heap_size=1 --stack_size=1 < ${",
+                        "  COMMAND ${CAKEML_COMPILER} --heap_size=1 --stack_size=1 --exclude_prelude=true --sexp=true < ${",
                         p,"_dir}/",p,".sexp > ${CMAKE_CURRENT_BINARY_DIR}/",
                         p,".S\n"],
                       String.concat [
@@ -139,9 +144,9 @@ struct
         val rrectbl = reverse_table rectbl
         val bidirtbl = ListPair.map (fn ((p,qs),(_,rs)) => (p,qs,rs)) (rectbl,rrectbl)
         fun mk_provides p qs =
-            map (fn q => String.concat ["    provides TransferString ",q,"__recv;\n"]) qs
+            map (fn q => String.concat ["    provides TransferString ",q,"_recv;\n"]) qs
         fun mk_uses p qs =
-            map (fn q => String.concat ["    uses TransferString ",q,"__send;\n"]) qs
+            map (fn q => String.concat ["    uses TransferString ",q,"_send;\n"]) qs
       in
         map
           (fn (p,qs,rs) =>
@@ -188,6 +193,7 @@ struct
             end
         val _ = mk_component_declarations chor |> List.app print_component_declaration
         val _ = print_to_file(builddir^"/CMakeLists.txt") (mk_camkes_cmakefile chorname chor)
+        val _ = print_to_file(builddir^"/interfaces/TransferString.idl4") transfer_string
       in
         ()
       end
