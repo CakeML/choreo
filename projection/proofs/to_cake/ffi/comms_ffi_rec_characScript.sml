@@ -536,10 +536,9 @@ Theorem ffi_gets_stream:
      (∃cs. ffi_divg_stream conf st src cs) ∨
      (∃cs. ffi_fail_stream conf st src cs))
 Proof
-  cheat
-(*
   rw[] >>
   reverse (Induct_on ‘qlk ((λ(_,q,_).q) st.ffi_state) src’)
+  (* Handle non-empty queue inductively *)
   >- (rw[] >> qabbrev_tac ‘fs = st.ffi_state’ >>
       PairCases_on ‘fs’ >> rename1 ‘(c,q,N)’ >> rename1 ‘h::tl’ >>
       first_x_assum (qspecl_then [‘st with ffi_state := (c,q |+ (src,tl),N)’,‘src’] assume_tac) >>
@@ -559,7 +558,7 @@ Proof
               ‘∃s2. strans conf (c,q,N) (ARecv src h) s2’
                 by metis_tac[strans_rules] >>
               qexists_tac ‘(h,s2)’ >> rw[])) >>
-      Cases_on ‘final h’ >>
+      Cases_on ‘final h’
       >- (DISJ1_TAC >> qexists_tac ‘[h]’ >>
           rw[ffi_term_stream_def,call_FFI_def,valid_receive_call_format_def,
              comms_ffi_oracle_def, ffi_receive_def] >>
@@ -574,7 +573,10 @@ Proof
               ‘∃s2. strans conf (c,q,N) (ARecv src h) s2’
                 by metis_tac[strans_rules] >>
               qexists_tac ‘(h,s2)’ >> rw[])) >>
-      rfs[ffi_wf_def]
+      rfs[] >>
+      ‘ffi_wf (c,q |+ (src,tl),N)’
+        by fs[ffi_wf_def] >>
+      fs[]
       >- (DISJ1_TAC >> qexists_tac ‘h::cs’ >>
           Cases_on ‘cs’ >>
           rw[ffi_term_stream_def,call_FFI_def,valid_receive_call_format_def,
@@ -584,49 +586,208 @@ Proof
           rw[]
           >- (rename1 ‘case x of (m,ns) => _’ >>
               PairCases_on ‘x’ >> fs[strans_rules] >>
-              ‘x0 = h’
-                suffices_by rw[]
               ‘strans conf (c,q,N) (ARecv src h) (c,q |+ (src,tl),N)’
-                suffices_by metis_tac[functional_ARecv] >>
-              metis_tac[strans_rules])
-
-
-          rw[Once ffi_term_stream_def] >>
-          )
-
-          fs[Once strans_cases]
-          >- (first_x_assum (assume_tac o GSYM) >>
-              last_x_assum (assume_tac o GSYM) >>
-              fs[])
-          strans_ind
-      rfs[ffi_wf_def]
-      >- (DISJ1_TAC >> Cases_on ‘final h’
-          >- (qexists_tac ‘[h]’ >>
-              rw[ffi_term_stream_def,call_FFI_def,valid_receive_call_format_def,
-                 comms_ffi_oracle_def,ffi_receive_def] >>
-              DEEP_INTRO_TAC some_intro >>
-              rw[]
-              >- (rename1 ‘case x of (m,ns) => _’ >>
-                  PairCases_on ‘x’ >> fs[strans_rules] >>
-                  ‘LENGTH x0 = SUC conf.payload_size’
-                    suffices_by (rw[])
-              >- (‘(λ(m,ns). strans conf (c,q,N) (ARecv src m) ns) (h,(c,q |+ (src,tl),N))’
-                    suffices_by metis_tac[] >>
-                  rw[strans_rules]) >>
-              SELECT_ELIM_TAC)
-      Induct_on ‘qlk q src’ >> rw[]
-      >- (cheat) >>
-      rename1 ‘h::tl’ >>
-      first_x_assum (qspecl_then [‘q |+ (src,tl)’,‘src’] assume_tac) >>
-
-      Cases_on ‘st.ffi_state’ >> rename1 ‘(q,r)’ >>
-      Cases_on ‘qlk q src’
+                by metis_tac[strans_rules] >>
+              ‘x0 = h’
+                by metis_tac[functional_ARecv] >>
+              rw[] >>
+              ‘ffi_wf (x1,x2,x3)’
+                by metis_tac[strans_pres_wf] >>
+              ‘ffi_eq conf (x1,x2,x3) (c,q |+ (src,tl),N)’
+                suffices_by (rw[] >>
+                             qmatch_goalsub_abbrev_tac ‘ffi_term_stream _ x _ _’ >>
+                             qmatch_asmsub_abbrev_tac  ‘ffi_term_stream _ y _ _’ >>
+                             qspecl_then [‘conf’,‘x’,‘y’] assume_tac ffi_eq_term_stream >>
+                             MAP_EVERY qunabbrev_tac [‘x’,‘y’] >> rfs[] >>
+                             ‘ffi_wf (x1,x2,x3)’
+                                by metis_tac[strans_pres_wf] >>
+                             fs[]) >>
+              metis_tac[ffi_eq_pres,ffi_eq_equivRel,equivalence_def,reflexive_def])
+          >- (qexists_tac ‘(h,(c,q|+(src,tl),N))’ >>
+              rw[] >> metis_tac[strans_rules]))
+      >- (DISJ2_TAC >> DISJ1_TAC >> qexists_tac ‘h::cs’ >>
+          rw[ffi_divg_stream_def,call_FFI_def,valid_receive_call_format_def,
+             comms_ffi_oracle_def, ffi_receive_def] >>
+          DEEP_INTRO_TAC some_intro >>
+          rw[]
+          >- (rw[AllCaseEqs()] >>
+              rename1 ‘(λ(m,ns). strans _ _ (ARecv src m) ns) x’ >>
+              PairCases_on ‘x’ >> fs[] >>
+              ‘strans conf (c,q,N) (ARecv src h) (c,q |+ (src,tl),N)’
+                by metis_tac[strans_rules] >>
+              ‘x0 = h’
+                by metis_tac[functional_ARecv] >>
+              rw[] >>
+              ‘ffi_wf (x1,x2,x3)’
+                by metis_tac[strans_pres_wf] >>
+              ‘ffi_eq conf (x1,x2,x3) (c,q |+ (src,tl),N)’
+                suffices_by (rw[] >>
+                             qmatch_goalsub_abbrev_tac ‘ffi_divg_stream _ x _ _’ >>
+                             qmatch_asmsub_abbrev_tac  ‘ffi_divg_stream _ y _ _’ >>
+                             qspecl_then [‘conf’,‘x’,‘y’] assume_tac ffi_eq_divg_stream >>
+                             MAP_EVERY qunabbrev_tac [‘x’,‘y’] >> rfs[] >>
+                             ‘ffi_wf (x1,x2,x3)’
+                                by metis_tac[strans_pres_wf] >>
+                             fs[]) >>
+              metis_tac[ffi_eq_pres,ffi_eq_equivRel,equivalence_def,reflexive_def])
+          >- (qexists_tac ‘(h,(c,q|+(src,tl),N))’ >>
+              rw[] >> metis_tac[strans_rules]))
+      >- (DISJ2_TAC >> DISJ2_TAC >> qexists_tac ‘h::cs’ >>
+          rw[ffi_fail_stream_def,call_FFI_def,valid_receive_call_format_def,
+             comms_ffi_oracle_def, ffi_receive_def] >>
+          DEEP_INTRO_TAC some_intro >>
+          rw[]
+          >- (rw[AllCaseEqs()] >>
+              rename1 ‘(λ(m,ns). strans _ _ (ARecv src m) ns) x’ >>
+              PairCases_on ‘x’ >> fs[] >>
+              ‘strans conf (c,q,N) (ARecv src h) (c,q |+ (src,tl),N)’
+                by metis_tac[strans_rules] >>
+              ‘x0 = h’
+                by metis_tac[functional_ARecv] >>
+              rw[] >>
+              ‘ffi_wf (x1,x2,x3)’
+                by metis_tac[strans_pres_wf] >>
+              ‘ffi_eq conf (x1,x2,x3) (c,q |+ (src,tl),N)’
+                suffices_by (rw[] >>
+                             qmatch_goalsub_abbrev_tac ‘ffi_fail_stream _ x _ _’ >>
+                             qmatch_asmsub_abbrev_tac  ‘ffi_fail_stream _ y _ _’ >>
+                             qspecl_then [‘conf’,‘x’,‘y’] assume_tac ffi_eq_fail_stream >>
+                             MAP_EVERY qunabbrev_tac [‘x’,‘y’] >> rfs[] >>
+                             ‘ffi_wf (x1,x2,x3)’
+                                by metis_tac[strans_pres_wf] >>
+                             fs[]) >>
+              metis_tac[ffi_eq_pres,ffi_eq_equivRel,equivalence_def,reflexive_def])
+          >- (qexists_tac ‘(h,(c,q|+(src,tl),N))’ >>
+              rw[] >> metis_tac[strans_rules]))) >>
+  (* Handle base case empty queue by induction on network *)
+  rw[] >> Induct_on ‘(λ(x,y,z). z) st.ffi_state’
+  (* Empty queue, Empty Network *)
+  >- (rw[] >> DISJ2_TAC >> DISJ1_TAC >> qexists_tac ‘[]’ >>
+      rw[ffi_divg_stream_def,call_FFI_def,valid_receive_call_format_def,
+         comms_ffi_oracle_def, ffi_receive_def] >>
+      rename1 ‘some (m,ns). strans conf st.ffi_state (ARecv src m) ns’ >>
+      ‘(some (m,ns). strans conf st.ffi_state (ARecv src m) ns) = NONE’
+        suffices_by rw[] >>
+      rw[some_def] >>
+      rename1 ‘¬_ x’ >>
+      PairCases_on ‘x’ >>
+      rw[] >> 
+      ‘∀conf s1 L s2.
+        strans conf s1 L s2 ⇒
+        case s1 of (c1,q1,N1) =>
+        case s2 of (c2,q2,N2) =>
+        (∀src m.
+          ([] ≠ qlk q1 src) ∨
+          (N1 ≠ NNil)       ∨
+          (L ≠ ARecv src m))’
+        suffices_by (rw[] >> CCONTR_TAC >>
+                     fs[] >>
+                     qmatch_asmsub_abbrev_tac ‘strans _ S1 L S2’ >>
+                     first_x_assum (qspecl_then [‘conf’,‘S1’,‘L’,‘S2’] assume_tac) >>
+                     MAP_EVERY qunabbrev_tac [‘L’,‘S2’] >>
+                     fs[] >> PairCases_on ‘S1’ >> fs[]) >>
+      rpt (first_x_assum (K ALL_TAC)) >>
+      ho_match_mp_tac strans_ind >>
       rw[] >>
-      Cases_on ‘∃cs. ffi_divg_stream conf st src cs’ >> 
-      rw[] >>
-      fs[ffi_term_stream_def,ffi_divg_stream_def] >>
-      CCONTR_TAC >> rw[] >> fs[] >> 
-*)
+      first_x_assum (qspecl_then [‘src’,‘m’] assume_tac) >>
+      rw[] >> TRY (metis_tac[]) >>
+      DISJ2_TAC >> DISJ1_TAC >>
+      rename1 ‘trans conf NA _ NB’ >>
+      MAP_EVERY Cases_on [‘NA’,‘NB’] >>
+      fs[Once trans_cases])
+  (* Empty queue, Parallel Network (with IH) *)
+  >- (* Induct on Parallel structure *)cheat
+  (* Empty queue, Single Endpoint network case *)
+  >- (rw[] >> reverse (Cases_on ‘l = src’)
+      (* Case where node is not the required sender (diverges) *)
+      >- (DISJ2_TAC >> DISJ1_TAC >>
+          qexists_tac ‘[]’ >>
+          rw[ffi_divg_stream_def,call_FFI_def,
+             comms_ffi_oracle_def,valid_receive_call_format_def,
+             ffi_receive_def] >>
+          rename1 ‘some (m,ns). strans conf st.ffi_state (ARecv src m) ns’ >>
+          ‘(some (m,ns). strans conf st.ffi_state (ARecv src m) ns) = NONE’
+            suffices_by rw[] >>
+          rw[some_def] >>
+          rename1 ‘¬_ x’ >>
+          PairCases_on ‘x’ >>
+          rw[] >>
+          ‘∀conf s1 L s2.
+            strans conf s1 L s2 ⇒
+            case s1 of (c1,q1,N1) =>
+            case s2 of (c2,q2,N2) =>
+            ∀i s e.
+            (N1 = NEndpoint i s e) ⇒
+            (∀src m.
+              ([] ≠ qlk q1 src) ∨
+              (i  = src) ∨
+              (L  ≠ ARecv src m))’
+            suffices_by (rw[] >> CCONTR_TAC >>
+                         fs[] >>
+                         first_x_assum (drule_all_then assume_tac) >>
+                         rename1 ‘ffi_wf S1’ >>
+                         PairCases_on ‘S1’ >>
+                         fs[] >> metis_tac[]) >>
+          rpt (first_x_assum (K ALL_TAC)) >>
+          ho_match_mp_tac strans_ind >>
+          rw[]
+          >- (fs[Once trans_cases] >>
+              metis_tac[])
+          >- (‘sp = i’
+                by (CCONTR_TAC >> fs[Once trans_cases] >>
+                    metis_tac[]) >>
+              fs[] >> rename1 ‘trans _ _ _ NB’ >>
+              ‘∃s2 e2. NB = NEndpoint i s2 e2’
+                by (fs[Once trans_cases] >> metis_tac[]) >>
+              first_x_assum (drule_all_then assume_tac) >>
+              first_x_assum (qspecl_then [‘src’,‘m’] strip_assume_tac) >>
+              rw[] >> Cases_on ‘i = src’ >> rw[] >>
+              rename1 ‘[] ≠ qlk (qpush q i d) src’ >>
+              ‘qlk q src = qlk (qpush q i d) src’
+                suffices_by rw[] >>
+              rw[qpush_def])) >>
+      (* Case where node is required sender, Induct on code *)
+      rename1 ‘NEndpoint l s e’ >> Induct_on ‘e’ >> rw[]
+      (* Nil case *)
+      >- (DISJ2_TAC >> DISJ1_TAC >>
+          qexists_tac ‘[]’ >>
+          rw[ffi_divg_stream_def,call_FFI_def,
+             comms_ffi_oracle_def,valid_receive_call_format_def,
+             ffi_receive_def] >>
+          rename1 ‘strans conf st.ffi_state (ARecv l _) _’ >>
+          ‘(some (m,ns). strans conf st.ffi_state (ARecv l m) ns) = NONE’
+            suffices_by rw[] >>
+          rw[some_def] >>
+          rename1 ‘¬_ x’ >>
+          PairCases_on ‘x’ >>
+          rw[] >>
+          ‘∀conf s1 L s2.
+            strans conf s1 L s2 ⇒
+            case s1 of (c1,q1,N1) =>
+            case s2 of (c2,q2,N2) =>
+            ∀i s e.
+            (N1 = NEndpoint i s e) ⇒
+            (∀src m.
+              ([] ≠ qlk q1 src) ∨
+              (e  ≠ Nil) ∨
+              (L  ≠ ARecv src m))’
+            suffices_by (rw[] >> CCONTR_TAC >>
+                         fs[] >>
+                         first_x_assum (drule_all_then assume_tac) >>
+                         rename1 ‘ffi_wf S1’ >>
+                         PairCases_on ‘S1’ >>
+                         fs[] >> metis_tac[]) >>
+          rpt (first_x_assum (K ALL_TAC)) >>
+          ho_match_mp_tac strans_ind >>
+          rw[] >> fs[Once trans_cases] >>
+          metis_tac[])
+      (* Send case *)
+      >- cheat
+      (* Receive case *)
+      >- cheat
+      (* IfThen case *)
+      >- cheat
+      >- cheat)
 QED
 
 val _ = export_theory ();
