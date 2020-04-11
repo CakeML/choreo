@@ -2754,7 +2754,16 @@ QED
 Theorem trans_not_same:
   ∀conf n1 l n2 . trans conf n1 l n2 ∧ conf.payload_size > 0 ⇒ n1 ≠ n2
 Proof
-  cheat
+  rpt gen_tac \\ strip_tac
+  \\ rpt (pop_assum mp_tac)
+  \\ MAP_EVERY (W(curry Q.SPEC_TAC)) [‘n2’,‘l’,‘n1’,‘conf’]
+  \\ ho_match_mp_tac trans_strongind \\ rw []
+  >- (Induct_on ‘e’ \\ rw [] \\ metis_tac [])
+  >- rw [payloadLangTheory.state_component_equality]
+  >- (disj2_tac \\ Induct_on ‘e’ \\ rw [] \\ metis_tac [])
+  >- (Induct_on ‘e1’ \\ rw [] \\ metis_tac [])
+  >- (Induct_on ‘e2’ \\ rw [] \\ metis_tac [])
+  \\  disj2_tac \\ Induct_on ‘e’ \\ rw [] \\ metis_tac []
 QED
 
 Theorem trans_ffi_eq_same:
@@ -2813,11 +2822,20 @@ Proof
        \\ conj_tac
        >- metis_tac [ffi_wf_def,trans_ffi_eq_same]
        \\ MAP_EVERY qexists_tac [‘p’,‘s’]
-       \\ rw [cpEval_valid_def,ffi_state_cor_def,ffi_wf_def]
-       (* Show that ffi_wf is preserver through trans *)
-       \\  cheat)
+       \\ rw [cpEval_valid_def,ffi_state_cor_def]
+       >- rw [ffi_wf_def]
+       \\ irule internal_trans_pres_wf
+       \\ MAP_EVERY qexists_tac [‘n’,‘conf’,‘s.queues’]
+       \\ rw [ffi_wf_def] \\ irule RTC_SINGLE
+       \\ rw [comms_ffi_consTheory.internal_trans_def]
+       \\ last_x_assum (assume_tac o ONCE_REWRITE_RULE [trans_cases]) \\ fs []
+       \\ IMP_RES_TAC trans_not_same \\ rw [] \\ fs [])
+   \\ drule_then (qspecl_then [‘vs1’,‘env1’,‘st1’] mp_tac) endpoint_forward_correctness
+   \\ CONV_TAC (PAT_CONV “λx. (∀vs2. x) ⇒ _” SWAP_FORALL_CONV)
+   \\ CONV_TAC (PAT_CONV “λx. x ⇒ _” SWAP_FORALL_CONV)
+   \\ disch_then (qspec_then ‘st2’ mp_tac)
+   \\ CONV_TAC (PAT_CONV “λx. x ⇒ _” SWAP_FORALL_CONV)
    \\ cheat
-
 QED
 
 Theorem network_forward_correctness_reduction:
