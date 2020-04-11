@@ -42,3 +42,7 @@ jobs:
       run: |
         cd choreo/projection/proofs
         Holmake
+    - name: Build projection/proofs/to_cake
+      run: |
+        cd choreo/projection/proofs/to_cake
+        Holmake

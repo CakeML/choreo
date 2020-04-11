@@ -36,6 +36,8 @@ Definition pingpong_def:
    )
 End
 
+(* val _ = project_to_camkes "pingpong_camkes" "pingpong" “pingpong”; *)
+
 val (ping_to_cake_thm,ping_to_cake_wholeprog) = project_to_cake ``pingpong`` "ping" 1
 
 val _ = astToSexprLib.write_ast_to_file "ping.sexp" ping_to_cake_wholeprog;

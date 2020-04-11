@@ -8,6 +8,7 @@ struct
   open astToSexprLib;
 
   val n2w8 = “n2w:num -> word8”;
+  val camkes_payload_size = 256 (* Can go up to 480 since this is the size of the IPC buffer *)
 
   fun pnames chor =
       “MAP (MAP (CHR o w2n)) (procsOf ^chor)”
@@ -39,12 +40,18 @@ struct
      |> map (fn (n,l) => (stringSyntax.fromHOLstring n,
                           map stringSyntax.fromHOLstring(fst(listSyntax.dest_list l))))
 
+  val transfer_string =
+      String.concat [
+        "procedure TransferString {\n",
+        "    void transfer_string(in string s);\n",
+        "};\n"]
+
   fun mk_camkes_assembly chor =
       let
         val rectbl = rectbl chor
         val pns = map fst rectbl
         fun mk_import name =
-            String.concat ["import \"components/",name,"/",name,"/",name,".camkes\";\n"]
+            String.concat ["import \"components/",name,"/",name,".camkes\";\n"]
         fun mk_component_decl name =
             String.concat ["        component ",name," ",name,";\n"]
         fun mk_connections (p,qs) =
@@ -68,12 +75,60 @@ struct
           "\n",
           "assembly {\n",
           "    composition {\n",
-          "        component Producer producer;\n",
           String.concat decls,
           "\n",
           String.concat connections,
           "    }\n",
           "}\n"
+        ]
+      end
+
+  fun mk_camkes_cmakefile chorname chor =
+      let
+        val pnames = pnames chor
+        val set_dirs =
+            map (fn p => "set("^p^"_dir ${CMAKE_CURRENT_LIST_DIR}/components/"^p^"/)\n") pnames
+        val custom_commands =
+            map (fn p =>
+                    String.concat [
+                      "add_custom_command(\n",
+                      "  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/"^p^".S\n",
+                      String.concat [
+                        "  COMMAND ${CAKEML_COMPILER} --heap_size=1 --stack_size=1 --exclude_prelude=true --sexp=true < ${",
+                        p,"_dir}/",p,".sexp > ${CMAKE_CURRENT_BINARY_DIR}/",
+                        p,".S\n"],
+                      String.concat [
+                        "  COMMAND sed -i 's/cdecl\\(main\\)/cdecl\\(run\\)/' ${CMAKE_CURRENT_BINARY_DIR}/",
+                        p,".S\n"],
+                      ")\n\n"
+                    ])
+                pnames
+        val component_decls =
+            map (fn p =>
+                    String.concat [
+                      "DeclareCAmkESComponent(",p,"\n",
+                      "  SOURCES components/",p,"/",p,".c ",
+                      "${CMAKE_CURRENT_BINARY_DIR}/",p,".S\n",
+                      ")\n\n"
+                    ])
+                pnames
+      in
+        String.concat [
+          "cmake_minimum_required(VERSION 3.8.2)\n",
+          "\n",
+          "project("^chorname^" C)\n",
+          "\n",
+          "add_definitions(-DCAMKES)\n",
+          "\n",
+          "find_program(CAKEML_COMPILER NAMES \"cake\")\n",
+          "\n",
+          String.concat set_dirs,
+          "\n",
+          String.concat custom_commands,
+          "includeGlobalComponents()\n",
+          "\n",
+          String.concat component_decls,
+          "DeclareCAmkESRootserver("^chorname^".camkes)\n"
         ]
       end
 
@@ -89,9 +144,9 @@ struct
         val rrectbl = reverse_table rectbl
         val bidirtbl = ListPair.map (fn ((p,qs),(_,rs)) => (p,qs,rs)) (rectbl,rrectbl)
         fun mk_provides p qs =
-            map (fn q => String.concat ["    provides TransferString ",q,"__recv;\n"]) qs
+            map (fn q => String.concat ["    provides TransferString ",q,"_recv;\n"]) qs
         fun mk_uses p qs =
-            map (fn q => String.concat ["    uses TransferString ",q,"__send;\n"]) qs
+            map (fn q => String.concat ["    uses TransferString ",q,"_send;\n"]) qs
       in
         map
           (fn (p,qs,rs) =>
@@ -137,6 +192,8 @@ struct
               print_to_file (builddir^"/components/"^p^"/"^p^".camkes") contents
             end
         val _ = mk_component_declarations chor |> List.app print_component_declaration
+        val _ = print_to_file(builddir^"/CMakeLists.txt") (mk_camkes_cmakefile chorname chor)
+        val _ = print_to_file(builddir^"/interfaces/TransferString.idl4") transfer_string
       in
         ()
       end
@@ -156,7 +213,6 @@ struct
 
       val letfuns_tm =
           listSyntax.mk_list(map stringSyntax.fromMLstring letfuns, “:string”)
-
 
       val to_cake_thm = “compile_endpoint ^conf ^letfuns_tm ^p_code” |> EVAL
 
@@ -229,6 +285,21 @@ struct
            ^(ml_progLib.get_prog (get_ml_prog_state()))” |> EVAL |> concl |> rhs
     in
       (to_cake_thm,to_cake_wholeprog)
+    end
+
+  fun project_to_camkes builddir chorname chor =
+    let
+      val pnames = pnames chor
+      val to_cakes = map(fn p => project_to_cake chor p camkes_payload_size) pnames
+      val _ = mk_camkes_boilerplate builddir chorname chor
+      val _ = ListPair.map
+                (fn (p,(_,p_wholeprog)) =>
+                    astToSexprLib.write_ast_to_file
+                      (String.concat [builddir,"/components/",p,"/",p,".sexp"])
+                      p_wholeprog)
+                (pnames,to_cakes)
+    in
+      ()
     end
 
 end

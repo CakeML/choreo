@@ -2538,6 +2538,129 @@ Proof
       simp[])
 QED
 
+Theorem nsOptBind_NONE[simp]:
+  nsOptBind NONE x env = env
+Proof
+  simp[nsOptBind_def]
+QED
+
+Theorem ALL_DISTINCT_sendloop_names[simp]:
+  ALL_DISTINCT (MAP (λ(x,y,z). x) (sendloop conf data))
+Proof
+  simp[sendloop_def]
+QED
+
+Theorem nsLookup_sendloop[simp]:
+  nsLookup (build_rec_env (sendloop conf data) env envv) (Short (ps2cs v)) =
+  nsLookup envv (Short (ps2cs v))
+Proof
+  simp[build_rec_env_def, ps2cs_def, nsLookup_def, sendloop_def]
+QED
+
+Theorem nsLookup_cpEval_valid:
+  cpEval_valid conf p cE pSt (Send p2 v n pCd) vs cSt ∧
+  FLOOKUP pSt.bindings v = SOME d ⇒
+  ∃cv. nsLookup cE.v (Short (ps2cs v)) = SOME cv ∧ LIST_TYPE WORD d cv
+Proof
+  csimp[cpEval_valid_def, sem_env_cor_def] >>  metis_tac[]
+QED
+
+Theorem nsLookup_build_rec_env_drop:
+  cpEval_valid conf p env pSt pCd vs cSt ⇒
+  ∃dv. nsLookup (build_rec_env (sendloop conf data) env env.v) conf.drop =
+       SOME dv ∧
+       (LIST_TYPE (WORD : word8 -> v -> bool) --> NUM --> LIST_TYPE WORD)
+       (combin$C DROP) dv
+Proof
+  simp[build_rec_env_def, sendloop_def, nsLookup_def, nsBind_def,
+       cpEval_valid_def, env_asm_def, has_v_def, in_module_def, PULL_EXISTS] >>
+  rw[]
+QED
+
+Theorem dec_clock_with_clock:
+  dec_clock (s with clock := c) = s with clock := c - 1
+Proof
+  simp[dec_clock_def]
+QED
+
+Definition result_bind_def[simp]:
+  result_bind (x, Rval v) f = f (x,v) ∧
+  result_bind (x, Rerr e) f = (x, Rerr e)
+End
+
+Definition result_return_def:
+  result_return (x,v) = (x, Rval v)
+End
+
+val _ = declare_monad("result", {bind = “result_bind”, ignorebind = NONE,
+                                 unit = “result_return”, fail = NONE,
+                                 choice = NONE, guard = NONE})
+
+val _ = enable_monad "result"
+
+Theorem evaluate_letNONE:
+  evaluate st env [Let NONE e1 e2] =
+     do
+        (st,v) <- evaluate st env [e1] ;
+        evaluate st env [e2]
+     od
+Proof
+  simp[evaluate_def] >> Cases_on‘evaluate st env [e1]’ >>
+  rename [‘evaluate _ _ _ = (v, res)’] >> Cases_on ‘res’ >> simp[]
+QED
+
+Theorem evaluate_opapp:
+  evaluate st env [App Opapp [e1; e2]] =
+   do
+     (st1,vs2) <- evaluate st env [e2];
+     (st2,vs1) <- evaluate st1 env [e1];
+     case do_opapp (REVERSE (HD vs2::vs1)) of
+       NONE => (st2, Rerr (Rabort Rtype_error))
+     | SOME (env, e) => if st2.clock = 0 then (st2,Rerr (Rabort Rtimeout_error))
+                        else evaluate (dec_clock st2) env [e]
+   od
+Proof
+  simp[evaluate_def] >>
+  Cases_on ‘evaluate st env [e2]’ >>
+  rename [‘evaluate st env [e2] = (st1, res2)’] >>
+  Cases_on ‘res2’ >> simp[] >>
+  ‘(∃st2 vs1. evaluate st1 env [e1] = (st2, Rval vs1)) ∨
+   ∃st2 e. evaluate st1 env [e1] = (st2, Rerr e)’
+     by metis_tac[pair_CASES, TypeBase.nchotomy_of “:(α,β) result”] >>
+  simp[]
+QED
+
+val evalths = evaluate_def |> CONJUNCTS
+fun find_evalform e =
+  let
+    val l = listSyntax.mk_list([e], type_of e)
+    fun test th =
+      let val (_, eqn) = strip_forall (concl th)
+      in
+          can (match_term l) (rand (lhs eqn))
+      end
+
+  in
+    valOf (List.find test evalths) handle Option => failwith "no match"
+  end
+
+Theorem bind_assoc:
+  result_bind (result_bind m f) g =
+  result_bind m (combin$C (result_bind o f) g)
+Proof
+  Cases_on ‘m’ >> Cases_on ‘r’ >> simp[]
+QED
+
+Theorem nsLookup_sendloop_exists:
+  ∃slv. nsLookup (build_rec_env(sendloop conf data) cE cEv) (Short "sendloop") =
+        SOME slv
+Proof
+  simp[build_rec_env_def, sendloop_def]
+QED
+
+val cp_type =
+  strip_fun (type_of “cpEval_valid”) |> #1 |> last |> dest_type |> #2 |> hd
+
 (* FORWARD CORRECTNESS
     Just the spec :) *)
 Theorem endpoint_forward_correctness:
@@ -2553,7 +2676,103 @@ Theorem endpoint_forward_correctness:
           (evaluate (cSt2 with clock := mc) cEnv2
                     [compile_endpoint conf vs2 pCd2])
 Proof
+  simp[Once trans_cases] >> rw[] >> simp[compile_endpoint_def]
+  >- ((* sendloop; d ≤ n + payload_size *) fs[cpFFI_valid_def] >>
+      simp[evaluate_letNONE, find_evalform “Letrec _ _”,
+           (* Once evaluate_opapp, *)
+           bind_assoc, o_UNCURRY_R, C_UNCURRY_L, o_ABS_R, C_ABS_L] >>
+      qmatch_goalsub_abbrev_tac ‘sendloop conf data’ >>
+      qabbrev_tac ‘
+        Env1 = build_rec_env (sendloop conf data) cEnv1 cEnv1.v
+      ’ >>
+      qmatch_goalsub_abbrev_tac ‘App Opapp [Var (Short "sendloop"); aexp]’ >>
+      ‘ck_equiv_hol (cEnv1 with v := Env1) (LIST_TYPE WORD) aexp (DROP n d)’
+        by (simp[Abbr‘aexp’, ck_equiv_hol_def, evaluate_opapp, bind_assoc,
+                 o_UNCURRY_R, C_UNCURRY_L, o_ABS_R, C_ABS_L,
+                 find_evalform “Lit _”, find_evalform “Var _”] >>
+            qx_gen_tac ‘refs0’ >>
+            ‘∀v. nsLookup Env1 (Short (ps2cs v)) =
+                 nsLookup cEnv1.v (Short (ps2cs v))’
+              by simp[Abbr‘Env1’] >> simp[] >>
+            drule_all_then (qx_choose_then ‘cv’ strip_assume_tac)
+                           nsLookup_cpEval_valid >> simp[] >>
+            drule_then (qspec_then ‘data’
+                        (qx_choose_then ‘dv’
+                         (CONJUNCTS_THEN2
+                          (fn th => mp_tac th >> CHANGED_TAC (simp[]))
+                          assume_tac)))
+                       nsLookup_build_rec_env_drop >> strip_tac >>
+            drule_all_then
+             (qspec_then ‘empty_state with refs := refs0’ $
+              qx_choosel_then [‘dcs_env’, ‘dcs_e’, ‘dcs_cl1’, ‘dcs_cl2’,
+                               ‘dcs_refs’, ‘dcs_v’] strip_assume_tac)
+             (SIMP_RULE (srw_ss()) [PULL_EXISTS] do_opapp_translate
+              |> INST_TYPE [“:'ffi” |-> “:unit”]) >>
+            Q.REFINE_EXISTS_TAC ‘dcs_cl1 + (mc + 1)’ >>
+            simp[dec_clock_with_clock] >>
+            pop_assum kall_tac >>
+            ‘NUM n (Litv (IntLit (&n)))’ by simp[NUM_def, INT_def] >>
+            drule_all_then
+             (qspec_then ‘empty_state with refs := refs0 ++ dcs_refs’ $
+              qx_choosel_then [‘alld_env’, ‘alld_e’, ‘alld_cl1’, ‘alld_cl2’,
+                               ‘alld_refs’, ‘alld_v’] strip_assume_tac)
+             (SIMP_RULE (srw_ss()) [PULL_EXISTS] do_opapp_translate
+              |> INST_TYPE [“:'ffi” |-> “:unit”]) >> simp[] >>
+            Q.REFINE_EXISTS_TAC ‘alld_cl1 + (mc + 1)’ >> simp[] >> fs[] >>
+            simp[state_component_equality]) >>
+      first_assum (mp_then (Pos (el 4)) mp_tac
+                   (sendloop_correct
+                    |> INST_TYPE [alpha |-> cp_type])) >>
+      simp[] >>
+      ‘nsLookup Env1 (Short "sendloop") =
+       SOME (Recclosure cEnv1 (sendloop conf data) "sendloop")’
+        by simp[Abbr‘Env1’, build_rec_env_def, sendloop_def] >> simp[] >>
+      disch_then (qspecl_then [‘conf’, ‘cSt1’] mp_tac) >>
+      ‘cSt1.ffi.oracle = comms_ffi_oracle conf’
+        by fs[cpEval_valid_def] >>
+      simp[Abbr‘data’] >>
+      disch_then (qspecl_then [‘valid_send_dest p2’, ‘p2’] mp_tac) >>
+      simp[send_invariant] >> impl_tac
+      >- (drule (SIMP_RULE (srw_ss()) [PULL_EXISTS] strans_dest_check) >>
+          fs[cpEval_valid_def]) >>
+      disch_then (qx_choosel_then [‘ck1’, ‘ck2’, ‘refs’] strip_assume_tac) >>
+      qexists_tac ‘ck1’ >> simp[] >> cheat ) >>
+     cheat
+QED
+
+Theorem NPar_trans_l_cases:
+  ∀p s c s' c' conf n n'.
+   trans conf (NPar (NEndpoint p s c) n) LTau (NPar (NEndpoint p s' c') n')
+   ⇒ (s = s' ∧ c = c') ∨
+     ∃L. trans conf (NEndpoint p s c) L (NEndpoint p s' c')
+Proof
+  rw []
+  \\ qpat_x_assum `trans _ _ _ _` (mp_tac o PURE_ONCE_REWRITE_RULE [trans_cases])
+  \\ rw [] \\ metis_tac []
+QED
+
+Theorem trans_not_same:
+  ∀conf n1 l n2 . trans conf n1 l n2 ∧ conf.payload_size > 0 ⇒ n1 ≠ n2
+Proof
   cheat
+QED
+
+Theorem trans_ffi_eq_same:
+  ∀p s c l conf n n'.
+   ffi_wf (p,s,n) ∧
+   conf.payload_size > 0 ∧
+   trans conf (NPar (NEndpoint p s c) n ) LTau
+              (NPar (NEndpoint p s c) n')
+   ⇒ ffi_eq conf (p,s.queues,n) (p,s.queues,n')
+Proof
+  rw []
+  \\ irule internal_trans_equiv_irrel
+  \\ fs [ffi_wf_def]
+  \\ irule RTC_SINGLE
+  \\ fs [comms_ffi_consTheory.internal_trans_def]
+  \\ ntac 2 (last_x_assum (K ALL_TAC))
+  \\ pop_assum (assume_tac o ONCE_REWRITE_RULE [trans_cases]) \\ fs []
+  \\ IMP_RES_TAC trans_not_same \\ rw [] \\ fs []
 QED
 
 Theorem network_forward_correctness:
@@ -2585,7 +2804,20 @@ Theorem network_forward_correctness:
       (evaluate (st2 with clock := mc) env2
                       [compile_endpoint conf vs2 c'])
 Proof
-  cheat
+   rw []
+   \\ drule_then assume_tac NPar_trans_l_cases
+   \\ fs [] \\ rveq
+   >- (asm_exists_tac \\ fs []
+       \\ asm_exists_tac \\ fs []
+       \\ irule ffi_irrel \\ fs []
+       \\ conj_tac
+       >- metis_tac [ffi_wf_def,trans_ffi_eq_same]
+       \\ MAP_EVERY qexists_tac [‘p’,‘s’]
+       \\ rw [cpEval_valid_def,ffi_state_cor_def,ffi_wf_def]
+       (* Show that ffi_wf is preserver through trans *)
+       \\  cheat)
+   \\ cheat
+
 QED
 
 Theorem network_forward_correctness_reduction:
