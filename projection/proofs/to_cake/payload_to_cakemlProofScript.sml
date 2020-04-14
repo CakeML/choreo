@@ -2754,11 +2754,23 @@ Theorem NPar_trans_l_cases:
   ∀p s c s' c' conf n n'.
    trans conf (NPar (NEndpoint p s c) n) LTau (NPar (NEndpoint p s' c') n')
    ⇒ (s = s' ∧ c = c') ∨
-     ∃L. trans conf (NEndpoint p s c) L (NEndpoint p s' c')
+     ∃L. trans conf (NEndpoint p s c) L (NEndpoint p s' c') ∧
+         ((n' = n ∧ L = LTau) ∨
+          (∃q d. trans conf n (LReceive p d q) n' ∧ L = LSend p d q) ∨
+          (∃q d. trans conf n (LSend q d p) n'    ∧ L = LReceive q d p))
 Proof
   rw []
   \\ qpat_x_assum `trans _ _ _ _` (mp_tac o PURE_ONCE_REWRITE_RULE [trans_cases])
-  \\ rw [] \\ metis_tac []
+  \\ rw []
+  >- (disj2_tac \\ asm_exists_tac \\ fs []
+      \\ qpat_x_assum `trans _ (NEndpoint _ _ _) _ _`
+                      (mp_tac o PURE_ONCE_REWRITE_RULE [trans_cases])
+      \\ rw [] \\ metis_tac [])
+  >- (disj2_tac \\ asm_exists_tac \\ fs []
+      \\ qpat_x_assum `trans _ (NEndpoint _ _ _) _ _`
+                      (mp_tac o PURE_ONCE_REWRITE_RULE [trans_cases])
+      \\ rw [] \\ metis_tac [])
+  \\ metis_tac []
 QED
 
 Theorem trans_not_same:
