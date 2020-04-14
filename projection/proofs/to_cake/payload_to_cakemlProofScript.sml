@@ -2,7 +2,10 @@ open preamble;
 open optionTheory
      rich_listTheory;
 open endpoint_to_payloadTheory;
-open payloadLangTheory payloadSemTheory payload_to_cakemlTheory;
+open payloadLangTheory
+     payloadSemTheory
+     payloadPropsTheory
+     payload_to_cakemlTheory;
 open comms_ffi_modelTheory
      comms_ffi_propsTheory
      comms_ffi_eqTheory
@@ -19,7 +22,7 @@ val _ = new_theory "payload_to_cakemlProof";
 
 val _ = set_grammar_ancestry
   ["option","rich_list","endpoint_to_payload",
-   "payloadLang","payloadSem","payload_to_cakeml",
+   "payloadLang","payloadSem","payloadProps","payload_to_cakeml",
    "comms_ffi_model","comms_ffi_props","comms_ffi_eq",
    "comms_ffi_rec_charac","evaluate_tools","ckExp_Equiv",
    "evaluate", "termination", "ml_translator",
@@ -2835,29 +2838,84 @@ Theorem network_forward_correctness:
       (evaluate (st2 with clock := mc) env2
                       [compile_endpoint conf vs2 c'])
 Proof
-   rw []
-   \\ drule_then assume_tac NPar_trans_l_cases
-   \\ fs [] \\ rveq
-   >- (asm_exists_tac \\ fs []
-       \\ asm_exists_tac \\ fs []
-       \\ irule ffi_irrel \\ fs []
-       \\ conj_tac
-       >- metis_tac [ffi_wf_def,trans_ffi_eq_same]
-       \\ MAP_EVERY qexists_tac [‘p’,‘s’]
-       \\ rw [cpEval_valid_def,ffi_state_cor_def]
-       >- rw [ffi_wf_def]
-       \\ irule internal_trans_pres_wf
-       \\ MAP_EVERY qexists_tac [‘n’,‘conf’,‘s.queues’]
-       \\ rw [ffi_wf_def] \\ irule RTC_SINGLE
-       \\ rw [comms_ffi_consTheory.internal_trans_def]
-       \\ last_x_assum (assume_tac o ONCE_REWRITE_RULE [trans_cases]) \\ fs []
-       \\ IMP_RES_TAC trans_not_same \\ rw [] \\ fs [])
-   \\ drule_then (qspecl_then [‘vs1’,‘env1’,‘st1’] mp_tac) endpoint_forward_correctness
-   \\ CONV_TAC (PAT_CONV “λx. (∀vs2. x) ⇒ _” SWAP_FORALL_CONV)
-   \\ CONV_TAC (PAT_CONV “λx. x ⇒ _” SWAP_FORALL_CONV)
-   \\ disch_then (qspec_then ‘st2’ mp_tac)
-   \\ CONV_TAC (PAT_CONV “λx. x ⇒ _” SWAP_FORALL_CONV)
-   \\ cheat
+  rw []
+  \\ drule_then assume_tac NPar_trans_l_cases
+  \\ fs [] \\ rveq
+  (* p is not involved at all *)
+  >- (CONV_TAC SWAP_EXISTS_CONV
+      \\ asm_exists_tac \\ fs []
+      \\ asm_exists_tac \\ fs []
+      \\ irule ffi_irrel \\ fs []
+      \\ conj_tac
+      >- metis_tac [ffi_wf_def,trans_ffi_eq_same]
+      \\ MAP_EVERY qexists_tac [‘p’,‘s’]
+      \\ rw [cpEval_valid_def,ffi_state_cor_def]
+      >- rw [ffi_wf_def]
+      \\ irule internal_trans_pres_wf
+      \\ MAP_EVERY qexists_tac [‘n’,‘conf’,‘s.queues’]
+      \\ rw [ffi_wf_def] \\ irule RTC_SINGLE
+      \\ rw [comms_ffi_consTheory.internal_trans_def]
+      \\ last_x_assum (assume_tac o ONCE_REWRITE_RULE [trans_cases]) \\ fs []
+      \\ IMP_RES_TAC trans_not_same \\ rw [] \\ fs [])
+  (* LTau (only p does something) *)
+  >- (drule_then (qspecl_then [‘vs1’,‘env1’,‘st1’,‘st2’] mp_tac) endpoint_forward_correctness
+      \\ impl_tac
+      >- (rw [cpEval_valid_def,ffi_wf_def,
+              ffi_state_cor_def,
+              cpFFI_valid_def,some_def]
+          \\ fs []
+          \\ qpat_assum `trans _ (NEndpoint _ _ _) _ _`
+                          (mp_tac o PURE_ONCE_REWRITE_RULE [trans_cases])
+          \\ fs [] \\ rw []
+          \\ fs [state_component_equality] \\ rveq \\ rfs [state_component_equality]
+          >- (SELECT_ELIM_TAC \\ rw []
+              >- (asm_exists_tac \\ fs [])
+              \\ Cases_on ‘x'’ \\ fs []
+              \\ Cases_on ‘tl’ \\ rw [] >- cheat
+              \\ fs [normalise_queues_FUPDATE_NONEMPTY]
+              \\ cheat)
+          >- cheat
+          >- (Cases_on ‘x’ \\ fs []
+              \\ qpat_x_assum ‘s.queues = _’ (assume_tac o Q.AP_TERM ‘λe. qlk e q’)
+              \\ fs [])
+          >- (Cases_on ‘x’ \\ fs []
+              \\ qpat_x_assum ‘s.queues = _’ (assume_tac o Q.AP_TERM ‘λe. qlk e q’)
+              \\ fs [])
+          >- (Cases_on ‘x’ \\ fs []
+              \\ qpat_x_assum ‘s.queues = _’ (assume_tac o Q.AP_TERM ‘λe. qlk e q’)
+              \\ fs [])
+          >- cheat
+          >- cheat
+          \\ irule qsame_irrel_ffi_eq \\ fs [qsame_def])
+       \\ rw []
+       \\ MAP_EVERY qexists_tac [‘mc’,‘cEnv2’,‘vs2’]
+       \\ fs [cpFFI_valid_def,cpEval_valid_def,ffi_state_cor_def])
+   (* LSend *)
+  >- (drule_then (qspecl_then [‘vs1’,‘env1’,‘st1’,‘st2’] mp_tac) endpoint_forward_correctness
+      \\ impl_tac
+      >- (rw [cpEval_valid_def,ffi_wf_def,ffi_state_cor_def,cpFFI_valid_def]
+          \\ qpat_x_assum `trans _ (NEndpoint _ _ _) _ _`
+                          (mp_tac o PURE_ONCE_REWRITE_RULE [trans_cases])
+          \\ fs [] \\ rw []
+          \\ metis_tac [strans_rules])
+      \\ rw []
+      \\ MAP_EVERY qexists_tac [‘mc’,‘cEnv2’,‘vs2’]
+      \\ fs [cpFFI_valid_def,cpEval_valid_def,ffi_state_cor_def])
+  \\ drule_then (qspecl_then [‘vs1’,‘env1’,‘st1’,‘st2’] mp_tac) endpoint_forward_correctness
+  \\ impl_tac
+  (* LReceive *)
+  >- (rw [cpEval_valid_def,ffi_wf_def,ffi_state_cor_def,cpFFI_valid_def]
+      \\ qpat_x_assum `trans _ (NEndpoint _ _ _) _ _`
+                      (mp_tac o PURE_ONCE_REWRITE_RULE [trans_cases])
+      \\ fs [] \\ rw []
+      \\ irule active_trans_equiv_irrel
+      \\ fs [ffi_wf_def]
+      \\ irule RTC_SINGLE
+      \\ fs [comms_ffi_consTheory.active_trans_def]
+      \\ disj2_tac \\ fs [comms_ffi_consTheory.emit_trans_def])
+  \\ rw []
+  \\ MAP_EVERY qexists_tac [‘mc’,‘cEnv2’,‘vs2’]
+  \\ fs [cpFFI_valid_def,cpEval_valid_def,ffi_state_cor_def]
 QED
 
 Theorem network_forward_correctness_reduction:
