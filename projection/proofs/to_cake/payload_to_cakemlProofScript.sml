@@ -17,6 +17,15 @@ open evaluateTheory terminationTheory ml_translatorTheory
 
 val _ = new_theory "payload_to_cakemlProof";
 
+val _ = set_grammar_ancestry
+  ["option","rich_list","endpoint_to_payload",
+   "payloadLang","payloadSem","payload_to_cakeml",
+   "comms_ffi_model","comms_ffi_props","comms_ffi_eq",
+   "comms_ffi_rec_charac","evaluate_tools","ckExp_Equiv",
+   "evaluate", "termination", "ml_translator",
+   "ml_prog", "evaluateProps", "namespace",
+   "semanticPrimitives","ffi"];
+
 val WORD8 = “WORD:word8 -> v -> bool”;
 val DATUM = “LIST_TYPE ^WORD8”;
 
@@ -1490,7 +1499,7 @@ Theorem receiveloop_pres_ffi_eq:
     (r1 = r2)
 Proof
   cheat
-QED        
+QED
 
 (* HOL HELPERS CORRECT *)
 Theorem w1ckV_is_1w:
