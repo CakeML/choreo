@@ -2674,12 +2674,13 @@ val cp_type =
     Just the spec :) *)
 Theorem endpoint_forward_correctness:
   ∀conf p pSt1 pCd1 L pSt2 pCd2
-        vs1 cEnv1 cSt1 vs2 cEnv2 cSt2.
+        vs1 cEnv1 cSt1 cSt2.
     trans conf (NEndpoint p pSt1 pCd1) L (NEndpoint p pSt2 pCd2) ∧
     cpEval_valid conf p cEnv1 pSt1 pCd1 vs1 cSt1 ∧
-    cpEval_valid conf p cEnv2 pSt2 pCd2 vs2 cSt2 ∧
     cpFFI_valid conf pSt1 pSt2 cSt1.ffi.ffi_state cSt2.ffi.ffi_state L ⇒
-    ∃mc. cEval_equiv conf
+    ∃mc vs2 cEnv2.
+         cpEval_valid conf p cEnv2 pSt2 pCd2 vs2 cSt2 ∧
+         cEval_equiv conf
           (evaluate (cSt1 with clock := mc) cEnv1
                     [compile_endpoint conf vs1 pCd1])
           (evaluate (cSt2 with clock := mc) cEnv2
