@@ -412,7 +412,7 @@ Proof
       first_x_assum (qspec_then ‘MO’ assume_tac) >>
       fs[GSYM pairTheory.FORALL_PROD] >>
       metis_tac[ffi_eq_def,BISIM_REL_def,BISIM_def])
-QED 
+QED
 
 Definition ffi_fail_stream_def:
   (ffi_fail_stream conf st src (c1::cs) =
@@ -525,7 +525,7 @@ Proof
       first_x_assum (qspec_then ‘MO’ assume_tac) >>
       fs[GSYM pairTheory.FORALL_PROD] >>
       metis_tac[ffi_eq_def,BISIM_REL_def,BISIM_def])
-QED 
+QED
 
 
 Theorem ffi_gets_stream:
@@ -541,7 +541,7 @@ Proof
   (* Handle non-empty queue inductively *)
   >- (rw[] >> qabbrev_tac ‘fs = st.ffi_state’ >>
       PairCases_on ‘fs’ >> rename1 ‘(c,q,N)’ >> rename1 ‘h::tl’ >>
-      first_x_assum (qspecl_then [‘st with ffi_state := (c,q |+ (src,tl),N)’,‘src’] assume_tac) >>
+      first_x_assum (qspecl_then [‘st with ffi_state := (c,normalise_queues (q |+ (src,tl)),N)’,‘src’] assume_tac) >>
       Cases_on ‘LENGTH h ≠ SUC conf.payload_size’
       >- (ntac 2 DISJ2_TAC >> qexists_tac ‘[]’ >>
           rw[ffi_fail_stream_def,call_FFI_def,
@@ -574,7 +574,7 @@ Proof
                 by metis_tac[strans_rules] >>
               qexists_tac ‘(h,s2)’ >> rw[])) >>
       rfs[] >>
-      ‘ffi_wf (c,q |+ (src,tl),N)’
+      ‘ffi_wf (c,normalise_queues (q |+ (src,tl)),N)’
         by fs[ffi_wf_def] >>
       fs[]
       >- (DISJ1_TAC >> qexists_tac ‘h::cs’ >>
@@ -586,14 +586,14 @@ Proof
           rw[]
           >- (rename1 ‘case x of (m,ns) => _’ >>
               PairCases_on ‘x’ >> fs[strans_rules] >>
-              ‘strans conf (c,q,N) (ARecv src h) (c,q |+ (src,tl),N)’
+              ‘strans conf (c,q,N) (ARecv src h) (c,normalise_queues (q |+ (src,tl)),N)’
                 by metis_tac[strans_rules] >>
               ‘x0 = h’
                 by metis_tac[functional_ARecv] >>
               rw[] >>
               ‘ffi_wf (x1,x2,x3)’
                 by metis_tac[strans_pres_wf] >>
-              ‘ffi_eq conf (x1,x2,x3) (c,q |+ (src,tl),N)’
+              ‘ffi_eq conf (x1,x2,x3) (c,normalise_queues (q |+ (src,tl)),N)’
                 suffices_by (rw[] >>
                              qmatch_goalsub_abbrev_tac ‘ffi_term_stream _ x _ _’ >>
                              qmatch_asmsub_abbrev_tac  ‘ffi_term_stream _ y _ _’ >>
@@ -601,9 +601,10 @@ Proof
                              MAP_EVERY qunabbrev_tac [‘x’,‘y’] >> rfs[] >>
                              ‘ffi_wf (x1,x2,x3)’
                                 by metis_tac[strans_pres_wf] >>
-                             fs[]) >>
+                             qmatch_goalsub_abbrev_tac ‘foo src (h'::t)’ >>
+                             fs []) >>
               metis_tac[ffi_eq_pres,ffi_eq_equivRel,equivalence_def,reflexive_def])
-          >- (qexists_tac ‘(h,(c,q|+(src,tl),N))’ >>
+          >- (qexists_tac ‘(h,(c,normalise_queues (q|+(src,tl)),N))’ >>
               rw[] >> metis_tac[strans_rules]))
       >- (DISJ2_TAC >> DISJ1_TAC >> qexists_tac ‘h::cs’ >>
           rw[ffi_divg_stream_def,call_FFI_def,valid_receive_call_format_def,
@@ -613,14 +614,14 @@ Proof
           >- (rw[AllCaseEqs()] >>
               rename1 ‘(λ(m,ns). strans _ _ (ARecv src m) ns) x’ >>
               PairCases_on ‘x’ >> fs[] >>
-              ‘strans conf (c,q,N) (ARecv src h) (c,q |+ (src,tl),N)’
+              ‘strans conf (c,q,N) (ARecv src h) (c,normalise_queues (q |+ (src,tl)),N)’
                 by metis_tac[strans_rules] >>
               ‘x0 = h’
                 by metis_tac[functional_ARecv] >>
               rw[] >>
               ‘ffi_wf (x1,x2,x3)’
                 by metis_tac[strans_pres_wf] >>
-              ‘ffi_eq conf (x1,x2,x3) (c,q |+ (src,tl),N)’
+              ‘ffi_eq conf (x1,x2,x3) (c,normalise_queues (q |+ (src,tl)),N)’
                 suffices_by (rw[] >>
                              qmatch_goalsub_abbrev_tac ‘ffi_divg_stream _ x _ _’ >>
                              qmatch_asmsub_abbrev_tac  ‘ffi_divg_stream _ y _ _’ >>
@@ -630,7 +631,7 @@ Proof
                                 by metis_tac[strans_pres_wf] >>
                              fs[]) >>
               metis_tac[ffi_eq_pres,ffi_eq_equivRel,equivalence_def,reflexive_def])
-          >- (qexists_tac ‘(h,(c,q|+(src,tl),N))’ >>
+          >- (qexists_tac ‘(h,(c,normalise_queues (q|+(src,tl)),N))’ >>
               rw[] >> metis_tac[strans_rules]))
       >- (DISJ2_TAC >> DISJ2_TAC >> qexists_tac ‘h::cs’ >>
           rw[ffi_fail_stream_def,call_FFI_def,valid_receive_call_format_def,
@@ -640,14 +641,14 @@ Proof
           >- (rw[AllCaseEqs()] >>
               rename1 ‘(λ(m,ns). strans _ _ (ARecv src m) ns) x’ >>
               PairCases_on ‘x’ >> fs[] >>
-              ‘strans conf (c,q,N) (ARecv src h) (c,q |+ (src,tl),N)’
+              ‘strans conf (c,q,N) (ARecv src h) (c,normalise_queues (q |+ (src,tl)),N)’
                 by metis_tac[strans_rules] >>
               ‘x0 = h’
                 by metis_tac[functional_ARecv] >>
               rw[] >>
               ‘ffi_wf (x1,x2,x3)’
                 by metis_tac[strans_pres_wf] >>
-              ‘ffi_eq conf (x1,x2,x3) (c,q |+ (src,tl),N)’
+              ‘ffi_eq conf (x1,x2,x3) (c,normalise_queues (q |+ (src,tl)),N)’
                 suffices_by (rw[] >>
                              qmatch_goalsub_abbrev_tac ‘ffi_fail_stream _ x _ _’ >>
                              qmatch_asmsub_abbrev_tac  ‘ffi_fail_stream _ y _ _’ >>
@@ -657,7 +658,7 @@ Proof
                                 by metis_tac[strans_pres_wf] >>
                              fs[]) >>
               metis_tac[ffi_eq_pres,ffi_eq_equivRel,equivalence_def,reflexive_def])
-          >- (qexists_tac ‘(h,(c,q|+(src,tl),N))’ >>
+          >- (qexists_tac ‘(h,(c,normalise_queues (q|+(src,tl)),N))’ >>
               rw[] >> metis_tac[strans_rules]))) >>
   (* Handle base case empty queue by induction on network *)
   rw[] >> Induct_on ‘(λ(x,y,z). z) st.ffi_state’
@@ -671,7 +672,7 @@ Proof
       rw[some_def] >>
       rename1 ‘¬_ x’ >>
       PairCases_on ‘x’ >>
-      rw[] >> 
+      rw[] >>
       ‘∀conf s1 L s2.
         strans conf s1 L s2 ⇒
         case s1 of (c1,q1,N1) =>
