@@ -167,20 +167,14 @@ Theorem qsame_irrel_receive:
       qsame q2 q2M
 Proof
   rw[qsame_def,output_trans_def] >>
-  qexists_tac ‘q1M |+ (sp,qlk q2 sp)’ >>
-  rw[finite_mapTheory.FLOOKUP_EXT,FUN_EQ_THM]
-  >- (reverse (Cases_on ‘x = sp’)
-      >- metis_tac[finite_mapTheory.FLOOKUP_UPDATE] >>
-      rw[finite_mapTheory.FLOOKUP_UPDATE,qlk_def,
-         fget_def] >>
-      pop_assum (qspec_then ‘sp’ assume_tac) >>
-      fs[finite_mapTheory.FLOOKUP_UPDATE,qlk_def,fget_def] >>
-      Cases_on ‘FLOOKUP q1M sp’ >> fs[])
-  >- (rename1 ‘qlk q2 x = qlk _ x’ >>
-      fs[qlk_def,fget_def] >>
-      reverse (Cases_on ‘x = sp’)
-      >- metis_tac[finite_mapTheory.FLOOKUP_UPDATE] >>
-      rw[finite_mapTheory.FLOOKUP_UPDATE])
+  qexists_tac ‘q2’ >>
+  rw[] >>
+  last_x_assum(SUBST_ALL_TAC o GSYM) >>
+  rw[finite_mapTheory.FLOOKUP_EXT,FUN_EQ_THM] >>
+  rename1 ‘FLOOKUP _ x’ >>
+  first_x_assum(qspec_then ‘x’ mp_tac) >>
+  rw[qlk_def,fget_def,FLOOKUP_normalise_queues] >>
+  rpt (BasicProvers.TOP_CASE_TAC >> fs[])
 QED
 
 (* Network Properties *)

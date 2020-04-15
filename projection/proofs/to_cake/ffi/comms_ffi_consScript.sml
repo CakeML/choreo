@@ -2,6 +2,7 @@ open HolKernel boolLib Parse bossLib;
 open relationTheory;
 open payloadSemTheory;
 open payloadLangTheory;
+open payloadPropsTheory;
 open comms_ffi_modelTheory;
 
 val _ = new_theory "comms_ffi_cons";
@@ -39,8 +40,8 @@ End
 Definition output_trans_def:
   output_trans conf c (q1,n1) (sp,d) (q2,n2) ⇔
     (n1 = n2) ∧
-    (q1 = q2 |+ (sp,d::(qlk q2 sp))) ∧
-    (q2 = q2 |+ (sp,qlk q2 sp))
+    (normalise_queues q1 = normalise_queues q2 |+ (sp,d::(qlk q2 sp))) ∧
+    (q2 = normalise_queues(q2 |+ (sp,qlk q2 sp)))
 End
 
 
@@ -157,6 +158,13 @@ Proof
   metis_tac[strans_send_deconstruct,strans_send_construct]
 QED
 
+(* TODO: move *)
+Triviality normalise_queues_FUPDATE_lemma:
+  normalise_queues (normalise_queues q |+ (ms,tl)) =
+  normalise_queues (q |+ (ms,tl))
+Proof
+  rw[normalise_queues_FUPDATE_NONEMPTY,DRESTRICT_normalise_queues]
+QED
 
 (* RECEIVE CONSTRUCTION/DECONSTRUCTION *)
 (* Pulling apart a receive operation *)
@@ -170,13 +178,12 @@ Theorem strans_receive_deconstruct:
 Proof
   Induct_on ‘strans’ >> rw[]
   >- (rename1 ‘qlk q ms = mc::tl’ >>
-      MAP_EVERY qexists_tac [‘q |+ (ms,mc::tl)’,‘q |+ (ms,tl)’,‘N’] >>
-      rw[qlk_def,fget_def,finite_mapTheory.FLOOKUP_DEF,output_trans_def] >>
-      ‘q |+ (ms,mc:: tl) = q’
-        suffices_by (rw[] >> metis_tac[RC_DEF]) >>
-      irule finite_mapTheory.FUPDATE_ELIM >>
-      fs[qlk_def,fget_def,finite_mapTheory.FLOOKUP_DEF] >>
-      Cases_on ‘ms ∈ FDOM q’ >> fs[])
+      MAP_EVERY qexists_tac [‘q’,‘normalise_queues(q |+ (ms,tl))’,‘N’] >>
+      rw[qlk_def,fget_def,finite_mapTheory.FLOOKUP_DEF,output_trans_def,
+          normalise_queues_FUPDATE_lemma] >>
+      rw[finite_mapTheory.fmap_eq_flookup,finite_mapTheory.FLOOKUP_UPDATE] >>
+      rw[] >>
+      fs[FLOOKUP_normalise_queues,qlk_def,fget_def,CaseEq "option"])
   >- (rename [‘trans conf NA LTau NB’,
               ‘RTC _ (qA,NB) (qC,NCD)’,
               ‘output_trans conf c (qC,NCD) (sp,d) (qD,NCD)’,
@@ -222,8 +229,11 @@ Proof
   ‘strans conf (c,qi1,ni) (ARecv sp d) (c,qi2,ni)’
     suffices_by metis_tac[strans_front_construct,strans_back_construct] >>
   ‘(qlk qi1 sp = d::(qlk qi2 sp)) ∧
-   (qi2 = qi1 |+ (sp,qlk qi2 sp))’
-    by (fs[output_trans_def,qlk_def,fget_def,finite_mapTheory.FLOOKUP_UPDATE]) >>
+   (qi2 = normalise_queues(qi1 |+ (sp,qlk qi2 sp)))’
+    by (fs[output_trans_def] >>
+        conj_tac >-
+          (FULL_SIMP_TAC std_ss [Once(GSYM qlk_normalise_queues)] >> rw[]) >>
+        fs[normalise_queues_FUPDATE_NONEMPTY] >> rw[] >> fs[DRESTRICT_normalise_queues]) >>
   metis_tac[strans_rules]
 QED 
 

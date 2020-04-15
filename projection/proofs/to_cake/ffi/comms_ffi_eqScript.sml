@@ -415,20 +415,16 @@ Proof
                  metis_tac[output_trans_pres_wf,
                            active_trans_equiv_irrel]) >>
   fs[qsame_def,output_trans_def] >>
-  qpat_x_assum ‘NS0 = NS0 |+ _’ mp_tac >>
-  qpat_x_assum ‘qOS = qOS |+ _’ mp_tac >>
-  qpat_x_assum ‘NS0 |+ _ = qOS |+ _’ mp_tac >>
+  qpat_x_assum ‘NS0 = normalise_queues(NS0 |+ _)’ (rw o single o Once) >>
+  qpat_x_assum ‘qOS = normalise_queues(qOS |+ _)’ (rw o single o Once) >>  
+  qpat_x_assum ‘normalise_queues NS0 |+ _ = normalise_queues qOS |+ _’ mp_tac >>
   rpt (pop_assum (K ALL_TAC)) >>
-  fs[qlk_def,fget_def] >>
   rw[] >>
-  reverse (Cases_on ‘sp = rp’)
-  >- metis_tac[finite_mapTheory.FLOOKUP_UPDATE] >>
-  Cases_on ‘FLOOKUP NS0 rp’ >>
-  Cases_on ‘FLOOKUP qOS rp’ >>
-  fs[finite_mapTheory.FLOOKUP_EXT,
-     FUN_EQ_THM] >>
-  last_x_assum (qspec_then ‘rp’ assume_tac) >>
-  fs[finite_mapTheory.FLOOKUP_UPDATE]
+  fs[finite_mapTheory.fmap_eq_flookup] >>
+  pop_assum(qspec_then ‘sp’ assume_tac) >>
+  fs[finite_mapTheory.FLOOKUP_UPDATE,CaseEq "bool"] >>
+  fs[qlk_def,fget_def,FLOOKUP_normalise_queues] >>
+  rpt(BasicProvers.PURE_FULL_CASE_TAC >> fs[])
 QED
 
 (* EQUIVALENCE PRESERVATION *)

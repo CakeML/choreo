@@ -429,23 +429,20 @@ Proof
       qexists_tac ‘qpush S2B0 sp d’ >> rw[]
       >- (rw[qpush_def] >>
           Cases_on ‘ML0 = sp’
-          >- (rw[qlk_def,fget_def] >>
-              Cases_on ‘FLOOKUP S2B0 ML0’ >>
-              simp[finite_mapTheory.FLOOKUP_UPDATE])
+          >- (rw[])
           >- (rw[qlk_def,fget_def] >>
               MAP_EVERY Cases_on [‘FLOOKUP S2B0 ML0’,‘FLOOKUP S2B0 sp’] >>
               simp[finite_mapTheory.FLOOKUP_UPDATE,
                    finite_mapTheory.FUPDATE_COMMUTES]))
       >- (rw[qpush_def] >>
           Cases_on ‘ML0 = sp’
-          >- (rw[qlk_def,fget_def] >>
-              Cases_on ‘FLOOKUP S2B0 ML0’ >>
-              simp[finite_mapTheory.FLOOKUP_UPDATE])
-          >- (fs[qlk_def,fget_def] >>
-              MAP_EVERY Cases_on [‘FLOOKUP S2B0 ML0’,‘FLOOKUP S2B0 sp’] >>
-              fs[finite_mapTheory.FLOOKUP_UPDATE,
-                 finite_mapTheory.FUPDATE_COMMUTES] >>
-              metis_tac[])))
+          >- (rw[] >>
+              qpat_x_assum ‘S2B0 = _’ (rw o single o Once) >>
+              rw[normalise_queues_FUPDATE_NONEMPTY])
+          >- (rw[] >>
+              qpat_x_assum ‘S2B0 = _’ (rw o single o Once) >>
+              rw[normalise_queues_FUPDATE_NONEMPTY] >>
+              fs[finite_mapTheory.FUPDATE_COMMUTES])))
 QED
 
 (* -- active/internal *)

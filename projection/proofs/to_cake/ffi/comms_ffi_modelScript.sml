@@ -26,7 +26,7 @@ Inductive strans:
   (* ARecv *)
   (∀conf c q ms mc tl N.
     qlk q ms = mc::tl
-    ⇒ strans conf (c,q,N) (ARecv ms mc) (c,q |+ (ms,tl), N)) ∧
+    ⇒ strans conf (c,q,N) (ARecv ms mc) (c,normalise_queues(q |+ (ms,tl)), N)) ∧
 
   (* LTauL *)
   (∀conf c q q' N N' N'' α.
