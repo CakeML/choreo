@@ -2680,7 +2680,7 @@ Theorem endpoint_forward_correctness:
         vs1 cEnv1 cSt1 cSt2.
     trans conf (NEndpoint p pSt1 pCd1) L (NEndpoint p pSt2 pCd2) ∧
     cpEval_valid conf p cEnv1 pSt1 pCd1 vs1 cSt1 ∧
-    st2.ffi.oracle = comms_ffi_oracle conf ∧
+    cSt2.ffi.oracle = comms_ffi_oracle conf ∧
     cpFFI_valid conf pSt1 pSt2 cSt1.ffi.ffi_state cSt2.ffi.ffi_state L ⇒
     ∃mc vs2 cEnv2.
          cpEval_valid conf p cEnv2 pSt2 pCd2 vs2 cSt2 ∧
