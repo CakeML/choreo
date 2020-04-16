@@ -2967,6 +2967,7 @@ Theorem network_forward_correctness:
   (* These assumptions should be dischargable by the static part of the compiler *)
   net_wf n ∧ (* equivalent to ALL_DISTINCT(MAP FST(endpoints n)) *)
   ~net_has_node n p ∧
+  normalised s.queues ∧
   conf.payload_size > 0 ∧
   st1.ffi.oracle = comms_ffi_oracle conf ∧
   st1.ffi.ffi_state = (p,s.queues,n) ∧
@@ -3015,28 +3016,42 @@ Proof
               ffi_state_cor_def,
               cpFFI_valid_def,some_def]
           \\ fs []
+          >- (drule payload_trans_normalised
+              \\ rw [normalised_network_def,normalised_def]
+              \\ SELECT_ELIM_TAC \\ rw []
+              >- (asm_exists_tac \\ fs [])
+              \\ qpat_x_assum ‘_ x’ (K ALL_TAC)
+              \\ Cases_on ‘x'’ \\ fs []
+              \\ qpat_assum ‘s.queues = _’ (ONCE_REWRITE_TAC o single o GSYM)
+              \\ first_assum (mp_then Any mp_tac normalise_queues_dequeue_eq)
+              \\ impl_tac >- rw [normalised_def]
+              \\ disch_then (ONCE_REWRITE_TAC o single)
+              \\ irule (CONJUNCTS strans_rules |> hd)
+              \\ fs [qlk_normalise_queues])
           \\ qpat_assum `trans _ (NEndpoint _ _ _) _ _`
                           (mp_tac o PURE_ONCE_REWRITE_RULE [trans_cases])
           \\ fs [] \\ rw []
           \\ fs [state_component_equality] \\ rveq \\ rfs [state_component_equality]
-          >- (SELECT_ELIM_TAC \\ rw []
-              >- (asm_exists_tac \\ fs [])
-              \\ Cases_on ‘x'’ \\ fs []
-              \\ Cases_on ‘tl’ \\ rw [] >- cheat
+          >- (first_x_assum (qspec_then ‘(p1,d)’ assume_tac) \\ fs []
               \\ fs [normalise_queues_FUPDATE_NONEMPTY]
-              \\ cheat)
-          >- cheat
-          >- (Cases_on ‘x’ \\ fs []
-              \\ qpat_x_assum ‘s.queues = _’ (assume_tac o Q.AP_TERM ‘λe. qlk e q’)
-              \\ fs [])
-          >- (Cases_on ‘x’ \\ fs []
-              \\ qpat_x_assum ‘s.queues = _’ (assume_tac o Q.AP_TERM ‘λe. qlk e q’)
-              \\ fs [])
-          >- (Cases_on ‘x’ \\ fs []
-              \\ qpat_x_assum ‘s.queues = _’ (assume_tac o Q.AP_TERM ‘λe. qlk e q’)
-              \\ fs [])
-          >- cheat
-          >- cheat
+              \\ first_assum (fn t => reverse (sg ‘¬ ^(concl t)’))
+              \\ pop_assum (K ALL_TAC)
+              \\ fs [normalised_def]
+              \\ ONCE_REWRITE_TAC [GSYM fmap_EQ_THM]
+              \\ fs [qlk_def,fget_def]
+              \\ EVERY_CASE_TAC
+              \\ fs [] \\ rveq \\ rw [FAPPLY_FUPDATE_THM]
+              \\ fs [FLOOKUP_DEF,ABSORPTION_RWT])
+          >- (first_x_assum (qspec_then ‘(p1,d)’ assume_tac) \\ fs []
+              \\ fs [normalise_queues_FUPDATE_NONEMPTY]
+              \\ first_assum (fn t => reverse (sg ‘¬ ^(concl t)’))
+              \\ pop_assum (K ALL_TAC)
+              \\ fs [normalised_def]
+              \\ ONCE_REWRITE_TAC [GSYM fmap_EQ_THM]
+              \\ fs [qlk_def,fget_def]
+              \\ EVERY_CASE_TAC
+              \\ fs [] \\ rveq \\ rw [FAPPLY_FUPDATE_THM]
+              \\ fs [FLOOKUP_DEF,ABSORPTION_RWT])
           \\ irule qsame_irrel_ffi_eq \\ fs [qsame_def])
        \\ rw []
        \\ MAP_EVERY qexists_tac [‘mc’,‘cEnv2’,‘vs2’]
