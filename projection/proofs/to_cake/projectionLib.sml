@@ -8,7 +8,10 @@ struct
   open astToSexprLib;
 
   val n2w8 = “n2w:num -> word8”;
-  val camkes_payload_size = 256 (* Can go up to 480 since this is the size of the IPC buffer *)
+  val camkes_payload_size = 256 (* Could go up to 480 since this is the size of the seL4 IPC buffer *)
+
+  val queue_size = 1 (* TODO: factor out *)
+  val debuggy = ref true;
 
   fun pnames chor =
       “MAP (MAP (CHR o w2n)) (procsOf ^chor)”
@@ -63,9 +66,21 @@ struct
                     "(from ",p,".",q,"_send, to ",q,".",p,"_recv);\n"
                   ])
               qs |> String.concat
+
+        fun mk_configs (p,qs) =
+            map
+              (fn q =>
+                  String.concat [
+                    "        ",q,".",p,"_empty_value = 1;\n", (* todo: queue_size *)
+                    "        ",q,".",p,"_usequeue_value = 1;\n",
+                    "        ",q,".",p,"_full_value = 0;\n"
+                  ])
+              qs |> String.concat
+
         val imports = map mk_import pns
         val decls = map mk_component_decl pns
         val connections = map mk_connections rectbl
+        val configs = map mk_configs rectbl
       in
         String.concat [
           "import <std_connector.camkes>;\n",
@@ -78,6 +93,9 @@ struct
           String.concat decls,
           "\n",
           String.concat connections,
+          "    }\n\n",
+          "    configuration {\n",
+          String.concat configs,
           "    }\n",
           "}\n"
         ]
@@ -98,7 +116,7 @@ struct
                         p,"_dir}/",p,".sexp > ${CMAKE_CURRENT_BINARY_DIR}/",
                         p,".S\n"],
                       String.concat [
-                        "  COMMAND sed -i 's/cdecl\\(main\\)/cdecl\\(run\\)/' ${CMAKE_CURRENT_BINARY_DIR}/",
+                        "  COMMAND sed -i 's/cdecl\\(main\\)/cdecl\\(main_func\\)/' ${CMAKE_CURRENT_BINARY_DIR}/",
                         p,".S\n"],
                       ")\n\n"
                     ])
@@ -147,6 +165,12 @@ struct
             map (fn q => String.concat ["    provides TransferString ",q,"_recv;\n"]) qs
         fun mk_uses p qs =
             map (fn q => String.concat ["    uses TransferString ",q,"_send;\n"]) qs
+        fun mk_semaphore name =
+            String.concat ["    has binary_semaphore ",name,";\n"]
+        fun mk_semaphores qs =
+            map (fn q => String.concat [mk_semaphore(q^"_usequeue"),
+                                        mk_semaphore(q^"_empty"),
+                                        mk_semaphore(q^"_full")]) qs
       in
         map
           (fn (p,qs,rs) =>
@@ -154,14 +178,223 @@ struct
                String.concat
                  ["component ",p," {\n",
                   "    control;\n",
-                  String.concat(mk_provides p rs),
+                  String.concat(mk_provides p qs),
                   String.concat(mk_uses p rs),
-                  "    has binary_semaphore binsem;\n",
+                  String.concat(mk_semaphores qs),
                   "}\n"
                  ]
               )
           )
           bidirtbl
+      end
+
+  fun mk_camkes_glue_code(p,qs,rs) =
+      let
+        fun ffisendline r =
+            String.concat (
+              (if !debuggy then
+                ["  printf(\"",p," |-> %s\n\",c);"]
+               else [])
+              @
+              [
+                " if (strcmp(c,\"",r,"\")==0) {\n",
+                "    ",r,"_send_transfer_string(a);\n",
+                "  }\n"
+              ]
+            )
+
+        fun ffireceiveline q =
+            String.concat [
+              " if (strcmp(c,\"",q,"\")==0) {\n",
+              "    assert(",q,"_full_wait() == 0);\n",
+              "    assert(",q,"_usequeue_wait() == 0);\n",
+              "    my_strcpy(",q,"_ins,a);\n",
+              "    assert(",q,"_usequeue_post() == 0);\n",
+              "    assert(",q,"_empty_post() == 0);\n",
+              "  }\n"
+            ]
+
+        fun ffirecvmethod q =
+            String.concat [
+              "void ",q,"_recv_transfer_string(const char *s) {\n",
+              "  assert(",q,"_empty_wait() == 0);\n",
+              "  assert(",q,"_usequeue_wait() == 0);\n",
+              "  my_strcpy(s,",q,"_ins);\n",
+              "  assert(",q,"_usequeue_post() == 0);\n",
+              "  assert(",q,"_full_post() == 0);\n",
+              "}\n",
+              "\n"
+            ]
+
+        val ffisend =
+            if null rs then
+              "ZF_LOGF(\"Unknown receiver: %s\\n\",c);\n"
+            else
+              String.concat
+                [" ",
+                 String.concatWith "  else" (map ffisendline rs),
+                 "  else {\n",
+                 "    ZF_LOGF(\"Unknown receiver: %s\\n\",c);\n",
+                 "  }\n"
+                ]
+
+        val ffireceive =
+            if null rs then
+              "ZF_LOGF(\"Unknown sender: %s\\n\",c);\n"
+            else
+              String.concat
+                [" ",
+                 String.concatWith "  else" (map ffireceiveline qs),
+                 "  else {\n",
+                 "    ZF_LOGF(\"Unknown sender: %s\\n\",c);\n",
+                 "  }\n"
+                ]
+
+        val receivemethods = String.concat (map ffirecvmethod qs)
+      in
+        String.concat [
+          "#include <stdio.h>\n",
+          "#include <string.h>\n",
+          "#include <stdlib.h>\n",
+          "#include <unistd.h>\n",
+          "#include <fcntl.h>\n",
+          "#include <sys/stat.h>\n",
+          "#include <sys/time.h>\n",
+          "#include <assert.h>\n",
+          "#include <camkes.h>\n",
+          "\n",
+          "extern unsigned int argc;\n",
+          "extern char **argv;\n",
+          "\n",
+          "void main_func(void);\n",
+          "\n",
+          "/* run the control thread */\n",
+          "int run(void) {\n",
+          "    main_func();\n",
+          "    return 0;\n",
+          "}\n",
+          "\n",
+          "/* This flag is on by default. It catches CakeML's out-of-memory exit codes\n",
+          " * and prints a helpful message to stderr.\n",
+          " * Note that this is not specified by the basis library.\n",
+          " * */\n",
+          "#define STDERR_MEM_EXHAUST\n",
+          "\n",
+          String.concat
+            (map (fn q =>
+                     String.concat ["volatile unsigned char ",q,"_ins[",
+                                    Int.toString(camkes_payload_size + 2),
+                                    "];\n"])
+                 qs),
+          "\n",
+          "void my_strcpy(char *s, volatile unsigned char *t) {\n",
+          String.concat ["  int len = ",
+                         Int.toString(camkes_payload_size + 1),
+                         ";\n"],
+          "  for (int i = 0; i <= len; i++) {\n",
+          "    t[i] = s[i];\n",
+          "  }\n",
+          "}\n",
+          "\n",
+          receivemethods,
+          "\n",
+          "void ffiwrite (unsigned char *c, long clen, unsigned char *a, long alen) {\n",
+          "  ZF_LOGF(\"ffi_write not supported\\n\");\n",
+          "}\n",
+          "\n",
+          "void ffisend (unsigned char *c, long clen, unsigned char *a, long alen) {  \n",
+          ffisend,
+          "}\n",
+          "\n",
+          "void ffireceive (unsigned char *c, long clen, unsigned char *a, long alen) {\n",
+          ffireceive,
+          "}\n",
+          "\n",
+          "/* GC FFI */\n",
+          "int inGC = 0;\n",
+          "struct timeval t1,t2,lastT;\n",
+          "long microsecs = 0;\n",
+          "int numGC = 0;\n",
+          "int hasT = 0;\n",
+          "\n",
+          "void cml_exit(int arg) {\n",
+          "\n",
+          "  #ifdef STDERR_MEM_EXHAUST\n",
+          "  if(arg == 1) {\n",
+          "    fprintf(stderr,\"CakeML heap space exhausted.\\n\");\n",
+          "  }\n",
+          "  else if(arg == 2) {\n",
+          "    fprintf(stderr,\"CakeML stack space exhausted.\\n\");\n",
+          "  }\n",
+          "  #endif\n",
+          "\n",
+          "  #ifdef DEBUG_FFI\n",
+          "  {\n",
+          "    fprintf(stderr,\"GCNum: %d, GCTime(us): %ld\\n\",numGC,microsecs);\n",
+          "  }\n",
+          "  #endif\n",
+          "\n",
+          "  exit(arg);\n",
+          "}\n",
+          "\n",
+          "void ffiexit (unsigned char *c, long clen, unsigned char *a, long alen) {\n",
+          "  assert(alen == 1);\n",
+          "  exit((int)a[0]);\n",
+          "}\n",
+          "\n",
+          "\n",
+          "/* empty FFI (assumed to do nothing, but can be used for tracing/logging) */\n",
+          "void ffi (unsigned char *c, long clen, unsigned char *a, long alen) {\n",
+          "  #ifdef DEBUG_FFI\n",
+          "  {\n",
+          "    if (clen == 0)\n",
+          "    {\n",
+          "      if(inGC==1)\n",
+          "      {\n",
+          "        gettimeofday(&t2, NULL);\n",
+          "        microsecs += (t2.tv_usec - t1.tv_usec) + (t2.tv_sec - t1.tv_sec)*1e6;\n",
+          "        numGC++;\n",
+          "        inGC = 0;\n",
+          "      }\n",
+          "      else\n",
+          "      {\n",
+          "        inGC = 1;\n",
+          "        gettimeofday(&t1, NULL);\n",
+          "      }\n",
+          "    } else {\n",
+          "      int indent = 30;\n",
+          "      for (int i=0; i<clen; i++) {\n",
+          "        putc(c[i],stderr);\n",
+          "        indent--;\n",
+          "      }\n",
+          "      for (int i=0; i<indent; i++) {\n",
+          "        putc(' ',stderr);\n",
+          "      }\n",
+          "      struct timeval nowT;\n",
+          "      gettimeofday(&nowT, NULL);\n",
+          "      if (hasT) {\n",
+          "        long usecs = (nowT.tv_usec - lastT.tv_usec) +\n",
+          "                     (nowT.tv_sec - lastT.tv_sec)*1e6;\n",
+          "        fprintf(stderr,\" --- %ld milliseconds\\n\",usecs / (long)1000);\n",
+          "      } else {\n",
+          "        fprintf(stderr,\"\\n\");\n",
+          "      }\n",
+          "      gettimeofday(&lastT, NULL);\n",
+          "      hasT = 1;\n",
+          "    }\n",
+          "  }\n",
+          "  #endif\n",
+          "}\n",
+          "\n",
+          "// FFI calls for floating-point parsing\n",
+          "void ffidouble_fromString (unsigned char *c, long clen, unsigned char *a, long alen) {\n",
+          "  ZF_LOGF(\"Floating point printing/parsing not supported\\n\");\n",
+          "}\n",
+          "\n",
+          "void ffidouble_toString (unsigned char *c, long clen, unsigned char *a, long alen) {\n",
+          "  ZF_LOGF(\"Floating point printing/parsing not supported\\n\");\n",
+          "}\n"
+        ]
       end
 
   (* TODO: what should permissions be? *)
@@ -179,6 +412,15 @@ struct
         TextIO.closeOut st
       end
 
+  fun mk_camkes_glue_codes chor =
+      let
+        val rectbl = rectbl chor
+        val rrectbl = reverse_table rectbl
+        val bidirtbl = ListPair.map (fn ((p,qs),(_,rs)) => (p,qs,rs)) (rectbl,rrectbl)
+      in
+        map (fn tup => (#1 tup, mk_camkes_glue_code tup)) bidirtbl
+      end
+
   fun mk_camkes_boilerplate builddir chorname chor =
       let
         val _ = mkdir builddir
@@ -191,7 +433,10 @@ struct
             in
               print_to_file (builddir^"/components/"^p^"/"^p^".camkes") contents
             end
+        fun print_camkes_glue_code (p,contents) =
+              print_to_file (builddir^"/components/"^p^"/"^p^".c") contents
         val _ = mk_component_declarations chor |> List.app print_component_declaration
+        val _ = mk_camkes_glue_codes chor |> List.app print_camkes_glue_code
         val _ = print_to_file(builddir^"/CMakeLists.txt") (mk_camkes_cmakefile chorname chor)
         val _ = print_to_file(builddir^"/interfaces/TransferString.idl4") transfer_string
       in

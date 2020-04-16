@@ -36,7 +36,7 @@ Definition pingpong_def:
    )
 End
 
-(* val _ = project_to_camkes "pingpong_camkes" "pingpong" “pingpong”; *)
+val _ = project_to_camkes "pingpong_camkes" "pingpong" “pingpong”;
 
 val (ping_to_cake_thm,ping_to_cake_wholeprog) = project_to_cake ``pingpong`` "ping" 1
 
