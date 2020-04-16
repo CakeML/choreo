@@ -2643,8 +2643,9 @@ Proof
 QED
 
 val evalths = evaluate_def |> CONJUNCTS
-fun find_evalform e =
+fun find_evalform q =
   let
+    val e = Parse.typed_parse_in_context “:ast$exp” [] q
     val l = listSyntax.mk_list([e], type_of e)
     fun test th =
       let val (_, eqn) = strip_forall (concl th)
@@ -2673,6 +2674,25 @@ QED
 val cp_type =
   strip_fun (type_of “cpEval_valid”) |> #1 |> last |> dest_type |> #2 |> hd
 
+Theorem pSt_pCd_corr_Send:
+  pSt_pCd_corr ps (Send p v n cd) ⇔
+    pSt_pCd_corr ps cd ∧
+    ∃vv. FLOOKUP ps.bindings v = SOME vv
+Proof
+  simp[pSt_pCd_corr_def, DISJ_IMP_THM, FORALL_AND_THM, CONJ_COMM]
+QED
+
+Theorem strans_ASend_pres_ffi_state_cor:
+  strans conf s1 (ASend d m) s2 ∧ ffi_state_cor p ps s1 ⇒
+  ffi_state_cor p ps s2
+Proof
+  PairCases_on ‘s1’ >> PairCases_on ‘s2’ >>
+  simp[ffi_state_cor_def] >> strip_tac >> conj_asm1_tac
+  >- (drule strans_pres_pnum >> simp[]) >>
+  rw[] >> drule strans_queue_pres >>
+  metis_tac[IS_PREFIX_TRANS]
+QED
+
 (* FORWARD CORRECTNESS
     Just the spec :) *)
 Theorem endpoint_forward_correctness:
@@ -2691,8 +2711,9 @@ Theorem endpoint_forward_correctness:
                     [compile_endpoint conf vs2 pCd2])
 Proof
   simp[Once trans_cases] >> rw[] >> simp[compile_endpoint_def]
-  >- ((* sendloop; d ≤ n + payload_size *) fs[cpFFI_valid_def] >>
-      simp[evaluate_letNONE, find_evalform “Letrec _ _”,
+  >- ((* sendloop; d ≤ n + payload_size *)
+      fs[cpFFI_valid_def] >>
+      simp[evaluate_letNONE, find_evalform ‘Letrec _ _’,
            (* Once evaluate_opapp, *)
            bind_assoc, o_UNCURRY_R, C_UNCURRY_L, o_ABS_R, C_ABS_L] >>
       qmatch_goalsub_abbrev_tac ‘sendloop conf data’ >>
@@ -2703,19 +2724,16 @@ Proof
       ‘ck_equiv_hol (cEnv1 with v := Env1) (LIST_TYPE WORD) aexp (DROP n d)’
         by (simp[Abbr‘aexp’, ck_equiv_hol_def, evaluate_opapp, bind_assoc,
                  o_UNCURRY_R, C_UNCURRY_L, o_ABS_R, C_ABS_L,
-                 find_evalform “Lit _”, find_evalform “Var _”] >>
+                 find_evalform ‘Lit _’, find_evalform ‘Var _’] >>
             qx_gen_tac ‘refs0’ >>
             ‘∀v. nsLookup Env1 (Short (ps2cs v)) =
                  nsLookup cEnv1.v (Short (ps2cs v))’
               by simp[Abbr‘Env1’] >> simp[] >>
             drule_all_then (qx_choose_then ‘cv’ strip_assume_tac)
                            nsLookup_cpEval_valid >> simp[] >>
-            drule_then (qspec_then ‘data’
-                        (qx_choose_then ‘dv’
-                         (CONJUNCTS_THEN2
-                          (fn th => mp_tac th >> CHANGED_TAC (simp[]))
-                          assume_tac)))
-                       nsLookup_build_rec_env_drop >> strip_tac >>
+            drule_then (qspec_then ‘data’ $ qx_choose_then ‘dv’ $
+                        strip_assume_tac)
+                       nsLookup_build_rec_env_drop >> rfs[] >>
             drule_all_then
              (qspec_then ‘empty_state with refs := refs0’ $
               qx_choosel_then [‘dcs_env’, ‘dcs_e’, ‘dcs_cl1’, ‘dcs_cl2’,
@@ -2750,7 +2768,97 @@ Proof
       >- (drule (SIMP_RULE (srw_ss()) [PULL_EXISTS] strans_dest_check) >>
           fs[cpEval_valid_def]) >>
       disch_then (qx_choosel_then [‘ck1’, ‘ck2’, ‘refs’] strip_assume_tac) >>
-      qexists_tac ‘ck1’ >> simp[] >> cheat ) >>
+      qexists_tac ‘ck1’ >> pop_assum (simp o single) >>
+      fs[cpEval_valid_def, letfuns_def] >>
+      rpt (goal_assum drule) >> simp[] >>
+      fs[pSt_pCd_corr_Send] >>
+      drule_then SUBST_ALL_TAC strans_pres_wf >> simp[] >>
+      drule strans_ASend_pres_ffi_state_cor >> simp[] >>
+      disch_then kall_tac >> cheat )
+  >- ((* Send with LENGTH d > n + conf.payload_size, and evaluations on both
+         sides: one of drop v n, other of drop v (n + conf.payload_size) *)
+      fs[cpFFI_valid_def, GREATER_DEF] >>
+      CONV_TAC SWAP_VARS_CONV >> qexists_tac ‘vs1’ >>
+      CONV_TAC SWAP_VARS_CONV >> qexists_tac ‘cEnv1’ >>
+      simp[evaluate_letNONE, find_evalform ‘Letrec _ _’,
+           (* Once evaluate_opapp, *)
+           bind_assoc, o_UNCURRY_R, C_UNCURRY_L, o_ABS_R, C_ABS_L] >>
+      qmatch_goalsub_abbrev_tac ‘sendloop conf data’ >>
+      qabbrev_tac ‘
+        Env1 = build_rec_env (sendloop conf data) cEnv1 cEnv1.v
+      ’ >>
+      qmatch_goalsub_abbrev_tac ‘App Opapp [dropv; Lit _]’ >>
+      qabbrev_tac ‘aexpf = λm. App Opapp [dropv; Lit (IntLit (&m))]’ >>
+      simp[] >>
+      ‘∀m. ck_equiv_hol (cEnv1 with v := Env1) (LIST_TYPE WORD)
+                        (aexpf m)
+                        (DROP m d)’
+        by (simp[Abbr‘aexpf’, ck_equiv_hol_def, evaluate_opapp, bind_assoc,
+                 o_UNCURRY_R, C_UNCURRY_L, o_ABS_R, C_ABS_L, Abbr‘dropv’,
+                 find_evalform ‘Lit _’, find_evalform ‘Var _’] >>
+            qx_genl_tac [‘m’, ‘refs0’] >>
+            ‘∀v. nsLookup Env1 (Short (ps2cs v)) =
+                 nsLookup cEnv1.v (Short (ps2cs v))’
+              by simp[Abbr‘Env1’] >> simp[] >>
+            drule_all_then (qx_choose_then ‘cv’ strip_assume_tac)
+                           nsLookup_cpEval_valid >> simp[] >>
+            drule_then (qspec_then ‘data’ $ qx_choose_then ‘dv’ $
+                        strip_assume_tac)
+                       nsLookup_build_rec_env_drop >> rfs[] >>
+            drule_all_then
+             (qspec_then ‘empty_state with refs := refs0’ $
+              qx_choosel_then [‘dcs_env’, ‘dcs_e’, ‘dcs_cl1’, ‘dcs_cl2’,
+                               ‘dcs_refs’, ‘dcs_v’] strip_assume_tac)
+             (SIMP_RULE (srw_ss()) [PULL_EXISTS] do_opapp_translate
+              |> INST_TYPE [“:'ffi” |-> “:unit”]) >>
+            Q.REFINE_EXISTS_TAC ‘dcs_cl1 + (mc + 1)’ >>
+            simp[dec_clock_with_clock] >>
+            pop_assum kall_tac >>
+            ‘NUM m (Litv (IntLit (&m)))’ by simp[NUM_def, INT_def] >>
+            drule_all_then
+             (qspec_then ‘empty_state with refs := refs0 ++ dcs_refs’ $
+              qx_choosel_then [‘alld_env’, ‘alld_e’, ‘alld_cl1’, ‘alld_cl2’,
+                               ‘alld_refs’, ‘alld_v’] strip_assume_tac)
+             (SIMP_RULE (srw_ss()) [PULL_EXISTS] do_opapp_translate
+              |> INST_TYPE [“:'ffi” |-> “:unit”]) >> simp[] >>
+            Q.REFINE_EXISTS_TAC ‘alld_cl1 + (mc + 1)’ >> simp[] >> fs[] >>
+            simp[state_component_equality]) >>
+      pop_assum (fn th => qspec_then ‘n’ assume_tac th >>
+                          qspec_then ‘n + conf.payload_size’ assume_tac th)
+      rpt (first_x_assum (mp_then (Pos (el 4)) mp_tac
+                          (sendloop_correct
+                           |> INST_TYPE [alpha |-> cp_type]))) >>
+      simp[] >>
+      ‘nsLookup Env1 (Short "sendloop") =
+       SOME (Recclosure cEnv1 (sendloop conf data) "sendloop")’
+        by simp[Abbr‘Env1’, build_rec_env_def, sendloop_def] >> simp[] >>
+      disch_then (qspecl_then [‘conf’, ‘cSt1’] mp_tac) >>
+      ‘cSt1.ffi.oracle = comms_ffi_oracle conf’
+        by fs[cpEval_valid_def] >>
+      simp[Abbr‘data’] >>
+      disch_then (qspecl_then [‘valid_send_dest p2’, ‘p2’] mp_tac) >>
+      simp[send_invariant] >> impl_tac
+      >- (drule (SIMP_RULE (srw_ss()) [PULL_EXISTS] strans_dest_check) >>
+          fs[cpEval_valid_def]) >>
+      disch_then (qx_choosel_then [‘ck1’, ‘ck2’, ‘refs’] strip_assume_tac) >>
+      qexists_tac ‘ck1’ >> pop_assum (simp o single) >> simp[Abbr‘aexp’] >>
+      qpat_x_assum ‘ck_equiv_hol _ _ _ _ ’ kall_tac >>
+      fs[cpEval_valid_def, letfuns_def] >>
+      rpt (goal_assum drule) >> simp[] >>
+      drule_then strip_assume_tac pSt_pCd_corr_Send_E >> simp[] >>
+      drule_then SUBST_ALL_TAC strans_pres_wf >> simp[] >>
+      drule strans_ASend_pres_ffi_state_cor >> simp[] >>
+      fs[GREATER_DEF] >>
+      simp[evaluate_letNONE, find_evalform ‘Letrec _ _’,
+           (* Once evaluate_opapp, *)
+           bind_assoc, o_UNCURRY_R, C_UNCURRY_L, o_ABS_R, C_ABS_L] >>
+      qmatch_goalsub_abbrev_tac ‘sendloop conf data’ >>
+      qabbrev_tac ‘
+        Env1 = build_rec_env (sendloop conf data) cEnv1 cEnv1.v
+      ’ >>
+      qmatch_goalsub_abbrev_tac ‘App Opapp [Var (Short "sendloop"); aexp]’ >>
+
+   )
      cheat
 QED
 
