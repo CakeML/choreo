@@ -1757,10 +1757,38 @@ Definition cpFFI_valid_def:
     ⇔ ffi_eq conf ffi1 ffi2) ∧
   (cpFFI_valid conf pSt1 pSt2 ffi1 ffi2 LTau
     ⇔ case (some (sp,d).
-              pSt1.queues = pSt2.queues |+ (sp,d::qlk pSt2.queues sp)) of
+              pSt1.queues = normalise_queues (pSt2.queues |+ (sp,d::qlk pSt2.queues sp))) of
         SOME (sp,d) => strans conf ffi1 (ARecv sp d) ffi2
       | NONE        => ffi_eq conf ffi1 ffi2)
 End
+
+Theorem normalise_queues_dequeue_eq:
+  ∀s s' q r.
+    normalised s'.queues ∧
+    s.queues = normalise_queues (s'.queues |+ (q,r::qlk s'.queues q))
+    ⇒ s'.queues = normalise_queues (s.queues |+ (q,qlk s'.queues q))
+Proof
+  rw [] \\ fs [normalised_def]
+  \\ Cases_on ‘qlk s'.queues q’
+  >- (fs [qlk_def,fget_def]
+      \\ EVERY_CASE_TAC
+      >- (fs [normalise_queues_FUPDATE_NONEMPTY,FLOOKUP_DEF]
+          \\ drule NOT_FDOM_DRESTRICT \\ rw [])
+      \\ fs [] \\ rveq
+      \\ pop_assum (fn t1 => last_assum (fn t2 => assume_tac (ONCE_REWRITE_RULE [GSYM t2] t1)))
+      \\ fs [normalise_queues_def,FLOOKUP_DRESTRICT] \\ fs [])
+  \\ qmatch_goalsub_abbrev_tac ‘_ = ss’
+  \\ qpat_assum ‘normalise_queues _ = _’  (ONCE_REWRITE_TAC o single o GSYM)
+  \\ UNABBREV_ALL_TAC
+  \\ AP_TERM_TAC
+  \\ ONCE_REWRITE_TAC [GSYM fmap_EQ_THM]
+  \\ fs [qlk_def,fget_def]
+  \\ EVERY_CASE_TAC
+  \\ fs [] \\ rveq \\ rw []
+  >- fs [FLOOKUP_DEF,ABSORPTION_RWT]
+  \\ rw [FAPPLY_FUPDATE_THM]
+  \\ fs [FLOOKUP_DEF]
+QED
 
 (* CAKEML EQUIVALENCE *)
 (* Basic Definition *)
