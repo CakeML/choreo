@@ -2917,7 +2917,7 @@ Proof
     >> cheat
 QED
 
-Theorem NPar_trans_l_cases:
+Theorem NPar_trans_l_cases_full:
   ∀p s c s' c' conf n n'.
    trans conf (NPar (NEndpoint p s c) n) LTau (NPar (NEndpoint p s' c') n')
    ⇒ (s = s' ∧ c = c') ∨
@@ -2937,6 +2937,25 @@ Proof
       \\ qpat_x_assum `trans _ (NEndpoint _ _ _) _ _`
                       (mp_tac o PURE_ONCE_REWRITE_RULE [trans_cases])
       \\ rw [] \\ metis_tac [])
+  \\ metis_tac []
+QED
+
+Theorem NPar_trans_l_cases:
+  ∀p s c s' c' conf n n'.
+   trans conf (NPar (NEndpoint p s c) n) LTau (NPar (NEndpoint p s' c') n')
+   ⇒ (s = s' ∧ c = c') ∨ ∃L. trans conf (NEndpoint p s c) L (NEndpoint p s' c')
+Proof
+  metis_tac [NPar_trans_l_cases_full]
+QED
+
+Theorem NPar_trans_r_cases:
+  ∀conf n n' l l'.
+   trans conf (NPar l n) LTau (NPar l' n')
+   ⇒ (n = n') ∨ ∃L. trans conf n L n'
+Proof
+  rw []
+  \\ qpat_x_assum `trans _ _ _ _` (mp_tac o PURE_ONCE_REWRITE_RULE [trans_cases])
+  \\ rw []
   \\ metis_tac []
 QED
 
@@ -3004,7 +3023,7 @@ Theorem network_forward_correctness:
                       [compile_endpoint conf vs2 c'])
 Proof
   rw []
-  \\ drule_then assume_tac NPar_trans_l_cases
+  \\ drule_then assume_tac NPar_trans_l_cases_full
   \\ fs [] \\ rveq
   (* p is not involved at all *)
   >- (CONV_TAC SWAP_EXISTS_CONV
