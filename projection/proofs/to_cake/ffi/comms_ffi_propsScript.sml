@@ -224,7 +224,7 @@ Proof
   MAP_EVERY PairCases_on [‘SB’,‘SK’] >>
   fs[internal_trans_def,ffi_wf_def] >>
   metis_tac[trans_pres_nodes,trans_pres_wf]
-QED 
+QED
 
 Theorem emit_trans_pres_wf:
   ∀conf c q1 N1 q2 N2.
@@ -243,7 +243,7 @@ Proof
   MAP_EVERY PairCases_on [‘SB’,‘SK’] >>
   fs[emit_trans_def,ffi_wf_def] >>
   metis_tac[trans_pres_nodes,trans_pres_wf]
-QED 
+QED
 
 Theorem active_trans_pres_wf:
   ∀conf c q1 N1 q2 N2.
@@ -263,7 +263,7 @@ Proof
   fs[active_trans_def,internal_trans_def,
      emit_trans_def,ffi_wf_def] >>
   metis_tac[trans_pres_nodes,trans_pres_wf]
-QED 
+QED
 
 Theorem input_trans_pres_wf:
   ∀conf c q1 N1 rp d q2 N2.
@@ -273,7 +273,7 @@ Theorem input_trans_pres_wf:
 Proof
   rw[input_trans_def,ffi_wf_def] >>
   metis_tac[trans_pres_nodes,trans_pres_wf]
-QED 
+QED
 
 Theorem output_trans_pres_wf:
   ∀conf c q1 N1 sp d q2 N2.
@@ -283,7 +283,7 @@ Theorem output_trans_pres_wf:
 Proof
   rw[output_trans_def,ffi_wf_def] >>
   metis_tac[trans_pres_nodes,trans_pres_wf]
-QED 
+QED
 
 
 (* FFI STATE COMMUNICATION PROPERTIES *)
