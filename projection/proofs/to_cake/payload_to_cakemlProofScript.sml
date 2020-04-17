@@ -1634,6 +1634,19 @@ Definition pSt_pCd_corr_def:
                               ⇒ ∃vv. FLOOKUP pSt.bindings vn = SOME vv
 End
 
+Theorem trans_pSt_pCd_corr_pres:
+  ∀conf p s c L s' c'.
+   trans conf (NEndpoint p s c) L (NEndpoint p s' c') ∧
+   pSt_pCd_corr s c
+   ⇒ pSt_pCd_corr s' c'
+Proof
+  rw []
+  \\ last_assum (mp_tac o PURE_ONCE_REWRITE_RULE [trans_cases])
+  \\ rw [] \\ fs [pSt_pCd_corr_def,pFv_def] \\ rw []
+  \\ TRY (fs [FLOOKUP_UPDATE] \\ EVERY_CASE_TAC \\ fs [] \\ NO_TAC)
+  \\ metis_tac []
+QED
+
 (* Payload State and Semantic Environment *)
 (* -- Check the semantic environment contains all the variable bindings in
       the payload state and also matches all the config assumptions        *)
