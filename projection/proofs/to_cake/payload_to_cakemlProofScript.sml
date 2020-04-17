@@ -3136,6 +3136,7 @@ Theorem network_forward_correctness_reduction:
   net_wf n ∧
   ~net_has_node n p ∧
   conf.payload_size > 0 ∧
+  normalised s.queues ∧
   st1.ffi.oracle = comms_ffi_oracle conf ∧
   st1.ffi.ffi_state = (p,s.queues,n) ∧
   st2.ffi.oracle = comms_ffi_oracle conf ∧
@@ -3157,7 +3158,78 @@ Theorem network_forward_correctness_reduction:
       (evaluate (st2 with clock := mc) env2
                       [compile_endpoint conf vs2 c'])
 Proof
-  cheat
+  strip_tac
+  \\ ‘conf.payload_size > 0
+      ⇒ ∀n1 n2. (reduction conf)⃰ n1 n2
+         ⇒ ∀p s c n p s' c' n' st1 vs1 env1 st2.
+            n1 = (NPar (NEndpoint p s  c)  n)  ∧
+            n2 = (NPar (NEndpoint p s' c') n') ∧
+            net_wf n ∧  ~net_has_node n p ∧
+            st1.ffi.oracle = comms_ffi_oracle conf ∧
+            st1.ffi.ffi_state = (p,s.queues,n) ∧
+            st2.ffi.oracle = comms_ffi_oracle conf ∧
+            st2.ffi.ffi_state = (p,s'.queues,n') ∧
+            pSt_pCd_corr s c ∧ normalised s.queues ∧
+            sem_env_cor conf s env1 ∧ env_asm env1 conf ∧
+            enc_ok conf env1 (letfuns c) vs1
+            ⇒
+            ∃mc env2 vs2.
+              sem_env_cor conf s' env2 ∧
+              env_asm env2 conf ∧
+              enc_ok conf env2 (letfuns c') vs2 ∧
+              cEval_equiv conf
+                (evaluate (st1 with clock := mc) env1
+                                [compile_endpoint conf vs1 c])
+                (evaluate (st2 with clock := mc) env2
+                                [compile_endpoint conf vs2 c'])’
+    suffices_by metis_tac []
+  \\ strip_tac
+  \\ ho_match_mp_tac RTC_INDUCT
+  \\ rw []
+  >- (CONV_TAC SWAP_VARS_CONV \\  qexists_tac ‘env1’
+      \\ CONV_TAC SWAP_VARS_CONV \\  qexists_tac ‘vs1’
+      \\ fs [] \\ irule ffi_irrel
+      \\ qspec_then ‘conf’ assume_tac ffi_eq_equivRel
+      \\ fs [equivalence_def,reflexive_def]
+      \\ map_every qexists_tac [‘p’,‘s’]
+      \\ fs [cpEval_valid_def,ffi_wf_def,ffi_state_cor_def])
+  \\ ‘∃s'' c'' n''. n1' = NPar (NEndpoint p s'' c'' ) n''’
+      by (fs [reduction_def,Once trans_cases]
+          \\ fs [Once trans_cases])
+  \\ rveq \\ fs [reduction_def]
+  \\ drule network_forward_correctness \\ fs []
+  \\ disch_then (qspecl_then [‘st1’,‘vs1’,‘env1’,
+                              ‘st1 with ffi :=
+                                   (st1.ffi with ffi_state
+                                            := (p,s''.queues,n''))’]
+                             mp_tac)
+  \\ qpat_abbrev_tac ‘st1' = st1 with ffi := _’
+  \\ impl_tac >- fs [Abbr‘st1'’]
+  \\ rw []
+  \\ ‘∀q. ffi_wf (p,q,n'')’
+    by (drule NPar_trans_r_cases \\ rw []
+        >- fs [ffi_wf_def]
+        \\ drule_then irule trans_pres_ffi_wf
+        \\ fs [ffi_wf_def])
+  \\ fs [ffi_wf_def]
+  \\ first_x_assum (qspecl_then [‘st1'’,‘vs2’,‘env2’,‘st2’] mp_tac)
+  \\ impl_tac
+  >- (fs [Abbr‘st1'’]
+      \\ drule NPar_trans_l_cases
+      \\ rw [] \\ fs []
+      >- metis_tac [trans_pSt_pCd_corr_pres]
+      \\ drule payload_trans_normalised
+      \\ rw [normalised_network_def,normalised_def])
+  \\ rw []
+  \\ CONV_TAC SWAP_VARS_CONV \\  qexists_tac ‘env2'’
+  \\ CONV_TAC SWAP_VARS_CONV \\  qexists_tac ‘vs2'’
+  \\ fs []
+  \\ pop_assum (mp_then Any (qspecl_then [‘mc’,‘mc’] mp_tac) clock_irrel)
+  \\ drule_then (qspecl_then [‘mc'’,‘mc'’] assume_tac) clock_irrel
+  \\ disch_then assume_tac
+  \\ qexists_tac ‘mc + mc'’
+  \\ fs []
+  \\ metis_tac [cEval_equiv_trans]
 QED
 
 val _ = export_theory ();
