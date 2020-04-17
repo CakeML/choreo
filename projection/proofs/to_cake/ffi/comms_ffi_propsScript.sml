@@ -207,6 +207,32 @@ Proof
   metis_tac[trans_pres_nodes,trans_pres_wf]
 QED
 
+Theorem trans_pres_ffi_wf:
+  ∀conf n L n' p q q' .
+   trans conf n L n' ∧
+   ffi_wf (p,q,n) ⇒
+   ffi_wf (p,q',n')
+Proof
+  rw [ffi_wf_def]
+  \\ metis_tac[trans_pres_nodes,trans_pres_wf]
+QED
+
+Theorem reduction_pres_ffi_wf:
+  ∀conf n n' p q q'.
+   RTC (reduction conf) n n' ∧
+   ffi_wf (p,q,n) ⇒
+   ffi_wf (p,q',n')
+Proof
+  rpt strip_tac
+  \\ pop_assum mp_tac
+  \\ map_every qid_spec_tac [‘q'’,‘q’,‘p’]
+  \\ pop_assum mp_tac
+  \\ map_every qid_spec_tac [‘n'’,‘n’]
+  \\ Induct_on ‘RTC’ \\  rw[reduction_def]
+  >- fs [ffi_wf_def]
+  \\ metis_tac [trans_pres_ffi_wf]
+QED
+
 Theorem internal_trans_pres_wf:
   ∀conf c q1 N1 q2 N2.
     RTC (internal_trans conf c) (q1,N1) (q2,N2) ⇒
