@@ -1811,29 +1811,41 @@ Definition cEval_equiv_def:
     crA = crB ∧
     crA ≠ Rerr (Rabort Rtimeout_error)
 End
+(* Transitive *)
+Theorem cEval_equiv_trans:
+  ∀conf p1 p2 p3.
+   cEval_equiv conf p1 p2 ∧
+   cEval_equiv conf p2 p3
+   ⇒ cEval_equiv conf p1 p3
+Proof
+  rw [] \\ Cases_on ‘p1’ \\ Cases_on ‘p2’ \\ Cases_on ‘p3’
+  \\ fs [cEval_equiv_def] \\ qspec_then ‘conf’ assume_tac ffi_eq_equivRel
+  \\ fs [equivalence_def,transitive_def]
+  \\ metis_tac []
+QED
 (* Irrelevance of extra time/fuel to equivalence *)
 Theorem clock_irrel:
-  ∀ conf cSt1 cSt2 cEnv cExps.
+  ∀ conf cSt1 cSt2 cEnv1 cExps1 cEnv2 cExps2.
     ∀mc eck1 eck2.
       cEval_equiv conf
-        (evaluate (cSt1 with clock := mc) cEnv cExps)
-        (evaluate (cSt2 with clock := mc) cEnv cExps)
+        (evaluate (cSt1 with clock := mc) cEnv1 cExps1)
+        (evaluate (cSt2 with clock := mc) cEnv2 cExps2)
     ⇒ cEval_equiv conf
-        (evaluate (cSt1 with clock := eck1 + mc) cEnv cExps)
-        (evaluate (cSt2 with clock := eck2 + mc) cEnv cExps)
+        (evaluate (cSt1 with clock := eck1 + mc) cEnv1 cExps1)
+        (evaluate (cSt2 with clock := eck2 + mc) cEnv2 cExps2)
 Proof
   rpt strip_tac >>
-  Cases_on ‘evaluate (cSt1 with clock := mc) cEnv cExps’ >>
-  Cases_on ‘evaluate (cSt2 with clock := mc) cEnv cExps’ >>
+  Cases_on ‘evaluate (cSt1 with clock := mc) cEnv1 cExps1’ >>
+  Cases_on ‘evaluate (cSt2 with clock := mc) cEnv2 cExps2’ >>
   fs[cEval_equiv_def] >>
-  ‘evaluate (cSt1 with clock := eck1 + mc) cEnv cExps
+  ‘evaluate (cSt1 with clock := eck1 + mc) cEnv1 cExps1
     = (q with clock := eck1 + q.clock,r)’
-    by (Q.ISPECL_THEN [‘(cSt1 with clock := mc)’,‘cEnv’, ‘cExps’,‘q’,‘r’,‘eck1’]
+    by (Q.ISPECL_THEN [‘(cSt1 with clock := mc)’,‘cEnv1’, ‘cExps1’,‘q’,‘r’,‘eck1’]
                       assume_tac evaluate_add_to_clock >>
         rfs[]) >>
-  ‘evaluate (cSt2 with clock := eck2 + mc) cEnv cExps
+  ‘evaluate (cSt2 with clock := eck2 + mc) cEnv2 cExps2
     = (q' with clock := eck2 + q'.clock,r')’
-    by (Q.ISPECL_THEN [‘(cSt2 with clock := mc)’,‘cEnv’, ‘cExps’,‘q'’,‘r'’,‘eck2’]
+    by (Q.ISPECL_THEN [‘(cSt2 with clock := mc)’,‘cEnv2’, ‘cExps2’,‘q'’,‘r'’,‘eck2’]
                       assume_tac evaluate_add_to_clock >>
         rfs[]) >>
   rw[cEval_equiv_def]
