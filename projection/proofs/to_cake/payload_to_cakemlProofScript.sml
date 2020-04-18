@@ -1624,7 +1624,7 @@ QED
 Definition pFv_def[simp]:
   pFv Nil = {} ∧
   pFv (Send _ fv _ npCd) = fv INSERT pFv npCd ∧
-  pFv (Receive _ fv _ npCd) = fv INSERT pFv npCd ∧
+  pFv (Receive _ fv _ npCd) =  pFv npCd DELETE fv ∧
   pFv (IfThen fv npCd1 npCd2) = fv INSERT pFv npCd1 ∪ pFv npCd2 ∧
   pFv (Let bv _ fvs npCd) = (pFv npCd DELETE bv) ∪ set fvs
 End
