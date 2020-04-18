@@ -3021,12 +3021,10 @@ Theorem network_forward_correctness:
 
   (* These assumptions can only be discharged by the dynamic part of the compiler *)
   sem_env_cor conf s env1 ∧
-  env_asm env1 conf ∧
   enc_ok conf env1 (letfuns c) vs1
   ⇒
   ∃mc env2 vs2.
     sem_env_cor conf s' env2 ∧
-    env_asm env2 conf ∧
     enc_ok conf env2 (letfuns c') vs2 ∧
     cEval_equiv conf
       (evaluate (st1 with clock := mc) env1
@@ -3046,6 +3044,7 @@ Proof
       >- metis_tac [ffi_wf_def,trans_ffi_eq_same]
       \\ MAP_EVERY qexists_tac [‘p’,‘s’]
       \\ rw [cpEval_valid_def,ffi_state_cor_def]
+      \\ fs [sem_env_cor_def]
       >- rw [ffi_wf_def]
       \\ irule internal_trans_pres_wf
       \\ MAP_EVERY qexists_tac [‘n’,‘conf’,‘s.queues’]
@@ -3059,7 +3058,7 @@ Proof
       >- (rw [cpEval_valid_def,ffi_wf_def,
               ffi_state_cor_def,
               cpFFI_valid_def,some_def]
-          \\ fs []
+          \\ fs [] >- fs [sem_env_cor_def]
           >- (drule payload_trans_normalised
               \\ rw [normalised_network_def,normalised_def]
               \\ SELECT_ELIM_TAC \\ rw []
@@ -3104,6 +3103,7 @@ Proof
   >- (drule_then (qspecl_then [‘vs1’,‘env1’,‘st1’,‘st2’] mp_tac) endpoint_forward_correctness
       \\ impl_tac
       >- (rw [cpEval_valid_def,ffi_wf_def,ffi_state_cor_def,cpFFI_valid_def]
+          >- fs [sem_env_cor_def]
           \\ qpat_x_assum `trans _ (NEndpoint _ _ _) _ _`
                           (mp_tac o PURE_ONCE_REWRITE_RULE [trans_cases])
           \\ fs [] \\ rw []
@@ -3115,6 +3115,7 @@ Proof
   \\ impl_tac
   (* LReceive *)
   >- (rw [cpEval_valid_def,ffi_wf_def,ffi_state_cor_def,cpFFI_valid_def]
+      >- fs [sem_env_cor_def]
       \\ qpat_x_assum `trans _ (NEndpoint _ _ _) _ _`
                       (mp_tac o PURE_ONCE_REWRITE_RULE [trans_cases])
       \\ fs [] \\ rw []
@@ -3145,12 +3146,10 @@ Theorem network_forward_correctness_reduction:
 
   (* These assumptions can only be discharged by the dynamic part of the compiler *)
   sem_env_cor conf s env1 ∧
-  env_asm env1 conf ∧
   enc_ok conf env1 (letfuns c) vs1
   ⇒
   ∃mc env2 vs2.
     sem_env_cor conf s' env2 ∧
-    env_asm env2 conf ∧
     enc_ok conf env2 (letfuns c') vs2 ∧
     cEval_equiv conf
       (evaluate (st1 with clock := mc) env1
@@ -3170,12 +3169,11 @@ Proof
             st2.ffi.oracle = comms_ffi_oracle conf ∧
             st2.ffi.ffi_state = (p,s'.queues,n') ∧
             pSt_pCd_corr s c ∧ normalised s.queues ∧
-            sem_env_cor conf s env1 ∧ env_asm env1 conf ∧
+            sem_env_cor conf s env1 ∧
             enc_ok conf env1 (letfuns c) vs1
             ⇒
             ∃mc env2 vs2.
               sem_env_cor conf s' env2 ∧
-              env_asm env2 conf ∧
               enc_ok conf env2 (letfuns c') vs2 ∧
               cEval_equiv conf
                 (evaluate (st1 with clock := mc) env1
@@ -3192,7 +3190,7 @@ Proof
       \\ qspec_then ‘conf’ assume_tac ffi_eq_equivRel
       \\ fs [equivalence_def,reflexive_def]
       \\ map_every qexists_tac [‘p’,‘s’]
-      \\ fs [cpEval_valid_def,ffi_wf_def,ffi_state_cor_def])
+      \\ fs [cpEval_valid_def,ffi_wf_def,ffi_state_cor_def,sem_env_cor_def])
   \\ ‘∃s'' c'' n''. n1' = NPar (NEndpoint p s'' c'' ) n''’
       by (fs [reduction_def,Once trans_cases]
           \\ fs [Once trans_cases])
