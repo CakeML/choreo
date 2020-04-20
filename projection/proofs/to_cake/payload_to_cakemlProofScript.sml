@@ -2765,6 +2765,26 @@ Proof
   simp[cpEval_valid_def, letfuns_def, pSt_pCd_corr_Send] >> metis_tac[]
 QED
 
+Theorem ffi_eq_REFL[simp]:
+  ffi_eq c s s
+Proof
+  ‘equivalence (ffi_eq c)’ by simp[ffi_eq_equivRel] >>
+  fs[equivalence_def, reflexive_def]
+QED
+
+Theorem cEval_equiv_bump_clocks:
+  cEval_equiv conf (evaluate st1 e1 l1) (evaluate st2 e2 l2) ∧
+  st1.clock ≤ clk1 ∧ st2.clock ≤ clk2 ⇒
+  cEval_equiv conf (evaluate (st1 with clock := clk1) e1 l1)
+                   (evaluate (st2 with clock := clk2) e2 l2)
+Proof
+  map_every Cases_on [‘evaluate st1 e1 l1’, ‘evaluate st2 e2 l2’] >>
+  simp[cEval_equiv_def] >> rw[] >>
+  dxrule_then (qspec_then ‘clk2 - st2.clock’ mp_tac) evaluate_add_to_clock >>
+  dxrule_then (qspec_then ‘clk1 - st1.clock’ mp_tac) evaluate_add_to_clock >>
+  simp[cEval_equiv_def]
+QED
+
 (* FORWARD CORRECTNESS
     Just the spec :) *)
 Theorem endpoint_forward_correctness:
@@ -2858,7 +2878,22 @@ Proof
             qexists_tac ‘valid_send_dest p2’ >> simp[send_invariant] >>
             irule strans_dest_check >> metis_tac[]) >>
       pop_assum (mp_then (Pos hd) drule ffi_irrel) >> simp[] >>
-      cheat)
+      impl_tac
+      >- (‘conf.payload_size > 0’ by fs[cpEval_valid_def] >>
+          irule ffi_eq_pres >>
+          goal_assum (first_assum o mp_then (Pos last) mp_tac) >>
+          qexists_tac ‘cSt1.ffi.ffi_state’ >> csimp[] >> conj_tac
+          >- fs[cpEval_valid_def] >>
+          simp[Abbr‘FFI1’, send_events_def, Once compile_message_def] >>
+          Cases_on ‘LENGTH d = n + conf.payload_size’ >>
+          fs[pad_def, final_def, DROP_LENGTH_NIL, update_state_def,
+             comms_ffi_oracle_def, ffi_send_def] >>
+          simp[AllCaseEqs()] >>
+          DEEP_INTRO_TAC optionTheory.some_intro >>
+          qpat_x_assum ‘strans _ _ _ _’ mp_tac >>
+          simp[] >> metis_tac[]) >>
+      disch_then (qx_choose_then ‘mc’ assume_tac) >> qexists_tac ‘mc’ >>
+      dxrule cEval_equiv_bump_clocks >> simp[])
   >- ((* Send with LENGTH d > n + conf.payload_size, and evaluations on both
          sides: one of drop v n, other of drop v (n + conf.payload_size) *)
       fs[cpFFI_valid_def, GREATER_DEF] >>
