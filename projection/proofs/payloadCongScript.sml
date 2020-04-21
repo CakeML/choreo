@@ -289,4 +289,393 @@ Proof
   metis_tac [net_wf_cong]
 QED
 
+(* Finds a specific endpoint by name in the network *)
+Definition net_find_def:
+  net_find p NNil = NONE
+∧ net_find p (NPar n1 n2) = OPTION_CHOICE (net_find p n1)
+                                          (net_find p n2)
+∧ net_find p (NEndpoint p' s c) = (if p = p'
+                                   then SOME (NEndpoint p s c)
+                                   else NONE)
+End
+
+(* Removes a specific (single) endpoint by name in the network.
+   Note that if multiple endpoints with the same name exists
+   a call to net_filter will only remove 1
+*)
+Definition net_filter_def:
+  net_filter p NNil = NNil
+∧ net_filter p (NEndpoint p' s c) =
+    (if p = p' then NNil
+     else NEndpoint p' s c)
+∧ net_filter p (NPar n1 n2) =
+    let l = net_filter p n1
+    in if n1 ≠ l
+       then if l = NNil then n2
+            else NPar l n2
+       else NPar n1 (net_filter p n2)
+End
+
+(* Show that the combination of net_filter and net_find does not affect any
+   the contents of the network and only modifies its structure.
+
+   REPN is only required to simplify the proof by constraining the
+   type of networks being consider
+
+ *)
+Theorem net_find_filter_cong:
+  ∀n p e.
+   REPN n ∧
+   net_find p n = SOME e
+   ⇒ n p≅ NPar e (net_filter p n)
+Proof
+  Induct
+  \\ rw [net_filter_def,net_find_def]
+  \\ fs [REPN_def,net_find_def,net_filter_def]
+  \\ Cases_on ‘n’ \\ fs [REPN_def,net_find_def,net_filter_def]
+  \\ Cases_on ‘p = l’ \\ fs [net_wf_def,payload_rcong_refl]
+  \\ metis_tac [payload_rcong_rules]
+QED
+
+(* Processes do not disappear after a transition ;) *)
+Theorem net_find_IS_SOME_trans_pres:
+  ∀conf n L n' p.
+    trans conf n L n'
+   ⇒ IS_SOME (net_find p n) = IS_SOME (net_find p n')
+Proof
+  rpt gen_tac
+  \\ map_every qid_spec_tac [‘n'’,‘L’,‘n’,‘conf’]
+  \\ ho_match_mp_tac trans_ind
+  \\ rw [net_find_def]
+  \\ qmatch_goalsub_abbrev_tac ‘IS_SOME (OPTION_CHOICE l1 r1) =
+                                IS_SOME (OPTION_CHOICE l2 r2)’
+  \\ ntac 4 (pop_assum kall_tac)
+  \\ Cases_on ‘l1’ \\ fs [IS_SOME_EXISTS,OPTION_CHOICE_def]
+  \\ Cases_on ‘l2’ \\ fs [IS_SOME_EXISTS,OPTION_CHOICE_def]
+QED
+
+(* Processes do not appear after a transition *)
+Theorem net_find_IS_NONE_trans_pres:
+  ∀conf n L n' p.
+    trans conf n L n'
+   ⇒ IS_NONE (net_find p n) = IS_NONE (net_find p n')
+Proof
+  rpt gen_tac
+  \\ map_every qid_spec_tac [‘n'’,‘L’,‘n’,‘conf’]
+  \\ ho_match_mp_tac trans_ind
+  \\ rw [net_find_def]
+  \\ qmatch_goalsub_abbrev_tac ‘(OPTION_CHOICE l1 r1) = NONE ⇔
+                                (OPTION_CHOICE l2 r2) = NONE’
+  \\ ntac 4 (pop_assum kall_tac)
+  \\ Cases_on ‘l1’ \\ fs []
+  \\ Cases_on ‘l2’ \\ fs []
+QED
+
+(* Rule version of net_find_IS_SOME_trans_pres *)
+Theorem net_find_IS_SOME_trans_pres_IMP:
+  ∀conf n L n' p.
+    trans conf n L n' ∧ IS_SOME (net_find p n)
+    ⇒ IS_SOME (net_find p n')
+Proof
+  metis_tac [net_find_IS_SOME_trans_pres]
+QED
+
+(* Rule version of net_find_IS_NONE_trans_pres *)
+Theorem net_find_IS_NONE_trans_pres_IMP:
+  ∀conf n L n' p.
+    trans conf n L n' ∧ IS_NONE (net_find p n)
+    ⇒ IS_NONE (net_find p n')
+Proof
+  metis_tac [net_find_IS_NONE_trans_pres]
+QED
+
+(* net_find always returns a single endpoint *)
+Theorem net_find_NEndpoint:
+  ∀n p x. net_find p n = SOME x ⇒ ∃s c. x = NEndpoint p s c
+Proof
+  Induct \\ rw [net_find_def]
+  \\ Cases_on ‘net_find p n’ \\ fs [IS_SOME_EXISTS,OPTION_CHOICE_def]
+  \\ Cases_on ‘net_find p n'’ \\ fs [IS_SOME_EXISTS,OPTION_CHOICE_def]
+QED
+
+(* If network n does not have process p in it,
+   net_filter returns the same network
+*)
+Theorem net_find_NONE_net_filter_simp:
+∀n p n'.
+  net_find p n = NONE
+  ⇒ net_filter p n = n ∧
+    net_filter p (NPar n n') = NPar n (net_filter p n')
+Proof
+  rpt gen_tac
+  \\ strip_tac
+  \\ (fn (asm,g) =>
+        sg ‘^(g  |> dest_conj |> fst)’ (asm,g))
+  >- (pop_assum mp_tac
+      \\ map_every qid_spec_tac [‘p’,‘n’]
+      \\ Induct \\ rw [net_filter_def,net_find_def]
+      \\ Cases_on ‘net_find p n’ \\ fs [OPTION_CHOICE_def]
+      \\ Cases_on ‘net_find p n'’ \\ fs [OPTION_CHOICE_def]
+      \\ res_tac
+      \\ fs [])
+  \\ pop_assum mp_tac
+  \\ map_every qid_spec_tac [‘n'’,‘p’,‘n’]
+  \\ Induct \\ rw [net_find_def]
+  \\ fs [net_filter_def]
+  \\ Cases_on ‘net_find p n’ \\ fs [OPTION_CHOICE_def]
+  \\ Cases_on ‘net_find p n'’ \\ fs [OPTION_CHOICE_def]
+  \\ res_tac \\ rw [net_filter_def]
+QED
+
+(* If the first network in a parallel composition
+   contains a process p, the second one would not be touched.
+*)
+Theorem net_find_SOME_net_filter_simp:
+∀n p x n'.
+  net_find p n = SOME x ∧ REPN (NPar n n')
+  ⇒ net_filter p (NPar n n') = n'
+Proof
+  Induct \\ rw [net_filter_def,net_filter_def,REPN_def] \\ rfs []
+  \\ fs [net_find_def] \\ rfs [] \\ rveq \\ fs []
+QED
+
+(* REPN is preserved by trans *)
+Theorem trans_REPN_pres:
+  ∀conf n L n'. trans conf n L n' ⇒ (REPN n ⇔ REPN n')
+Proof
+  rw []
+  \\ rpt (pop_assum mp_tac)
+  \\ map_every qid_spec_tac [‘n'’,‘L’,‘n’,‘conf’]
+  \\ ho_match_mp_tac trans_strongind
+  \\ rw [REPN_def]
+  \\ qmatch_goalsub_rename_tac ‘REPN (NPar nn _) = _’
+  \\ EQ_TAC \\ rw []
+  >- (Cases_on ‘nn’ \\ fs [REPN_def]
+      \\ drule trans_struct_pres_NEnpoint
+      \\ rw [REPN_def] \\ fs [REPN_def])
+  \\ Cases_on ‘nn’ \\ fs [REPN_def]
+  \\ TRY (fs [Once trans_cases] \\ NO_TAC)
+  \\ TRY (drule trans_struct_pres_NPar \\ strip_tac \\ fs [REPN_def] \\ NO_TAC)
+  \\ drule trans_struct_pres_NEnpoint
+  \\ rw [REPN_def] \\ fs [REPN_def]
+QED
+
+(* Rule version of trans_REPN_pres *)
+Theorem trans_REPN_pres_IMP:
+  ∀conf n L n'. trans conf n L n' ∧ REPN n ⇒ REPN n'
+Proof
+  metis_tac [trans_REPN_pres]
+QED
+
+(* All the cases an LReceive transition can be split using
+   net_find and net_filter *)
+Theorem net_filter_LReceive_cases:
+  ∀n conf n' p s r x d.
+  trans conf n (LReceive r d s) n' ∧
+  net_find p n = SOME x ∧ REPN n
+  ⇒ (∃x'. trans conf x (LReceive r d s) x' ∧
+          net_find p n' = SOME x' ∧
+          s = p ∧
+          net_filter p n = net_filter p n') ∨
+    (trans conf (net_filter p n) (LReceive r d s) (net_filter p n') ∧
+     net_find p n' = SOME x)
+Proof
+  Induct \\ rw []
+  \\ qpat_assum ‘trans conf _ _ _’
+                (mp_tac o PURE_ONCE_REWRITE_RULE [trans_cases])
+  \\ fs [] \\ rw []
+  >- (first_x_assum (drule_then assume_tac)
+      \\ Cases_on ‘n’ \\ fs [net_find_def,REPN_def]
+      \\ Cases_on ‘p = l’ \\ fs [OPTION_CHOICE_def]
+      \\ drule_then assume_tac trans_struct_pres_NEnpoint
+      \\ fs [] \\ rveq \\ fs []
+      \\ ‘l = s’ by fs [Once trans_cases]
+      >- (disj1_tac \\ asm_exists_tac \\ fs [net_find_def,net_filter_def])
+      \\ disj2_tac
+      \\ rw [OPTION_CHOICE_def,net_find_def,net_filter_def]
+      \\ metis_tac [trans_rules])
+  >- (first_x_assum (drule_then assume_tac)
+      \\ Cases_on ‘net_find p n’ \\ fs [net_find_def,REPN_def]
+      >- (first_x_assum drule
+          \\ impl_tac >- (Cases_on ‘n’ \\ fs [REPN_def])
+          \\ fs [net_find_NONE_net_filter_simp]
+          \\ metis_tac [trans_rules])
+      \\ rveq \\ fs [] \\ disj2_tac
+      \\ ‘REPN (NPar n n2')’
+          by (Cases_on ‘n’ \\ fs [REPN_def]
+              \\ drule_all trans_REPN_pres_IMP \\ rw [])
+      \\ fs[net_find_SOME_net_filter_simp])
+  \\ fs [net_find_def] \\ rveq \\ rfs [net_filter_def]
+QED
+
+(* All the cases an LSend transition can be split using
+   net_find and net_filter *)
+Theorem net_filter_LSend_cases:
+  ∀n conf n' p s r x d.
+  trans conf n (LSend s d r) n' ∧
+  net_find p n = SOME x ∧ REPN n
+  ⇒ (∃x'. trans conf x (LSend s d r) x' ∧
+          net_find p n' = SOME x' ∧
+          s = p ∧
+          net_filter p n = net_filter p n') ∨
+    (trans conf (net_filter p n) (LSend s d r) (net_filter p n') ∧
+     net_find p n' = SOME x)
+Proof
+  Induct \\ rw []
+  \\ qpat_assum ‘trans conf _ _ _’
+                (mp_tac o PURE_ONCE_REWRITE_RULE [trans_cases])
+  \\ fs [] \\ rw []
+  >- (first_x_assum (drule_then assume_tac)
+      \\ Cases_on ‘n’ \\ fs [net_find_def,REPN_def]
+      \\ Cases_on ‘p = l’ \\ fs [OPTION_CHOICE_def]
+      \\ drule_then assume_tac trans_struct_pres_NEnpoint
+      \\ fs [] \\ rveq \\ fs []
+      \\ ‘l = s’ by fs [Once trans_cases]
+      >- (disj1_tac \\ asm_exists_tac \\ fs [net_find_def,net_filter_def])
+      \\ disj2_tac
+      \\ rw [OPTION_CHOICE_def,net_find_def,net_filter_def]
+      \\ metis_tac [trans_rules])
+  >- (first_x_assum (drule_then assume_tac)
+      \\ Cases_on ‘net_find p n’ \\ fs [net_find_def,REPN_def]
+      >- (first_x_assum drule
+          \\ impl_tac >- (Cases_on ‘n’ \\ fs [REPN_def])
+          \\ fs [net_find_NONE_net_filter_simp]
+          \\ metis_tac [trans_rules])
+      \\ rveq \\ fs [] \\ disj2_tac
+      \\ ‘REPN (NPar n n2')’
+          by (Cases_on ‘n’ \\ fs [REPN_def]
+              \\ drule_all trans_REPN_pres_IMP \\ rw [])
+      \\ fs[net_find_SOME_net_filter_simp])
+  \\ fs [net_find_def] \\ rveq \\ rfs [net_filter_def]
+QED
+
+(* All the cases an LTau transition can be split using
+   net_find and net_filter *)
+Theorem net_filter_LTau_cases:
+  ∀n conf n' p s r x d.
+  trans conf n LTau n' ∧
+  net_find p n = SOME x ∧ REPN n
+  ⇒ (trans conf (net_filter p n) LTau (net_filter p n') ∧
+     net_find p n' = SOME x) ∨
+    (∃x'. trans conf x LTau x' ∧ net_find p n' = SOME x' ∧
+          net_filter p n = net_filter p n') ∨
+    (∃x' s d r. trans conf x (LSend s d r) x' ∧ net_find p n' = SOME x' ∧
+                trans conf (net_filter p n) (LReceive s d r) (net_filter p n')) ∨
+    (∃x' s d r. trans conf x (LReceive s d r) x' ∧ net_find p n' = SOME x' ∧
+                trans conf (net_filter p n) (LSend s d r) (net_filter p n'))
+Proof
+  Induct
+  \\ rw []
+  \\ qpat_x_assum `trans _ _ _ _` (mp_tac o PURE_ONCE_REWRITE_RULE [trans_cases])
+  \\ rw [REPN_def] \\ fs [REPN_def]
+  \\ qmatch_asmsub_rename_tac ‘REPN (NPar n1 n2)’
+  >- (‘REPN n2’ by (Cases_on ‘n1’ \\ fs [REPN_def])
+      \\ Cases_on ‘net_find  p n1’
+      >- (fs [net_find_def]
+          \\ qpat_assum ‘trans _ n1 _ _’ (mp_then Any mp_tac net_find_IS_NONE_trans_pres_IMP)
+          \\ disch_then (qspec_then ‘p’ mp_tac)
+          \\ rw [net_find_NONE_net_filter_simp]
+          \\ drule_all net_filter_LReceive_cases
+          \\ rw []
+          \\ metis_tac [trans_rules])
+      \\ Cases_on ‘n1’ \\ fs [REPN_def,net_find_def]
+      \\ rveq \\ fs []
+      \\ drule trans_struct_pres_NEnpoint \\ rw []
+      \\ rw [net_find_def,net_filter_def]
+      \\ metis_tac [trans_rules])
+  >- (‘REPN n2’ by (Cases_on ‘n1’ \\ fs [REPN_def])
+      \\ Cases_on ‘net_find  p n1’
+      >- (fs [net_find_def]
+          \\ qpat_assum ‘trans _ n1 _ _’ (mp_then Any mp_tac net_find_IS_NONE_trans_pres_IMP)
+          \\ disch_then (qspec_then ‘p’ mp_tac)
+          \\ rw [net_find_NONE_net_filter_simp]
+          \\ drule_all net_filter_LSend_cases
+          \\ rw []
+          \\ metis_tac [trans_rules])
+      \\ Cases_on ‘n1’ \\ fs [REPN_def,net_find_def]
+      \\ rveq \\ fs []
+      \\ drule trans_struct_pres_NEnpoint \\ rw []
+      \\ rw [net_find_def,net_filter_def]
+      \\ metis_tac [trans_rules])
+  >- (‘REPN n2’ by (Cases_on ‘n1’ \\ fs [REPN_def])
+      \\ Cases_on ‘net_find  p n1’
+      \\ fs [net_find_def]
+      >- (disj1_tac
+          \\ drule_then (qspec_then ‘p’ mp_tac) net_find_IS_NONE_trans_pres_IMP
+          \\ rw [net_find_NONE_net_filter_simp]
+          \\ metis_tac [trans_rules])
+      \\ Cases_on ‘n1’ \\ fs [REPN_def,net_find_def]
+      \\ rveq \\ fs []
+      \\ drule trans_struct_pres_NEnpoint \\ rw []
+      \\ rw [net_find_def,net_filter_def]
+      \\ metis_tac [trans_rules])
+  \\ ‘REPN n2’ by (Cases_on ‘n1’ \\ fs [REPN_def])
+  \\ Cases_on ‘net_find  p n1’
+  \\ fs [net_find_def]
+  >- (first_x_assum drule_all \\ rw []
+      \\ metis_tac [net_find_NONE_net_filter_simp,trans_rules])
+  \\ ‘REPN (NPar n1 n2')’
+      by (Cases_on ‘n1’ \\ fs [REPN_def]
+          \\ metis_tac [trans_REPN_pres_IMP])
+  \\ rveq \\ fs [net_find_SOME_net_filter_simp]
+QED
+
+(* Arbitrary reordering of network using net_find and net_filter *)
+Theorem net_find_filter_trans:
+  ∀conf n L n' p.
+   trans conf n L n' ∧
+   REPN n ∧
+   IS_SOME (net_find p n) ∧
+   conf.payload_size > 0
+   ⇒ trans conf (NPar (THE (net_find p n )) (net_filter p n )) L
+                (NPar (THE (net_find p n')) (net_filter p n'))
+Proof
+   rw []
+   \\ drule_all_then assume_tac net_find_IS_SOME_trans_pres_IMP
+   \\ fs [IS_SOME_EXISTS,net_find_def]
+   \\ ntac 4 (pop_assum mp_tac)
+   \\ map_every qid_spec_tac [‘x'’,‘x’,‘p’]
+   \\ simp [AND_IMP_INTRO]
+   \\ pop_assum mp_tac
+   \\ map_every qid_spec_tac [‘n'’,‘L’,‘n’,‘conf’]
+   \\ ho_match_mp_tac trans_strongind
+   \\ rw [REPN_def]
+   (* Receive *)
+   >- (Cases_on ‘n’ \\ fs [REPN_def,net_find_def]
+       \\ drule_then assume_tac trans_struct_pres_NEnpoint
+       \\ fs [] \\ rveq \\ fs []
+       \\ Cases_on ‘p = l’ \\ fs [OPTION_CHOICE_def]
+       \\ rveq \\ fs [net_find_def,net_filter_def]
+       >- metis_tac [trans_rules]
+       \\ drule_all net_filter_LReceive_cases
+       \\ rw []
+       \\ metis_tac [trans_rules])
+   (* Send *)
+   >- (Cases_on ‘n’ \\ fs [REPN_def,net_find_def]
+       \\ drule_then assume_tac trans_struct_pres_NEnpoint
+       \\ fs [] \\ rveq \\ fs []
+       \\ Cases_on ‘p = l’ \\ fs [OPTION_CHOICE_def]
+       \\ rveq \\ fs [net_find_def,net_filter_def]
+       >- metis_tac [trans_rules]
+       \\ drule_all net_filter_LSend_cases
+       \\ rw []
+       \\ metis_tac [trans_rules])
+   >- (Cases_on ‘net_find p n’
+       \\ Cases_on ‘n’ \\ fs [REPN_def,net_find_def]
+       \\ rveq \\ fs []
+       \\ drule trans_struct_pres_NEnpoint
+       \\ rw [] \\ fs [net_filter_def]
+       \\ fs [net_find_def,OPTION_CHOICE_def]
+       \\ rveq \\ fs []
+       \\ metis_tac [trans_rules])
+   \\ reverse (Cases_on ‘net_find p n1’)
+   \\ Cases_on ‘n1’ \\ fs [REPN_def,net_find_def]
+   \\ rveq \\ fs [net_filter_def]
+   >- metis_tac [trans_rules]
+   \\ first_x_assum drule_all
+   \\ rw []
+   \\ pop_assum (assume_tac o ONCE_REWRITE_RULE [trans_cases])
+   \\ fs [] \\ metis_tac [trans_rules]
+QED
+
 val _ = export_theory ()
