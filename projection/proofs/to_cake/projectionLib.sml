@@ -11,7 +11,7 @@ struct
   val camkes_payload_size = 256 (* Could go up to 480 since this is the size of the seL4 IPC buffer *)
 
   val queue_size = 1 (* TODO: factor out *)
-  val debuggy = ref true;
+  val debug_print = ref true;
 
   fun pnames chor =
       “MAP (MAP (CHR o w2n)) (procsOf ^chor)”
@@ -192,10 +192,6 @@ struct
       let
         fun ffisendline r =
             String.concat (
-              (if !debuggy then
-                ["  printf(\"",p," |-> %s\n\",c);"]
-               else [])
-              @
               [
                 " if (strcmp(c,\"",r,"\")==0) {\n",
                 "    ",r,"_send_transfer_string(a);\n",
@@ -227,16 +223,23 @@ struct
             ]
 
         val ffisend =
+
             if null rs then
               "ZF_LOGF(\"Unknown receiver: %s\\n\",c);\n"
             else
-              String.concat
-                [" ",
-                 String.concatWith "  else" (map ffisendline rs),
-                 "  else {\n",
-                 "    ZF_LOGF(\"Unknown receiver: %s\\n\",c);\n",
-                 "  }\n"
+              String.concat (
+                (if !debug_print then
+                   ["  printf(\"",p," |-> %s: %s\\n\",c,a + unpad(a));\n"]
+                 else [])
+                @
+                [
+                  " ",
+                  String.concatWith "  else" (map ffisendline rs),
+                  "  else {\n",
+                  "    ZF_LOGF(\"Unknown receiver: %s\\n\",c);\n",
+                  "  }\n"
                 ]
+              )
 
         val ffireceive =
             if null rs then
@@ -302,6 +305,17 @@ struct
           "  ZF_LOGF(\"ffi_write not supported\\n\");\n",
           "}\n",
           "\n",
+          "/* Returns the index of the first non-padding character in arr.\n",
+          " */\n",
+          "int unpad(char* arr) {\n",
+          "  if(arr[0] == 7 || arr[0] == 2) return 1;\n",
+          "  assert(arr[0] == 6);\n",
+          "  int i = 1;\n",
+          "  while(arr[i] == 0) {\n",
+          "    i++;\n",
+          "  }\n",
+          "  return(i++);\n",
+          "}",
           "void ffisend (unsigned char *c, long clen, unsigned char *a, long alen) {  \n",
           ffisend,
           "}\n",
