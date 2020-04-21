@@ -2787,6 +2787,18 @@ Proof
   simp[cEval_equiv_def]
 QED
 
+Theorem strans_dest_check':
+  strans conf S1 (ASend dest bytes) S2 ⇒
+  valid_send_dest dest S1 ∧ valid_send_dest dest S2
+Proof
+  strip_tac >>
+  drule_then assume_tac
+             (SIMP_RULE (srw_ss()) [PULL_EXISTS] strans_dest_check) >>
+  drule_then assume_tac strans_pres_nodes >>
+  drule_then assume_tac strans_pres_pnum >> simp[] >>
+  fs[valid_send_dest_def]
+QED
+
 (* FORWARD CORRECTNESS
     Just the spec :) *)
 Theorem endpoint_forward_correctness:
