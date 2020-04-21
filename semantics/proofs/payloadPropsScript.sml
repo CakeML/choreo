@@ -2190,4 +2190,38 @@ Definition empty_q_def:
 ∧ empty_q (NEndpoint _ s _) = (s.queues = FEMPTY)
 End
 
+(* trans preserves the structure of the network *)
+Theorem trans_struct_pres_NPar:
+  ∀conf n L l r.
+   trans conf (NPar l r) L n
+   ⇒ ∃ l' r'. n = NPar l' r'
+Proof
+  rw [Once trans_cases]
+QED
+
+(* trans preserves the structure of the network *)
+Theorem trans_struct_pres_NPar_NEndpoint:
+  ∀conf p s c n L n'.
+   trans conf (NPar (NEndpoint p s c) n) L n'
+   ⇒ ∃ s' c' n''. n' = NPar (NEndpoint p s' c') n''
+Proof
+  rw []
+  \\ pop_assum (ASSUME_TAC o ONCE_REWRITE_RULE [trans_cases])
+  \\ fs []
+  \\ qpat_x_assum ‘trans conf (NEndpoint _ _ _) _ _’
+                  (ASSUME_TAC o ONCE_REWRITE_RULE [trans_cases])
+  \\ fs []
+QED
+
+(* trans preserves the structure of the network *)
+Theorem trans_struct_pres_NEnpoint:
+  ∀conf p s c n L n'.
+   trans conf (NEndpoint p s c) L n'
+   ⇒ ∃ s' c'. n' = NEndpoint p s' c'
+Proof
+  rw []
+  \\ pop_assum (ASSUME_TAC o ONCE_REWRITE_RULE [trans_cases])
+  \\ fs []
+QED
+
 val _ = export_theory ();

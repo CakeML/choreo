@@ -45,6 +45,14 @@ Proof
   \\ rw [endpoints_def,nfold_def]
 QED
 
+Theorem REPN_nfold_endpoint_id:
+  ∀n. REPN n ⇒ n = nfold (endpoints n)
+Proof
+  Induct \\ rw [REPN_def,endpoints_def,nfold_def]
+  \\ Cases_on ‘n’
+  \\ fs [REPN_def,endpoints_def,nfold_def]
+QED
+
 Inductive payload_rcong:
 (* Basic congruence rules *)
   (* Symmetric *)
@@ -209,6 +217,76 @@ Theorem compile_endpoint_REPN:
 Proof
   Induct \\ rw [compile_network_def,REPN_def,endpointCongTheory.REPN_def]
   \\ Cases_on ‘epn’ \\ fs [REPN_def,endpointCongTheory.REPN_def,compile_network_def]
+QED
+
+(* payload_rcong preserves normalised_network,
+   since all the states should be the same
+*)
+Theorem normalised_network_cong:
+  ∀n n'.
+   n p≅ n'
+   ⇒ normalised_network n = normalised_network n'
+Proof
+  ho_match_mp_tac payload_rcong_ind
+  \\ rw [normalised_network_def]
+  \\ metis_tac []
+QED
+
+(* Rule verison of normalised_network_cong *)
+Theorem normalised_network_cong_IMP:
+  ∀n n'.
+   normalised_network n ∧ n p≅ n'
+   ⇒ normalised_network n'
+Proof
+  metis_tac [normalised_network_cong]
+QED
+
+(* The set of all endpoint names in a parallel composition
+   is the union of the node names at each sub-network
+*)
+Theorem net_has_node_NPar:
+  ∀n1 n2. net_has_node (NPar n1 n2) = net_has_node n1 ∪ net_has_node n2
+Proof
+  rw []
+  \\ CONV_TAC FUN_EQ_CONV
+  \\ simp [net_has_node_def,IN_DEF]
+QED
+
+(* payload_rcong preserver all endpoint names *)
+Theorem net_has_node_cong:
+  ∀n n'.
+    n p≅ n'
+    ⇒ net_has_node n = net_has_node n'
+Proof
+  ho_match_mp_tac payload_rcong_ind
+  \\ rw [net_has_node_def,net_has_node_NPar]
+  \\ ONCE_REWRITE_TAC [UNION_ASSOC]
+  \\ rw [UNION_COMM]
+QED
+
+(* payload_rcong preserves well-formedness, since only the structure
+   is changed not its contents
+*)
+Theorem net_wf_cong:
+  ∀n n'.
+    n p≅ n'
+    ⇒ net_wf n = net_wf n'
+Proof
+  ho_match_mp_tac payload_rcong_strongind
+  \\ rw [net_wf_def]
+  >- (rw [net_has_node_NPar,DISJOINT_SYM]
+      \\ metis_tac [])
+  \\ drule_then assume_tac net_has_node_cong
+  \\ fs []
+QED
+
+(* Rule version of net_wf_cong *)
+Theorem net_wf_cong_IMP:
+  ∀n n'.
+    net_wf n ∧ n p≅ n'
+    ⇒  net_wf n'
+Proof
+  metis_tac [net_wf_cong]
 QED
 
 val _ = export_theory ()
