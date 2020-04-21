@@ -678,4 +678,66 @@ Proof
    \\ fs [] \\ metis_tac [trans_rules]
 QED
 
+(* net_has_node implies net_find wil find something *)
+Theorem net_has_node_IS_SOME_net_find:
+  ∀n p. net_has_node n p = IS_SOME (net_find p n)
+Proof
+  Induct \\ rw [net_has_node_def,net_find_def]
+  \\ Cases_on ‘net_has_node n p’
+  \\ fs [IS_SOME_EXISTS,OPTION_CHOICE_def]
+  \\ rfs []
+  \\ Cases_on ‘net_has_node n' p’
+  \\ fs [IS_SOME_EXISTS,OPTION_CHOICE_def]
+  \\ rfs []
+  \\ Cases_on ‘net_find p n’ \\ fs []
+QED
+
+(* normalised_network can be re-arranged using net_filter and net_find *)
+Theorem normalised_network_net_find_filter:
+  ∀n p e.
+  net_find p n = SOME e ∧ REPN n ⇒
+  normalised_network n = normalised_network (NPar e (net_filter p n))
+Proof
+  rw []
+  \\ drule_all net_find_filter_cong
+  \\ fs [normalised_network_cong]
+QED
+
+(* Then endpoints left in the network after a call to net_filter
+   are a subset of the original ones
+*)
+Theorem net_filter_SUBSET:
+  ∀n p. net_has_node (net_filter p n) ⊆ net_has_node n
+Proof
+  rw [SUBSET_DEF,IN_DEF]
+  \\ Induct_on ‘n’ \\ fs [net_has_node_def,net_filter_def]
+  \\ rw [] \\ fs [net_has_node_def]
+QED
+
+(* net_wf still holds after removing any process *)
+Theorem net_wf_filter:
+  ∀n p. net_wf n ⇒ net_wf (net_filter p n)
+Proof
+  Induct \\ rw [net_filter_def,net_wf_def]
+  >- (ONCE_REWRITE_TAC [DISJOINT_SYM]
+      \\ irule DISJOINT_SUBSET
+      \\ qexists_tac ‘net_has_node n’
+      \\ fs [DISJOINT_SYM]
+      \\ fs [net_filter_SUBSET])
+  \\ irule DISJOINT_SUBSET
+  \\ qexists_tac ‘net_has_node n'’
+  \\ fs []
+  \\ fs [net_filter_SUBSET]
+QED
+
+(* net_filter removes all endpoint named p from well-formed networks *)
+Theorem not_net_has_node_net_filter:
+  ∀n p. net_wf n ∧ REPN n ⇒ ¬ net_has_node (net_filter p n) p
+Proof
+  Induct \\ rw [net_wf_def,net_has_node_def,net_filter_def,DISJOINT_ALT,IN_DEF,REPN_def]
+  \\ Cases_on ‘n’ \\ fs [REPN_def,net_filter_def]
+  \\ TRY (first_x_assum irule)
+  \\ Cases_on ‘p = l’ \\ fs [net_has_node_def]
+QED
+
 val _ = export_theory ()
