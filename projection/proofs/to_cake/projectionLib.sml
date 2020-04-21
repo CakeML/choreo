@@ -8,7 +8,13 @@ struct
   open astToSexprLib;
 
   val n2w8 = “n2w:num -> word8”;
-  val camkes_payload_size = 256 (* Could go up to 480 since this is the size of the seL4 IPC buffer *)
+  val camkes_payload_size = 256
+  (* Buffer size must be at least payload_size + 1 and be 4096-aligned *)
+  fun buf_size n =
+      if (n + 1) mod 4096 = 0 then
+        n + 1
+      else
+        (n + 1) + (4096 - ((n + 1) mod 4096))
 
   val queue_size = 1 (* TODO: factor out *)
   val debug_print = ref true;
@@ -63,7 +69,10 @@ struct
                   String.concat [
                     "        connection seL4RPCCall ",
                     p,"_to_",q,
-                    "(from ",p,".",q,"_send, to ",q,".",p,"_recv);\n"
+                    "(from ",p,".",q,"_send, to ",q,".",p,"_recv);\n",
+                    "        connection seL4SharedData ",
+                    p,"_to_",q,"_data",
+                    "(from ",p,".",q,"_out, to ",q,".",p,"_in);\n"
                   ])
               qs |> String.concat
 
@@ -162,9 +171,18 @@ struct
         val rrectbl = reverse_table rectbl
         val bidirtbl = ListPair.map (fn ((p,qs),(_,rs)) => (p,qs,rs)) (rectbl,rrectbl)
         fun mk_provides p qs =
-            map (fn q => String.concat ["    provides TransferString ",q,"_recv;\n"]) qs
+            map (fn q =>
+                    String.concat [
+                      "    provides TransferString ",q,"_recv;\n",
+                      "    dataport Buf(",Int.toString(buf_size camkes_payload_size),") ",q,"_in;\n"
+                    ]
+                )
+                qs
         fun mk_uses p qs =
-            map (fn q => String.concat ["    uses TransferString ",q,"_send;\n"]) qs
+            map (fn q =>
+                    String.concat [
+                      "    uses TransferString ",q,"_send;\n",
+                      "    dataport Buf(",Int.toString(buf_size camkes_payload_size),") ",q,"_out;\n"]) qs
         fun mk_semaphore name =
             String.concat ["    has binary_semaphore ",name,";\n"]
         fun mk_semaphores qs =
@@ -194,6 +212,7 @@ struct
             String.concat (
               [
                 " if (strcmp(c,\"",r,"\")==0) {\n",
+                "    my_strcpy(a,(char *)",r,"_out);\n",
                 "    ",r,"_send_transfer_string(a);\n",
                 "  }\n"
               ]
@@ -215,7 +234,7 @@ struct
               "void ",q,"_recv_transfer_string(const char *s) {\n",
               "  assert(",q,"_empty_wait() == 0);\n",
               "  assert(",q,"_usequeue_wait() == 0);\n",
-              "  my_strcpy(s,",q,"_ins);\n",
+              "  my_strcpy((char *)",q,"_in,",q,"_ins);\n",
               "  assert(",q,"_usequeue_post() == 0);\n",
               "  assert(",q,"_full_post() == 0);\n",
               "}\n",
@@ -314,8 +333,9 @@ struct
           "  while(arr[i] == 0) {\n",
           "    i++;\n",
           "  }\n",
-          "  return(i++);\n",
-          "}",
+          "  return(i+2);\n",
+          "}\n",
+          "\n",
           "void ffisend (unsigned char *c, long clen, unsigned char *a, long alen) {  \n",
           ffisend,
           "}\n",
