@@ -5,11 +5,13 @@ open endpoint_to_payloadTheory;
 open payloadLangTheory
      payloadSemTheory
      payloadPropsTheory
-     payload_to_cakemlTheory;
+     payload_to_cakemlTheory
+     payloadCongTheory;
 open comms_ffi_modelTheory
      comms_ffi_propsTheory
      comms_ffi_eqTheory
-     comms_ffi_rec_characTheory;
+     comms_ffi_rec_characTheory
+     comms_ffi_consTheory;
 open evaluate_toolsTheory
      ckExp_EquivTheory;
 open evaluate_rwLib
@@ -22,11 +24,11 @@ val _ = new_theory "payload_to_cakemlProof";
 
 val _ = set_grammar_ancestry
   ["option","rich_list","endpoint_to_payload",
-   "payloadLang","payloadSem","payloadProps","payload_to_cakeml",
-   "comms_ffi_model","comms_ffi_props","comms_ffi_eq",
-   "comms_ffi_rec_charac","evaluate_tools","ckExp_Equiv",
-   "evaluate", "termination", "ml_translator",
-   "ml_prog", "evaluateProps", "namespace",
+   "payloadCong","payloadLang","payloadSem","payloadProps",
+   "payload_to_cakeml","comms_ffi_model","comms_ffi_props",
+   "comms_ffi_eq","comms_ffi_rec_charac","comms_ffi_cons",
+   "evaluate_tools", "ckExp_Equiv","evaluate", "termination",
+   "ml_translator", "ml_prog", "evaluateProps", "namespace",
    "semanticPrimitives","ffi"];
 
 val WORD8 = “WORD:word8 -> v -> bool”;
@@ -3033,14 +3035,14 @@ Proof
   \\ irule internal_trans_equiv_irrel
   \\ fs [ffi_wf_def]
   \\ irule RTC_SINGLE
-  \\ fs [comms_ffi_consTheory.internal_trans_def]
+  \\ fs [internal_trans_def]
   \\ ntac 2 (last_x_assum (K ALL_TAC))
   \\ pop_assum (assume_tac o ONCE_REWRITE_RULE [trans_cases]) \\ fs []
   \\ IMP_RES_TAC trans_not_same \\ rw [] \\ fs []
 QED
 
-Theorem network_forward_correctness:
-  ∀conf p s c n p s' c' n' st1 vs1 env1 st2.
+Theorem network_NPar_forward_correctness:
+  ∀conf s c n p s' c' n' st1 vs1 env1 st2.
   trans conf (NPar (NEndpoint p s c) n) LTau (NPar (NEndpoint p s' c') n') ∧
 
   (* These assumptions should be dischargable by the static part of the compiler *)
@@ -3164,8 +3166,8 @@ Proof
   \\ fs [cpFFI_valid_def,cpEval_valid_def,ffi_state_cor_def]
 QED
 
-Theorem network_forward_correctness_reduction:
-  ∀conf p s c n p s' c' n' st1 vs1 env1 st2.
+Theorem network_NPar_forward_correctness_reduction:
+  ∀conf p s c n s' c' n' st1 vs1 env1 st2.
   (reduction conf)⃰ (NPar (NEndpoint p s c) n) (NPar (NEndpoint p s' c') n') ∧
 
   (* These assumptions should be dischargable by the static part of the compiler *)
@@ -3230,7 +3232,7 @@ Proof
       by (fs [reduction_def,Once trans_cases]
           \\ fs [Once trans_cases])
   \\ rveq \\ fs [reduction_def]
-  \\ drule network_forward_correctness \\ fs []
+  \\ drule network_NPar_forward_correctness \\ fs []
   \\ disch_then (qspecl_then [‘st1’,‘vs1’,‘env1’,
                               ‘st1 with ffi :=
                                    (st1.ffi with ffi_state
@@ -3263,6 +3265,48 @@ Proof
   \\ qexists_tac ‘mc + mc'’
   \\ fs []
   \\ metis_tac [cEval_equiv_trans]
+QED
+
+Theorem network_forward_correctness:
+  ∀conf p s c n p s' c' n' np np' st1 vs1 env1 st2.
+  trans conf n LTau n' ∧
+  (* These assumptions should be dischargable by the static part of the compiler *)
+  REPN n ∧
+  net_wf n ∧
+  normalised_network n ∧
+  conf.payload_size > 0 ∧
+  net_has_node n p ∧
+  net_find p n  = SOME (NEndpoint p s  c ) ∧
+  net_find p n' = SOME (NEndpoint p s' c') ∧
+  st1.ffi.oracle = comms_ffi_oracle conf ∧
+  st1.ffi.ffi_state = (p,s.queues,net_filter p n) ∧
+  st2.ffi.oracle = comms_ffi_oracle conf ∧
+  st2.ffi.ffi_state = (p,s'.queues,net_filter p n') ∧
+  pSt_pCd_corr s c ∧
+  sem_env_cor conf s env1 ∧
+  enc_ok conf env1 (letfuns c) vs1
+  ⇒
+  ∃mc env2 vs2.
+    sem_env_cor conf s' env2 ∧
+    enc_ok conf env2 (letfuns c') vs2 ∧
+    cEval_equiv conf
+      (evaluate (st1 with clock := mc) env1
+                      [compile_endpoint conf vs1 c])
+      (evaluate (st2 with clock := mc) env2
+                      [compile_endpoint conf vs2 c'])
+Proof
+  rw []
+  \\ irule network_NPar_forward_correctness
+  \\ fs [] \\ qexists_tac ‘s’
+  \\ rw []
+  >- (drule_all payload_trans_normalised
+      \\ drule_all  normalised_network_net_find_filter
+      \\ rw [normalised_network_def])
+  >- fs [net_wf_filter]
+  >- fs [not_net_has_node_net_filter]
+  \\ drule_then (qspec_then ‘p’ mp_tac) net_find_filter_trans
+  \\ impl_tac >- fs [net_has_node_IS_SOME_net_find]
+  \\ rw []
 QED
 
 val _ = export_theory ();
