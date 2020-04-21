@@ -2970,10 +2970,28 @@ Proof
       simp[Abbr‘data’] >>
       disch_then (qspecl_then [‘valid_send_dest p2’, ‘p2’] mp_tac) >>
       simp[send_invariant] >> impl_tac
-      >- (drule (SIMP_RULE (srw_ss()) [PULL_EXISTS] strans_dest_check) >>
-          fs[cpEval_valid_def]) >>
+      >- (drule strans_dest_check' >> fs[cpEval_valid_def]) >>
       disch_then (qx_choosel_then [‘ck1’, ‘ck2’, ‘refs’] strip_assume_tac) >>
-      pop_assum kall_tac >> cheat
+      Q.REFINE_EXISTS_TAC ‘ck1 + mc’ >>
+      dxrule evaluate_add_to_clock >> simp[] >> disch_then kall_tac >>
+
+      first_assum (qspec_then ‘n + conf.payload_size’ assume_tac) >>
+      first_x_assum (mp_then (Pos (el 4)) mp_tac
+                     (sendloop_correct
+                      |> INST_TYPE [alpha |-> cp_type])) >>
+      simp[] >>
+      disch_then (qspecl_then [‘conf’, ‘cSt2’] mp_tac) >>
+      ‘cSt2.ffi.oracle = comms_ffi_oracle conf’
+        by fs[cpEval_valid_def] >>
+      disch_then (qspecl_then [‘valid_send_dest p2’, ‘p2’] mp_tac) >>
+      simp[send_invariant] >> impl_tac
+      >- (drule strans_dest_check' >> fs[cpEval_valid_def]) >>
+      disch_then (qx_choosel_then [‘ck0’, ‘ck3’, ‘refs2’] strip_assume_tac) >>
+      Q.REFINE_EXISTS_TAC ‘ck0 + mc’ >>
+      dxrule evaluate_add_to_clock >> simp[] >> disch_then kall_tac >>
+
+
+            pop_assum kall_tac >> cheat
    )
     >> cheat
 QED
