@@ -1937,6 +1937,7 @@ Proof
                   MAP_EVERY qexists_tac [‘P’,‘l’] >> rw[]) >>
   metis_tac[send_events_is_stream]
 QED
+
 (* A stream of valid send events cannot break FFI correspondence*)
 Theorem ffi_state_cor_send_stream_irrel:
   ∀conf cpNum pSt ckFSt l send_stream P.
@@ -1990,6 +1991,8 @@ Proof
       pop_assum SUBST_ALL_TAC >>
       Cases_on ‘R’ >> Cases_on ‘R'’ >>
       rename1 ‘strans conf (_,Q,N) _ (_,Q',N')’ >>
+      fs[ffi_state_cor_def]
+      (* SCARY *)
       ‘∀sp. qlk Q sp ≼ qlk Q' sp’
         suffices_by (rw[] >> fs[ffi_state_cor_def] >>
                      rw[] >> metis_tac[IS_PREFIX_TRANS]) >>
