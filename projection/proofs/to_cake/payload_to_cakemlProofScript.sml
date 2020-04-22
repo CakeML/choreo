@@ -2989,11 +2989,62 @@ Proof
       disch_then (qx_choosel_then [‘ck0’, ‘ck3’, ‘refs2’] strip_assume_tac) >>
       Q.REFINE_EXISTS_TAC ‘ck0 + mc’ >>
       dxrule evaluate_add_to_clock >> simp[] >> disch_then kall_tac >>
-
-
-            pop_assum kall_tac >> cheat
-   )
-    >> cheat
+      drule_all_then assume_tac cpEval_valid_Send_strans_E >>
+      goal_assum drule >>
+      MAP_EVERY RM_ABBREV_TAC ["aexpf", "Env1"] >>
+      qpat_x_assum ‘nsLookup _ _ = _’ kall_tac >>
+      qpat_abbrev_tac ‘FFI1 = _.ffi with <| ffi_state := _; io_events := _|>’ >>
+      qmatch_goalsub_abbrev_tac
+        ‘cSt2 with <| clock := _ ; refs := _ ; ffi := FFI2 |>’ >>
+      ‘cpEval_valid conf p cEnv1 pSt1 e vs1
+        (cSt2 with <| ffi := FFI2; refs := cSt2.refs ++ refs2|>)’
+        by (fs[cpEval_valid_def] >> simp[Abbr‘FFI2’] >> conj_tac
+            >- (irule ffi_state_cor_send_events_irrel >> simp[] >>
+                qexists_tac ‘valid_send_dest p2’ >> simp[send_invariant] >>
+                metis_tac[strans_dest_check']) >>
+            irule ffi_wf_send_events_irrel >> simp[] >>
+            qexists_tac ‘valid_send_dest p2’ >> simp[send_invariant] >>
+            metis_tac[strans_dest_check']) >>
+      ‘cpEval_valid conf p cEnv1 pSt1 e vs1
+        (cSt1 with <| ffi := FFI1 ; refs := cSt1.refs ++ refs|>)’
+        by (fs[cpEval_valid_def] >> simp[Abbr‘FFI1’] >>
+            conj_tac
+            >- (irule ffi_state_cor_send_events_irrel >> simp[] >>
+                qexists_tac ‘valid_send_dest p2’ >> simp[send_invariant] >>
+                irule strans_dest_check >> metis_tac[]) >>
+            irule ffi_wf_send_events_irrel >> simp[] >>
+            qexists_tac ‘valid_send_dest p2’ >> simp[send_invariant] >>
+            irule strans_dest_check >> metis_tac[]) >>
+      pop_assum (mp_then (Pos hd) drule ffi_irrel) >>
+      ‘0 < conf.payload_size’ by fs[cpEval_valid_def] >> impl_tac
+      >- (simp[Abbr‘FFI1’, Abbr‘FFI2’] >>
+          simp[send_events_def] >>
+          simp[SimpL “ffi_eq conf”, Once compile_message_def] >>
+          simp[DROP_DROP_T] >>
+          ‘¬final (pad conf (DROP n d))’ by simp[final_def, pad_def] >>
+          simp[update_state_def] >> SELECT_ELIM_TAC >> conj_tac
+          >- (simp[comms_ffi_oracle_def, ffi_send_def] >>
+              simp[pad_def] >> DEEP_INTRO_TAC some_intro >> simp[] >>
+              qpat_x_assum ‘strans _ _ _ _’ mp_tac >>
+              simp[pad_def] >> metis_tac[]) >>
+          qx_gen_tac ‘cSt’ >> simp[comms_ffi_oracle_def, ffi_send_def] >>
+          simp[AllCaseEqs()] >> DEEP_INTRO_TAC some_intro >> simp[] >>
+          rpt strip_tac >>
+          irule ffi_eq_send_stream_irrel >> rw[]
+          >- (fs[cpEval_valid_def] >> metis_tac[strans_pres_wf])
+          >- (fs[cpEval_valid_def])
+          >- (qexistsl_tac [‘valid_send_dest p2’, ‘p2’] >> rw[]
+              >- metis_tac[strans_dest_check']
+              >- metis_tac[strans_dest_check']
+              >- simp[GSYM send_events_def, send_events_is_stream] >>
+              simp[send_invariant]) >>
+          irule ffi_eq_pres >>
+          goal_assum (first_assum o mp_then (Pos last) mp_tac) >>
+          goal_assum (first_assum o mp_then (Pos last) mp_tac) >>
+          simp[] >> fs[cpEval_valid_def]) >>
+      disch_then (qx_choose_then ‘MC’ assume_tac) >>
+      qexists_tac ‘MC’ >> dxrule cEval_equiv_bump_clocks >> simp[])
+  >> cheat
 QED
 
 Theorem NPar_trans_l_cases_full:
