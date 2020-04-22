@@ -138,12 +138,39 @@ Definition normalised_network_def:
    (normalised_network NNil = T)
 ∧ (normalised_network (NEndpoint p s e) = normalised(s.queues))
 ∧ (normalised_network (NPar n1 n2) ⇔ normalised_network n1 ∧ normalised_network n2)
-End        
+End
 
 Definition endpoints_def:
    (endpoints NNil = [])
 ∧ (endpoints (NEndpoint p1 s e1) = [(p1,s,e1)])
 ∧ (endpoints (NPar n1 n2) = endpoints n1 ++ endpoints n2)
 End
-           
+
+(* Finds a specific endpoint by name in the network *)
+Definition net_find_def:
+  net_find p NNil = NONE
+∧ net_find p (NPar n1 n2) = OPTION_CHOICE (net_find p n1)
+                                          (net_find p n2)
+∧ net_find p (NEndpoint p' s c) = (if p = p'
+                                   then SOME (NEndpoint p s c)
+                                   else NONE)
+End
+
+(* Removes a specific (single) endpoint by name in the network.
+   Note that if multiple endpoints with the same name exists
+   a call to net_filter will only remove 1
+*)
+Definition net_filter_def:
+  net_filter p NNil = NNil
+∧ net_filter p (NEndpoint p' s c) =
+    (if p = p' then NNil
+     else NEndpoint p' s c)
+∧ net_filter p (NPar n1 n2) =
+    let l = net_filter p n1
+    in if n1 ≠ l
+       then if l = NNil then n2
+            else NPar l n2
+       else NPar n1 (net_filter p n2)
+End
+
 val _ = export_theory ()
