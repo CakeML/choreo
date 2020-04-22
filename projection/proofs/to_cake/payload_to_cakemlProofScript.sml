@@ -1945,7 +1945,72 @@ Proof
   metis_tac[]
 QED
 
+Theorem ffi_eq_REFL[simp]:
+  ffi_eq c s s
+Proof
+  ‘equivalence (ffi_eq c)’ by simp[ffi_eq_equivRel] >>
+  fs[equivalence_def, reflexive_def]
+QED
 
+Inductive fmap_pfxall:
+  (∀qm. fmap_pfxall FEMPTY qm) ∧
+  (∀fm k v qm. fmap_pfxall (fm \\ k) qm ∧ v = [] ⇒
+               fmap_pfxall (fm |+ (k,v)) qm) ∧
+  (∀fm k v1 qm v2.
+     fmap_pfxall (fm \\ k) qm ∧ FLOOKUP qm k = SOME v2 ∧ v1 ≼ v2 ⇒
+     fmap_pfxall (fm |+ (k,v1)) qm)
+End
+
+Definition network_nodemap_def[simp]:
+  network_nodemap payloadLang$NNil = FEMPTY ∧
+  network_nodemap (NPar n1 n2) = network_nodemap n1 ⊌ network_nodemap n2 ∧
+  network_nodemap (NEndpoint p s e) = FEMPTY |+ (p,(s,e))
+End
+
+Theorem FDOM_network_nodemap:
+  FDOM (network_nodemap n) = { k | net_has_node n k }
+Proof
+  Induct_on ‘n’ >> simp[net_has_node_def, GSPEC_OR]
+QED
+
+Definition network_fupd_at_def[simp]:
+  (network_fupd_at k f payloadLang$NNil =
+     f k <| bindings := FEMPTY;  queues := FEMPTY |> Nil) ∧
+  (network_fupd_at k f (NPar n1 n2) =
+    if net_has_node n1 k then NPar (network_fupd_at k f n1) n2
+    else NPar n1 (network_fupd_at k f n2)) ∧
+  (network_fupd_at k f (payloadLang$NEndpoint k' s e) =
+    if k = k' then f k s e
+    else NPar (NEndpoint k' s e)
+              (f k <| bindings := FEMPTY;  queues := FEMPTY |> Nil))
+End
+
+Definition network_bindings_def[simp]:
+  network_bindings payloadLang$NNil = ∅ ∧
+  network_bindings (NPar n1 n2) = network_bindings n1 ∪ network_bindings n2 ∧
+  network_bindings (NEndpoint _ s _) = FDOM s.bindings
+End
+
+Theorem FINITE_network_bindings[simp]: FINITE (network_bindings n)
+Proof Induct_on ‘n’ >> simp[]
+QED
+
+(*
+Theorem fresh_binding_exists:
+  ∃nm. nm ∉ network_bindings n
+Proof
+
+
+Theorem larger_queues_bisimilar:
+  fmap_pfxall Q2 Q1 ∧ net_wf N1 ⇒
+  ∃N2. ffi_eq conf (p,Q1,N1) (p,Q2,N2) ∧ net_wf N2
+Proof
+  Induct_on ‘fmap_pfxall’ >> rw[]
+  >- (Induct_on ‘Q1’ >> rw[]
+      >- (qexists_tac ‘N1’ >> simp[]) >>
+      rename [‘Q1 |+ (sp,mc)’] >>
+      qexists_tac ‘network_fupd_at sp (λk s e. ’
+*)
 
 (* A stream of valid send events cannot break FFI correspondence*)
 Theorem ffi_state_cor_send_stream_irrel:
@@ -2005,7 +2070,8 @@ Proof
       Cases_on ‘R’ >> Cases_on ‘R'’ >>
       rename1 ‘strans conf (_,Q,N) _ (_,Q',N')’ >>
       fs[ffi_state_cor_def] >>
-      metis_tac[ffi_eq_bisimulation_L]
+      (* SCARY *)
+
 
       ‘∀sp.
         isPREFIX (qlk Q sp) (qlk Q' sp)’
@@ -2778,13 +2844,6 @@ Theorem cpEval_valid_Send_E[simp]:
   ∃vv. FLOOKUP pSt.bindings v = SOME vv
 Proof
   simp[cpEval_valid_def, letfuns_def, pSt_pCd_corr_Send] >> metis_tac[]
-QED
-
-Theorem ffi_eq_REFL[simp]:
-  ffi_eq c s s
-Proof
-  ‘equivalence (ffi_eq c)’ by simp[ffi_eq_equivRel] >>
-  fs[equivalence_def, reflexive_def]
 QED
 
 Theorem cEval_equiv_bump_clocks:
