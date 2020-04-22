@@ -678,6 +678,30 @@ Proof
    \\ fs [] \\ metis_tac [trans_rules]
 QED
 
+(* Arbitrary reordering of network using net_find and net_filter *)
+Theorem net_find_filter_reduction:
+  ∀conf n n' p.
+   (reduction conf)⃰ n n' ∧
+   REPN n ∧
+   IS_SOME (net_find p n) ∧
+   conf.payload_size > 0
+   ⇒ (reduction conf)⃰ (NPar (THE (net_find p n )) (net_filter p n ))
+                       (NPar (THE (net_find p n')) (net_filter p n'))
+Proof
+  rw []
+  \\ pop_assum (fn t => ntac 2 (pop_assum mp_tac) \\ assume_tac t)
+  \\ simp [AND_IMP_INTRO]
+  \\ last_x_assum mp_tac
+  \\ map_every qid_spec_tac [‘n'’,‘n’]
+  \\ ho_match_mp_tac RTC_INDUCT
+  \\ rw []
+  \\ irule (RTC_RULES  |> SPEC_ALL  |> CONJUNCT2)
+  \\ fs [reduction_def]
+  \\ metis_tac [trans_REPN_pres_IMP,
+                net_find_IS_SOME_trans_pres_IMP,
+                net_find_filter_trans]
+QED
+
 (* net_has_node implies net_find wil find something *)
 Theorem net_has_node_IS_SOME_net_find:
   ∀n p. net_has_node n p = IS_SOME (net_find p n)

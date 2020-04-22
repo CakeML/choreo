@@ -100,6 +100,16 @@ Proof
   rw[normalised_network_def]
 QED
 
+Theorem payload_reduction_normalised:
+  ∀conf p1 alpha p2.
+  (reduction conf)^* p1 p2 ∧ normalised_network p1 ⇒ normalised_network p2
+Proof
+  rw [] \\ rpt (pop_assum mp_tac)
+  \\ map_every qid_spec_tac [‘p2’,‘p1’]
+  \\ ho_match_mp_tac RTC_INDUCT
+  \\ rw [] \\ metis_tac [payload_trans_normalised,reduction_def]
+QED
+
 (* todo: move? *)
 val EXISTS_REPLICATE = Q.store_thm("EXISTS_REPLICATE",
   `!f n d. EXISTS f (REPLICATE n d) = (n > 0 /\ f d)`,

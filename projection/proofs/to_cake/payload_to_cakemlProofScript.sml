@@ -3247,6 +3247,52 @@ Proof
   \\ fs [cpFFI_valid_def,cpEval_valid_def,ffi_state_cor_def]
 QED
 
+Theorem network_NPar_forward_correctness':
+  ∀conf s c n p s' c' n' st1 vs1 env1.
+  trans conf (NPar (NEndpoint p s c) n) LTau (NPar (NEndpoint p s' c') n') ∧
+
+  (* These assumptions should be dischargable by the static part of the compiler *)
+  net_wf n ∧ (* equivalent to ALL_DISTINCT(MAP FST(endpoints n)) *)
+  ~net_has_node n p ∧
+  normalised s.queues ∧
+  conf.payload_size > 0 ∧
+  st1.ffi.oracle = comms_ffi_oracle conf ∧
+  st1.ffi.ffi_state = (p,s.queues,n) ∧
+  pSt_pCd_corr s c ∧
+
+  (* These assumptions can only be discharged by the dynamic part of the compiler *)
+  sem_env_cor conf s env1 ∧
+  enc_ok conf env1 (letfuns c) vs1
+  ⇒
+  ∃mc st2 env2 vs2.
+    st2.ffi.oracle = comms_ffi_oracle conf ∧
+    st2.ffi.ffi_state = (p,s'.queues,n') ∧
+    sem_env_cor conf s' env2 ∧
+    enc_ok conf env2 (letfuns c') vs2 ∧
+    cEval_equiv conf
+      (evaluate (st1 with clock := mc) env1
+                      [compile_endpoint conf vs1 c])
+      (evaluate (st2 with clock := mc) env2
+                      [compile_endpoint conf vs2 c'])
+Proof
+  rw []
+  \\ CONV_TAC SWAP_EXISTS_CONV
+  \\ qabbrev_tac ‘st2 = st1 with ffi := (st1.ffi with ffi_state := (p,s'.queues,n'))’
+  \\ qexists_tac ‘st2’
+  \\ CONV_TAC (DEPTH_CONV EXISTS_AND_CONV)
+  \\ conj_asm1_tac
+  >- fs [Abbr‘st2’]
+  \\ fs []
+  \\ CONV_TAC (DEPTH_CONV EXISTS_AND_CONV)
+  \\ conj_asm1_tac
+  >- fs [Abbr‘st2’]
+  \\ fs []
+  \\ ntac 2 (pop_assum mp_tac)
+  \\ pop_assum kall_tac
+  \\ rw []
+  \\ metis_tac [network_NPar_forward_correctness]
+QED
+
 Theorem network_NPar_forward_correctness_reduction:
   ∀conf p s c n s' c' n' st1 vs1 env1 st2.
   (reduction conf)⃰ (NPar (NEndpoint p s c) n) (NPar (NEndpoint p s' c') n') ∧
@@ -3348,8 +3394,54 @@ Proof
   \\ metis_tac [cEval_equiv_trans]
 QED
 
+Theorem network_NPar_forward_correctness_reduction':
+  ∀conf p s c n s' c' n' st1 vs1 env1.
+  (reduction conf)⃰ (NPar (NEndpoint p s c) n) (NPar (NEndpoint p s' c') n') ∧
+
+  (* These assumptions should be dischargable by the static part of the compiler *)
+  net_wf n ∧
+  ~net_has_node n p ∧
+  conf.payload_size > 0 ∧
+  normalised s.queues ∧
+  st1.ffi.oracle = comms_ffi_oracle conf ∧
+  st1.ffi.ffi_state = (p,s.queues,n) ∧
+  pSt_pCd_corr s c ∧
+
+  (* These assumptions can only be discharged by the dynamic part of the compiler *)
+  sem_env_cor conf s env1 ∧
+  enc_ok conf env1 (letfuns c) vs1
+  ⇒
+  ∃mc st2 env2 vs2.
+    st2.ffi.oracle = comms_ffi_oracle conf ∧
+    st2.ffi.ffi_state = (p,s'.queues,n') ∧
+    sem_env_cor conf s' env2 ∧
+    enc_ok conf env2 (letfuns c') vs2 ∧
+    cEval_equiv conf
+      (evaluate (st1 with clock := mc) env1
+                      [compile_endpoint conf vs1 c])
+      (evaluate (st2 with clock := mc) env2
+                      [compile_endpoint conf vs2 c'])
+Proof
+  rw []
+  \\ CONV_TAC SWAP_EXISTS_CONV
+  \\ qabbrev_tac ‘st2 = st1 with ffi := (st1.ffi with ffi_state := (p,s'.queues,n'))’
+  \\ qexists_tac ‘st2’
+  \\ CONV_TAC (DEPTH_CONV EXISTS_AND_CONV)
+  \\ conj_asm1_tac
+  >- fs [Abbr‘st2’]
+  \\ fs []
+  \\ CONV_TAC (DEPTH_CONV EXISTS_AND_CONV)
+  \\ conj_asm1_tac
+  >- fs [Abbr‘st2’]
+  \\ fs []
+  \\ ntac 2 (pop_assum mp_tac)
+  \\ pop_assum kall_tac
+  \\ rw []
+  \\ metis_tac [network_NPar_forward_correctness_reduction]
+QED
+
 Theorem network_forward_correctness:
-  ∀conf p s c n p s' c' n' np np' st1 vs1 env1 st2.
+  ∀conf p s c n p s' c' n' st1 vs1 env1 st2.
   trans conf n LTau n' ∧
   (* These assumptions should be dischargable by the static part of the compiler *)
   REPN n ∧
@@ -3386,6 +3478,132 @@ Proof
   >- fs [net_wf_filter]
   >- fs [not_net_has_node_net_filter]
   \\ drule_then (qspec_then ‘p’ mp_tac) net_find_filter_trans
+  \\ impl_tac >- fs [net_has_node_IS_SOME_net_find]
+  \\ rw []
+QED
+
+Theorem network_forward_correctness':
+  ∀conf p s c n p s' c' n' st1 vs1 env1.
+  trans conf n LTau n' ∧
+  (* These assumptions should be dischargable by the static part of the compiler *)
+  REPN n ∧
+  net_wf n ∧
+  normalised_network n ∧
+  conf.payload_size > 0 ∧
+  net_has_node n p ∧
+  net_find p n  = SOME (NEndpoint p s  c ) ∧
+  net_find p n' = SOME (NEndpoint p s' c') ∧
+  st1.ffi.oracle = comms_ffi_oracle conf ∧
+  st1.ffi.ffi_state = (p,s.queues,net_filter p n) ∧
+  pSt_pCd_corr s c ∧
+  sem_env_cor conf s env1 ∧
+  enc_ok conf env1 (letfuns c) vs1
+  ⇒
+  ∃mc st2 env2 vs2.
+    st2.ffi.oracle = comms_ffi_oracle conf ∧
+    st2.ffi.ffi_state = (p,s'.queues,net_filter p n') ∧
+    sem_env_cor conf s' env2 ∧
+    enc_ok conf env2 (letfuns c') vs2 ∧
+    cEval_equiv conf
+      (evaluate (st1 with clock := mc) env1
+                      [compile_endpoint conf vs1 c])
+      (evaluate (st2 with clock := mc) env2
+                      [compile_endpoint conf vs2 c'])
+Proof
+  rw []
+  \\ irule network_NPar_forward_correctness'
+  \\ fs [] \\ qexists_tac ‘s’
+  \\ rw []
+  >- (drule_all payload_trans_normalised
+      \\ drule_all  normalised_network_net_find_filter
+      \\ rw [normalised_network_def])
+  >- fs [net_wf_filter]
+  >- fs [not_net_has_node_net_filter]
+  \\ drule_then (qspec_then ‘p’ mp_tac) net_find_filter_trans
+  \\ impl_tac >- fs [net_has_node_IS_SOME_net_find]
+  \\ rw []
+QED
+
+Theorem network_forward_correctness_reduction:
+  ∀conf p s c n p s' c' n' st1 vs1 env1 st2.
+  (reduction conf)⃰ n n' ∧
+  (* These assumptions should be dischargable by the static part of the compiler *)
+  REPN n ∧
+  net_wf n ∧
+  normalised_network n ∧
+  conf.payload_size > 0 ∧
+  net_has_node n p ∧
+  net_find p n  = SOME (NEndpoint p s  c ) ∧
+  net_find p n' = SOME (NEndpoint p s' c') ∧
+  st1.ffi.oracle = comms_ffi_oracle conf ∧
+  st1.ffi.ffi_state = (p,s.queues,net_filter p n) ∧
+  st2.ffi.oracle = comms_ffi_oracle conf ∧
+  st2.ffi.ffi_state = (p,s'.queues,net_filter p n') ∧
+  pSt_pCd_corr s c ∧
+  sem_env_cor conf s env1 ∧
+  enc_ok conf env1 (letfuns c) vs1
+  ⇒
+  ∃mc env2 vs2.
+    sem_env_cor conf s' env2 ∧
+    enc_ok conf env2 (letfuns c') vs2 ∧
+    cEval_equiv conf
+      (evaluate (st1 with clock := mc) env1
+                      [compile_endpoint conf vs1 c])
+      (evaluate (st2 with clock := mc) env2
+                      [compile_endpoint conf vs2 c'])
+Proof
+  rw []
+  \\ irule network_NPar_forward_correctness_reduction
+  \\ fs [] \\ qexists_tac ‘s’
+  \\ rw []
+  >- (drule_all payload_reduction_normalised
+      \\ drule_all  normalised_network_net_find_filter
+      \\ rw [normalised_network_def])
+  >- fs [net_wf_filter]
+  >- fs [not_net_has_node_net_filter]
+  \\ drule_then (qspec_then ‘p’ mp_tac) net_find_filter_reduction
+  \\ impl_tac >- fs [net_has_node_IS_SOME_net_find]
+  \\ rw []
+QED
+
+Theorem network_forward_correctness_reduction':
+  ∀conf p s c n p s' c' n' st1 vs1 env1.
+  (reduction conf)⃰ n n' ∧
+  (* These assumptions should be dischargable by the static part of the compiler *)
+  REPN n ∧
+  net_wf n ∧
+  normalised_network n ∧
+  conf.payload_size > 0 ∧
+  net_has_node n p ∧
+  net_find p n  = SOME (NEndpoint p s  c ) ∧
+  net_find p n' = SOME (NEndpoint p s' c') ∧
+  st1.ffi.oracle = comms_ffi_oracle conf ∧
+  st1.ffi.ffi_state = (p,s.queues,net_filter p n) ∧
+  pSt_pCd_corr s c ∧
+  sem_env_cor conf s env1 ∧
+  enc_ok conf env1 (letfuns c) vs1
+  ⇒
+  ∃mc st2 env2 vs2.
+    st2.ffi.oracle = comms_ffi_oracle conf ∧
+    st2.ffi.ffi_state = (p,s'.queues,net_filter p n') ∧
+    sem_env_cor conf s' env2 ∧
+    enc_ok conf env2 (letfuns c') vs2 ∧
+    cEval_equiv conf
+      (evaluate (st1 with clock := mc) env1
+                      [compile_endpoint conf vs1 c])
+      (evaluate (st2 with clock := mc) env2
+                      [compile_endpoint conf vs2 c'])
+Proof
+  rw []
+  \\ irule network_NPar_forward_correctness_reduction'
+  \\ fs [] \\ qexists_tac ‘s’
+  \\ rw []
+  >- (drule_all payload_reduction_normalised
+      \\ drule_all  normalised_network_net_find_filter
+      \\ rw [normalised_network_def])
+  >- fs [net_wf_filter]
+  >- fs [not_net_has_node_net_filter]
+  \\ drule_then (qspec_then ‘p’ mp_tac) net_find_filter_reduction
   \\ impl_tac >- fs [net_has_node_IS_SOME_net_find]
   \\ rw []
 QED
