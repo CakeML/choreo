@@ -3441,7 +3441,7 @@ Proof
 QED
 
 Theorem network_forward_correctness:
-  ∀conf p s c n p s' c' n' st1 vs1 env1 st2.
+  ∀conf p s c n s' c' n' st1 vs1 env1 st2.
   trans conf n LTau n' ∧
   (* These assumptions should be dischargable by the static part of the compiler *)
   REPN n ∧
@@ -3483,7 +3483,7 @@ Proof
 QED
 
 Theorem network_forward_correctness':
-  ∀conf p s c n p s' c' n' st1 vs1 env1.
+  ∀conf p s c n s' c' n' st1 vs1 env1.
   trans conf n LTau n' ∧
   (* These assumptions should be dischargable by the static part of the compiler *)
   REPN n ∧
@@ -3525,7 +3525,7 @@ Proof
 QED
 
 Theorem network_forward_correctness_reduction:
-  ∀conf p s c n p s' c' n' st1 vs1 env1 st2.
+  ∀conf p s c n s' c' n' st1 vs1 env1 st2.
   (reduction conf)⃰ n n' ∧
   (* These assumptions should be dischargable by the static part of the compiler *)
   REPN n ∧
@@ -3567,7 +3567,7 @@ Proof
 QED
 
 Theorem network_forward_correctness_reduction':
-  ∀conf p s c n p s' c' n' st1 vs1 env1.
+  ∀conf p s c n s' c' n' st1 vs1 env1.
   (reduction conf)⃰ n n' ∧
   (* These assumptions should be dischargable by the static part of the compiler *)
   REPN n ∧
