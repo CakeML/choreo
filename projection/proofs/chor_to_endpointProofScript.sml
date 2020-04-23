@@ -2,7 +2,7 @@ open preamble choreoUtilsTheory
               endpointLangTheory chor_to_endpointTheory
               endpointSemTheory endpointPropsTheory
               endpointCongTheory chorSemTheory chorPropsTheory
-              endpointConfluenceTheory confluenceTheory;
+              endpointConfluenceTheory chorConfluenceTheory;
 
 val _ = new_theory "chor_to_endpointProof";
 

@@ -1,4 +1,4 @@
-open preamble bigstepSemTheory chorSemTheory confluenceTheory;
+open preamble bigstepSemTheory chorSemTheory chorConfluenceTheory;
 
 val _ = new_theory "bigstepProof";
 
@@ -45,7 +45,7 @@ val evaluate_complete = Q.store_thm("evaluate_complete",
    (qpat_x_assum `trans _ _ _` (assume_tac o PURE_ONCE_REWRITE_RULE [trans_cases])
     >> fs[evaluate_def] >> rveq >> fs[]
     >> fs[evaluate_def] >> every_case_tac >> rveq >> fs[]
-    >> imp_res_tac confluenceTheory.lookup_fresh_after_trans >> fs[]
+    >> imp_res_tac lookup_fresh_after_trans >> fs[]
     >> pop_assum drule >> DISCH_TAC
     >> fs[]
     >> metis_tac[])
@@ -54,9 +54,9 @@ val evaluate_complete = Q.store_thm("evaluate_complete",
     >> qpat_x_assum `trans _ _ _` (assume_tac o PURE_ONCE_REWRITE_RULE [trans_cases])
     >> fs[evaluate_def] >> rveq >> fs[]
     >> fs[evaluate_def] >> every_case_tac >> rveq >> fs[]
-    >> imp_res_tac confluenceTheory.lookup_fresh_after_trans
+    >> imp_res_tac lookup_fresh_after_trans
     >> pop_assum(qspec_then `p1` assume_tac) >> rfs[] >> fs[]
-    >> imp_res_tac confluenceTheory.lookup_unwritten_after_trans
+    >> imp_res_tac lookup_unwritten_after_trans
     >> pop_assum(qspecl_then [`v1`,`p1`] assume_tac) >> rfs[] >> fs[]
     >> drule semantics_add_irrelevant_state_tup >> disch_then drule
     >> disch_then (qspecl_then [`v2`,`x`] assume_tac) >> first_x_assum drule
@@ -67,8 +67,8 @@ val evaluate_complete = Q.store_thm("evaluate_complete",
     >> fs[evaluate_def] >> rveq >> fs[]
     >> fs[evaluate_def] >> every_case_tac >> rveq >> fs[]
     >> conj_tac
-    >- (imp_res_tac confluenceTheory.map_lookup_fresh_after_trans' >> fs[])
-    >> imp_res_tac confluenceTheory.map_lookup_fresh_after_trans_tup
+    >- (imp_res_tac map_lookup_fresh_after_trans' >> fs[])
+    >> imp_res_tac map_lookup_fresh_after_trans_tup
     >> fs[]
     >> qpat_abbrev_tac `a1 = f _`
     >> drule semantics_add_irrelevant_state_tup >> disch_then drule
@@ -78,7 +78,7 @@ val evaluate_complete = Q.store_thm("evaluate_complete",
    (qpat_x_assum `trans _ _ _` (assume_tac o PURE_ONCE_REWRITE_RULE [trans_cases])
     >> fs[evaluate_def] >> rveq >> fs[]
     >> fs[evaluate_def] >> every_case_tac >> rveq >> fs[]
-    >> imp_res_tac confluenceTheory.lookup_fresh_after_trans >> fs[]
+    >> imp_res_tac lookup_fresh_after_trans >> fs[]
     >> pop_assum drule >> DISCH_TAC
     >> fs[]
     >> metis_tac[]));

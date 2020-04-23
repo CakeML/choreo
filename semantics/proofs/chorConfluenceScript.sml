@@ -1,6 +1,6 @@
 open preamble chorSemTheory chorPropsTheory
 
-val _ = new_theory "confluence";
+val _ = new_theory "chorConfluence";
 
 val semantics_deterministic = Q.store_thm("semantics_deterministic",
 `!sc alpha l l' sc' sc''. trans sc (alpha,l) sc' /\ trans sc (alpha,l') sc'' ==> (sc' = sc'')`,
