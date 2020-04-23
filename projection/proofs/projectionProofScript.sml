@@ -2,6 +2,8 @@ open preamble choreoUtilsTheory chorPropsTheory
      projectionTheory payloadPropsTheory
      endpointPropsTheory
 
+open endpointCongTheory
+open payloadCongTheory
 
 open chorSemTheory endpointLangTheory
 
@@ -391,6 +393,39 @@ Proof
   \\ rw []
   \\ drule_then (qspec_then ‘conf’ assume_tac) empty_q_to_payload
   \\ rpt(goal_assum drule)
+QED
+
+Theorem REPN_projection:
+  ∀conf s c l. REPN (projection conf s c l)
+Proof
+  rw [projection_def]
+  \\ qmatch_goalsub_abbrev_tac ‘compile_network conf epn’
+  \\ ‘REPN epn’
+    by (rw [Abbr‘epn’]
+        \\ qmatch_goalsub_abbrev_tac ‘compile_network epn’
+        \\ ‘REPN epn’ by rw [Abbr‘epn’,chor_REPN_compile_network]
+        \\ qpat_x_assum ‘Abbrev _’ kall_tac
+        \\ fs [endpoint_to_choiceTheory.compile_network_def]
+        \\ qmatch_goalsub_abbrev_tac ‘compile_network_fv fv epn’
+        \\ pop_assum kall_tac
+        \\ pop_assum mp_tac
+        \\ map_every qid_spec_tac [‘fv’,‘epn’]
+        \\ Induct \\ rw []
+        \\ fs [endpointCongTheory.REPN_def,
+               endpoint_to_choiceTheory.compile_network_fv_def]
+        \\ Cases_on ‘epn’
+        \\ fs [endpointCongTheory.REPN_def,
+               endpoint_to_choiceTheory.compile_network_fv_def,
+               var_names_network_def])
+  \\ qpat_x_assum ‘Abbrev _’ kall_tac
+  \\ Induct_on ‘epn’
+  \\ fs [endpointCongTheory.REPN_def,
+         payloadCongTheory.REPN_def,
+         compile_network_def]
+  \\ rw []
+  \\ Cases_on ‘epn’ \\ fs [endpointCongTheory.REPN_def]
+  \\ rw [endpoint_to_payloadTheory.compile_network_def,
+         payloadCongTheory.REPN_def]
 QED
 
 val _ = export_theory ()
