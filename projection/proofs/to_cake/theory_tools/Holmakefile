@@ -2,7 +2,7 @@ ifndef CAKEDIR
 CAKEDIR = ../../../../../cakeml
 endif
 
-INCLUDES = $(CAKEDIR)/misc ../ $(CAKEDIR)/semantics $(CAKEDIR)/semantics/ffi \
+INCLUDES = $(CAKEDIR)/misc ../lib_tools $(CAKEDIR)/semantics $(CAKEDIR)/semantics/ffi \
            $(CAKEDIR)/semantics/proofs $(CAKEDIR)/translator
 
 all: $(DEFAULT_TARGETS)
