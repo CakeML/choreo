@@ -344,6 +344,30 @@ Proof
   \\ Cases_on ‘l2’ \\ fs []
 QED
 
+(* Processes do not disappear after multiple reductions ;) *)
+Theorem net_find_IS_SOME_reduction_pres:
+  ∀conf n n' p.
+    (reduction conf)^* n n'
+   ⇒ IS_SOME (net_find p n) = IS_SOME (net_find p n')
+Proof
+  rpt (gen_tac)
+  \\ map_every qid_spec_tac [‘n'’,‘n’]
+  \\ ho_match_mp_tac RTC_INDUCT
+  \\ metis_tac [reduction_def,net_find_IS_SOME_trans_pres]
+QED
+
+(* Processes do not appear after multiple reductions *)
+Theorem net_find_IS_NONE_reduction_pres:
+  ∀conf n n' p.
+    (reduction conf)^* n n'
+   ⇒ IS_NONE (net_find p n) = IS_NONE (net_find p n')
+Proof
+  rpt (gen_tac)
+  \\ map_every qid_spec_tac [‘n'’,‘n’]
+  \\ ho_match_mp_tac RTC_INDUCT
+  \\ metis_tac [reduction_def,net_find_IS_NONE_trans_pres]
+QED
+
 (* Rule version of net_find_IS_SOME_trans_pres *)
 Theorem net_find_IS_SOME_trans_pres_IMP:
   ∀conf n L n' p.
@@ -360,6 +384,24 @@ Theorem net_find_IS_NONE_trans_pres_IMP:
     ⇒ IS_NONE (net_find p n')
 Proof
   metis_tac [net_find_IS_NONE_trans_pres]
+QED
+
+(* Rule version of net_find_IS_SOME_reduction_pres *)
+Theorem net_find_IS_SOME_reduction_pres_IMP:
+  ∀conf n n' p.
+    (reduction conf)^* n n' ∧ IS_SOME (net_find p n)
+    ⇒ IS_SOME (net_find p n')
+Proof
+  metis_tac [net_find_IS_SOME_reduction_pres]
+QED
+
+(* Rule version of net_find_IS_NONE_reduction_pres *)
+Theorem net_find_IS_NONE_reduction_pres_IMP:
+  ∀conf n n' p.
+    (reduction conf)^* n n' ∧ IS_NONE (net_find p n)
+    ⇒ IS_NONE (net_find p n')
+Proof
+  metis_tac [net_find_IS_NONE_reduction_pres]
 QED
 
 (* net_find always returns a single endpoint *)
