@@ -44,4 +44,4 @@ jobs:
     - name: Build projection/proofs/to_cake
       run: |
         cd choreo/projection/proofs/to_cake
-        Holmake payload_to_cakemlProofTheory
+        Holmake compilationProofTheory
