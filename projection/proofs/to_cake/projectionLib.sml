@@ -213,7 +213,7 @@ struct
               [
                 " if (strcmp(c,\"",r,"\")==0) {\n",
                 "    my_strcpy(a,(char *)",r,"_out);\n",
-                "    ",r,"_send_transfer_string("");\n",
+                "    ",r,"_send_transfer_string(\"\");\n",
                 "  }\n"
               ]
             )
