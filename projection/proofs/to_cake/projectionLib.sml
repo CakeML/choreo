@@ -17,7 +17,6 @@ struct
         (n + 1) + (4096 - ((n + 1) mod 4096))
 
   val queue_size = 1 (* TODO: factor out *)
-  val debug_print = ref true;
 
   fun pnames chor =
       “MAP (MAP (CHR o w2n)) (procsOf ^chor)”
@@ -196,9 +195,9 @@ struct
                String.concat
                  ["component ",p," {\n",
                   "    control;\n",
-                  String.concat(mk_provides p qs),
-                  String.concat(mk_uses p rs),
-                  String.concat(mk_semaphores qs),
+                  String.concat(mk_provides p rs),
+                  String.concat(mk_uses p qs),
+                  String.concat(mk_semaphores rs),
                   "}\n"
                  ]
               )
@@ -206,7 +205,7 @@ struct
           bidirtbl
       end
 
-  fun mk_camkes_glue_code(p,qs,rs) =
+  fun mk_camkes_glue_code(p,rs,qs) =
       let
         fun ffisendline r =
             String.concat (
@@ -246,21 +245,17 @@ struct
               "ZF_LOGF(\"Unknown receiver: %s\\n\",c);\n"
             else
               String.concat (
-                (if !debug_print then
-                   ["  printf(\"",p," |-> %s: %s\\n\",c,a + unpad(a));\n"]
-                 else [])
-                @
-                [
-                  " ",
-                  String.concatWith "  else" (map ffisendline rs),
-                  "  else {\n",
-                  "    ZF_LOGF(\"Unknown receiver: %s\\n\",c);\n",
-                  "  }\n"
+                ("  ZF_LOGE(\"",p," |-> %s: %s\\n\",c,a + unpad(a));\n",
+                 " ",
+                 String.concatWith "  else" (map ffisendline rs),
+                 "  else {\n",
+                 "    ZF_LOGF(\"Unknown receiver: %s\\n\",c);\n",
+                 "  }\n"
                 ]
               )
 
         val ffireceive =
-            if null rs then
+            if null qs then
               "ZF_LOGF(\"Unknown sender: %s\\n\",c);\n"
             else
               String.concat
@@ -332,7 +327,7 @@ struct
           "  while(arr[i] == 0) {\n",
           "    i++;\n",
           "  }\n",
-          "  return(i+2);\n",
+          "  return(i+1);\n",
           "}\n",
           "\n",
           "void ffisend (unsigned char *c, long clen, unsigned char *a, long alen) {  \n",
