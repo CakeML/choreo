@@ -1,8 +1,9 @@
 open preamble
 
 open  projectionTheory projectionProofTheory
+       chorSemTheory
 
-open  payloadCongTheory
+open  payloadLangTheory payloadCongTheory payloadPropsTheory
       payload_to_cakemlProofTheory
 
 val _ = new_theory "compilationProof";
@@ -54,9 +55,10 @@ Proof
   \\ drule network_forward_correctness_reduction'
   \\ rpt (disch_then (first_assum o (mp_then Any mp_tac)))
   \\ impl_tac \\ rw []
-  >- rw [Abbr‘pEPN1’,REPN_projection] (* REPN from compiled network *)
-  >- cheat (* net_wf from compile_network *)
-  >- cheat (* normalised_network from compile_network *)
+  >- rw [Abbr‘pEPN1’,REPN_projection]
+  >- (irule net_wf_ALL_DISTINCT_eq
+      \\ rw [Abbr‘pEPN1’,endpoints_projection,procsOf_all_distinct])
+  >- (irule empty_q_normalised_network \\ rw [Abbr‘pEPN1’,projection_empty_q])
   >- rw [net_has_node_IS_SOME_net_find,IS_SOME_EXISTS]
   \\ asm_exists_tac
   \\ fs []

@@ -430,4 +430,41 @@ Proof
          payloadCongTheory.REPN_def]
 QED
 
+Theorem endpoints_compile_network_payload:
+  ∀epn conf.
+   MAP FST (endpoints (endpoint_to_payload$compile_network conf epn)) = MAP FST (endpoints epn)
+Proof
+  Induct \\ rw [endpoint_to_payloadTheory.compile_network_def,
+                endpointPropsTheory.endpoints_def,
+                payloadLangTheory.endpoints_def]
+QED
+
+Theorem endpoints_projection:
+  ∀conf s c l. MAP FST (endpoints (projection conf s c l)) = l
+Proof
+  rw [projection_def,
+      endpoints_compile_network_payload,
+      endpoints_compile_network_epn,
+      endpoints_compile_network_chor]
+QED
+
+Theorem projection_empty_q:
+  ∀conf s c l. empty_q (projection conf s c l)
+Proof
+  rw [projection_def,
+      endpoint_to_choiceTheory.compile_network_def,
+      empty_q_to_payload,
+      compile_network_fv_empty_q,
+      compile_network_empty_q]
+QED
+
+Theorem empty_q_normalised_network:
+  ∀n. empty_q n ⇒ normalised_network n
+Proof
+  Induct \\ rw[payloadPropsTheory.empty_q_def,
+               payloadLangTheory.normalised_network_def,
+               payloadLangTheory.normalised_def,
+               payloadLangTheory.normalise_queues_def]
+QED
+
 val _ = export_theory ()

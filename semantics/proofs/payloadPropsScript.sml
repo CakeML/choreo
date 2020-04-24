@@ -623,6 +623,21 @@ Definition net_wf_def:
                           (net_has_node n2))
 End
 
+Theorem net_has_node_MEM_endpoints:
+  ∀n p. net_has_node n p ⇔ MEM p (MAP FST (endpoints n))
+Proof
+  Induct \\ rw [] \\ fs [endpoints_def,net_has_node_def]
+  \\ metis_tac []
+QED
+
+Theorem net_wf_ALL_DISTINCT_eq:
+  ∀n. ALL_DISTINCT(MAP FST(endpoints n)) ⇒ net_wf n
+Proof
+  Induct \\ fs [net_wf_def,endpoints_def,ALL_DISTINCT_APPEND]
+  \\ fs [DISJOINT_ALT]
+  \\ fs [IN_DEF,net_has_node_MEM_endpoints]
+QED
+
 Theorem trans_pres_wf:
   ∀conf s0 l s1.
     trans conf s0 l s1 ⇒
