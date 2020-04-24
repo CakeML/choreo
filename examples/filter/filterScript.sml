@@ -17,7 +17,7 @@ val filter = “MAP (^n2w8 o ORD) "filter"” |> EVAL |> concl |> rhs;
 val consumer = “MAP (^n2w8 o ORD) "consumer"” |> EVAL |> concl |> rhs;
 
 val msg1 = “MAP (^n2w8 o ORD) "This message should be filtered."” |> EVAL |> concl |> rhs;
-val msg2 = “MAP (^n2w8 o ORD) "A message such as this should be forwarded."” |> EVAL |> concl |> rhs;
+val msg2 = “MAP (^n2w8 o ORD) "A message such as this should be forwarded. It is absurdly long, so hopefully it will be split into distinct messages that will all be forwarded. Indeed, that would be great, wouldn't it? Hopefully, that will be exactly the behaviour you observe when you run this example."” |> EVAL |> concl |> rhs;
 val msg3 = “MAP (^n2w8 o ORD) "Drop this message."” |> EVAL |> concl |> rhs;
 
 Definition test_def :
