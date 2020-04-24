@@ -72,13 +72,6 @@ Definition filter_def:
         chorLang$Nil
 End
 
-(* Test if the filter choreography is projectable
-  EVAL``project ^producer (filter test [fm;sm])``;
-  EVAL``project ^consumer (filter test [fm;sm])``;
-  EVAL``project ^filter (filter test [fm;sm])``;
-  EVAL``project ^filter (filter test [Kmsg1;Kmsg2;Kmsg3])``;  
- *)
-
 val _ = project_to_camkes "filter_camkes" "filter" “filter test [Kmsg1;Kmsg2;Kmsg3]”;
 
 val _ = export_theory();
