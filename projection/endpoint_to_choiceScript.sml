@@ -22,8 +22,8 @@ Definition compile_endpoint_def :
 ∧ (compile_endpoint fv (Receive p v e) = Receive p v (compile_endpoint fv e))
 ∧ (compile_endpoint fv (IntChoice b p e) =
    if b then
-     Let fv K0 [] (Send p fv (compile_endpoint fv e))
-    else Let fv K1 [] (Send p fv (compile_endpoint fv e)))
+     Let fv K1 [] (Send p fv (compile_endpoint fv e))
+    else Let fv K0 [] (Send p fv (compile_endpoint fv e)))
 ∧ (compile_endpoint fv (ExtChoice p e1 e2) =
     Receive p fv (IfThen fv (compile_endpoint fv e1) (compile_endpoint fv e2)))
 ∧ (compile_endpoint fv (IfThen v e1 e2) = IfThen v (compile_endpoint fv e1) (compile_endpoint fv e2))
