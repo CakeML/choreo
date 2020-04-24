@@ -43,13 +43,15 @@ Proof
     by(simp[gen_fresh_name_def] >>
        qid_spec_tac `s` >>
        Induct_on `l` >> rw[] >>
-       first_x_assum(qspec_then `s` mp_tac) >> intLib.COOPER_TAC) >>
+       first_x_assum(qspec_then `h` mp_tac) >> intLib.COOPER_TAC) >>
   conj_tac >- (spose_not_then strip_assume_tac >> fs[]) >>
   pop_assum kall_tac >>
   `!s'. MEM s' l ==> STRLEN s' < STRLEN(gen_fresh_name (s::l))`
     by(simp[gen_fresh_name_def] >>
        qid_spec_tac `s` >>
-       Induct_on `l` >> rw[] >> rw[] >>
+       qid_spec_tac `l` >>
+       ho_match_mp_tac SNOC_INDUCT >>
+       rw[FOLDL_SNOC] >> rw[] >>
        res_tac >>
        first_x_assum(qspec_then `s` mp_tac) >> intLib.COOPER_TAC) >>
   spose_not_then strip_assume_tac >> res_tac >>

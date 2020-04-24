@@ -4,7 +4,7 @@ val _ = new_theory "endpoint_to_choice";
 
 val gen_fresh_name_def = Define `
    (gen_fresh_name [] = "a")
-/\ (gen_fresh_name (n::ns) = #"a" :: FOLDR (λe b. if LENGTH e ≥ LENGTH b then e else b) n ns)
+/\ (gen_fresh_name (n::ns) = #"a" :: FOLDL (λe b. if LENGTH e ≥ LENGTH b then e else b) n ns)
 `
 
 val compile_endpoint_def = Define `
