@@ -2074,11 +2074,15 @@ Definition make_sends_def:
   make_sends c genf dest pos [] var s e = (s, e) ∧
   make_sends c genf dest pos ((msg : word8 list) :: rest) vn s0 e0 =
     if intermediate msg then
-       case make_sends c genf dest (pos + c.payload_size) rest vn s0 e0 of
-       | (s, e) =>
-            (s with bindings :=
-               s.bindings |+ (genf vn,TL msg ++ qlk s.bindings (genf vn)),
-             Send dest (genf vn) pos e)
+       if rest = [] then
+         (s0 with bindings := s0.bindings |+ (genf vn, TL msg ++ [0w]),
+          Send dest (genf vn) pos e0)
+       else
+         case make_sends c genf dest (pos + c.payload_size) rest vn s0 e0 of
+         | (s, e) =>
+              (s with bindings :=
+                 s.bindings |+ (genf vn,TL msg ++ qlk s.bindings (genf vn)),
+               Send dest (genf vn) pos e)
     else
        case make_sends c genf dest 0n rest (vn + 1n) s0 e0 of
        | (s, e) => (s with bindings := s.bindings |+ (genf vn, ms_mkmsg msg),
@@ -2268,53 +2272,56 @@ Proof
   simp[FORALL_PROD, EXISTS_PROD] >> metis_tac[nfv_eq_strans, nfv_eq_SYM]
 QED
 
-
-(* Theorem normBindings_trans_I:
-  trans c N1 L N2 ⇒ trans c (normBindings N1) L (normBindings N2)
+Theorem normBindings_nfv_eq:
+  nfv_eq (normBindings N) N
 Proof
-  Induct_on ‘trans’ >> simp[] >> rw[]
-  >- (simp[snormB_def] >> irule (hd (CONJUNCTS trans_rules))
-*)
+  Induct_on ‘N’ >> simp[] >- metis_tac[nfv_eq_rules] >> rw[] >>
+  irule (last (CONJUNCTS nfv_eq_rules)) >>
+  simp[snormB_def, FLOOKUP_DEF, DRESTRICT_DEF]
+QED
 
-Theorem larger_queues_bisimilar:
-  ∀N1. fmap_pfxall Q2 Q1 ∧ normalised Q2 ∧ normalised Q1 ∧
-       (∀msgs m. msgs ∈ FRANGE Q1 ∧ MEM m msgs ⇒ valid_msg conf m) ∧
-       net_wf N1 ∧ ¬net_has_node N1 p ∧ p ∉ FDOM Q1 ⇒
-       ∃N2. ffi_eq conf (p,Q1,N1) (p,Q2,N2) ∧ net_wf N2 ∧ ¬net_has_node N2 p
+Theorem net_has_node_normBindings[simp]:
+  net_has_node (normBindings N) = net_has_node N
 Proof
-  Induct_on ‘fmap_pfxall’ >> rpt conj_tac
-  >- (Induct_on ‘Q1’ >> rw[]
-      >- (qexists_tac ‘N1’ >> simp[]) >>
-      rfs[DOMSUB_NOT_IN_DOM] >>
-      fs[DISJ_IMP_THM, FORALL_AND_THM, RIGHT_AND_OVER_OR] >>
-      rename [‘Q1 |+ (sp,mc)’] >>
-      ‘FINITE (network_bindings N1)’ by simp[] >>
-      first_x_assum (mp_then (Pos last) (qspec_then ‘univ(:string)’ mp_tac)
-                     IN_INFINITE_NOT_FINITE_gen) >> simp[] >>
-      disch_then (qx_choose_then ‘genf’ strip_assume_tac) >>
-      qabbrev_tac ‘mks = make_sends conf genf p 0 mc 0’ >>
-      ‘∃N3. ffi_eq conf (p,Q1 |+ (sp,mc),N1) (p,Q1,N3) ∧ net_wf N3 ∧
-            ¬net_has_node N3 p’ suffices_by metis_tac[ffi_eq_TRANS] >>
-      qexists_tac ‘network_fupd_at sp mks N1’ >> simp[Abbr‘mks’] >>
-      simp[IN_DEF] >>
-      irule ffi_eq_SYM >>
-      irule active_trans_equiv_irrel >> conj_tac
-      >- simp[ffi_wf_def, IN_DEF] >>
-      qspec_tac(‘0n’, ‘n’) >>
-      Induct_on ‘mc’ >> simp[] >> Cases_on ‘mc’ >> fs[]
-      >- (qx_gen_tac ‘msg’ >> strip_tac >> qx_gen_tac ‘vn’ >>
-          irule RTC_SINGLE >> simp[active_trans_def] >> disj2_tac >>
-          simp[emit_trans_def, qpush_def] >>
-          qexistsl_tac [‘sp’, ‘msg’] >> simp[qlk_def, fget_def, FLOOKUP_DEF] >>
-          irule network_fupd_at_trans >>
-          simp[]
+  Induct_on ‘N’ >> simp[net_has_node_def, FUN_EQ_THM]
+QED
+
+Theorem net_wf_normBindings[simp]:
+  net_wf (normBindings N) = net_wf N
+Proof
+  Induct_on ‘N’ >> simp[net_wf_def]
+QED
+
+Theorem nfv_eq_network_fupd_at:
+  (∀s e. SND (f s e) = e) ∧ net_has_node n sp ∧
+  (∀s e. (FST(f s e)).queues = s.queues) ∧
+  (∀v s e. v ∈ pFv e ⇒ FLOOKUP (FST (f s e)).bindings v = FLOOKUP s.bindings v)
+ ⇒
+  nfv_eq (network_fupd_at sp f n) n
+Proof
+  Induct_on ‘n’ >> simp[net_has_node_def]
+  >- (rw[] >> fs[nfv_eq_rules]) >>
+  simp[UNCURRY] >> rw[] >> irule (last (CONJUNCTS nfv_eq_rules)) >> simp[]
+QED
 
 
-simp[make_sends_def] >> strip_tac >> simp[Abbr‘mks’] >>
-          irule ffi_eq_TRANS >> qexists_tac ‘(p, Q1, N1)’ >> conj_tac
-          >-
+Definition NB_def:
+  NB f s e = let (s', e') = f s e
+             in
+               (snormB s' e', e')
+End
 
-*)
+Theorem network_fupd_at_EQ:
+  net_find p N = SOME (plNEndpoint p s e) ⇒
+  (network_fupd_at p f1 N = network_fupd_at p f2 N ⇔ f1 s e = f2 s e)
+Proof
+  Induct_on‘N’ >- simp[net_find_def]
+  >- (simp[net_find_def] >>
+      rename [‘OPTION_CHOICE (net_find p N1) (net_find p N2)’] >>
+      Cases_on ‘net_find p N1’ >> fs[net_has_node_IS_SOME_net_find]) >>
+  simp[] >> REWRITE_TAC[net_find_def] >> rw[] >> simp[UNCURRY] >>
+  map_every Cases_on [‘f1 s e’, ‘f2 s e’] >> simp[]
+QED
 
 (* A stream of valid send events cannot break FFI correspondence*)
 Theorem ffi_state_cor_send_stream_irrel:
@@ -2375,6 +2382,13 @@ Proof
       rename1 ‘strans conf (_,Q,N) _ (_,Q',N')’ >>
       fs[ffi_state_cor_def] >>
       (* SCARY *)
+      ‘∃s3. ffi_eq conf (cpNum,Q',N') s3 ∧
+            strans conf (cpNum,pSt.queues,fNet1) (ASend l (MAP SND d)) s3’
+        by metis_tac[ffi_eq_bisimulation_L] >>
+      PairCases_on ‘s3’ >>
+      pop_assum mp_tac >> rename [‘strans _ _ _ (p',Q2, N2) ⇒ _’] >>
+      strip_tac >> drule strans_pres_pnum >> rw[] >> pop_assum mp_tac >>
+      simp[strans_send_equiv, input_trans_def] >>
 
 
       ‘∀sp.
