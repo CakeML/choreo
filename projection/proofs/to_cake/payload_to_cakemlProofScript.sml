@@ -1744,9 +1744,16 @@ QED
 Definition ffi_state_cor_def:
   ffi_state_cor conf cpNum pSt (fNum,fQueue,fNet) ⇔
     cpNum = fNum ∧
+<<<<<<< Updated upstream
     ?fQueue1 fNet1.
       ffi_eq conf (fNum,fQueue,fNet) (fNum,fQueue1,fNet1) /\
       !sp.
+=======
+    ∃fQueue1 fNet1.
+      ffi_wf (fNum,fQueue1,fNet1) ∧
+      ffi_eq conf (fNum,fQueue,fNet) (fNum,fQueue1,fNet1) ∧
+      ∀sp.
+>>>>>>> Stashed changes
         isPREFIX (qlk pSt.queues sp) (qlk fQueue1 sp)
 End
 
@@ -1941,20 +1948,32 @@ QED
 (* A stream of valid send events cannot break FFI correspondence*)
 Theorem ffi_state_cor_send_stream_irrel:
   ∀conf cpNum pSt ckFSt l send_stream P.
+<<<<<<< Updated upstream
+=======
+    ffi_wf ckFSt ∧
+>>>>>>> Stashed changes
     ffi_state_cor conf cpNum pSt ckFSt ∧
     EVERY (valid_send_event_format conf l) send_stream ∧
     ffi_accepts_rel P (valid_send_call_format conf l) (comms_ffi_oracle conf) ∧
     P ckFSt
     ⇒
+<<<<<<< Updated upstream
     ffi_state_cor conf cpNum pSt
                   (update_state ckFSt (comms_ffi_oracle conf) send_stream)
+=======
+    ffi_state_cor conf cpNum pSt (update_state ckFSt (comms_ffi_oracle conf) send_stream)
+>>>>>>> Stashed changes
 Proof
   Induct_on ‘send_stream’ >>
   rw[update_state_def] >>
   Cases_on ‘h’ >>
   PURE_ONCE_REWRITE_TAC [update_state_def] >>
+<<<<<<< Updated upstream
   qmatch_goalsub_abbrev_tac
     ‘ffi_state_cor _ cpNum pSt (update_state ckFSt1 _ send_stream)’ >>
+=======
+  qmatch_goalsub_abbrev_tac ‘ffi_state_cor conf cpNum pSt (update_state ckFSt1 _ send_stream)’ >>
+>>>>>>> Stashed changes
   rename1 ‘valid_send_event_format conf l (IO_event s l' d)’ >>
   ‘l' = l’
     by fs[valid_send_event_format_def,valid_send_call_format_def] >>
@@ -1971,6 +1990,9 @@ Proof
   fs[] >> qunabbrev_tac ‘ckFSt1’ >>
   qmatch_goalsub_rename_tac ‘ffi_state_cor _ _ _ ckFSt1’ >>
   rw[]
+  >- (fs[comms_ffi_oracle_def,valid_send_call_format_def] >>
+      rw[] >> fs[ffi_send_def,AllCaseEqs()] >> first_x_assum mp_tac >>
+      DEEP_INTRO_TAC some_intro >> rw[] >> metis_tac[strans_pres_wf])
   >- (MAP_EVERY qexists_tac [‘P’,‘l’] >> fs[]) >>
   fs[ffi_accepts_rel_def,valid_send_event_format_def] >>
   rfs[] >>
@@ -1982,6 +2004,7 @@ Proof
   irule SELECT_ELIM_THM >>
   rw[]
   >- (qpat_x_assum ‘strans _ _ _ ns’ (K ALL_TAC) >>
+<<<<<<< Updated upstream
       qmatch_goalsub_rename_tac ‘ffi_state_cor _ _ _ ns’ >>
       Cases_on ‘ns’ >> Cases_on ‘ckFSt’ >>
       rename1 ‘strans conf (PN,R) _ (PN',R')’ >>
@@ -1996,17 +2019,43 @@ Proof
       ‘∀sp. qlk Q sp ≼ qlk Q' sp’
         suffices_by (rw[] >> fs[ffi_state_cor_def] >>
                      rw[] >> metis_tac[IS_PREFIX_TRANS]) >>
+=======
+      qmatch_goalsub_rename_tac ‘ffi_state_cor _ _  _ ns’ >>
+      MAP_EVERY PairCases_on [‘ns’,‘ckFSt’] >>
+      fs[ffi_state_cor_def] >>
+      ‘ns0 = ckFSt0’
+        by metis_tac[strans_pres_pnum,pairTheory.FST] >>
+      rw[] >>
+      ‘∃s2.
+        strans conf (ckFSt0,fQueue1,fNet1)
+                    (ASend l (MAP SND d))
+                    s2’
+        by metis_tac[ffi_eq_def,bisimulationTheory.BISIM_REL_def,
+                     bisimulationTheory.BISIM_def,pairTheory.FORALL_PROD] >>
+      PairCases_on ‘s2’ >>
+      ‘s20 = ckFSt0’
+        by metis_tac[strans_pres_pnum,pairTheory.FST] >>
+      rw[] >>
+      MAP_EVERY qexists_tac [‘s21’,‘s22’] >>
+      rw[]
+      >- metis_tac[strans_pres_wf]
+      >- metis_tac[ffi_eq_pres,pairTheory.FORALL_PROD] >>
+      ‘∀sp.
+        isPREFIX (qlk fQueue1 sp) (qlk s21 sp)’
+        suffices_by metis_tac[IS_PREFIX_TRANS] >>
+>>>>>>> Stashed changes
       metis_tac[strans_queue_pres])
   >- (qexists_tac ‘ns’ >> simp[])
 QED
 (* send_events cannot break FFI correspondence*)
 Theorem ffi_state_cor_send_events_irrel:
   ∀conf cpNum pSt ckFSt l d P.
-    ffi_state_cor cpNum pSt ckFSt ∧
+    ffi_wf ckFSt ∧
+    ffi_state_cor conf cpNum pSt ckFSt ∧
     ffi_accepts_rel P (valid_send_call_format conf l) (comms_ffi_oracle conf) ∧
     P ckFSt
     ⇒
-    ffi_state_cor cpNum pSt (update_state ckFSt (comms_ffi_oracle conf)
+    ffi_state_cor conf cpNum pSt (update_state ckFSt (comms_ffi_oracle conf)
                                           (send_events conf l d))
 Proof
   rpt strip_tac >>
@@ -2575,20 +2624,22 @@ Proof
             >- (‘ps2cs n ≠ ps2cs s’
                   by rw[ps2cs_def] >>
                 fs[FLOOKUP_UPDATE,nsOptBind_def,nsLookup_nsBind_compute])) >>
-      ‘ffi_state_cor cpNum pStM cSt1M.ffi.ffi_state’
-        by (‘ffi_state_cor cpNum pSt cSt1.ffi.ffi_state’
+      ‘ffi_state_cor conf cpNum pStM cSt1M.ffi.ffi_state’
+        by (‘ffi_state_cor conf cpNum pSt cSt1.ffi.ffi_state’
               by fs[cpEval_valid_def] >>
             qunabbrev_tac ‘pStM’ >> qunabbrev_tac ‘cSt1M’ >>
             simp[] >> Cases_on ‘cSt1.ffi.ffi_state’ >>
-            qmatch_goalsub_rename_tac ‘ffi_state_cor _ _ (P,R)’ >>
-            Cases_on ‘R’ >> fs[ffi_state_cor_def]) >>
-      ‘ffi_state_cor cpNum pStM cSt2M.ffi.ffi_state’
-        by (‘ffi_state_cor cpNum pSt cSt2.ffi.ffi_state’
+            qmatch_goalsub_rename_tac ‘ffi_state_cor  _ _ _ (P,R)’ >>
+            Cases_on ‘R’ >> fs[ffi_state_cor_def] >>
+            metis_tac[]) >>
+      ‘ffi_state_cor conf cpNum pStM cSt2M.ffi.ffi_state’
+        by (‘ffi_state_cor conf cpNum pSt cSt2.ffi.ffi_state’
               by fs[cpEval_valid_def] >>
             qunabbrev_tac ‘pStM’ >> qunabbrev_tac ‘cSt2M’ >>
             simp[] >> Cases_on ‘cSt2.ffi.ffi_state’ >>
-            qmatch_goalsub_rename_tac ‘ffi_state_cor _ _ (P,R)’ >>
-            Cases_on ‘R’ >> fs[ffi_state_cor_def]) >>
+            qmatch_goalsub_rename_tac ‘ffi_state_cor _ _ _ (P,R)’ >>
+            Cases_on ‘R’ >> fs[ffi_state_cor_def] >>
+            metis_tac[]) >>
       ‘ffi_wf cSt1M.ffi.ffi_state’
         by (qunabbrev_tac ‘cSt1M’ >> fs[cpEval_valid_def]) >>
       ‘ffi_wf cSt2M.ffi.ffi_state’
