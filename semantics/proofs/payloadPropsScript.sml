@@ -100,6 +100,16 @@ Proof
   rw[normalised_network_def]
 QED
 
+Theorem payload_reduction_normalised:
+  ∀conf p1 alpha p2.
+  (reduction conf)^* p1 p2 ∧ normalised_network p1 ⇒ normalised_network p2
+Proof
+  rw [] \\ rpt (pop_assum mp_tac)
+  \\ map_every qid_spec_tac [‘p2’,‘p1’]
+  \\ ho_match_mp_tac RTC_INDUCT
+  \\ rw [] \\ metis_tac [payload_trans_normalised,reduction_def]
+QED
+
 (* todo: move? *)
 val EXISTS_REPLICATE = Q.store_thm("EXISTS_REPLICATE",
   `!f n d. EXISTS f (REPLICATE n d) = (n > 0 /\ f d)`,
@@ -612,6 +622,21 @@ Definition net_wf_def:
                           (net_has_node n1)
                           (net_has_node n2))
 End
+
+Theorem net_has_node_MEM_endpoints:
+  ∀n p. net_has_node n p ⇔ MEM p (MAP FST (endpoints n))
+Proof
+  Induct \\ rw [] \\ fs [endpoints_def,net_has_node_def]
+  \\ metis_tac []
+QED
+
+Theorem net_wf_ALL_DISTINCT_eq:
+  ∀n. ALL_DISTINCT(MAP FST(endpoints n)) ⇒ net_wf n
+Proof
+  Induct \\ fs [net_wf_def,endpoints_def,ALL_DISTINCT_APPEND]
+  \\ fs [DISJOINT_ALT]
+  \\ fs [IN_DEF,net_has_node_MEM_endpoints]
+QED
 
 Theorem trans_pres_wf:
   ∀conf s0 l s1.

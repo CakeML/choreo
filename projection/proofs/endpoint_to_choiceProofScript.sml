@@ -167,12 +167,13 @@ val compile_network_preservation_int_choice_T = Q.store_thm(
       >> qexists_tac `NEndpoint p1
                         (s with bindings := s.bindings
                                               |+ (fv,
-                                                  (K [1w])(MAP (THE o FLOOKUP s.bindings) [])))
+                                                  (K1)(MAP (THE o FLOOKUP s.bindings) [])))
                         a1`
       >> conj_tac
       >- (match_mp_tac trans_let >> simp[])
       >> simp[]
       >> unabbrev_all_tac
+      >> simp[K1_def]
       >> PURE_ONCE_REWRITE_TAC [DROP_0 |> GEN_ALL |> ISPEC ``[1w:8 word]`` |> GSYM]
       >> match_mp_tac trans_send >> fs[FLOOKUP_UPDATE])
   >- (first_x_assum (qspec_then `fv` assume_tac)
@@ -215,12 +216,13 @@ val compile_network_preservation_int_choice_F = Q.store_thm(
       >> qexists_tac `NEndpoint p1
                         (s with bindings := s.bindings
                                               |+ (fv,
-                                                  (K [0w])(MAP (THE o FLOOKUP s.bindings) [])))
+                                                  (K0)(MAP (THE o FLOOKUP s.bindings) [])))
                         a1`
       >> conj_tac
       >- (match_mp_tac trans_let >> simp[])
       >> simp[]
       >> unabbrev_all_tac
+      >> simp[K0_def]
       >> PURE_ONCE_REWRITE_TAC [DROP_0 |> GEN_ALL |> ISPEC ``[0w:8 word]`` |> GSYM]
       >> match_mp_tac trans_send >> fs[FLOOKUP_UPDATE])
   >- (first_x_assum (qspec_then `fv` assume_tac)
@@ -357,7 +359,7 @@ val compile_network_preservation_trans = Q.store_thm("compile_network_preservati
       >> metis_tac[RTC_SINGLE,junkcong_refl])
   >- (* com-choice-l *)
      (Cases_on `b`
-      >- (fs[endpoints_def,ALL_DISTINCT_APPEND,compile_network_fv_def]
+      >- (fs[endpoints_def,ALL_DISTINCT_APPEND,compile_network_fv_def,K0_def,K1_def]
           >> imp_res_tac compile_network_preservation_int_choice_T
           >> imp_res_tac compile_network_preservation_ext_choice_T
           >> rpt(first_x_assum(qspec_then `fv` assume_tac))
@@ -374,7 +376,7 @@ val compile_network_preservation_trans = Q.store_thm("compile_network_preservati
           >- (match_mp_tac junkcong_add_state_free_vars >> fs[var_names_network_def,reduction_def]
               >> metis_tac[MEM_free_vars_compile_network,trans_var_names_mono,free_names_are_names])
           >- MATCH_ACCEPT_TAC junkcong_refl)
-      >- (fs[endpoints_def,ALL_DISTINCT_APPEND,compile_network_fv_def]
+      >- (fs[endpoints_def,ALL_DISTINCT_APPEND,compile_network_fv_def,K0_def,K1_def]
           >> imp_res_tac compile_network_preservation_int_choice_F
           >> imp_res_tac compile_network_preservation_ext_choice_F
           >> rpt(first_x_assum(qspec_then `fv` assume_tac))
@@ -393,7 +395,7 @@ val compile_network_preservation_trans = Q.store_thm("compile_network_preservati
           >- MATCH_ACCEPT_TAC junkcong_refl))
   >- (* com-choice-l *)
      (Cases_on `d` (* TODO: why not b? *)
-      >- (fs[endpoints_def,ALL_DISTINCT_APPEND,compile_network_fv_def]
+      >- (fs[endpoints_def,ALL_DISTINCT_APPEND,compile_network_fv_def,K0_def,K1_def]
           >> imp_res_tac compile_network_preservation_int_choice_T
           >> imp_res_tac compile_network_preservation_ext_choice_T
           >> rpt(first_x_assum(qspec_then `fv` assume_tac))
@@ -411,7 +413,7 @@ val compile_network_preservation_trans = Q.store_thm("compile_network_preservati
           >- (match_mp_tac junkcong_add_state_free_vars >> fs[var_names_network_def,reduction_def]
               >> metis_tac[MEM_free_vars_compile_network,trans_var_names_mono,free_names_are_names])
          )
-      >- (fs[endpoints_def,ALL_DISTINCT_APPEND,compile_network_fv_def]
+      >- (fs[endpoints_def,ALL_DISTINCT_APPEND,compile_network_fv_def,K0_def,K1_def]
           >> imp_res_tac compile_network_preservation_int_choice_F
           >> imp_res_tac compile_network_preservation_ext_choice_F
           >> rpt(first_x_assum(qspec_then `fv` assume_tac))
@@ -1431,6 +1433,7 @@ val choice_rel_trans_pres = Q.prove(
               >> rpt(first_x_assum (qspec_then `s` assume_tac))
               >> imp_res_tac choice_rel_endpoint_eq_junk
               >> PURE_ONCE_REWRITE_TAC [CONJ_SYM]
+              >> simp[K0_def,K1_def]
               >> asm_exists_tac
               >> simp[weak_trans_refl]
               >> match_mp_tac trans_IMP_weak_trans

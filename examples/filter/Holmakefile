@@ -1,0 +1,9 @@
+ifndef CAKEDIR
+CAKEDIR = ../../../cakeml
+endif
+
+INCLUDES = $(CAKEDIR)/misc $(CAKEDIR)/semantics ../../semantics ../../projection $(CAKEDIR)/basis $(CAKEDIR)/unverified/sexpr-bootstrap $(CAKEDIR)/compiler/parsing ../../projection/proofs/to_cake
+OPTIONS = QUIT_ON_FAILURE
+
+all: $(DEFAULT_TARGETS)
+.PHONY: all

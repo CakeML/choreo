@@ -289,33 +289,6 @@ Proof
   metis_tac [net_wf_cong]
 QED
 
-(* Finds a specific endpoint by name in the network *)
-Definition net_find_def:
-  net_find p NNil = NONE
-∧ net_find p (NPar n1 n2) = OPTION_CHOICE (net_find p n1)
-                                          (net_find p n2)
-∧ net_find p (NEndpoint p' s c) = (if p = p'
-                                   then SOME (NEndpoint p s c)
-                                   else NONE)
-End
-
-(* Removes a specific (single) endpoint by name in the network.
-   Note that if multiple endpoints with the same name exists
-   a call to net_filter will only remove 1
-*)
-Definition net_filter_def:
-  net_filter p NNil = NNil
-∧ net_filter p (NEndpoint p' s c) =
-    (if p = p' then NNil
-     else NEndpoint p' s c)
-∧ net_filter p (NPar n1 n2) =
-    let l = net_filter p n1
-    in if n1 ≠ l
-       then if l = NNil then n2
-            else NPar l n2
-       else NPar n1 (net_filter p n2)
-End
-
 (* Show that the combination of net_filter and net_find does not affect any
    the contents of the network and only modifies its structure.
 
@@ -371,6 +344,30 @@ Proof
   \\ Cases_on ‘l2’ \\ fs []
 QED
 
+(* Processes do not disappear after multiple reductions ;) *)
+Theorem net_find_IS_SOME_reduction_pres:
+  ∀conf n n' p.
+    (reduction conf)^* n n'
+   ⇒ IS_SOME (net_find p n) = IS_SOME (net_find p n')
+Proof
+  rpt (gen_tac)
+  \\ map_every qid_spec_tac [‘n'’,‘n’]
+  \\ ho_match_mp_tac RTC_INDUCT
+  \\ metis_tac [reduction_def,net_find_IS_SOME_trans_pres]
+QED
+
+(* Processes do not appear after multiple reductions *)
+Theorem net_find_IS_NONE_reduction_pres:
+  ∀conf n n' p.
+    (reduction conf)^* n n'
+   ⇒ IS_NONE (net_find p n) = IS_NONE (net_find p n')
+Proof
+  rpt (gen_tac)
+  \\ map_every qid_spec_tac [‘n'’,‘n’]
+  \\ ho_match_mp_tac RTC_INDUCT
+  \\ metis_tac [reduction_def,net_find_IS_NONE_trans_pres]
+QED
+
 (* Rule version of net_find_IS_SOME_trans_pres *)
 Theorem net_find_IS_SOME_trans_pres_IMP:
   ∀conf n L n' p.
@@ -387,6 +384,24 @@ Theorem net_find_IS_NONE_trans_pres_IMP:
     ⇒ IS_NONE (net_find p n')
 Proof
   metis_tac [net_find_IS_NONE_trans_pres]
+QED
+
+(* Rule version of net_find_IS_SOME_reduction_pres *)
+Theorem net_find_IS_SOME_reduction_pres_IMP:
+  ∀conf n n' p.
+    (reduction conf)^* n n' ∧ IS_SOME (net_find p n)
+    ⇒ IS_SOME (net_find p n')
+Proof
+  metis_tac [net_find_IS_SOME_reduction_pres]
+QED
+
+(* Rule version of net_find_IS_NONE_reduction_pres *)
+Theorem net_find_IS_NONE_reduction_pres_IMP:
+  ∀conf n n' p.
+    (reduction conf)^* n n' ∧ IS_NONE (net_find p n)
+    ⇒ IS_NONE (net_find p n')
+Proof
+  metis_tac [net_find_IS_NONE_reduction_pres]
 QED
 
 (* net_find always returns a single endpoint *)
@@ -676,6 +691,30 @@ Proof
    \\ rw []
    \\ pop_assum (assume_tac o ONCE_REWRITE_RULE [trans_cases])
    \\ fs [] \\ metis_tac [trans_rules]
+QED
+
+(* Arbitrary reordering of network using net_find and net_filter *)
+Theorem net_find_filter_reduction:
+  ∀conf n n' p.
+   (reduction conf)⃰ n n' ∧
+   REPN n ∧
+   IS_SOME (net_find p n) ∧
+   conf.payload_size > 0
+   ⇒ (reduction conf)⃰ (NPar (THE (net_find p n )) (net_filter p n ))
+                       (NPar (THE (net_find p n')) (net_filter p n'))
+Proof
+  rw []
+  \\ pop_assum (fn t => ntac 2 (pop_assum mp_tac) \\ assume_tac t)
+  \\ simp [AND_IMP_INTRO]
+  \\ last_x_assum mp_tac
+  \\ map_every qid_spec_tac [‘n'’,‘n’]
+  \\ ho_match_mp_tac RTC_INDUCT
+  \\ rw []
+  \\ irule (RTC_RULES  |> SPEC_ALL  |> CONJUNCT2)
+  \\ fs [reduction_def]
+  \\ metis_tac [trans_REPN_pres_IMP,
+                net_find_IS_SOME_trans_pres_IMP,
+                net_find_filter_trans]
 QED
 
 (* net_has_node implies net_find wil find something *)

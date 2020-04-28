@@ -1,7 +1,7 @@
 open preamble chor_to_pchorTheory congProofTheory
 open chorLangTheory chorSemTheory chorPropsTheory
 open pchorLangTheory pchorSemTheory
-open confluenceTheory choreoUtilsTheory
+open chorConfluenceTheory choreoUtilsTheory
 
 val _ = new_theory "chor_to_pchorProof"
 

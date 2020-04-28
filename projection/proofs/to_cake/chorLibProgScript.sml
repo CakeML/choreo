@@ -741,4 +741,42 @@ Proof
       EVAL_TAC >> simp[] >> NO_TAC)
 QED
 
+Theorem env_asm_extend:
+  ∀env conf env'.
+  env_asm env conf ∧
+  nsLookup env'.c conf.nil = nsLookup env.c conf.nil ∧
+  nsLookup env'.c conf.cons = nsLookup env.c conf.cons ∧
+  nsLookup env'.v conf.append = nsLookup env.v conf.append ∧
+  nsLookup env'.v conf.concat = nsLookup env.v conf.concat ∧
+  nsLookup env'.v conf.length = nsLookup env.v conf.length ∧
+  nsLookup env'.v conf.null = nsLookup env.v conf.null ∧
+  nsLookup env'.v conf.take = nsLookup env.v conf.take ∧
+  nsLookup env'.v conf.drop = nsLookup env.v conf.drop ∧
+  nsLookup env'.v conf.toList = nsLookup env.v conf.toList ∧
+  nsLookup env'.v conf.fromList = nsLookup env.v conf.fromList
+  ⇒
+  env_asm env' conf
+Proof
+  rw[payload_to_cakemlProofTheory.env_asm_def,payload_to_cakemlProofTheory.has_v_def]
+QED
+
+Theorem env_asm_simps:
+  (env_asm env (conf with payload_size := n) = env_asm env conf) ∧
+  (env_asm env (conf with letModule := s) = env_asm env conf)
+Proof
+  rw[payload_to_cakemlProofTheory.env_asm_def]
+QED
+
+Theorem enc_ok_alt:
+    (enc_ok _ _ [] [] = T) ∧
+    (enc_ok conf cEnv (f::fs) (n::ns) =
+       (Eval cEnv (Var (getLetID conf n)) ((LIST_TYPE(LIST_TYPE WORD8) --> LIST_TYPE WORD8) f) ∧
+        enc_ok conf cEnv fs ns
+       )
+    )
+Proof
+  rw[payload_to_cakemlProofTheory.enc_ok_def,EQ_IMP_THM,ml_translatorTheory.Eval_Var_nsLookup] >>
+  PURE_FULL_CASE_TAC >> rfs[]
+QED
+
 val _ = export_theory ();
