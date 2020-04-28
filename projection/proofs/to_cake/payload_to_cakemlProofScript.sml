@@ -1652,33 +1652,6 @@ Proof
   >- fs[receiveloop_def]
 QED
 
-Theorem receiveloop_pres_ffi_eq:
-  ∀conf env env' s1 s2 src bufLoc bufInit.
-    (* We have a sensible environment for execution at all *)
-    env_asm env' conf ∧
-    conf.payload_size ≠ 0 ∧
-    (* Receive loop function and storage buffer properly initialised *)
-    nsLookup env.v (Short "receiveloop") = SOME(Recclosure env' (receiveloop conf (MAP (CHR o w2n) src)) "receiveloop") ∧
-    nsLookup env'.v (Short "buff") = SOME(Loc bufLoc) ∧
-    store_lookup bufLoc s1.refs = SOME(W8array bufInit) ∧
-    store_lookup bufLoc s2.refs = SOME(W8array bufInit) ∧
-    LENGTH bufInit = SUC conf.payload_size ∧
-    (* Our ffi is in the right state to receive the same message *)
-    ffi_eq conf s1.ffi.ffi_state s2.ffi.ffi_state
-    ⇒
-    ∃ckA1 ckB1 ckA2 ckB2 refsB1 refsB2 ffiB1 ffiB2 r1 r2.
-    evaluate$evaluate (s1 with clock:= ckA1) env [App Opapp [Var (Short "receiveloop"); Con NONE []]] =
-                      (s1 with <|clock := ckB1; refs := refsB1; ffi:= ffiB1|>,
-                      r1) ∧
-    evaluate$evaluate (s2 with clock:= ckA2) env [App Opapp [Var (Short "receiveloop"); Con NONE []]] =
-                      (s2 with <|clock := ckB2; refs := refsB2; ffi:= ffiB2|>,
-                      r2) ∧
-    ffi_eq conf ffiB1.ffi_state ffiB2.ffi_state ∧
-    (r1 = r2)
-Proof
-  cheat
-QED
-
 (* HOL HELPERS CORRECT *)
 Theorem w1ckV_is_1w:
   ∀env conf.
