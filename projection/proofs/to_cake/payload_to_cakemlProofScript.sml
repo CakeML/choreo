@@ -1744,16 +1744,10 @@ QED
 Definition ffi_state_cor_def:
   ffi_state_cor conf cpNum pSt (fNum,fQueue,fNet) ⇔
     cpNum = fNum ∧
-<<<<<<< Updated upstream
-    ?fQueue1 fNet1.
-      ffi_eq conf (fNum,fQueue,fNet) (fNum,fQueue1,fNet1) /\
-      !sp.
-=======
     ∃fQueue1 fNet1.
       ffi_wf (fNum,fQueue1,fNet1) ∧
       ffi_eq conf (fNum,fQueue,fNet) (fNum,fQueue1,fNet1) ∧
       ∀sp.
->>>>>>> Stashed changes
         isPREFIX (qlk pSt.queues sp) (qlk fQueue1 sp)
 End
 
@@ -1948,32 +1942,19 @@ QED
 (* A stream of valid send events cannot break FFI correspondence*)
 Theorem ffi_state_cor_send_stream_irrel:
   ∀conf cpNum pSt ckFSt l send_stream P.
-<<<<<<< Updated upstream
-=======
     ffi_wf ckFSt ∧
->>>>>>> Stashed changes
     ffi_state_cor conf cpNum pSt ckFSt ∧
     EVERY (valid_send_event_format conf l) send_stream ∧
     ffi_accepts_rel P (valid_send_call_format conf l) (comms_ffi_oracle conf) ∧
     P ckFSt
     ⇒
-<<<<<<< Updated upstream
-    ffi_state_cor conf cpNum pSt
-                  (update_state ckFSt (comms_ffi_oracle conf) send_stream)
-=======
     ffi_state_cor conf cpNum pSt (update_state ckFSt (comms_ffi_oracle conf) send_stream)
->>>>>>> Stashed changes
 Proof
   Induct_on ‘send_stream’ >>
   rw[update_state_def] >>
   Cases_on ‘h’ >>
   PURE_ONCE_REWRITE_TAC [update_state_def] >>
-<<<<<<< Updated upstream
-  qmatch_goalsub_abbrev_tac
-    ‘ffi_state_cor _ cpNum pSt (update_state ckFSt1 _ send_stream)’ >>
-=======
   qmatch_goalsub_abbrev_tac ‘ffi_state_cor conf cpNum pSt (update_state ckFSt1 _ send_stream)’ >>
->>>>>>> Stashed changes
   rename1 ‘valid_send_event_format conf l (IO_event s l' d)’ >>
   ‘l' = l’
     by fs[valid_send_event_format_def,valid_send_call_format_def] >>
@@ -2004,22 +1985,6 @@ Proof
   irule SELECT_ELIM_THM >>
   rw[]
   >- (qpat_x_assum ‘strans _ _ _ ns’ (K ALL_TAC) >>
-<<<<<<< Updated upstream
-      qmatch_goalsub_rename_tac ‘ffi_state_cor _ _ _ ns’ >>
-      Cases_on ‘ns’ >> Cases_on ‘ckFSt’ >>
-      rename1 ‘strans conf (PN,R) _ (PN',R')’ >>
-      ‘PN' = PN’ by (drule strans_pres_pnum >> simp[]) >>
-      pop_assum SUBST_ALL_TAC >>
-      ‘PN = cpNum’ by (Cases_on ‘R’ >> fs[ffi_state_cor_def]) >>
-      pop_assum SUBST_ALL_TAC >>
-      Cases_on ‘R’ >> Cases_on ‘R'’ >>
-      rename1 ‘strans conf (_,Q,N) _ (_,Q',N')’ >>
-      fs[ffi_state_cor_def]
-      (* SCARY *)
-      ‘∀sp. qlk Q sp ≼ qlk Q' sp’
-        suffices_by (rw[] >> fs[ffi_state_cor_def] >>
-                     rw[] >> metis_tac[IS_PREFIX_TRANS]) >>
-=======
       qmatch_goalsub_rename_tac ‘ffi_state_cor _ _  _ ns’ >>
       MAP_EVERY PairCases_on [‘ns’,‘ckFSt’] >>
       fs[ffi_state_cor_def] >>
@@ -2043,10 +2008,10 @@ Proof
       ‘∀sp.
         isPREFIX (qlk fQueue1 sp) (qlk s21 sp)’
         suffices_by metis_tac[IS_PREFIX_TRANS] >>
->>>>>>> Stashed changes
       metis_tac[strans_queue_pres])
   >- (qexists_tac ‘ns’ >> simp[])
 QED
+
 (* send_events cannot break FFI correspondence*)
 Theorem ffi_state_cor_send_events_irrel:
   ∀conf cpNum pSt ckFSt l d P.
@@ -2785,15 +2750,72 @@ Proof
   simp[pSt_pCd_corr_def, DISJ_IMP_THM, FORALL_AND_THM, CONJ_COMM]
 QED
 
-Theorem strans_ASend_pres_ffi_state_cor:
-  strans conf s1 (ASend d m) s2 ∧ ffi_state_cor p ps s1 ⇒
-  ffi_state_cor p ps s2
+Theorem ffi_eq_REFL[simp]:
+  ffi_eq c s s
 Proof
-  PairCases_on ‘s1’ >> PairCases_on ‘s2’ >>
-  simp[ffi_state_cor_def] >> strip_tac >> conj_asm1_tac
-  >- (drule strans_pres_pnum >> simp[]) >>
-  rw[] >> drule strans_queue_pres >>
-  metis_tac[IS_PREFIX_TRANS]
+  ‘equivalence (ffi_eq c)’ by simp[ffi_eq_equivRel] >>
+  fs[equivalence_def, reflexive_def]
+QED
+
+Theorem ffi_eq_TRANS:
+  ffi_eq c s1 s2 ∧ ffi_eq c s2 s3 ⇒ ffi_eq c s1 s3
+Proof
+  ‘equivalence (ffi_eq c)’ by simp[ffi_eq_equivRel] >>
+  fs[equivalence_def, transitive_def] >> metis_tac[]
+QED
+
+Theorem ffi_eq_bisimulation_L:
+  ffi_eq conf s1 s2 ∧ strans conf s1 L s1' ⇒
+  ∃s2'. ffi_eq conf s1' s2' ∧ strans conf s2 L s2'
+Proof
+  simp[ffi_eq_def] >>
+  simp[SimpL “$==>”, Once bisimulationTheory.BISIM_REL_cases] >>
+  metis_tac[]
+QED
+
+Theorem active_trans_pres_nodes:
+  (active_trans c p)^* (q0,n0) (q,n) ⇒
+  ∀nd. net_has_node n nd ⇔ net_has_node n0 nd
+Proof
+  ‘∀a b. (active_trans c p)^* a b ⇒
+         ∀q0 n0 q n. a = (q0,n0) ∧ b = (q,n) ⇒
+                     ∀nd. net_has_node n nd ⇔ net_has_node n0 nd’
+  suffices_by metis_tac[] >>
+  ho_match_mp_tac RTC_INDUCT >> simp[] >>
+  simp[active_trans_def, FORALL_PROD, internal_trans_def, emit_trans_def] >>
+  metis_tac[trans_pres_nodes]
+QED
+
+Theorem strans_send_queues_unchanged:
+  ffi_wf (p,q0,n0) ∧ strans c (p,q0,n0) (ASend d m) (p,q,n) ⇒
+  ∃n'. strans c (p,q0,n0) (ASend d m) (p,q0,n') ∧
+       ffi_eq c (p,q,n) (p,q0,n')
+Proof
+  rw[] >>
+  ‘∃n'. strans c (p,q0,n0) (ASend d m) (p,q0,n')’
+    suffices_by metis_tac[ffi_eq_pres, ffi_eq_REFL] >>
+  ‘∃n'. trans c n0 (LReceive p m d) n'’ suffices_by metis_tac[strans_rules] >>
+  ‘p ≠ d ∧ net_has_node n0 d’
+    by metis_tac[strans_dest_check, valid_send_dest_def, FST,
+                 ffi_has_node_def] >>
+  metis_tac[trans_receive_cond]
+QED
+
+Theorem strans_ASend_pres_ffi_state_cor:
+  strans conf s0 (ASend d m) s1 ∧ ffi_state_cor conf p ps s0 ⇒
+  ffi_state_cor conf p ps s1
+Proof
+  map_every PairCases_on [‘s0’, ‘s1’] >> rw[] >>
+  drule_then assume_tac strans_pres_pnum >> fs[] >> rw[] >>
+  fs[ffi_state_cor_def] >>
+  rename [‘strans _ (p,q1,n1) (ASend d m) (p,qA,nA)’,
+          ‘ffi_eq _ (p,q1,n1) (p,q2,n2)’] >>
+  ‘∃S3. strans conf (p,q2,n2) (ASend d m) S3 ∧ ffi_eq conf (p,qA,nA) S3’
+    by metis_tac[ffi_eq_bisimulation_L] >>
+  pop_assum mp_tac >> PairCases_on ‘S3’ >>
+  rename [‘ffi_eq _ _ (pnum, qB,nB) ⇒ _’] >> drule strans_pres_pnum >>
+  rw[] >> qexists_tac ‘q2’ >> simp[] >>
+  metis_tac[strans_pres_wf, strans_send_queues_unchanged, ffi_eq_TRANS]
 QED
 
 Theorem cpEval_valid_Send_strans_E:
@@ -2814,13 +2836,6 @@ Theorem cpEval_valid_Send_E[simp]:
   ∃vv. FLOOKUP pSt.bindings v = SOME vv
 Proof
   simp[cpEval_valid_def, letfuns_def, pSt_pCd_corr_Send] >> metis_tac[]
-QED
-
-Theorem ffi_eq_REFL[simp]:
-  ffi_eq c s s
-Proof
-  ‘equivalence (ffi_eq c)’ by simp[ffi_eq_equivRel] >>
-  fs[equivalence_def, reflexive_def]
 QED
 
 Theorem cEval_equiv_bump_clocks:
@@ -2848,6 +2863,18 @@ Proof
   fs[valid_send_dest_def]
 QED
 
+Theorem pSt_pCd_corr_ignores_queues[simp]:
+  pSt_pCd_corr (ps with queues := x) pcd ⇔ pSt_pCd_corr ps pcd
+Proof
+  simp[pSt_pCd_corr_def]
+QED
+
+Theorem sem_env_cor_ignores_queues[simp]:
+  sem_env_cor c (ps with queues := x) pcd ⇔ sem_env_cor c ps pcd
+Proof
+  simp[sem_env_cor_def]
+QED
+
 (* FORWARD CORRECTNESS
     Just the spec :) *)
 Theorem endpoint_forward_correctness:
@@ -2856,6 +2883,8 @@ Theorem endpoint_forward_correctness:
     cpEval_valid conf p cEnv1 pSt1 pCd1 vs1 cSt1 ∧
     normalised pSt1.queues ∧
     cSt2.ffi.oracle = comms_ffi_oracle conf ∧
+    ffi_wf cSt2.ffi.ffi_state ∧
+    FST cSt2.ffi.ffi_state = FST cSt1.ffi.ffi_state ∧
     cpFFI_valid conf pSt1 pSt2 cSt1.ffi.ffi_state cSt2.ffi.ffi_state L ⇒
     ∃mc vs2 cEnv2.
          cpEval_valid conf p cEnv2 pSt2 pCd2 vs2 cSt2 ∧
@@ -3081,7 +3110,6 @@ Proof
           rpt strip_tac >>
           irule ffi_eq_send_stream_irrel >> rw[]
           >- (fs[cpEval_valid_def] >> metis_tac[strans_pres_wf])
-          >- (fs[cpEval_valid_def])
           >- (qexistsl_tac [‘valid_send_dest p2’, ‘p2’] >> rw[]
               >- metis_tac[strans_dest_check']
               >- metis_tac[strans_dest_check']
@@ -3093,6 +3121,18 @@ Proof
           simp[] >> fs[cpEval_valid_def]) >>
       disch_then (qx_choose_then ‘MC’ assume_tac) >>
       qexists_tac ‘MC’ >> dxrule cEval_equiv_bump_clocks >> simp[])
+  >- ((* LReceive *)
+      fs[cpFFI_valid_def, GREATER_DEF] >>
+      CONV_TAC SWAP_VARS_CONV >> qexists_tac ‘vs1’ >>
+      CONV_TAC SWAP_VARS_CONV >> qexists_tac ‘cEnv1’ >>
+      simp[RIGHT_EXISTS_AND_THM] >> conj_asm1_tac
+      >- (fs[cpEval_valid_def] >>
+          rename [‘qpush _ sp msg’] >>
+          ‘(∃p1 q1 n1. cSt1.ffi.ffi_state = (p1,q1,n1)) ∧
+           (∃p2 q2 n2. cSt2.ffi.ffi_state = (p2,q2,n2))’
+            by metis_tac[TypeBase.nchotomy_of “:α#β”] >> fs[] >> rw[] >>
+          fs[ffi_state_cor_def] >> cheat) >>
+      irule ffi_irrel >> cheat)
   >> cheat
 QED
 
