@@ -3,6 +3,7 @@ open preamble chorLangTheory chorSemTheory projectionTheory
 open chorLibProgTheory;
 open fromSexpTheory;
 open astToSexprLib;
+open compilationProofTheory;
 
 open projectionLib;
 
@@ -72,6 +73,6 @@ Definition filter_def:
         chorLang$Nil
 End
 
-val _ = project_to_camkes "filter_camkes" "filter" “filter test [Kmsg1;Kmsg2;Kmsg3]”;
+val thm = project_to_camkes "filter_camkes" "filter" “filter test [Kmsg1;Kmsg2;Kmsg3]”;
 
 val _ = export_theory();

@@ -3,6 +3,7 @@ struct
   (* TODO: open local parse context like a good boy *)
   open preamble chorLangTheory chorSemTheory projectionTheory
      payload_to_cakemlTheory basisProgTheory ml_translatorLib ml_progLib basisFunctionsLib;
+  open compilationProofTheory;
   open chorLibProgTheory;
   open fromSexpTheory;
   open astToSexprLib;
@@ -161,7 +162,7 @@ struct
   fun reverse_table tbl =
       map
         (fn (p,_) =>
-            (p,filter (exists (curry op = p) o snd) tbl |> map fst)
+            (p,List.filter (exists (curry op = p) o snd) tbl |> map fst)
         ) tbl
 
   fun mk_component_declarations chor =
@@ -244,15 +245,14 @@ struct
             if null rs then
               "ZF_LOGF(\"Unknown receiver: %s\\n\",c);\n"
             else
-              String.concat (
-                ("  ZF_LOGE(\"",p," |-> %s: %s\\n\",c,a + unpad(a));\n",
+              String.concat
+                ["  ZF_LOGE(\"",p," |-> %s: %s\\n\",c,a + unpad(a));\n",
                  " ",
                  String.concatWith "  else" (map ffisendline rs),
                  "  else {\n",
                  "    ZF_LOGF(\"Unknown receiver: %s\\n\",c);\n",
                  "  }\n"
                 ]
-              )
 
         val ffireceive =
             if null qs then
@@ -560,10 +560,96 @@ struct
       (to_cake_thm,to_cake_wholeprog)
     end
 
+  fun mk_projection_thm p chor pc =
+    let
+      val conf = pc |> concl |> lhs |> rator |> rator |> rand
+      val pCd1 = pc |> concl |> lhs |> rand
+      val vs = pc |> concl |> lhs |> rator |> rand
+      val ptm = “MAP (^n2w8 o ORD) ^(stringSyntax.fromMLstring p)” |> EVAL |> concl |> rhs
+
+      val oracle = “comms_ffi_oracle ^conf”
+      val oracle_type = type_of oracle |> strip_fun |> fst |> C (curry List.nth) 1
+      fun subst_the_var rex tm =
+          subst [hd(free_vars tm) |-> rex] tm
+
+      val cst = get_ml_prog_state() |> get_state |> inst [alpha |-> oracle_type] |>
+                                 subst_the_var “initial_ffi_state ^oracle (^ptm,FEMPTY,net_filter ^ptm (projection ^conf FEMPTY ^chor (procsOf ^chor)))”
+      val cenv = get_ml_prog_state() |> get_env
+
+      val eval_assm = C MP TRUTH o CONV_RULE(LAND_CONV(EVAL))
+
+      val env_asm =
+          env_asm_extend
+            |> PURE_ONCE_REWRITE_RULE[GSYM AND_IMP_INTRO]
+            |> C MATCH_MP chorLibProgTheory.env_asm_base_conf
+            |> SPEC cenv
+            |> eval_assm
+
+      val enc_ok_thm =
+          auto_prove "enc_ok"
+            (“enc_ok ^conf ^cenv (letfuns ^pCd1) ^vs”,
+             PURE_REWRITE_TAC [enc_ok_alt,payload_to_cakemlTheory.letfuns_def,boolTheory.AND_CLAUSES,
+                               payload_to_cakemlTheory.getLetID_def,payloadLangTheory.state_accfupds,
+                               payloadLangTheory.config_accfupds,listTheory.APPEND] >>
+             SIMP_TAC std_ss [] >>
+             rpt conj_tac >>
+             MAP_FIRST match_mp_tac
+                       (“(letfuns ^pCd1)” |> EVAL |> concl |> rhs |>
+                        listSyntax.dest_list |> fst
+                        |> map lookup_v_thm |> map DISCH_ALL) >>
+             CONV_TAC(LHS_CONV EVAL) >>
+             MATCH_ACCEPT_TAC EQ_REFL)
+    in
+      compilation_preservation
+        |> Q.SPEC ‘FEMPTY’
+        |> SPEC chor
+        |> SPEC(mk_var("s2",“:string # word8 list |-> word8 list”))
+        |> SPEC(mk_var("c2",“:chorLang$chor”))
+        |> SPEC conf
+        |> SPEC ptm
+        |> Q.SPEC ‘<|bindings := FEMPTY; queues := FEMPTY|>’
+        |> SPEC pCd1
+        |> Q.SPEC ‘projection ^conf FEMPTY ^chor (procsOf ^chor)’
+        |> SPEC cst
+        |> SPEC vs
+        |> SPEC cenv
+        |> PURE_REWRITE_RULE [GSYM AND_IMP_INTRO]
+        |> UNDISCH
+        |> eval_assm
+        |> eval_assm
+        |> eval_assm
+        |> eval_assm
+        |> CONV_RULE(LAND_CONV(SIMP_CONV pure_ss [EQ_REFL]))
+        |> C MP TRUTH
+        |> CONV_RULE(LAND_CONV EVAL)
+        |> CONV_RULE(LAND_CONV (PURE_REWRITE_CONV [DRESTRICT_FEMPTY,MAP_KEYS_FEMPTY]))
+        |> CONV_RULE(LAND_CONV(SIMP_CONV pure_ss [EQ_REFL]))
+        |> C MP TRUTH
+        |> eval_assm
+        |> eval_assm
+        |> CONV_RULE(LAND_CONV EVAL)
+        |> CONV_RULE(LAND_CONV(SIMP_CONV std_ss []))
+        |> C MP TRUTH
+        |> CONV_RULE(LAND_CONV (PURE_REWRITE_CONV[payload_to_cakemlProofTheory.sem_env_cor_def,env_asm_simps]))
+        |> PURE_ONCE_REWRITE_RULE[GSYM AND_IMP_INTRO]
+        |> C MP env_asm
+        |> CONV_RULE(LAND_CONV(SIMP_CONV
+                                 (std_ss ++ pred_setLib.PRED_SET_ss)
+                                 [payload_to_cakemlProofTheory.pSt_pCd_corr_def,
+                                  payload_to_cakemlProofTheory.pFv_def,
+                                  payloadLangTheory.state_accfupds,
+                                  finite_mapTheory.FLOOKUP_EMPTY,
+                                  listTheory.MEM]))
+        |> C MP TRUTH
+        |> C MP enc_ok_thm
+        |> DISCH_ALL
+    end
+
   fun project_to_camkes builddir chorname chor =
     let
       val pnames = pnames chor
       val to_cakes = map(fn p => project_to_cake chor p camkes_payload_size) pnames
+      val thms = ListPair.map (fn (p,(pc,_)) => mk_projection_thm p chor pc) (pnames,to_cakes)
       val _ = mk_camkes_boilerplate builddir chorname chor
       val _ = ListPair.map
                 (fn (p,(_,p_wholeprog)) =>
@@ -572,7 +658,7 @@ struct
                       p_wholeprog)
                 (pnames,to_cakes)
     in
-      ()
+      thms
     end
 
 end
