@@ -4219,6 +4219,13 @@ Proof
   \\ IMP_RES_TAC trans_not_same \\ rw [] \\ fs []
 QED
 
+Theorem LIST_TYPE_WORD_EXISTS:
+ ∀xs:word8 list. ∃v. LIST_TYPE WORD xs v
+Proof
+ Induct \\ fs [LIST_TYPE_def,WORD_def]
+ \\ goal_assum (first_assum o mp_then Any mp_tac)
+QED
+
 Theorem network_NPar_forward_correctness:
   ∀conf s c n p s' c' n' st1 vs1 env1 st2.
   trans conf (NPar (NEndpoint p s c) n) LTau (NPar (NEndpoint p s' c') n') ∧
@@ -4270,7 +4277,57 @@ Proof
       >- (MAP_EVERY qexists_tac [‘s.queues’,‘n’] \\ rw [ffi_wf_def])
       \\ MAP_EVERY qexists_tac [‘s.queues’,‘n'’] \\ rw [ffi_wf_def])
   (* LTau (only p does something) *)
-  >- (‘∃vs2 env2. cpEval_valid conf p env2 s' c' vs2 st2’ by cheat
+  >- (‘∃vs2 env2. cpEval_valid conf p env2 s' c' vs2 st2’
+       by (pop_assum (ASSUME_TAC o ONCE_REWRITE_RULE [trans_cases])
+           \\ rw []
+           >- (qspec_then ‘FLAT ds ++ unpad d’ assume_tac LIST_TYPE_WORD_EXISTS
+               \\ fs [] \\ rename1 ‘LIST_TYPE _ _ v0’
+               \\ MAP_EVERY qexists_tac [‘vs1’,‘env1 with v := nsBind (ps2cs v) v0 env1.v’]
+               \\ rw [cpEval_valid_def]
+               \\ fs [sem_env_cor_def,letfuns_def]
+               >- (fs [pSt_pCd_corr_def,FLOOKUP_UPDATE] \\ rw [])
+               >- (fs [pSt_pCd_corr_def,FLOOKUP_UPDATE] \\ rw [] \\ fs [])
+               >- (rw [ffi_state_cor_def]
+                   \\ qmatch_goalsub_abbrev_tac ‘(p,q,n)’
+                   \\ MAP_EVERY qexists_tac [‘q’,‘n’]
+                   \\ UNABBREV_ALL_TAC \\ rw [qlk_normalise_queues,ffi_wf_def])
+               \\ rw [ffi_wf_def])
+           >- (rw [cpEval_valid_def] \\ fs [sem_env_cor_def,ffi_wf_def,pSt_pCd_corr_def]
+               \\ asm_exists_tac \\ fs [letfuns_def]
+               \\ asm_exists_tac \\ fs [] \\ rw []
+               \\ rw [ffi_state_cor_def]
+               \\ qmatch_goalsub_abbrev_tac ‘(p,q,n)’
+               \\ MAP_EVERY qexists_tac [‘q’,‘n’]
+               \\ UNABBREV_ALL_TAC \\ rw [qlk_normalise_queues,ffi_wf_def])
+           >- (MAP_EVERY qexists_tac [‘TAKE (LENGTH (letfuns c')) vs1’,‘env1’]
+               \\ rw [cpEval_valid_def]
+               \\ fs [sem_env_cor_def,letfuns_def,ffi_wf_def,pSt_pCd_corr_def]
+               >- (irule enc_ok_take \\ asm_exists_tac \\ fs [])
+               \\ rw [ffi_state_cor_def]
+               \\ qmatch_goalsub_abbrev_tac ‘(p,q,n)’
+               \\ MAP_EVERY qexists_tac [‘q’,‘n’]
+               \\ UNABBREV_ALL_TAC \\ rw [qlk_normalise_queues,ffi_wf_def])
+           >- (MAP_EVERY qexists_tac [‘DROP (LENGTH (letfuns e1)) vs1’,‘env1’]
+               \\ rw [cpEval_valid_def]
+               \\ fs [sem_env_cor_def,letfuns_def,ffi_wf_def,pSt_pCd_corr_def]
+               >- (irule enc_ok_drop \\ asm_exists_tac \\ fs [])
+               \\ rw [ffi_state_cor_def]
+               \\ qmatch_goalsub_abbrev_tac ‘(p,q,n)’
+               \\ MAP_EVERY qexists_tac [‘q’,‘n’]
+               \\ UNABBREV_ALL_TAC \\ rw [qlk_normalise_queues,ffi_wf_def])
+           \\ qspec_then ‘f (MAP (THE ∘ FLOOKUP s.bindings) vl)’ assume_tac LIST_TYPE_WORD_EXISTS
+           \\ fs [] \\ rename1 ‘LIST_TYPE _ _ v0’
+           \\ MAP_EVERY qexists_tac [‘TL vs1’,‘env1 with v := nsBind (ps2cs v) v0 env1.v’]
+           \\ rw [cpEval_valid_def]
+           \\ fs [sem_env_cor_def,letfuns_def]
+           >- (Cases_on ‘vs1’ \\ fs [enc_ok_def])
+           >- (fs [pSt_pCd_corr_def,FLOOKUP_UPDATE] \\ rw [])
+           >- (fs [pSt_pCd_corr_def,FLOOKUP_UPDATE] \\ rw [] \\ fs [])
+           >- (rw [ffi_state_cor_def]
+               \\ qmatch_goalsub_abbrev_tac ‘(p,q,n)’
+               \\ MAP_EVERY qexists_tac [‘q’,‘n’]
+               \\ UNABBREV_ALL_TAC \\ rw [qlk_normalise_queues,ffi_wf_def])
+           \\ rw [ffi_wf_def])
       \\ drule_then (qspecl_then [‘vs1’,‘vs2’,‘env1’,‘env2’,‘st1’,‘st2’] mp_tac)
                     endpoint_forward_correctness
       \\ simp []
@@ -4320,7 +4377,20 @@ Proof
        \\ MAP_EVERY qexists_tac [‘mc’,‘env2’,‘vs2’]
        \\ fs [cpFFI_valid_def,cpEval_valid_def,ffi_state_cor_def])
    (* LSend *)
-  >- (‘∃vs2 env2. cpEval_valid conf p env2 s' c' vs2 st2’ by cheat
+  >- (drule_then (qspecl_then [‘p’,‘s.queues’,‘s'.queues’] mp_tac) trans_pres_ffi_wf
+      \\ impl_tac >- fs [ffi_wf_def]
+      \\ strip_tac
+      \\ ‘∃vs2 env2. cpEval_valid conf p env2 s' c' vs2 st2’
+        by (qpat_x_assum ‘trans _ _ (LSend _ _ _) _’ (ASSUME_TAC o ONCE_REWRITE_RULE [trans_cases])
+           \\ rw [cpEval_valid_def] \\ fs [sem_env_cor_def,ffi_wf_def,pSt_pCd_corr_def]
+           \\ asm_exists_tac \\ fs [letfuns_def]
+           \\ asm_exists_tac \\ fs [] \\ rw []
+           \\ TRY (rw [ffi_state_cor_def]
+                \\ qmatch_goalsub_abbrev_tac ‘(p,q0,n')’
+                \\ MAP_EVERY qexists_tac [‘q0’,‘n'’]
+                \\ UNABBREV_ALL_TAC \\ rw [qlk_normalise_queues,ffi_wf_def]
+                \\ NO_TAC)
+           \\ metis_tac [])
       \\ drule_then (qspecl_then [‘vs1’,‘vs2’,‘env1’,‘env2’,‘st1’,‘st2’] mp_tac)
                     endpoint_forward_correctness
       \\ simp []
@@ -4338,14 +4408,23 @@ Proof
       \\ rw []
       \\ MAP_EVERY qexists_tac [‘mc’,‘env2’,‘vs2’]
       \\ fs [cpFFI_valid_def,cpEval_valid_def,ffi_state_cor_def])
-
-  \\ ‘∃vs2 env2. cpEval_valid conf p env2 s' c' vs2 st2’ by cheat
-  \\ drule_then (qspecl_then [‘vs1’,‘vs2’,‘env1’,‘env2’,‘st1’,‘st2’] mp_tac)
-                endpoint_forward_correctness
-  \\ simp []
   \\ drule_then (qspecl_then [‘p’,‘s.queues’,‘s'.queues’] mp_tac) trans_pres_ffi_wf
   \\ impl_tac >- fs [ffi_wf_def]
   \\ strip_tac
+  \\ ‘∃vs2 env2. cpEval_valid conf p env2 s' c' vs2 st2’
+    by (qpat_x_assum ‘trans _ _ (LReceive _ _ _) _’ (ASSUME_TAC o ONCE_REWRITE_RULE [trans_cases])
+        \\ rw [cpEval_valid_def] \\ fs [sem_env_cor_def,ffi_wf_def,pSt_pCd_corr_def]
+        \\ asm_exists_tac \\ fs [letfuns_def]
+        \\ asm_exists_tac \\ fs [] \\ rw []
+        \\ TRY (rw [ffi_state_cor_def]
+                \\ qmatch_goalsub_abbrev_tac ‘(p,q0,n')’
+                \\ MAP_EVERY qexists_tac [‘q0’,‘n'’]
+                \\ UNABBREV_ALL_TAC \\ rw [qlk_normalise_queues,ffi_wf_def]
+                \\ NO_TAC)
+        \\ metis_tac [])
+  \\ drule_then (qspecl_then [‘vs1’,‘vs2’,‘env1’,‘env2’,‘st1’,‘st2’] mp_tac)
+                endpoint_forward_correctness
+  \\ simp []
   \\ impl_tac
   (* LReceive *)
   >- (rw [cpEval_valid_def,ffi_wf_def,ffi_state_cor_def,cpFFI_valid_def]
