@@ -22,6 +22,8 @@ open evaluateTheory terminationTheory ml_translatorTheory
 
 val _ = new_theory "payload_to_cakemlProof";
 
+infixr 1 $
+
 val _ = set_grammar_ancestry
   ["option","rich_list","endpoint_to_payload",
    "payloadCong","payloadLang","payloadSem","payloadProps",
@@ -33,6 +35,12 @@ val _ = set_grammar_ancestry
 
 val WORD8 = “WORD:word8 -> v -> bool”;
 val DATUM = “LIST_TYPE ^WORD8”;
+
+Theorem ps2cs_11[simp]:
+  ps2cs x = ps2cs y ⇔ x = y
+Proof
+  simp[ps2cs_def]
+QED
 
 (* ENVIRONMENT CHECK
     General check environment has something defined with property *)
@@ -1926,6 +1934,20 @@ Definition cpFFI_valid_def:
       | NONE        => ffi_eq conf ffi1 ffi2)
 End
 
+Theorem FDOM_normalise_queues:
+  FDOM (normalise_queues fm) = FDOM fm DIFF { k | k ∈ FDOM fm ∧ fm ' k = []}
+Proof
+  simp[normalise_queues_def, DRESTRICT_DEF] >>
+  csimp[EXTENSION, FLOOKUP_DEF]
+QED
+
+Theorem FAPPLY_normalise_queues:
+  normalise_queues fm ' k = if k ∈ FDOM fm ∧ fm ' k ≠ [] then fm ' k
+                            else FEMPTY ' k
+Proof
+  csimp[normalise_queues_def, DRESTRICT_DEF, FLOOKUP_DEF]
+QED
+
 Theorem normalise_queues_dequeue_eq:
   ∀s s' q r.
     normalised s'.queues ∧
@@ -2950,6 +2972,14 @@ Proof
   rename [‘evaluate _ _ _ = (v, res)’] >> Cases_on ‘res’ >> simp[]
 QED
 
+Theorem generic_casebind:
+  (case x of (s, Rval v) => f s v | (s, Rerr e) => (s, Rerr e)) =
+  do (s,v) <- x ; f s v od
+Proof
+  Cases_on ‘x’ >> Cases_on ‘r’ >> simp[]
+QED
+
+
 Theorem evaluate_opapp:
   evaluate st env [App Opapp [e1; e2]] =
    do
@@ -3136,6 +3166,28 @@ Proof
   simp[sem_env_cor_def]
 QED
 
+Theorem ffi_state_cor_ignores_bindings[simp]:
+  ffi_state_cor c p (ps with bindings := v) ffi ⇔
+  ffi_state_cor c p ps ffi
+Proof
+  PairCases_on ‘ffi’ >> simp[ffi_state_cor_def]
+QED
+
+Theorem env_asm_ignores_ps2cs_bindings[simp]:
+  env_asm (e with v := nsBind (ps2cs vr) value e.v) conf ⇔
+  env_asm e conf
+Proof
+  simp[env_asm_def, in_module_def, has_v_def]>> csimp[]
+QED
+
+Theorem enc_ok_ignores_nsBind[simp]:
+  ∀ys. enc_ok conf (e with v := nsBind (ps2cs v) cmlV e.v) xs ys ⇔
+       enc_ok conf e xs ys
+Proof
+  Induct_on ‘xs’ >> Cases_on ‘ys’ >> simp[enc_ok_def] >>
+  Cases_on ‘e.v’ >> simp[nsLookup_def, nsBind_def, getLetID_def]
+QED
+
 (* FORWARD CORRECTNESS
     Just the spec :) *)
 Theorem endpoint_forward_correctness:
@@ -3320,7 +3372,7 @@ Proof
         by (rw[Abbr‘cStB’] >> drule strans_dest_check' >> simp[]) >> simp[] >>
       strip_tac >>
       first_assum (qspecl_then [‘F’, ‘n’] $
-                   qx_choosel_then [‘ck1’, ‘ck2’, ‘refs’] strip_assume_tac)
+                   qx_choosel_then [‘ck1’, ‘ck2’, ‘refs’] strip_assume_tac) >>
       Q.REFINE_EXISTS_TAC ‘ck1 + mc’ >>
       dxrule evaluate_add_to_clock >> simp[] >> disch_then kall_tac >>
       first_assum (qspecl_then [‘T’, ‘n + conf.payload_size’] $
@@ -3383,7 +3435,71 @@ Proof
       ‘∃p2 q2 n2. cSt2.ffi.ffi_state = (p2,q2,n2)’
         by metis_tac[TypeBase.nchotomy_of “:α#β”] >>
       fs[ffi_state_cor_def] >> metis_tac[IS_PREFIX_TRANS, qpush_prefix])
-  >> cheat
+  >- ((* receiveloop on left *) cheat )
+  >- ((* double receiveloop *) cheat )
+  >- ((* if / guard -> T *) cheat)
+  >- ((* if / guard -> F *) cheat)
+  >- ((* let *)
+      ‘∃hv vs cl. vs1 = hv::vs ∧
+                  nsLookup cEnv1.v (getLetID conf hv) = SOME cl ∧
+                  (LIST_TYPE (LIST_TYPE WORD) --> LIST_TYPE WORD) f cl’
+       by (fs[cpEval_valid_def, letfuns_def] >>
+           Cases_on ‘vs1’ >> fs[enc_ok_def] >> metis_tac[]) >>
+      simp[compile_endpoint_def] >>
+      simp[find_evalform ‘Let _  _ _ ’, generic_casebind,
+           bind_assoc, o_UNCURRY_R, C_UNCURRY_L, o_ABS_R, C_ABS_L] >>
+      ‘ck_equiv_hol cEnv1 (LIST_TYPE (LIST_TYPE WORD) --> LIST_TYPE WORD)
+                    (Var (getLetID conf hv)) f’
+        by (simp[ck_equiv_hol_def, find_evalform ‘Var _’]>>
+            metis_tac[APPEND_NIL]) >>
+      fs[EVERY_MEM, MEM_EL, PULL_EXISTS, IS_SOME_EXISTS, EL_MAP] >>
+      qpat_x_assum ‘∀n:num. _’
+                   (mp_tac o
+                    SIMP_RULE (srw_ss()) [GSYM RIGHT_EXISTS_IMP_THM,
+                                          SKOLEM_THM]) >>
+      disch_then $ (qx_choose_then ‘nv’ strip_assume_tac) >>
+      ‘MAP (THE o FLOOKUP pSt1.bindings) vl = GENLIST nv (LENGTH vl)’
+        by simp[Once LIST_EQ_REWRITE, EL_MAP] >> fs[] >>
+      ‘ck_equiv_hol cEnv1 (LIST_TYPE (LIST_TYPE WORD))
+                    (convList conf (MAP (Var o Short o ps2cs) vl))
+                    (GENLIST nv (LENGTH vl))’
+        by (irule convList_corr >>
+            simp[EVERY_MEM, MEM_ZIP, PULL_EXISTS, EL_MAP] >>
+            ‘env_asm cEnv1 conf’ by fs[cpEval_valid_def] >> simp[] >>
+            qx_gen_tac ‘m’ >> strip_tac >>
+            irule ck_equiv_hol_Var >>
+            fs[cpEval_valid_def, sem_env_cor_def]) >>
+      dxrule_all_then assume_tac ck_equiv_hol_App >>
+      drule_then (qspec_then ‘cSt1’ $
+                  qx_choosel_then [‘ck1’, ‘ck2’, ‘refs1’, ‘cmlV’]
+                                  strip_assume_tac)
+                 ck_equiv_hol_apply >>
+      Q.REFINE_EXISTS_TAC ‘ck1 + mc’ >> simp[] >>
+      fs[cpFFI_valid_def] >>
+      ‘∀sp d. pSt1.queues ≠
+              normalise_queues (pSt1.queues |+ (sp,d::qlk pSt1.queues sp))’
+        by (simp[fmap_EXT, FDOM_normalise_queues] >>
+            rw[] >> Cases_on ‘sp ∈ FDOM pSt1.queues’ >> simp[]
+            >- (disj2_tac >> qexists_tac ‘sp’ >>
+                simp[qlk_def, fget_def, FLOOKUP_DEF, FAPPLY_normalise_queues])>>
+            disj1_tac >> simp[EXTENSION] >> metis_tac[]) >>
+      fs[optionTheory.some_def, EXISTS_PROD] >> rw[] >>
+      qabbrev_tac ‘cSt1' = cSt1 with refs := cSt1.refs ++ refs1’ >>
+      ‘ffi_eq conf cSt1'.ffi.ffi_state cSt2.ffi.ffi_state’
+        by simp[Abbr‘cSt1'’] >>
+      first_assum (mp_then (Pos last) mp_tac ffi_irrel) >>
+      disch_then (first_assum o mp_then (Pos last) mp_tac) >>
+      qpat_abbrev_tac ‘cEnv1' = cEnv1 with v := nsOptBind _ _ _’ >>
+      disch_then (qspecl_then [‘cEnv1'’, ‘vs’] mp_tac) >> impl_tac
+      >- (fs[cpEval_valid_def, Abbr‘cEnv1'’, nsOptBind_def, Abbr‘cSt1'’,
+             letfuns_def, enc_ok_def] >>
+          fs[sem_env_cor_def] >>
+          Cases_on ‘cEnv1.v’ >>
+          fs[nsLookup_def, nsBind_def, AllCaseEqs()] >> dsimp[] >>
+          csimp[FLOOKUP_DEF, DISJ_IMP_THM, FORALL_AND_THM,
+                FAPPLY_FUPDATE_THM] >> metis_tac[FLOOKUP_DEF]) >>
+      disch_then $ qx_choose_then ‘MC’ assume_tac >>
+      qexists_tac ‘MC’ >> dxrule cEval_equiv_bump_clocks >> simp[])
 QED
 
 Theorem NPar_trans_l_cases_full:
