@@ -4257,23 +4257,29 @@ Proof
       \\ irule ffi_irrel_weak \\ fs []
       \\ conj_tac
       >- metis_tac [ffi_wf_def,trans_ffi_eq_same]
+      \\ ‘ffi_wf(p,s.queues,n')’
+        by (irule internal_trans_pres_wf
+            \\ MAP_EVERY qexists_tac [‘n’,‘conf’,‘s.queues’]
+            \\ rw [ffi_wf_def] \\ irule RTC_SINGLE
+            \\ rw [comms_ffi_consTheory.internal_trans_def]
+            \\ last_x_assum (assume_tac o ONCE_REWRITE_RULE [trans_cases]) \\ fs []
+            \\ IMP_RES_TAC trans_not_same \\ rw [] \\ fs [])
       \\ MAP_EVERY qexists_tac [‘p’,‘s’]
       \\ rw [cpEval_valid_def,ffi_state_cor_def]
-      \\ fs [sem_env_cor_def]
-      >- rw [ffi_wf_def]
-      \\ irule internal_trans_pres_wf
-      \\ MAP_EVERY qexists_tac [‘n’,‘conf’,‘s.queues’]
-      \\ rw [ffi_wf_def] \\ irule RTC_SINGLE
-      \\ rw [comms_ffi_consTheory.internal_trans_def]
-      \\ last_x_assum (assume_tac o ONCE_REWRITE_RULE [trans_cases]) \\ fs []
-      \\ IMP_RES_TAC trans_not_same \\ rw [] \\ fs [])
+      \\ fs [sem_env_cor_def,ffi_wf_def]
+      >- (MAP_EVERY qexists_tac [‘s.queues’,‘n’] \\ rw [ffi_wf_def])
+      \\ MAP_EVERY qexists_tac [‘s.queues’,‘n'’] \\ rw [ffi_wf_def])
   (* LTau (only p does something) *)
-  >- (drule_then (qspecl_then [‘vs1’,‘env1’,‘st1’,‘st2’] mp_tac) endpoint_forward_correctness
+  >- (‘∃vs2 env2. cpEval_valid conf p env2 s' c' vs2 st2’ by cheat
+      \\ drule_then (qspecl_then [‘vs1’,‘vs2’,‘env1’,‘env2’,‘st1’,‘st2’] mp_tac)
+                    endpoint_forward_correctness
+      \\ simp []
       \\ impl_tac
       >- (rw [cpEval_valid_def,ffi_wf_def,
               ffi_state_cor_def,
               cpFFI_valid_def,some_def]
           \\ fs [] >- fs [sem_env_cor_def]
+          >- (MAP_EVERY qexists_tac [‘s.queues’,‘n’] \\ rw [ffi_wf_def])
           >- (drule payload_trans_normalised
               \\ rw [normalised_network_def,normalised_def]
               \\ SELECT_ELIM_TAC \\ rw []
@@ -4300,37 +4306,51 @@ Proof
               \\ EVERY_CASE_TAC
               \\ fs [] \\ rveq \\ rw [FAPPLY_FUPDATE_THM]
               \\ fs [FLOOKUP_DEF,ABSORPTION_RWT])
-          >- (first_x_assum (qspec_then ‘(p1,d)’ assume_tac) \\ fs []
-              \\ fs [normalise_queues_FUPDATE_NONEMPTY]
-              \\ first_assum (fn t => reverse (sg ‘¬ ^(concl t)’))
-              \\ pop_assum (K ALL_TAC)
-              \\ fs [normalised_def]
-              \\ ONCE_REWRITE_TAC [GSYM fmap_EQ_THM]
-              \\ fs [qlk_def,fget_def]
-              \\ EVERY_CASE_TAC
-              \\ fs [] \\ rveq \\ rw [FAPPLY_FUPDATE_THM]
-              \\ fs [FLOOKUP_DEF,ABSORPTION_RWT])
-          \\ irule qsame_irrel_ffi_eq \\ fs [qsame_def])
+          \\ first_x_assum (qspec_then ‘(p1,d)’ assume_tac) \\ fs []
+          \\ fs [normalise_queues_FUPDATE_NONEMPTY]
+          \\ first_assum (fn t => reverse (sg ‘¬ ^(concl t)’))
+          \\ pop_assum (K ALL_TAC)
+          \\ fs [normalised_def]
+          \\ ONCE_REWRITE_TAC [GSYM fmap_EQ_THM]
+          \\ fs [qlk_def,fget_def]
+          \\ EVERY_CASE_TAC
+          \\ fs [] \\ rveq \\ rw [FAPPLY_FUPDATE_THM]
+          \\ fs [FLOOKUP_DEF,ABSORPTION_RWT])
        \\ rw []
-       \\ MAP_EVERY qexists_tac [‘mc’,‘cEnv2’,‘vs2’]
+       \\ MAP_EVERY qexists_tac [‘mc’,‘env2’,‘vs2’]
        \\ fs [cpFFI_valid_def,cpEval_valid_def,ffi_state_cor_def])
    (* LSend *)
-  >- (drule_then (qspecl_then [‘vs1’,‘env1’,‘st1’,‘st2’] mp_tac) endpoint_forward_correctness
+  >- (‘∃vs2 env2. cpEval_valid conf p env2 s' c' vs2 st2’ by cheat
+      \\ drule_then (qspecl_then [‘vs1’,‘vs2’,‘env1’,‘env2’,‘st1’,‘st2’] mp_tac)
+                    endpoint_forward_correctness
+      \\ simp []
+      \\ drule_then (qspecl_then [‘p’,‘s.queues’,‘s'.queues’] mp_tac) trans_pres_ffi_wf
+      \\ impl_tac >- fs [ffi_wf_def]
+      \\ strip_tac
       \\ impl_tac
       >- (rw [cpEval_valid_def,ffi_wf_def,ffi_state_cor_def,cpFFI_valid_def]
           >- fs [sem_env_cor_def]
+          >- (MAP_EVERY qexists_tac [‘s.queues’,‘n’] \\ fs [])
           \\ qpat_x_assum `trans _ (NEndpoint _ _ _) _ _`
                           (mp_tac o PURE_ONCE_REWRITE_RULE [trans_cases])
           \\ fs [] \\ rw []
           \\ metis_tac [strans_rules])
       \\ rw []
-      \\ MAP_EVERY qexists_tac [‘mc’,‘cEnv2’,‘vs2’]
+      \\ MAP_EVERY qexists_tac [‘mc’,‘env2’,‘vs2’]
       \\ fs [cpFFI_valid_def,cpEval_valid_def,ffi_state_cor_def])
-  \\ drule_then (qspecl_then [‘vs1’,‘env1’,‘st1’,‘st2’] mp_tac) endpoint_forward_correctness
+
+  \\ ‘∃vs2 env2. cpEval_valid conf p env2 s' c' vs2 st2’ by cheat
+  \\ drule_then (qspecl_then [‘vs1’,‘vs2’,‘env1’,‘env2’,‘st1’,‘st2’] mp_tac)
+                endpoint_forward_correctness
+  \\ simp []
+  \\ drule_then (qspecl_then [‘p’,‘s.queues’,‘s'.queues’] mp_tac) trans_pres_ffi_wf
+  \\ impl_tac >- fs [ffi_wf_def]
+  \\ strip_tac
   \\ impl_tac
   (* LReceive *)
   >- (rw [cpEval_valid_def,ffi_wf_def,ffi_state_cor_def,cpFFI_valid_def]
       >- fs [sem_env_cor_def]
+      >- (MAP_EVERY qexists_tac [‘s.queues’,‘n’] \\ fs [])
       \\ qpat_x_assum `trans _ (NEndpoint _ _ _) _ _`
                       (mp_tac o PURE_ONCE_REWRITE_RULE [trans_cases])
       \\ fs [] \\ rw []
@@ -4340,7 +4360,7 @@ Proof
       \\ fs [comms_ffi_consTheory.active_trans_def]
       \\ disj2_tac \\ fs [comms_ffi_consTheory.emit_trans_def])
   \\ rw []
-  \\ MAP_EVERY qexists_tac [‘mc’,‘cEnv2’,‘vs2’]
+  \\ MAP_EVERY qexists_tac [‘mc’,‘env2’,‘vs2’]
   \\ fs [cpFFI_valid_def,cpEval_valid_def,ffi_state_cor_def]
 QED
 
@@ -4451,7 +4471,8 @@ Proof
       \\ qspec_then ‘conf’ assume_tac ffi_eq_equivRel
       \\ fs [equivalence_def,reflexive_def]
       \\ map_every qexists_tac [‘p’,‘s’]
-      \\ fs [cpEval_valid_def,ffi_wf_def,ffi_state_cor_def,sem_env_cor_def])
+      \\ fs [cpEval_valid_def,ffi_wf_def,ffi_state_cor_def,sem_env_cor_def]
+      \\ MAP_EVERY qexists_tac [‘s.queues’,‘n’] \\ fs [])
   \\ ‘∃s'' c'' n''. n1' = NPar (NEndpoint p s'' c'' ) n''’
       by (fs [reduction_def,Once trans_cases]
           \\ fs [Once trans_cases])
