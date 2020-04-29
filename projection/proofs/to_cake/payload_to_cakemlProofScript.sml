@@ -3378,17 +3378,11 @@ Proof
       disch_then (qx_choose_then ‘MC’ assume_tac) >>
       qexists_tac ‘MC’ >> dxrule cEval_equiv_bump_clocks >> simp[])
   >- ((* LReceive *)
-      fs[cpFFI_valid_def, GREATER_DEF] >>
-      CONV_TAC SWAP_VARS_CONV >> qexists_tac ‘vs1’ >>
-      CONV_TAC SWAP_VARS_CONV >> qexists_tac ‘cEnv1’ >>
-      simp[RIGHT_EXISTS_AND_THM] >> conj_asm1_tac
-      >- (fs[cpEval_valid_def] >>
-          rename [‘qpush _ sp msg’] >>
-          ‘(∃p1 q1 n1. cSt1.ffi.ffi_state = (p1,q1,n1)) ∧
-           (∃p2 q2 n2. cSt2.ffi.ffi_state = (p2,q2,n2))’
-            by metis_tac[TypeBase.nchotomy_of “:α#β”] >> fs[] >> rw[] >>
-          fs[ffi_state_cor_def] >> cheat) >>
-      irule ffi_irrel >> cheat)
+      fs[cpFFI_valid_def, GREATER_DEF] >> irule ffi_irrel >> simp[] >>
+      fs[cpEval_valid_def] >> rpt (goal_assum drule) >>
+      ‘∃p2 q2 n2. cSt2.ffi.ffi_state = (p2,q2,n2)’
+        by metis_tac[TypeBase.nchotomy_of “:α#β”] >>
+      fs[ffi_state_cor_def] >> metis_tac[IS_PREFIX_TRANS, qpush_prefix])
   >> cheat
 QED
 
