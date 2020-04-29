@@ -1747,7 +1747,7 @@ Proof
   fs eval_sl >>
   rw[state_component_equality] >>
   rename1 ‘(LUPDATE bufFinl _ (LUPDATE _ _ _ ++ refsA)) ++ refsB’ >>
-  MAP_EVERY qexists_tac [‘bufFinl’,‘refsA ++ refsB’] >> 
+  MAP_EVERY qexists_tac [‘bufFinl’,‘refsA ++ refsB’] >>
   rw[]
   >- metis_tac[LUPDATE_LUPDATE,LUPDATE_APPEND] >>
   pop_assum kall_tac >>
@@ -1851,7 +1851,7 @@ Proof
   fs eval_sl >>
   rw[state_component_equality] >>
   rename1 ‘(LUPDATE bufFinl _ (LUPDATE _ _ _ ++ refsA)) ++ refsB’ >>
-  MAP_EVERY qexists_tac [‘bufFinl’,‘refsA ++ refsB’] >> 
+  MAP_EVERY qexists_tac [‘bufFinl’,‘refsA ++ refsB’] >>
   rw[]
   >- metis_tac[LUPDATE_LUPDATE,LUPDATE_APPEND] >>
   pop_assum kall_tac >>
@@ -3078,7 +3078,7 @@ Proof
           pop_assum kall_tac >>
           (* evaluate right *)
           qabbrev_tac ‘rec = App Opapp [Var (Short "receiveloop"); Con NONE []]’ >>
-          qabbrev_tac ‘cEnvR2I = cEnv2 with v:= nsBind "buff" (Loc (LENGTH cSt2.refs)) cEnv2.v’ >> 
+          qabbrev_tac ‘cEnvR2I = cEnv2 with v:= nsBind "buff" (Loc (LENGTH cSt2.refs)) cEnv2.v’ >>
           qmatch_goalsub_abbrev_tac ‘evaluate (cStR2 with clock := _) cEnvR2 [rec]’ >>
           qspecl_then [‘conf’,‘cs’,‘cEnvR2’,‘cEnvR2I’,‘cStR2’,‘src’,‘LENGTH cSt2.refs’,
                        ‘REPLICATE (conf.payload_size + 1) 0w’]
@@ -3114,7 +3114,7 @@ Proof
                       (FLAT (l++ulv))’
             by
                        =
-        
+
           ‘store_lookup’
                 rename [‘(LIST_TYPE WORD --> LIST_TYPE WORD --> LIST_TYPE WORD) $++ vA’,
                         ‘(LIST_TYPE ^DATUM --> LIST_TYPE ^DATUM --> LIST_TYPE ^DATUM) $++ vB’] >>
@@ -3123,7 +3123,7 @@ Proof
                 metis_tac[EQ_SYM_EQ]
 
 
-          conf cs envM envR s 
+          conf cs envM envR s
           drule_all_then strip_assume_tac receiveloop_correct_term *))
       (* Divergent Stream Case *)
       >- (‘ffi_divg_stream conf cSt2.ffi src cs’
@@ -3156,7 +3156,7 @@ Proof
           pop_assum kall_tac >>
           (* evaluate right *)
           qabbrev_tac ‘rec = App Opapp [Var (Short "receiveloop"); Con NONE []]’ >>
-          qabbrev_tac ‘cEnvR2I = cEnv2 with v:= nsBind "buff" (Loc (LENGTH cSt2.refs)) cEnv2.v’ >> 
+          qabbrev_tac ‘cEnvR2I = cEnv2 with v:= nsBind "buff" (Loc (LENGTH cSt2.refs)) cEnv2.v’ >>
           qmatch_goalsub_abbrev_tac ‘evaluate (cStR2 with clock := _) cEnvR2 [rec]’ >>
           qspecl_then [‘conf’,‘cs’,‘cEnvR2’,‘cEnvR2I’,‘cStR2’,‘src’,‘LENGTH cSt2.refs’,
                        ‘REPLICATE (conf.payload_size + 1) 0w’]
@@ -3226,7 +3226,7 @@ Proof
           pop_assum kall_tac >>
           (* evaluate right *)
           qabbrev_tac ‘rec = App Opapp [Var (Short "receiveloop"); Con NONE []]’ >>
-          qabbrev_tac ‘cEnvR2I = cEnv2 with v:= nsBind "buff" (Loc (LENGTH cSt2.refs)) cEnv2.v’ >> 
+          qabbrev_tac ‘cEnvR2I = cEnv2 with v:= nsBind "buff" (Loc (LENGTH cSt2.refs)) cEnv2.v’ >>
           qmatch_goalsub_abbrev_tac ‘evaluate (cStR2 with clock := _) cEnvR2 [rec]’ >>
           qspecl_then [‘conf’,‘cs’,‘cEnvR2’,‘cEnvR2I’,‘cStR2’,‘src’,‘LENGTH cSt2.refs’,
                        ‘REPLICATE (conf.payload_size + 1) 0w’]
