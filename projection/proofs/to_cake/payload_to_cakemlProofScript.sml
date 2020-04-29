@@ -1518,7 +1518,7 @@ Proof
   qabbrev_tac ‘NESTREC = App Opapp [Var(Short "receiveloop");Var(Short "u")]’ >>
   qabbrev_tac ‘NOEVAL = App Opapp [unpadv conf; Var (Short "buff")]’ >>
   rw eval_sl_nffi
-  (* Final Message *)  
+  (* Final Message *)
   >- (PURE_ONCE_REWRITE_TAC [find_recfun_def] >>
       rw (receiveloop_def::eval_sl_nffi) >>
       rw [dec_clock_def] >>
@@ -1559,7 +1559,7 @@ Proof
       qunabbrev_tac ‘sUn’ >>
       rw (EL_APPEND_EQN::LENGTH_LUPDATE::EL_LUPDATE::eval_sl) >>
       qunabbrev_tac ‘envUn’ >>
-      fs[env_asm_def,has_v_def,in_module_def] >> 
+      fs[env_asm_def,has_v_def,in_module_def] >>
       rw[nsLookup_def] >> rw[state_component_equality] >>
       rename1 ‘LUPDATE (W8array (_::t)) bufLoc s.refs ++ drefs’ >>
       qmatch_asmsub_abbrev_tac ‘W8array (fb::t)’ >>
@@ -1632,7 +1632,7 @@ Proof
       fs eval_sl >>
       rw[state_component_equality] >>
       rename1 ‘(LUPDATE bufFinl _ (LUPDATE _ _ _ ++ refsA)) ++ refsB’ >>
-      MAP_EVERY qexists_tac [‘bufFinl’,‘refsA ++ refsB’] >> 
+      MAP_EVERY qexists_tac [‘bufFinl’,‘refsA ++ refsB’] >>
       rw[]
       >- metis_tac[LUPDATE_LUPDATE,LUPDATE_APPEND]
       >- (pop_assum kall_tac >>
@@ -3139,17 +3139,17 @@ QED
 (* FORWARD CORRECTNESS
     Just the spec :) *)
 Theorem endpoint_forward_correctness:
-  ∀conf p pSt1 pCd1 L pSt2 pCd2 vs1 cEnv1 cSt1 cSt2.
+  ∀conf p pSt1 pCd1 L pSt2 pCd2 vs1 vs2 cEnv1 cEnv2 cSt1 cSt2.
     trans conf (NEndpoint p pSt1 pCd1) L (NEndpoint p pSt2 pCd2) ∧
     cpEval_valid conf p cEnv1 pSt1 pCd1 vs1 cSt1 ∧
+    cpEval_valid conf p cEnv2 pSt2 pCd2 vs2 cSt2 ∧
     normalised pSt1.queues ∧
     cSt2.ffi.oracle = comms_ffi_oracle conf ∧
     ffi_wf cSt2.ffi.ffi_state ∧
     FST cSt2.ffi.ffi_state = FST cSt1.ffi.ffi_state ∧
     cpFFI_valid conf pSt1 pSt2 cSt1.ffi.ffi_state cSt2.ffi.ffi_state L ⇒
-    ∃mc vs2 cEnv2.
-         cpEval_valid conf p cEnv2 pSt2 pCd2 vs2 cSt2 ∧
-         cEval_equiv conf
+    ∃mc.
+       cEval_equiv conf
           (evaluate (cSt1 with clock := mc) cEnv1
                     [compile_endpoint conf vs1 pCd1])
           (evaluate (cSt2 with clock := mc) cEnv2
@@ -3174,11 +3174,13 @@ Proof
             ‘∀v. nsLookup Env1 (Short (ps2cs v)) =
                  nsLookup cEnv1.v (Short (ps2cs v))’
               by simp[Abbr‘Env1’] >> simp[] >>
-            drule_all_then (qx_choose_then ‘cv’ strip_assume_tac)
-                           nsLookup_cpEval_valid >> simp[] >>
-            drule_then (qspec_then ‘data’ $ qx_choose_then ‘dv’ $
-                        strip_assume_tac)
-                       nsLookup_build_rec_env_drop >> rfs[] >>
+            ‘∃cv. nsLookup cEnv1.v (Short (ps2cs v)) = SOME cv ∧
+                  LIST_TYPE WORD d cv’ by metis_tac[nsLookup_cpEval_valid] >>
+            simp[] >>
+            qpat_assum ‘cpEval_valid _ _ cEnv1 _ _ _ _ ’
+                       ((mp_then (Pos hd) $ qspec_then ‘data’ $
+                         qx_choose_then ‘dv’ $ strip_assume_tac)
+                        nsLookup_build_rec_env_drop) >> rfs[] >>
             drule_all_then
              (qspec_then ‘empty_state with refs := refs0’ $
               qx_choosel_then [‘dcs_env’, ‘dcs_e’, ‘dcs_cl1’, ‘dcs_cl2’,
@@ -3215,10 +3217,6 @@ Proof
       disch_then (qx_choosel_then [‘ck1’, ‘ck2’, ‘refs’] strip_assume_tac) >>
       Q.REFINE_EXISTS_TAC ‘ck1 + mc’ >>
       dxrule evaluate_add_to_clock >> simp[] >> disch_then kall_tac >>
-      drule_all_then assume_tac cpEval_valid_Send_strans_E >>
-      goal_assum drule >>
-      MAP_EVERY RM_ABBREV_TAC ["aexp", "Env1"] >>
-      qpat_x_assum ‘nsLookup _ _ = _’ kall_tac >>
       qpat_abbrev_tac ‘FFI1 = _.ffi with <| ffi_state := _; io_events := _|>’ >>
       ‘cpEval_valid conf p cEnv1 pSt1 pCd2 vs1
         (cSt1 with <| ffi := FFI1 ; refs := cSt1.refs ++ refs|>)’
@@ -3230,7 +3228,7 @@ Proof
             irule ffi_wf_send_events_irrel >> simp[] >>
             qexists_tac ‘valid_send_dest p2’ >> simp[send_invariant] >>
             irule strans_dest_check >> metis_tac[]) >>
-      pop_assum (mp_then (Pos hd) drule ffi_irrel_weak) >> simp[] >>
+      pop_assum (mp_then (Pos hd) drule ffi_irrel) >> simp[] >>
       impl_tac
       >- (‘conf.payload_size > 0’ by fs[cpEval_valid_def] >>
           irule ffi_eq_pres >>
@@ -3250,28 +3248,30 @@ Proof
   >- ((* Send with LENGTH d > n + conf.payload_size, and evaluations on both
          sides: one of drop v n, other of drop v (n + conf.payload_size) *)
       fs[cpFFI_valid_def, GREATER_DEF] >>
-      CONV_TAC SWAP_VARS_CONV >> qexists_tac ‘vs1’ >>
-      CONV_TAC SWAP_VARS_CONV >> qexists_tac ‘cEnv1’ >>
       simp[evaluate_letNONE, find_evalform ‘Letrec _ _’,
            (* Once evaluate_opapp, *)
            bind_assoc, o_UNCURRY_R, C_UNCURRY_L, o_ABS_R, C_ABS_L] >>
       qmatch_goalsub_abbrev_tac ‘sendloop conf data’ >>
       qabbrev_tac ‘
-        Env1 = build_rec_env (sendloop conf data) cEnv1 cEnv1.v
-      ’ >>
+        EnvN = λe. build_rec_env (sendloop conf data) e e.v
+      ’ >> simp[] >>
       qmatch_goalsub_abbrev_tac ‘App Opapp [dropv; Lit _]’ >>
       qabbrev_tac ‘aexpf = λm. App Opapp [dropv; Lit (IntLit (&m))]’ >>
       simp[] >>
-      ‘∀m. ck_equiv_hol (cEnv1 with v := Env1) (LIST_TYPE WORD)
-                        (aexpf m)
-                        (DROP m d)’
+      qabbrev_tac ‘EnvB = λb. if b then cEnv2 else cEnv1’ >>
+      ‘cEnv1 = EnvB F ∧ cEnv2 = EnvB T’ by simp[Abbr‘EnvB’] >> simp[] >>
+      ‘∀m b. ck_equiv_hol (EnvB b with v := EnvN (EnvB b)) (LIST_TYPE WORD)
+                          (aexpf m)
+                          (DROP m d)’
         by (simp[Abbr‘aexpf’, ck_equiv_hol_def, evaluate_opapp, bind_assoc,
                  o_UNCURRY_R, C_UNCURRY_L, o_ABS_R, C_ABS_L, Abbr‘dropv’,
                  find_evalform ‘Lit _’, find_evalform ‘Var _’] >>
-            qx_genl_tac [‘m’, ‘refs0’] >>
-            ‘∀v. nsLookup Env1 (Short (ps2cs v)) =
-                 nsLookup cEnv1.v (Short (ps2cs v))’
-              by simp[Abbr‘Env1’] >> simp[] >>
+            qx_genl_tac [‘m’, ‘b’, ‘refs0’] >>
+            ‘∀v. nsLookup (EnvN (EnvB b)) (Short (ps2cs v)) =
+                 nsLookup (EnvB b).v (Short (ps2cs v))’
+              by simp[Abbr‘EnvN’] >> simp[] >>
+            ‘∃V CS. cpEval_valid conf p (EnvB b) pSt1 e V CS’
+              by (rw[Abbr‘EnvB’] >> goal_assum drule) >>
             drule_all_then (qx_choose_then ‘cv’ strip_assume_tac)
                            nsLookup_cpEval_valid >> simp[] >>
             drule_then (qspec_then ‘data’ $ qx_choose_then ‘dv’ $
@@ -3295,47 +3295,43 @@ Proof
               |> INST_TYPE [“:'ffi” |-> “:unit”]) >> simp[] >>
             Q.REFINE_EXISTS_TAC ‘alld_cl1 + (mc + 1)’ >> simp[] >> fs[] >>
             simp[state_component_equality]) >>
-      ‘nsLookup Env1 (Short "sendloop") =
-       SOME (Recclosure cEnv1 (sendloop conf data) "sendloop")’
-        by simp[Abbr‘Env1’, build_rec_env_def, sendloop_def] >>
-      first_assum (qspec_then ‘n’ assume_tac) >>
-      first_x_assum (mp_then (Pos (el 4)) mp_tac
-                     (sendloop_correct
-                      |> INST_TYPE [alpha |-> cp_type])) >>
+      ‘∀e. nsLookup (EnvN e) (Short "sendloop") =
+           SOME (Recclosure e (sendloop conf data) "sendloop")’
+        by simp[Abbr‘EnvN’, build_rec_env_def, sendloop_def] >>
+      first_assum (qspecl_then [‘m’, ‘b’] $
+                   mp_then (Pos (el 4)) (mp_tac o Q.GENL [‘m’, ‘b’])
+                           (sendloop_correct
+                            |> INST_TYPE [alpha |-> cp_type])) >>
       simp[] >>
-      disch_then (qspecl_then [‘conf’, ‘cSt1’] mp_tac) >>
-      ‘cSt1.ffi.oracle = comms_ffi_oracle conf’
-        by fs[cpEval_valid_def] >>
-      simp[Abbr‘data’] >>
-      disch_then (qspecl_then [‘valid_send_dest p2’, ‘p2’] mp_tac) >>
-      simp[send_invariant] >> impl_tac
-      >- (drule strans_dest_check' >> fs[cpEval_valid_def]) >>
-      disch_then (qx_choosel_then [‘ck1’, ‘ck2’, ‘refs’] strip_assume_tac) >>
+      ‘(∀b. env_asm (EnvB b) conf) ∧ 0 < conf.payload_size’
+        by (fs[cpEval_valid_def, Abbr‘EnvB’] >> rw[]) >>
+      first_x_assum (qspec_then ‘b’ $
+                     (fn th => disch_then (fn ith => mp_then (Pos hd)
+                                           (mp_tac o Q.GEN ‘b’) ith th))) >>
+      simp[] >>
+      qabbrev_tac ‘cStB = λb. if b then cSt2 else cSt1’ >>
+      ‘cSt1 = cStB F ∧ cSt2 = cStB T’ by simp[Abbr‘cStB’] >>
+      disch_then (qspecl_then [‘b’, ‘m’, ‘cStB b’, ‘valid_send_dest p2’, ‘p2’] $
+                  mp_tac o Q.GENL [‘b’, ‘m’]) >> simp[Abbr‘data’] >>
+      ‘∀b. (cStB b).ffi.oracle = comms_ffi_oracle conf’
+        by (fs[cpEval_valid_def, Abbr‘cStB’] >> rw[]) >>
+      simp[send_invariant] >>
+      ‘∀b. valid_send_dest p2 (cStB b).ffi.ffi_state’
+        by (rw[Abbr‘cStB’] >> drule strans_dest_check' >> simp[]) >> simp[] >>
+      strip_tac >>
+      first_assum (qspecl_then [‘F’, ‘n’] $
+                   qx_choosel_then [‘ck1’, ‘ck2’, ‘refs’] strip_assume_tac)
       Q.REFINE_EXISTS_TAC ‘ck1 + mc’ >>
       dxrule evaluate_add_to_clock >> simp[] >> disch_then kall_tac >>
-
-      first_assum (qspec_then ‘n + conf.payload_size’ assume_tac) >>
-      first_x_assum (mp_then (Pos (el 4)) mp_tac
-                     (sendloop_correct
-                      |> INST_TYPE [alpha |-> cp_type])) >>
-      simp[] >>
-      disch_then (qspecl_then [‘conf’, ‘cSt2’] mp_tac) >>
-      ‘cSt2.ffi.oracle = comms_ffi_oracle conf’
-        by fs[cpEval_valid_def] >>
-      disch_then (qspecl_then [‘valid_send_dest p2’, ‘p2’] mp_tac) >>
-      simp[send_invariant] >> impl_tac
-      >- (drule strans_dest_check' >> fs[cpEval_valid_def]) >>
-      disch_then (qx_choosel_then [‘ck0’, ‘ck3’, ‘refs2’] strip_assume_tac) >>
+      first_assum (qspecl_then [‘T’, ‘n + conf.payload_size’] $
+                   qx_choosel_then [‘ck0’, ‘ck3’, ‘refs2’] strip_assume_tac) >>
       Q.REFINE_EXISTS_TAC ‘ck0 + mc’ >>
       dxrule evaluate_add_to_clock >> simp[] >> disch_then kall_tac >>
-      drule_all_then assume_tac cpEval_valid_Send_strans_E >>
-      goal_assum drule >>
-      MAP_EVERY RM_ABBREV_TAC ["aexpf", "Env1"] >>
-      qpat_x_assum ‘nsLookup _ _ = _’ kall_tac >>
+      pop_assum kall_tac >> qunabbrev_tac ‘cStB’ >> fs[] >>
       qpat_abbrev_tac ‘FFI1 = _.ffi with <| ffi_state := _; io_events := _|>’ >>
       qmatch_goalsub_abbrev_tac
         ‘cSt2 with <| clock := _ ; refs := _ ; ffi := FFI2 |>’ >>
-      ‘cpEval_valid conf p cEnv1 pSt1 e vs1
+      ‘cpEval_valid conf p cEnv2 pSt1 e vs2
         (cSt2 with <| ffi := FFI2; refs := cSt2.refs ++ refs2|>)’
         by (fs[cpEval_valid_def] >> simp[Abbr‘FFI2’] >> conj_tac
             >- (irule ffi_state_cor_send_events_irrel >> simp[] >>
@@ -3354,8 +3350,7 @@ Proof
             irule ffi_wf_send_events_irrel >> simp[] >>
             qexists_tac ‘valid_send_dest p2’ >> simp[send_invariant] >>
             irule strans_dest_check >> metis_tac[]) >>
-      pop_assum (mp_then (Pos hd) drule ffi_irrel_weak) >>
-      ‘0 < conf.payload_size’ by fs[cpEval_valid_def] >> impl_tac
+      pop_assum (mp_then (Pos hd) drule ffi_irrel) >> impl_tac
       >- (simp[Abbr‘FFI1’, Abbr‘FFI2’] >>
           simp[send_events_def] >>
           simp[SimpL “ffi_eq conf”, Once compile_message_def] >>
