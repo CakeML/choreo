@@ -42,7 +42,7 @@ Theorem compilation_preservation:
                         [compile_endpoint conf vs2 pCd3])
 Proof
   rw []
-  \\ drule_all projection_preservation
+  \\ drule_all projection_preservation_junkcong
   \\ rw []
   \\ asm_exists_tac \\ fs []
   \\ asm_exists_tac \\ fs []
