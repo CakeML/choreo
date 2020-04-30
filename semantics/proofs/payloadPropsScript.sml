@@ -2249,4 +2249,377 @@ Proof
   \\ fs []
 QED
 
+val (junkcong_rules, junkcong_ind, junkcong_cases) = Hol_reln `
+  (* Reflexive *)
+  (∀fvs n:payloadLang$network. junkcong fvs n n)
+
+  (* Symmetric *)
+∧ (∀n1 n2 fvs.
+    junkcong fvs n1 n2
+    ⇒ junkcong fvs n2 n1)
+  (* Transitive *)
+∧ (∀n1 n2 n3 fvs.
+     junkcong fvs n1 n2
+     ∧ junkcong fvs n2 n3
+     ⇒ junkcong fvs n1 n3)
+
+  (* Add-junk *)
+∧ (∀p s e v fvs d.
+    v ∈ fvs ∧ ¬MEM v (free_var_names_endpoint e)
+    ⇒ junkcong fvs (NEndpoint p s e) (NEndpoint p (s with bindings:= s.bindings |+ (v,d)) e))
+
+  (* Par *)
+∧ (∀n1 n2 n3 n4 fvs.
+     junkcong fvs n1 n2
+     ∧ junkcong fvs n3 n4
+     ⇒ junkcong fvs (NPar n1 n3) (NPar n2 n4))`
+
+val [junkcong_refl,junkcong_sym,junkcong_trans,junkcong_add_junk,junkcong_par]
+    = zip ["junkcong_refl","junkcong_sym","junkcong_trans","junkcong_add_junk","junkcong_par"]
+          (CONJUNCTS junkcong_rules) |> map save_thm;
+
+val junkcong_strongind = fetch "-" "junkcong_strongind"
+
+val junkcong_refl_IMP = Q.store_thm("junkcong_refl_IMP",
+  `∀fvs n n'. n = n' ==> junkcong fvs n n'`,
+  simp[junkcong_refl]);
+
+val junkcong_add_junk' = Q.store_thm("junkcong_add_junk'",
+ `∀p s b e v fvs d.
+    v ∈ fvs ∧ ¬MEM v (free_var_names_endpoint e)
+    ⇒ junkcong fvs (NEndpoint p (s with bindings := b) e) (NEndpoint p (s with bindings:= b |+ (v,d)) e)`,
+ rpt strip_tac
+ >> `s with bindings := b |+ (v,d) =
+     (s with bindings := b) with bindings := (s with bindings := b).bindings |+ (v,d)`
+      by simp[]
+ >> pop_assum(fn thm => PURE_ONCE_REWRITE_TAC [thm])
+ >> match_mp_tac junkcong_add_junk >> simp[]);
+
+val junkcong_add_junk'' = Q.store_thm("junkcong_add_junk''",
+ `∀p b q e v fvs d.
+    v ∈ fvs ∧ ¬MEM v (free_var_names_endpoint e)
+    ⇒ junkcong fvs (NEndpoint p <|bindings := b; queues := q|> e)
+                    (NEndpoint p <|bindings := b |+ (v,d); queues := q|> e)`,
+ rpt strip_tac
+ >> qmatch_goalsub_abbrev_tac `junkcong _ (NEndpoint _ a1 _) (NEndpoint _ a2 _)`
+ >> `a2 = a1 with bindings := a1.bindings |+ (v,d)`
+     by(unabbrev_all_tac >> simp[])
+ >> rveq
+ >> match_mp_tac junkcong_add_junk >> simp[]);
+
+val junkcong_add_junk''' = Q.store_thm("junkcong_add_junk'''",
+  `∀p s q e v fvs d.
+     v ∈ fvs ∧ ¬MEM v (free_var_names_endpoint e) ⇒
+     junkcong fvs (NEndpoint p (s with queues := q) e)
+     (NEndpoint p (s with <|bindings := s.bindings |+ (v,d); queues := q|>) e)`,
+  rpt strip_tac
+  >> qpat_abbrev_tac `a1 = s with queues := q`
+  >> `s.bindings = a1.bindings` by(unabbrev_all_tac >> simp[])
+  >> fs[junkcong_add_junk]);
+
+val junkcong_remove_junk = Q.store_thm("junkcong_remove_junk",
+  `(∀p s e v fvs.
+    v ∈ fvs ∧ ¬MEM v (free_var_names_endpoint e)
+    ⇒ junkcong fvs (NEndpoint p s e) (NEndpoint p (s with bindings:= s.bindings \\ v) e))`,
+  rpt strip_tac
+  >> Cases_on `v ∈ FDOM s.bindings`
+  >- (fs[FDOM_FLOOKUP] >> rename1 `FLOOKUP _ _ = SOME d`
+      >> drule junkcong_add_junk >> disch_then drule
+      >> disch_then (qspecl_then [`p`,`s with bindings := s.bindings \\ v`,`d`] assume_tac)
+      >> fs[GSYM FUPDATE_PURGE]
+      >> `s.bindings |+ (v,d) = s.bindings`
+           by(match_mp_tac FUPDATE_ELIM >> fs[flookup_thm])
+      >> `s with bindings := s.bindings = s` by fs[payloadLangTheory.state_component_equality]
+      >> fs[FUPDATE_ELIM] >> match_mp_tac junkcong_sym >> first_x_assum ACCEPT_TAC)
+  >- (fs[DOMSUB_NOT_IN_DOM]
+      >> match_mp_tac junkcong_refl_IMP >> simp[payloadLangTheory.state_component_equality]));
+
+val junkcong_sym_eq = Q.store_thm("junkcong_sym_eq",
+`∀fvs p q. junkcong fvs p q = junkcong fvs q p`,metis_tac[junkcong_sym]);
+
+val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
+  `∀fvs p1 q1.
+     junkcong fvs p1 q1
+     ⇒ ∀ conf alpha p2 q2.
+            ((trans conf p1 alpha p2 ⇒ (∃q2. trans conf q1 alpha q2 ∧ junkcong fvs p2 q2))
+         ∧ (trans conf q1 alpha q2 ⇒ (∃p2. trans conf p1 alpha p2 ∧ junkcong fvs p2 q2)))`,
+  ho_match_mp_tac junkcong_strongind
+  >> rpt strip_tac
+  >- metis_tac[junkcong_rules]
+  >- metis_tac[junkcong_rules]
+  >- metis_tac[junkcong_rules]
+  >- metis_tac[junkcong_rules]
+  >- metis_tac[junkcong_rules]
+  >- metis_tac[junkcong_rules]
+  >- (* junkcong_add_junk *)
+     (qpat_x_assum `trans _ _ _ _` (assume_tac
+                                    o REWRITE_RULE [Once payloadSemTheory.trans_cases])
+      >> fs[] >> rveq
+      >> TRY(qmatch_goalsub_abbrev_tac `junkcong fvs (NEndpoint a1 a2 a3)`
+             >> qexists_tac `NEndpoint a1 (a2 with bindings := a2.bindings |+ (v,d)) a3`
+             >> conj_tac
+             >- (unabbrev_all_tac
+                 >> MAP_FIRST match_mp_tac (CONJUNCTS payloadSemTheory.trans_rules)
+                 >> fs[FLOOKUP_UPDATE,free_var_names_endpoint_def])
+             >- (`¬MEM v (free_var_names_endpoint a3)`
+                   by(unabbrev_all_tac >> fs[free_var_names_endpoint_def])
+                 >> fs[free_var_names_endpoint_def] >> metis_tac[junkcong_rules]))
+      >> TRY(qmatch_goalsub_abbrev_tac `junkcong fvs (NEndpoint a1 (a2 with queues := a3) a4)`
+             >> qexists_tac `NEndpoint a1 (a2 with <|queues := a3; bindings := a2.bindings |+ (v,d)|>) a4`
+             >> conj_tac
+             >- (PURE_ONCE_REWRITE_TAC [payloadLangTheory.state_fupdcanon]
+                 >> qmatch_goalsub_abbrev_tac `trans _ (NEndpoint _ a5 _)`
+                 >> `a2 with <|bindings := a2.bindings |+ (v,d); queues := a3|>
+                     = a5 with queues := a3` by(unabbrev_all_tac >> simp[])
+                 >> pop_assum (fn thm => PURE_ONCE_REWRITE_TAC[thm])
+                 >> qunabbrev_tac `a3`
+                 >> `a2.queues = a5.queues` by(unabbrev_all_tac >> simp[])
+                 >> pop_assum (fn thm => PURE_ONCE_REWRITE_TAC[thm])
+                 >> MAP_FIRST match_mp_tac (CONJUNCTS trans_rules)
+                 >> simp[])
+             >- (imp_res_tac junkcong_add_junk
+                 >> pop_assum(qspec_then `a2 with queues := a3` assume_tac)
+                 >> fs[]))
+      >> TRY(qmatch_goalsub_abbrev_tac `junkcong fvs (NEndpoint a1
+                                                                <|bindings := a2;
+                                                                  queues := a3|>
+                                                                a4)`
+             >> qexists_tac `NEndpoint a1 <|bindings := if v = v' then a2
+                                                        else a2 |+ (v,d); queues := a3|> a4`
+             >> conj_tac
+             >- (IF_CASES_TAC
+                 >> unabbrev_all_tac
+                 >> `s.queues = (s with bindings := s.bindings |+ (v,d)).queues` by simp[]
+                 >> pop_assum(fn thm => FULL_SIMP_TAC bool_ss [Once thm])
+                 >> imp_res_tac trans_dequeue_intermediate_payload
+                 >> imp_res_tac trans_dequeue_last_payload
+                 >> first_x_assum(qspec_then `v'` assume_tac)
+                 >> rveq
+                 >> fs[Once FUPDATE_COMMUTES])
+             >- (IF_CASES_TAC
+                 >- metis_tac[junkcong_rules]
+                 >> `¬MEM v (free_var_names_endpoint a4)`
+                     by(unabbrev_all_tac >> fs[free_var_names_endpoint_def,MEM_FILTER])
+                 >> metis_tac[junkcong_add_junk'']))
+      >> TRY(qmatch_goalsub_abbrev_tac `junkcong fvs (NEndpoint a1 (a2 with queues := a3) a4)`
+             >> qexists_tac `NEndpoint a1 (<|queues := a3;
+                                             bindings := a2.bindings |+ (v,d)|>) a4`
+             >> conj_tac
+             >- (PURE_ONCE_REWRITE_TAC [payloadLangTheory.state_fupdcanon]
+                 >> qmatch_goalsub_abbrev_tac `trans _ (NEndpoint _ a5 _)`
+                 >> `<|bindings := a2.bindings |+ (v,d); queues := a3|>
+                     = a5 with queues := a3` by(unabbrev_all_tac >> simp[])
+                 >> pop_assum (fn thm => PURE_ONCE_REWRITE_TAC[thm])
+                 >> qunabbrev_tac `a4`
+                 >> qunabbrev_tac `a3`
+                 >> `a2.queues = a5.queues` by(unabbrev_all_tac >> simp[])
+                 >> pop_assum (fn thm => PURE_ONCE_REWRITE_TAC[thm])
+                 >> MAP_FIRST match_mp_tac (CONJUNCTS trans_rules)
+                 >> unabbrev_all_tac >> simp[])
+             >- (`¬MEM v (free_var_names_endpoint a4)`
+                   by(unabbrev_all_tac >> fs[free_var_names_endpoint_def])
+                 >> imp_res_tac junkcong_add_junk
+                 >> rpt(first_x_assum(qspec_then `a2 with queues := a3` assume_tac ))
+                 >> fs[]))
+      >> TRY(qmatch_goalsub_abbrev_tac `junkcong fvs (NEndpoint a1 (a2 with bindings := a3) a4)`
+             >> qexists_tac `NEndpoint a1 (a2 with bindings := if v = v' then a3
+                                                               else a3|+ (v,d)) a4`
+             >> conj_tac
+             >- (IF_CASES_TAC
+                 >> unabbrev_all_tac >> fs[free_var_names_endpoint_def,MEM_FILTER]
+                 >> `EVERY IS_SOME (MAP (FLOOKUP ((s with bindings := s.bindings |+ (v,d)).bindings)) vl)`
+                     by(fs[EVERY_MAP,FLOOKUP_UPDATE,EVERY_MEM] >> rw[])
+                 >> drule trans_let >> fs[] >> disch_then(qspecl_then [‘conf’,`v'`] assume_tac)
+                 >> `MAP (THE ∘ FLOOKUP (s.bindings |+ (v,d))) vl
+                     = MAP (THE ∘ FLOOKUP s.bindings) vl`
+                     by(rw[MAP_EQ_f,FLOOKUP_UPDATE] >> rw[] >> fs[])
+                 >> rfs[] >> fs[Once FUPDATE_COMMUTES])
+             >- (IF_CASES_TAC
+                 >- metis_tac[junkcong_rules]
+                 >- (match_mp_tac junkcong_add_junk' >> fs[free_var_names_endpoint_def,MEM_FILTER])))
+     )
+  >- (* junkcong_add_junk, symmetric case *)
+     (PURE_ONCE_REWRITE_TAC [junkcong_sym_eq]
+      >> qpat_x_assum `trans _ _ _ _` (assume_tac
+                                       o REWRITE_RULE [Once payloadSemTheory.trans_cases])
+      >> fs[] >> rveq
+      >> TRY(qmatch_goalsub_abbrev_tac `junkcong fvs (NEndpoint a1 (a2 with bindings := _) a3)`
+             >> qexists_tac `NEndpoint a1 a2 a3`
+             >> conj_tac
+             >- (unabbrev_all_tac
+                 >> MAP_FIRST match_mp_tac (CONJUNCTS payloadSemTheory.trans_rules)
+                 >> fs[FLOOKUP_UPDATE,free_var_names_endpoint_def] >> rfs[])
+             >- (`¬MEM v (free_var_names_endpoint a3)`
+                   by(unabbrev_all_tac >> fs[free_var_names_endpoint_def])
+                 >> fs[free_var_names_endpoint_def] >> metis_tac[junkcong_rules]))
+      >> TRY(qmatch_goalsub_abbrev_tac `junkcong fvs
+                                                (NEndpoint a1
+                                                           <|bindings := a2 |+ _ |+ (a3,a4);
+                                                             queues := a5|> a6)`
+             >> qexists_tac `NEndpoint a1 (s with <|queues := a5; bindings := a2 |+ (a3,a4)|>) a6`
+             >> conj_tac
+             >- (unabbrev_all_tac >> MAP_FIRST match_mp_tac (CONJUNCTS trans_rules)
+                 >> simp[])
+             >- (Cases_on `v = a3` >> fs[Once FUPDATE_COMMUTES]
+                 >> fs[free_var_names_endpoint_def,MEM_FILTER]
+                 >> metis_tac[junkcong_rules,junkcong_add_junk']))
+      >> TRY(qmatch_goalsub_abbrev_tac `junkcong fvs
+                                                (NEndpoint a1
+                                                           <|bindings := a2 |+ (v,d);
+                                                             queues := a3|> a4)`
+             >> qexists_tac `NEndpoint a1 (s with queues := a3) a4`
+             >> conj_tac
+             >- (PURE_ONCE_REWRITE_TAC [payloadLangTheory.state_fupdcanon]
+                 >> unabbrev_all_tac
+                 >> MAP_FIRST match_mp_tac (CONJUNCTS trans_rules)
+                 >> simp[])
+             >- (`¬MEM v (free_var_names_endpoint a4)`
+                   by(unabbrev_all_tac >> fs[free_var_names_endpoint_def])
+                 >> imp_res_tac junkcong_add_junk
+                 >> rpt(first_x_assum(qspec_then `s with queues := a3` assume_tac))
+                 >> fs[] >> rw[Once junkcong_sym_eq] >> unabbrev_all_tac >> fs[]))
+      >> TRY(qmatch_goalsub_abbrev_tac `junkcong fvs
+                                                 (NEndpoint a1
+                                                            (s with bindings := a2 |+ _ |+ (a3,a4))
+                                                            a5)`
+             >> qexists_tac `NEndpoint a1 (s with bindings := a2 |+ (a3,a4)) a5`
+             >> conj_tac
+             >- (unabbrev_all_tac >> fs[free_var_names_endpoint_def,MEM_FILTER]
+                 >> `MAP (THE ∘ FLOOKUP (s.bindings |+ (v,d))) vl
+                     = MAP (THE ∘ FLOOKUP s.bindings) vl`
+                      by(rw[MAP_EQ_f,FLOOKUP_UPDATE] >> rw[] >> fs[])
+                 >> fs[] >> match_mp_tac trans_let >> fs[EVERY_MAP,EVERY_MEM] >> rw[]
+                 >> first_x_assum drule >> strip_tac >> fs[IS_SOME_EXISTS,FLOOKUP_UPDATE]
+                 >> every_case_tac >> fs[])
+             >- (Cases_on `a3 = v` >> fs[Once FUPDATE_COMMUTES]
+                 >> fs[free_var_names_endpoint_def,MEM_FILTER]
+                 >> metis_tac[junkcong_rules,junkcong_add_junk'])))
+  >- (* par-l *)
+     (qpat_x_assum `trans _ (NPar _ _) _ _` (assume_tac
+                                    o REWRITE_RULE [Once payloadSemTheory.trans_cases])
+      >> fs[] >> rveq
+      >> EVERY_ASSUM imp_res_tac
+      >> imp_res_tac trans_com_l
+      >> imp_res_tac trans_com_r
+      >> imp_res_tac trans_par_l
+      >> imp_res_tac trans_par_r
+      >> metis_tac[junkcong_rules])
+  >- (* par-r *)
+     (qpat_x_assum `trans _ (NPar _ _) _ _` (assume_tac
+                                    o REWRITE_RULE [Once payloadSemTheory.trans_cases])
+      >> fs[] >> rveq
+      >> EVERY_ASSUM imp_res_tac
+      >> imp_res_tac trans_com_l
+      >> imp_res_tac trans_com_r
+      >> imp_res_tac trans_par_l
+      >> imp_res_tac trans_par_r
+      >> metis_tac[junkcong_rules]));
+
+val junkcong_reduction_eq = Q.store_thm("junkcong_reduction_eq",
+  `∀conf fvs p1 q1.
+     junkcong fvs p1 q1
+     ⇒ ∀ p2 q2.
+         (((reduction conf)^* p1 p2 ⇒ (∃q2. (reduction conf)^* q1 q2 ∧ junkcong fvs p2 q2))
+         ∧ ((reduction conf)^* q1 q2 ⇒ (∃p2. (reduction conf)^* p1 p2 ∧ junkcong fvs p2 q2)))`,
+  rw []
+  >- (last_x_assum mp_tac
+      \\ MAP_EVERY (W(curry Q.SPEC_TAC)) [`q2`,`q1`,`fvs`]
+      \\ first_x_assum mp_tac
+      \\ MAP_EVERY (W(curry Q.SPEC_TAC)) [`p2`,`p1`]
+      \\ ho_match_mp_tac RTC_ind \\ rw []
+      >- (qexists_tac ‘q1’ \\ fs [junkcong_rules])
+      \\ fs [reduction_def]
+      \\ drule_then (qspecl_then [‘conf’,‘LTau’,‘p1'’,‘q1'’] assume_tac) junkcong_trans_eq
+      \\ rfs [] \\ first_x_assum drule \\ rw [] \\ qexists_tac ‘q2'’ \\ rw []
+      \\ rw [reduction_def] \\ irule RTC_TRANS \\ qexists_tac ‘q2’ \\ rw []
+      \\ rw [reduction_def])
+  \\ last_x_assum mp_tac
+  \\ MAP_EVERY (W(curry Q.SPEC_TAC)) [`p2`,`p1`,`fvs`]
+  \\ first_x_assum mp_tac
+  \\ MAP_EVERY (W(curry Q.SPEC_TAC)) [`q2`,`q1`]
+  \\ ho_match_mp_tac RTC_ind \\ rw []
+  >- (qexists_tac ‘p1’ \\ fs [junkcong_rules])
+  \\ fs [reduction_def]
+  \\ drule_then (qspecl_then [‘conf’,‘LTau’,‘p1'’,‘q1'’] assume_tac) junkcong_trans_eq
+  \\ rfs [] \\ first_x_assum drule \\ rw [] \\ qexists_tac ‘p2'’ \\ rw []
+  \\ rw [reduction_def] \\ irule RTC_TRANS \\ qexists_tac ‘p2’ \\ rw []
+  \\ rw [reduction_def]
+);
+
+val junkcong_has_fv_eq = Q.store_thm("junkcong_has_fv_eq",
+  `!fv e l s e2. junkcong {fv} (NEndpoint l s e) e2
+   /\ MEM fv (free_var_names_endpoint e)
+   ==> NEndpoint l s e = e2`,
+  `!fvs e1 e2. junkcong fvs e1 e2
+   ==> (!fv e l s. e1 = NEndpoint l s e /\ fvs = {fv} /\ MEM fv (free_var_names_endpoint e)
+                        ==> NEndpoint l s e = e2) /\
+       (!fv e l s. e2 = NEndpoint l s e /\ fvs = {fv} /\ MEM fv (free_var_names_endpoint e)
+                        ==> e1 = NEndpoint l s e)
+  ` suffices_by metis_tac[]
+  >> ho_match_mp_tac junkcong_strongind
+  >> rpt strip_tac
+  >> fs[] >> rveq >> fs[]);
+
+val junkcong_nil_rel_nil = Q.store_thm("junkcong_nil_rel_nil",
+  `!fvs n2.
+   junkcong fvs NNil n2 ==> n2 = NNil`,
+  `!fvs n1 n2.
+    junkcong fvs n1 n2
+    ==> (n1 = NNil <=> n2 = NNil)`
+    suffices_by metis_tac[]
+  >> ho_match_mp_tac junkcong_strongind
+  >> rpt strip_tac >> fs[]);
+
+val junkcong_par_rel_par = Q.store_thm("junkcong_par_rel_par",
+  `!fvs n1 n2 n3.
+   junkcong fvs (NPar n1 n2) n3 ==> ?n4 n5. n3 = NPar n4 n5 /\ junkcong fvs n1 n4 /\ junkcong fvs n2 n5`,
+  `!fvs n1 n2.
+    junkcong fvs n1 n2
+    ==> (!n3 n4. n1 = NPar n3 n4 ==> ?n5 n6. n2 = NPar n5 n6 /\ junkcong fvs n3 n5 /\ junkcong fvs n4 n6)
+        /\ (!n3 n4. n2 = NPar n3 n4 ==> ?n5 n6. n1 = NPar n5 n6 /\ junkcong fvs n5 n3 /\ junkcong fvs n6 n4)`
+    suffices_by metis_tac[]
+  >> ho_match_mp_tac junkcong_strongind
+  >> rpt strip_tac >> fs[junkcong_refl,junkcong_sym]
+  >> rfs[] >> fs[] >> metis_tac[junkcong_trans]);
+
+val junkcong_endpoint_rel_endpoint = Q.store_thm("junkcong_endpoint_rel_endpoint",
+  `!fvs p1 s1 e1 n2.
+   junkcong fvs (NEndpoint p1 s1 e1) n2 ==> ?s2. n2 = NEndpoint p1 s2 e1`,
+  `!fvs n1 n2.
+    junkcong fvs n1 n2
+    ==> (!p1 s1 e1. n1 = NEndpoint p1 s1 e1 ==> ?s2. n2 = NEndpoint p1 s2 e1)
+        /\ !p2 s2 e2. n2 = NEndpoint p2 s2 e2 ==> ?s1. n1 = NEndpoint p2 s1 e2`
+    suffices_by metis_tac[]
+  >> ho_match_mp_tac junkcong_strongind
+  >> rpt strip_tac >> fs[]);
+
+val junkcong_endpoint_queue_eq = Q.store_thm("junkcong_endpoint_queue_eq",
+  `!fvs p1 s1 s2 e1 .
+   junkcong fvs (NEndpoint p1 s1 e1) (NEndpoint p1 s2 e1) ==> s1.queues = s2.queues`,
+  `!fvs n1 n2.
+    junkcong fvs n1 n2
+    ==> (!p1 s1 s2 e1. n1 = NEndpoint p1 s1 e1 /\ n2 = NEndpoint p1 s2 e1
+          ==> s1.queues = s2.queues)`
+    suffices_by metis_tac[]
+  >> ho_match_mp_tac junkcong_strongind
+  >> rpt strip_tac >> fs[] >> rveq
+  >> simp[] >> metis_tac [junkcong_rules,junkcong_endpoint_rel_endpoint]);
+
+val junkcong_endpoints = Q.store_thm("junkcong_endpoints",
+  `!fvs n1 n2. junkcong fvs n1 n2 ==> MAP FST (endpoints n1) = MAP FST (endpoints n2)`,
+  ho_match_mp_tac junkcong_ind
+  >> rpt strip_tac >> fs[endpoints_def]);
+
+val junkcong_trans_pres = Q.store_thm("junkcong_trans_pres",
+  `∀conf p1 q1 fv alpha p2.
+     junkcong fv p1 q1 ∧ trans conf p1 alpha p2
+     ⇒ ∃q2. trans conf q1 alpha q2 ∧ junkcong fv p2 q2`,
+  metis_tac[junkcong_trans_eq])
+
+val junkcong_reduction_pres = Q.store_thm("junkcong_reduction_pres",
+  `∀conf p1 q1 fv alpha p2.
+     junkcong fv p1 q1 ∧ (reduction conf)^* p1 p2
+     ⇒ ∃q2. (reduction conf)^* q1 q2 ∧ junkcong fv p2 q2`,
+  metis_tac[junkcong_reduction_eq])
+
 val _ = export_theory ();
