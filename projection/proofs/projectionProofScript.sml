@@ -13,6 +13,7 @@ open chor_to_endpointTheory
 open chor_to_endpointProofTheory
      endpoint_to_choiceProofTheory
      endpoint_to_payloadProofTheory
+open bisimulationTheory
 
 val _ = new_theory "projectionProof";
 
@@ -67,6 +68,90 @@ Proof
                           endpoint_to_choiceTheory.compile_endpoint_def]
 QED
 
+Theorem compile_endpoint_choice_inj:
+  ∀fv fv' e1 e2.
+  endpoint_to_choice$compile_endpoint fv e1 = endpoint_to_choice$compile_endpoint fv e2
+  ⇒
+  e1 = e2
+Proof
+  Induct_on ‘e1’ >> rw[endpoint_to_choiceTheory.compile_endpoint_def,free_var_names_endpoint_def]
+  >- (Cases_on ‘e2’ >> fs[endpoint_to_choiceTheory.compile_endpoint_def] >> rw[] >> fs[])
+  >- (Cases_on ‘e2’ >> fs[endpoint_to_choiceTheory.compile_endpoint_def] >> rveq
+      >- metis_tac[]
+      >- (PURE_FULL_CASE_TAC >> fs[]))
+  >- (Cases_on ‘e2’ >> fs[endpoint_to_choiceTheory.compile_endpoint_def] >> rw[] >> fs[] >>
+      fs[MEM_FILTER] >> rveq >>
+      >- metis_tac[]
+      >- (PURE_FULL_CASE_TAC >> fs[])
+      >- metis_tac[endpoint_to_choiceTheory.compile_endpoint_def]
+      )
+     )
+
+            >> Cases_on ‘e2’ >> rw[endpoint_to_choiceTheory.compile_endpoint_def] >>
+  res_tac >> fs[] >>
+
+
+QED
+
+
+Theorem junkcong_swap_endpoint:
+  ∀fvs n1 n2.
+    junkcong fvs n1 n2 ⇒
+    ∀fv l s e1 s'.
+      fvs = {fv} ∧ ~MEM fv (free_var_names_endpoint e1) ∧
+      n1 = NEndpoint l s (endpoint_to_choice$compile_endpoint fv e1) ∧
+      n2 = NEndpoint l s' (endpoint_to_choice$compile_endpoint fv e1) ⇒
+     junkcong {fv} (NEndpoint l s e1) (NEndpoint l s' e1)
+Proof
+  ho_match_mp_tac junkcong_strongind >> rw[]
+  >- metis_tac[junkcong_refl]
+  >- metis_tac[junkcong_sym]
+  >- (imp_res_tac junkcong_endpoint_rel_endpoint >> rveq >> metis_tac[junkcong_trans])
+  >- (match_mp_tac junkcong_add_junk >> rfs[])
+QED
+
+Theorem junkcong_fv:
+  ∀fvs n1 n2.
+    junkcong fvs n1 n2 ⇒
+    ∀fv l s e1 s'.
+      fvs = {fv} ∧ MEM fv (free_var_names_endpoint e1) ∧
+      n1 = NEndpoint l s e1 ∧
+      n2 = NEndpoint l s' e1 ⇒
+     s = s'
+Proof
+  ho_match_mp_tac junkcong_strongind >> rw[]
+  >- (imp_res_tac junkcong_endpoint_rel_endpoint >> rveq >>
+      metis_tac[junkcong_free_var_names])
+  >- rfs[]
+QED
+
+Theorem free_var_names_var_names:
+  MEM fv (endpointLang$free_var_names_endpoint e) ⇒ MEM fv (var_names_endpoint e)
+Proof
+  Induct_on ‘e’ >> rw[endpointLangTheory.var_names_endpoint_def,endpointLangTheory.free_var_names_endpoint_def,MEM_FILTER] >>
+  res_tac >> fs[]
+QED
+
+Theorem junkcong_compile_network_fv:
+  ∀fv e1 e2.
+  junkcong {fv}
+    (compile_network_fv fv e1)
+    e2 ∧ ~MEM fv (var_names_network e1) ⇒
+  ∃e2'.
+    junkcong {fv} (e1) e2' ∧
+    e2 = compile_network_fv fv e2'
+Proof
+  Induct_on ‘e1’ >> rw[compile_network_fv_def,var_names_network_def]
+  >- (imp_res_tac junkcong_nil_rel_nil >> rveq >> goal_assum drule >> rw[compile_network_fv_def])
+  >- (imp_res_tac junkcong_par_rel_par >> rveq >> res_tac >> rveq >>
+      metis_tac[junkcong_par,compile_network_fv_def])
+  >- (imp_res_tac junkcong_endpoint_rel_endpoint >> rveq >>
+      qexists_tac ‘NEndpoint l s2 e’ >>
+      rw[compile_network_fv_def] >>
+      drule_then match_mp_tac junkcong_swap_endpoint >> rw[] >>
+      metis_tac[free_var_names_var_names])
+QED
+
 Theorem projection_preservation:
   ∀s c s'' c'' conf.
    compile_network_ok s c (procsOf c)
@@ -101,6 +186,156 @@ Proof
   \\ irule to_payload_preservation
   \\ fs [Abbr‘to_choice’]
   \\ rw [choice_free_network_compile_network_fv]
+QED
+
+Theorem trans_s_trans:
+  trans_s (s,c) (s',c') ∧ trans_s (s',c') (s'',c'') ⇒
+  trans_s (s,c) (s'',c'')
+Proof
+  rw[trans_s_def] >> imp_res_tac RTC_RTC
+QED
+
+(* TODO: move *)
+Definition variables_def:
+  (variables (chorLang$Nil) = {}) /\
+  (variables (IfThen v p c1 c2) = {(v,p)} ∪ (variables c1 ∪ variables c2)) /\
+  (variables (Com p1 v1 p2 v2 c) = {(v1,p1);(v2,p2)} ∪ (variables c)) /\
+  (variables (Let v p f vl c) = set(MAP (λv. (v,p)) vl) ∪ {(v,p)} ∪ variables c) /\
+  (variables (Sel p b q c) = variables c)
+End
+
+Theorem trans_variables_mono:
+  ∀s c a l s' c'.
+  trans (s,c) (a,l) (s',c') ⇒
+  variables c' ⊆ variables c
+Proof
+  ho_match_mp_tac trans_pairind >>
+  rw[variables_def] >>
+  fs[SUBSET_DEF]
+QED
+
+Theorem trans_s_variables_mono:
+  ∀s c s' c'.
+  trans_s (s,c) (s',c') ⇒
+  variables c' ⊆ variables c
+Proof
+  rpt strip_tac >>
+  ‘(∀sc sc'. (λp q. ∃s. chorSem$trans p s q) sc sc' ⇒ combin$C pred_set$SUBSET ((λ(s,c). variables c) sc) ((λ(s,c). variables c) sc'))’
+    by(Cases >> Cases >> rw[] >> rename1 ‘trans _ a _’ >> Cases_on ‘a’ >> metis_tac[trans_variables_mono]) >>
+  dxrule RTC_lifts_reflexive_transitive_relations >>
+  disch_then(qspecl_then [‘(s,c)’,‘(s',c')’] mp_tac) >>
+  simp[] >>
+  disch_then match_mp_tac >>
+  fs[trans_s_def] >>
+  fs[reflexive_def,transitive_def] >>
+  metis_tac[SUBSET_TRANS]
+QED
+
+Theorem split_sel_variables:
+  split_sel p1 p2 c = SOME(b,c') ⇒
+  variables c' = variables c
+Proof
+  Induct_on ‘c’ >> rw[split_sel_def,variables_def]
+QED
+
+Theorem project'_variables_eq:
+  ∀proc c.
+  project_ok proc c ⇒
+  set (var_names_endpoint (project' proc c)) = IMAGE FST (variables c ∩ {(a,v) | a=a ∧ v = proc})
+Proof
+  ho_match_mp_tac project_ind >> rw[project_def,var_names_endpoint_def,variables_def] >>
+  res_tac >> fs[SUBSET_DEF,INTER_DEF,IMAGE_DEF,FUN_EQ_THM,PULL_EXISTS,MEM_MAP] >-
+    (metis_tac[IN_DEF]) >-
+    (metis_tac[IN_DEF]) >>
+  rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
+  fs[var_names_endpoint_def] >>
+  rw[] >> res_tac >>
+  rveq >> metis_tac[split_sel_variables,IN_DEF]
+QED
+
+Theorem projection_variables_eq_lemma:
+  ∀procs s c.
+  compile_network_ok s c procs ⇒
+  set (var_names_network (compile_network s c procs)) = IMAGE FST (variables c ∩ {(a,v) | a=a ∧ MEM v procs})
+Proof
+  Induct_on ‘procs’ >> rw[compile_network_gen_def,var_names_network_def] >>
+  res_tac >>
+  rw[EXTENSION,PULL_EXISTS,EQ_IMP_THM] >>
+  rfs[project'_variables_eq,PULL_EXISTS] >>
+  rveq >> metis_tac[]
+QED
+
+Theorem variables_IN_procsOF:
+  x ∈ variables c ⇒ MEM (SND x) (procsOf c)
+Proof
+  Induct_on ‘c’ >> rw[procsOf_def,variables_def,MEM_nub',MEM_MAP] >> rw[]
+QED
+
+Theorem projection_variables_eq:
+  ∀s c.
+  compile_network_ok s c (procsOf c) ⇒
+  set (var_names_network (compile_network s c (procsOf c))) = IMAGE FST (variables c)
+Proof
+  rpt strip_tac >> drule projection_variables_eq_lemma >>
+  disch_then SUBST_ALL_TAC >>
+  rw[EXTENSION,PULL_EXISTS,EQ_IMP_THM] >>
+  metis_tac[FST,PAIR,variables_IN_procsOF]
+QED
+
+Theorem project'_variables_SUBSET:
+  ∀proc c.
+  set (var_names_endpoint (project' proc c)) ⊆ IMAGE FST (variables c)
+Proof
+  ho_match_mp_tac project_ind >> rw[project_def,var_names_endpoint_def,variables_def] >>
+  res_tac >> fs[SUBSET_DEF] >-
+    (rw[PULL_EXISTS,MEM_MAP]) >>
+  rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
+  fs[var_names_endpoint_def] >>
+  rw[] >> res_tac >>
+  rveq >> metis_tac[split_sel_variables]
+QED
+
+Theorem projection_variables_SUBSET:
+  ∀s c procs.
+  set(var_names_network (compile_network s c procs)) ⊆
+  IMAGE FST (variables c)
+Proof
+  Induct_on ‘procs’ >> rw[compile_network_gen_def,var_names_network_def] >>
+  MATCH_ACCEPT_TAC project'_variables_SUBSET
+QED
+
+Theorem projection_preservation_lift_junkcong:
+  ∀s c s'' c'' conf.
+   compile_network_ok s c (procsOf c)
+   ∧ conf.payload_size > 0
+   ∧ trans_s (s,c) (s'',c'')
+   ∧ no_undefined_vars (s,c)
+   ∧ no_self_comunication c
+   ⇒ ∃s''' c''' epn.
+      trans_s (s'',c'') (s''',c''') ∧
+      junkcong {new_fv s c}
+        (compile_network s''' c''' (procsOf c))
+        epn ∧
+      (reduction conf)^* (projection conf s c (procsOf c))
+                         (compile_network conf (compile_network_fv (new_fv s c) epn))
+Proof
+  rw [] >>
+  drule_all_then strip_assume_tac projection_preservation >>
+  goal_assum drule >>
+  fs[project_choice_def] >>
+  drule junkcong_compile_network_fv >> impl_tac >-
+    (dxrule_all_then assume_tac trans_s_trans
+     \\ drule_then assume_tac trans_s_variables_mono
+     \\ spose_not_then strip_assume_tac
+     \\ drule(projection_variables_SUBSET |> REWRITE_RULE[SUBSET_DEF])
+     \\ strip_tac
+     \\ fs[SUBSET_DEF] \\ res_tac
+     \\ drule projection_variables_eq
+     \\ disch_then(mp_tac o SIMP_RULE std_ss [EXTENSION])
+     \\ disch_then(qspec_then ‘FST x’ mp_tac)
+     \\ simp[]
+     \\ metis_tac[gen_fresh_name_same]) >>
+  metis_tac[]
 QED
 
 val from_choice_reflection =
