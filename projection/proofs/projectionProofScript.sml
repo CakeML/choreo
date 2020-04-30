@@ -86,7 +86,7 @@ QED
 
 Theorem junkcong_fv:
   ∀fvs n1 n2.
-    junkcong fvs n1 n2 ⇒
+    endpointProps$junkcong fvs n1 n2 ⇒
     ∀fv l s e1 s'.
       fvs = {fv} ∧ MEM fv (free_var_names_endpoint e1) ∧
       n1 = NEndpoint l s e1 ∧
