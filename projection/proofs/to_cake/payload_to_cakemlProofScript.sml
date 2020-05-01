@@ -3556,6 +3556,12 @@ Proof
   simp[sendloop_def]
 QED
 
+Theorem ALL_DISTINCT_receiveloop_names[simp]:
+  ALL_DISTINCT (MAP (λ(x,y,z). x) (receiveloop c d))
+Proof
+  simp[receiveloop_def]
+QED
+
 Theorem nsLookup_sendloop[simp]:
   nsLookup (build_rec_env (sendloop conf data) env envv) (Short (ps2cs v)) =
   nsLookup envv (Short (ps2cs v))
@@ -3621,6 +3627,19 @@ Proof
   Cases_on ‘x’ >> Cases_on ‘r’ >> simp[]
 QED
 
+Definition check_option_def[simp]:
+  check_option NONE e (s:α state) = (s, Rerr e) ∧
+  check_option (SOME y) e s = (s, Rval y)
+End
+
+Theorem option_bind:
+  (case x of NONE => (s, Rerr e) | SOME y => f s y) =
+  do (s,y) <- check_option x e s ; f s y od
+Proof
+  Cases_on ‘x’ >> simp[]
+QED
+
+
 
 Theorem evaluate_opapp:
   evaluate st env [App Opapp [e1; e2]] =
@@ -3642,6 +3661,8 @@ Proof
      by metis_tac[pair_CASES, TypeBase.nchotomy_of “:(α,β) result”] >>
   simp[]
 QED
+
+Theorem evaluate_nonsing = evaluate_def |> CONJUNCTS |> el 2
 
 val evalths = evaluate_def |> CONJUNCTS
 fun find_evalform q =
@@ -3815,8 +3836,8 @@ Proof
   PairCases_on ‘ffi’ >> simp[ffi_state_cor_def]
 QED
 
-Theorem env_asm_ignores_ps2cs_bindings[simp]:
-  env_asm (e with v := nsBind (ps2cs vr) value e.v) conf ⇔
+Theorem env_asm_ignores_nsBindings[simp]:
+  env_asm (e with v := nsBind k value e.v) conf ⇔
   env_asm e conf
 Proof
   simp[env_asm_def, in_module_def, has_v_def]>> csimp[]
@@ -3828,6 +3849,18 @@ Theorem enc_ok_ignores_nsBind[simp]:
 Proof
   Induct_on ‘xs’ >> Cases_on ‘ys’ >> simp[enc_ok_def] >>
   Cases_on ‘e.v’ >> simp[nsLookup_def, nsBind_def, getLetID_def]
+QED
+
+Theorem do_con_check_tuple[simp]:
+  do_con_check e NONE l
+Proof
+  simp[do_con_check_def]
+QED
+
+Theorem build_conv_NONE[simp]:
+  build_conv e NONE vs = SOME (Conv NONE vs)
+Proof
+  simp[build_conv_def]
 QED
 
 (* FORWARD CORRECTNESS
@@ -4077,7 +4110,46 @@ Proof
       ‘∃p2 q2 n2. cSt2.ffi.ffi_state = (p2,q2,n2)’
         by metis_tac[TypeBase.nchotomy_of “:α#β”] >>
       fs[ffi_state_cor_def] >> metis_tac[IS_PREFIX_TRANS, qpush_prefix])
-  >- ((* receiveloop on left *) cheat )
+  >- ((* receiveloop on left *)
+      simp[find_evalform ‘Let _ _ _’, find_evalform ‘App _ _’,
+           find_evalform ‘Lit _’,
+           generic_casebind, bind_assoc, o_UNCURRY_R, C_UNCURRY_L, o_ABS_R,
+           C_ABS_L, evaluate_nonsing] >>
+      simp[do_app_def, store_alloc_def] >>
+      simp[find_evalform ‘Letrec _ _’] >>
+      qpat_abbrev_tac ‘buffE = cEnv1 with v := nsOptBind (SOME "buff") _ _’ >>
+      qpat_abbrev_tac ‘bre = build_rec_env (receiveloop _ _) _ _’ >>
+      ‘nsLookup bre (Short "receiveloop") =
+         SOME (Recclosure buffE (receiveloop conf (MAP (CHR o w2n) p1))
+                          "receiveloop")’
+        by simp[Abbr‘bre’, build_rec_env_def, receiveloop_def] >>
+      simp[Ntimes (find_evalform ‘App _ _’) 2, evaluate_nonsing,
+           generic_casebind,
+           bind_assoc, o_UNCURRY_R, C_UNCURRY_L, o_ABS_R, C_ABS_L,
+           find_evalform ‘Var _’, option_bind, find_evalform ‘Con _ _’] >>
+      fs[cpEval_valid_def] >>
+      qpat_abbrev_tac ‘arefs = cSt1.refs ++ [_]’ >>
+      qabbrev_tac ‘cSt1' = cSt1 with refs := arefs’ >>
+      ‘env_asm buffE conf ∧
+       nsLookup buffE.v (Short "buff") = SOME (Loc (LENGTH cSt1.refs))’
+        by simp[Abbr‘buffE’, nsOptBind_def] >>
+      ‘ffi_wf cSt1'.ffi.ffi_state ∧ cSt1'.ffi.oracle = comms_ffi_oracle conf’
+        by simp[Abbr‘cSt1'’] >>
+      pop_assum (mp_then (Pos last)
+                 (drule_then $ qspec_then ‘p1’ strip_assume_tac)
+                 ffi_gets_stream)
+      >- (pop_assum (mp_then (Pos last)
+                     (qspec_then ‘cEnv1 with v := bre’ mp_tac)
+                     receiveloop_correct_term) >>
+          simp[Abbr‘cSt1'’, store_lookup_def, Abbr‘arefs’, EL_APPEND2] >>
+          disch_then (qx_choosel_then [‘ck1’, ‘ck2’, ‘finalBuf’, ‘refs2’, ‘rv’]
+                      strip_assume_tac) >>
+          Q.REFINE_EXISTS_TAC ‘ck1 + mc’ >>
+          dxrule evaluate_add_to_clock >> simp[] >> disch_then kall_tac >>
+          cheat (* use convDatumList_corr, do_opapp_translate *)) >>
+      >- ((* divg stream *) cheat)
+      >- ((* fail stream *) cheat)
+   )
   >- ((* double receiveloop *) cheat )
   >- ((* if / guard -> T *) cheat)
   >- ((* if / guard -> F *) cheat)
