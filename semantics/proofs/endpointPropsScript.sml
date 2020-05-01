@@ -2091,4 +2091,13 @@ Proof
   \\ drule junkcong_endpoint_queue_eq \\ fs []
 QED
 
+Theorem junkcong_net_end:
+  ∀fv n1 n2. junkcong fv n1 n2 ⇒ (net_end n1 ⇔ net_end n2)
+Proof
+  ho_match_mp_tac junkcong_ind
+  \\ rw [endpointLangTheory.net_end_def]
+  \\ Cases_on ‘e’
+  \\ rw [endpointLangTheory.net_end_def]
+QED
+
 val _ = export_theory ()

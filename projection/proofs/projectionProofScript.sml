@@ -1026,4 +1026,29 @@ Proof
                payloadLangTheory.normalise_queues_def]
 QED
 
+Theorem projection_net_end:
+  ∀l conf s. net_end (projection conf s Nil l)
+Proof
+  Induct \\ EVAL_TAC
+  \\ rw [] \\ pop_assum (ASSUME_TAC o EVAL_RULE)
+  \\ rw []
+QED
+
+Theorem net_end_net_find:
+  ∀n p.
+   net_end n ∧ net_has_node n p
+   ⇒ ∃s. net_find p n = SOME (NEndpoint p s Nil)
+Proof
+  Induct \\ EVAL_TAC
+  \\ rw []
+  >- (fs [net_has_node_IS_SOME_net_find]
+      \\ first_x_assum drule_all
+      \\ fs [IS_SOME_EXISTS])
+  >- (Cases_on ‘IS_SOME (net_find p n)’ \\ fs []
+      \\ fs [GSYM net_has_node_IS_SOME_net_find]
+      \\ res_tac
+      \\ rw [] \\ fs [])
+  \\ Cases_on ‘e’ \\ fs [payloadLangTheory.net_end_def]
+QED
+
 val _ = export_theory ()

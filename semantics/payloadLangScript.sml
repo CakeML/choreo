@@ -173,4 +173,11 @@ Definition net_filter_def:
        else NPar n1 (net_filter p n2)
 End
 
+Definition net_end_def:
+  net_end NNil = T
+∧ net_end (NEndpoint _ _ Nil) = T
+∧ net_end (NPar l r) = (net_end l ∧ net_end r)
+∧ net_end _ = F
+End
+
 val _ = export_theory ()

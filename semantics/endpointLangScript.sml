@@ -65,4 +65,11 @@ val choice_free_network_def = Define `
 ∧ (choice_free_network (NPar n1 n2) = (choice_free_network n1 ∧ choice_free_network n2))
 ∧ (choice_free_network (NEndpoint p s e) = choice_free_endpoint e)`
 
+Definition net_end_def:
+  net_end NNil = T
+∧ net_end (NEndpoint _ _ Nil) = T
+∧ net_end (NPar l r) = (net_end l ∧ net_end r)
+∧ net_end _ = F
+End
+
 val _ = export_theory ()

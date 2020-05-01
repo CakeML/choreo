@@ -2622,4 +2622,13 @@ val junkcong_reduction_pres = Q.store_thm("junkcong_reduction_pres",
      ⇒ ∃q2. (reduction conf)^* q1 q2 ∧ junkcong fv p2 q2`,
   metis_tac[junkcong_reduction_eq])
 
+Theorem junkcong_net_end:
+  ∀fv n1 n2. junkcong fv n1 n2 ⇒ (net_end n1 ⇔ net_end n2)
+Proof
+  ho_match_mp_tac junkcong_ind
+  \\ rw [net_end_def]
+  \\ Cases_on ‘e’
+  \\ rw [net_end_def]
+QED
+
 val _ = export_theory ();
