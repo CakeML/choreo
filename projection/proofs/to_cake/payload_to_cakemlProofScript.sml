@@ -4146,7 +4146,7 @@ Proof
                       strip_assume_tac) >>
           Q.REFINE_EXISTS_TAC ‘ck1 + mc’ >>
           dxrule evaluate_add_to_clock >> simp[] >> disch_then kall_tac >>
-          cheat (* use convDatumList_corr, do_opapp_translate *)) >>
+          cheat (* use convDatumList_corr, do_opapp_translate *))
       >- ((* divg stream *) cheat)
       >- ((* fail stream *) cheat)
    )
