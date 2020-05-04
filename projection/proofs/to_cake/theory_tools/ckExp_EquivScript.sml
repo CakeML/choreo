@@ -5,7 +5,8 @@ open semanticPrimitivesTheory
      evaluatePropsTheory
      ml_translatorTheory;
 open evaluate_toolsTheory
-     evaluate_rwLib;
+     evaluate_rwLib
+     state_tacticLib;
 
 val _ = new_theory "ckExp_Equiv";
 
@@ -158,6 +159,56 @@ Proof
   ‘Litv cL = cV’
     suffices_by simp[] >>
   metis_tac[UNCT_def]
+QED
+
+Theorem ck_equiv_hol_apply_custom_App:
+  ∀cEnv (hTa : α -> v -> bool) (hTb : β -> v -> bool)
+   fExp (hF : α -> β) (cSt : γ semanticPrimitives$state)
+   rc1 aExp rc2 refs2 (ffi2 : γ ffi_state) cV hV.
+    ck_equiv_hol cEnv (hTa --> hTb) fExp hF ∧
+    evaluate (cSt with clock := rc1) cEnv [aExp]
+              = (cSt with <|clock := rc2;
+                            refs := refs2;
+                            ffi := ffi2|>,
+                Rval [cV]) ∧
+    hTa hV cV ⇒
+    ∃bc1 bc2 drefs cVr.
+      hTb (hF hV) cVr ∧
+      ∀dc.
+        evaluate (cSt with clock := bc1 + dc) cEnv [App Opapp [fExp;aExp]]
+        = (cSt with <|clock := dc + bc2;
+                      refs := refs2 ++ drefs;
+                      ffi := ffi2|>,
+            Rval [cVr])
+Proof
+  rpt strip_tac >>
+  rw[evaluate_def] >>
+  dxrule evaluate_add_to_clock >> rw[] >>
+  rename1 ‘∀extra.
+            evaluate (cSt with clock := extra + AC1) cEnv [aExp] = (_ with clock := extra + BC1,Rval [cV])’ >>
+  Q.REFINE_EXISTS_TAC ‘bc1 + AC1’ >>
+  fs[] >> simp[] >>
+  pop_assum kall_tac >>
+  drule_then assume_tac (INST_TYPE [beta |-> gamma] ck_equiv_hol_apply) >>
+  first_x_assum (qspec_then ‘cSt with <|refs := refs2; ffi := ffi2|>’ strip_assume_tac) >>
+  rename1 ‘∀dc.
+            evaluate (_ with clock := AC2 + dc) cEnv [fExp] = (_ with clock := dc + BC2,Rval [cVf])’ >>
+  Q.REFINE_EXISTS_TAC ‘bc1 + AC2’ >>
+  simp[] >> 
+  Q.REFINE_EXISTS_TAC ‘SUC bc1’ >> rw[dec_clock_def,arithmeticTheory.ADD1] >>
+  pop_assum kall_tac >>
+  qpat_x_assum ‘ck_equiv_hol _ _ _ _’ kall_tac >>
+  drule_all_then assume_tac (INST_TYPE [gamma |-> gamma] do_opapp_translate_general) >>
+  fs[PULL_EXISTS] >>
+  unite_nums "ec1" >> simp[] >>
+  qmatch_goalsub_abbrev_tac ‘evaluate (cStR with clock := _) _ _’ >>
+  first_x_assum (qspec_then ‘cStR’ strip_assume_tac) >>
+  rename1 ‘∀dc.
+            evaluate (_ with clock := bc1 + dc) cfa_env [cfa_exp] =
+              (cStR with <|clock := bc2 + dc; refs := cStR.refs ++ drefs1|>,
+               Rval [cVr])’ >>
+  MAP_EVERY qexists_tac [‘bc1’,‘bc2 + ec1’,‘drefs ++ drefs1’,‘cVr’] >>
+  rw[] >> qunabbrev_tac ‘cStR’ >> rw[state_component_equality]
 QED
 
 (* Methods of constructing equivalence *)

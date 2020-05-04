@@ -49,13 +49,14 @@ Proof
 QED
 
 (* Applying translated function in arbitrary state to produce correct result *)
-Theorem do_opapp_translate:
-  ∀ cfv hf ha cav ta tb (cSt: 'ffi semanticPrimitives$state).
-    (ta --> tb) hf cfv                     ∧
+Theorem do_opapp_translate_general:
+  ∀ cfv hf (ha : α) cav (ta : α -> v -> bool) (tb : β -> v -> bool).
+    (ta --> tb) hf cfv ∧
     ta ha cav
     ⇒ ∃cfa_env cfa_exp.
         do_opapp [cfv; cav] = SOME (cfa_env,cfa_exp) ∧
-        ∃ bc1 bc2 drefs crv.
+        ∀(cSt: γ semanticPrimitives$state).
+        ∃bc1 bc2 drefs crv.
           tb (hf ha) crv ∧
           ∀x dc.
             x = bc1 + dc
@@ -84,5 +85,27 @@ Proof
   metis_tac[evaluate_generalise]
 QED
 
+Theorem do_opapp_translate_general_prop:
+  ∀ cfv hf (ha : α) cav (ta : α -> v -> bool) (tb : β -> v -> bool)
+    (cSt: γ semanticPrimitives$state).
+    (ta --> tb) hf cfv                     ∧
+    ta ha cav
+    ⇒ ∃cfa_env cfa_exp.
+        do_opapp [cfv; cav] = SOME (cfa_env,cfa_exp) ∧
+        ∃bc1 bc2 drefs crv.
+          tb (hf ha) crv ∧
+          ∀x dc.
+            x = bc1 + dc
+            ⇒ evaluate (cSt with clock := x) cfa_env [cfa_exp]
+              = (cSt with <|clock := bc2 + dc;
+                          refs := cSt.refs ++ drefs|>,
+                  Rval [crv])
+Proof
+  rw[] >>
+  drule_all_then strip_assume_tac do_opapp_translate_general >>
+  rw[] >> metis_tac[]
+QED
+
+Theorem do_opapp_translate = INST_TYPE [beta |-> Type ‘:'ffi’] do_opapp_translate_general_prop
 
 val _ = export_theory ();

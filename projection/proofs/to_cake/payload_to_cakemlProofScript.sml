@@ -2495,10 +2495,263 @@ QED
 (* RECEIVE EVENTS FFI INTERACTION
     Used with receiveloop_correct in proofs to model
     changes to FFI *)
+(* receive_events of a term stream cannot change the cpNum *)
+Theorem ffi_num_receive_events_term_irrel:
+  ∀conf src cs bufInit ffi1.
+    LENGTH bufInit = SUC conf.payload_size ∧
+    ffi_wf ffi1.ffi_state ∧
+    ffi1.oracle = comms_ffi_oracle conf ∧
+    ffi_term_stream conf ffi1 src cs ⇒
+    FST ffi1.ffi_state =
+    FST (update_state ffi1.ffi_state (comms_ffi_oracle conf)
+         (receive_events_raw conf bufInit src cs))
+Proof
+  Induct_on ‘cs’ >>
+  rw[receive_events_raw_def,ZIP_def,update_state_def] >>
+  qmatch_goalsub_abbrev_tac ‘FST (update_state s1 _ _)’ >>
+  rename1 ‘ZIP (h::cs,cs)’ >>
+  first_x_assum (qspecl_then [‘conf’,‘src’,‘h’,‘ffi1 with ffi_state := s1’]
+                              assume_tac) >>
+  fs[receive_events_raw_def] >>
+  Cases_on ‘cs’
+  >- (rw[ZIP_def,update_state_def] >>
+      qunabbrev_tac ‘s1’ >>
+      SELECT_ELIM_TAC >> rw[]
+      >- (fs[ffi_term_stream_def,call_FFI_def,valid_receive_call_format_def] >>
+          last_x_assum (drule_then strip_assume_tac) >>
+          rfs[AllCaseEqs()] >> rw[MAP_ZIP]) >>
+      fs[comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()] >>
+      pop_assum mp_tac >> DEEP_INTRO_TAC some_intro >> rw[] >>
+      fs[] >> metis_tac[strans_pres_pnum]) >>
+  qunabbrev_tac ‘s1’ >>
+  pop_assum mp_tac >>
+  ‘∃x.
+    comms_ffi_oracle conf "receive" ffi1.ffi_state src
+      (MAP FST (ZIP (bufInit,h))) =
+    Oracle_return x (MAP SND (ZIP (bufInit,h)))’
+    by (fs[ffi_term_stream_def,valid_receive_call_format_def,call_FFI_def] >>
+        rfs[AllCaseEqs()] >>
+        rpt (first_x_assum (qspec_then ‘bufInit’ assume_tac)) >>
+        rfs[] >> rw[MAP_ZIP]) >>
+  impl_tac >> rw[]
+  >- (fs[ffi_term_stream_def,valid_receive_call_format_def] >>
+      first_x_assum (drule_then assume_tac) >>
+      fs[call_FFI_def,comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()])
+  >- (fs[comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()] >>
+      pop_assum mp_tac >>
+      DEEP_INTRO_TAC some_intro >> rw[] >>
+      PairCases_on ‘x’ >> fs[] >>
+      metis_tac[strans_pres_wf])
+  >- (rename1 ‘h1::t’ >>
+      fs[ffi_term_stream_def,call_FFI_def,valid_receive_call_format_def] >>
+      rpt (first_x_assum (qspec_then ‘bufInit’ assume_tac)) >>
+      rfs[AllCaseEqs()] >> rw[] >> fs[] >> rw[] >>
+      qmatch_asmsub_abbrev_tac ‘ffi_term_stream conf ffi1M src (h1::t)’ >>
+      qmatch_goalsub_abbrev_tac ‘ffi_term_stream conf ffi1M2 src (h1::t)’ >>
+      ‘ffi_term_stream conf ffi1M = ffi_term_stream conf ffi1M2’
+        suffices_by metis_tac[] >>
+      irule ffi_eq_term_stream >>
+      MAP_EVERY qunabbrev_tac [‘ffi1M’,‘ffi1M2’] >>
+      fs[comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()] >>
+      pop_assum mp_tac >> DEEP_INTRO_TAC some_intro >> rw[] >>
+      fs[]
+      >- metis_tac[strans_pres_wf]
+      >- metis_tac[strans_pres_wf]
+      >- metis_tac[ffi_eq_equivRel,equivalence_def,reflexive_def]) >>
+  ‘FST ffi1.ffi_state = FST x’
+    suffices_by metis_tac[] >>
+  pop_assum kall_tac >>
+  fs[comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()] >>
+  pop_assum mp_tac >> DEEP_INTRO_TAC some_intro >> rw[] >>
+  fs[] >> metis_tac[strans_pres_pnum]
+QED
+
+(* receive_events of a term stream cannot break wellformedness *)
+Theorem ffi_wf_receive_events_term_irrel:
+  ∀conf src cs bufInit ffi1.
+    LENGTH bufInit = SUC conf.payload_size ∧
+    ffi_wf ffi1.ffi_state ∧
+    ffi1.oracle = comms_ffi_oracle conf ∧
+    ffi_term_stream conf ffi1 src cs ⇒
+    ffi_wf
+      (update_state ffi1.ffi_state (comms_ffi_oracle conf)
+        (receive_events_raw conf bufInit src cs))
+Proof
+  Induct_on ‘cs’ >>
+  rw[receive_events_raw_def,ZIP_def,update_state_def] >>
+  qmatch_goalsub_abbrev_tac ‘ffi_wf (update_state s1 _ _)’ >>
+  rename1 ‘ZIP (h::cs,cs)’ >>
+  first_x_assum (qspecl_then [‘conf’,‘src’,‘h’,‘ffi1 with ffi_state := s1’]
+                              assume_tac) >>
+  fs[receive_events_raw_def] >>
+  Cases_on ‘cs’
+  >- (rw[ZIP_def,update_state_def] >>
+      qunabbrev_tac ‘s1’ >>
+      SELECT_ELIM_TAC >> rw[]
+      >- (fs[ffi_term_stream_def,call_FFI_def,valid_receive_call_format_def] >>
+          last_x_assum (drule_then strip_assume_tac) >>
+          rfs[AllCaseEqs()] >> rw[MAP_ZIP]) >>
+      fs[comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()] >>
+      pop_assum mp_tac >> DEEP_INTRO_TAC some_intro >> rw[] >>
+      fs[] >> metis_tac[strans_pres_wf]) >>
+  first_x_assum irule >>
+  qunabbrev_tac ‘s1’ >>
+  ‘∃x.
+    comms_ffi_oracle conf "receive" ffi1.ffi_state src
+      (MAP FST (ZIP (bufInit,h))) =
+    Oracle_return x (MAP SND (ZIP (bufInit,h)))’
+    by (fs[ffi_term_stream_def,valid_receive_call_format_def,call_FFI_def] >>
+        rfs[AllCaseEqs()] >>
+        rpt (first_x_assum (qspec_then ‘bufInit’ assume_tac)) >>
+        rfs[] >> rw[MAP_ZIP]) >> rw[]
+  >- (fs[comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()] >>
+      pop_assum mp_tac >>
+      DEEP_INTRO_TAC some_intro >> rw[] >>
+      PairCases_on ‘x’ >> fs[] >>
+      metis_tac[strans_pres_wf])
+  >- (fs[ffi_term_stream_def,valid_receive_call_format_def] >>
+      first_x_assum (drule_then assume_tac) >>
+      fs[call_FFI_def,comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()])
+  >- (rename1 ‘h1::t’ >>
+      fs[ffi_term_stream_def,call_FFI_def,valid_receive_call_format_def] >>
+      rpt (first_x_assum (qspec_then ‘bufInit’ assume_tac)) >>
+      rfs[AllCaseEqs()] >> rw[] >> fs[] >> rw[] >>
+      qmatch_asmsub_abbrev_tac ‘ffi_term_stream conf ffi1M src (h1::t)’ >>
+      qmatch_goalsub_abbrev_tac ‘ffi_term_stream conf ffi1M2 src (h1::t)’ >>
+      ‘ffi_term_stream conf ffi1M = ffi_term_stream conf ffi1M2’
+        suffices_by metis_tac[] >>
+      irule ffi_eq_term_stream >>
+      MAP_EVERY qunabbrev_tac [‘ffi1M’,‘ffi1M2’] >>
+      fs[comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()] >>
+      pop_assum mp_tac >> DEEP_INTRO_TAC some_intro >> rw[] >>
+      fs[]
+      >- metis_tac[strans_pres_wf]
+      >- metis_tac[strans_pres_wf]
+      >- metis_tac[ffi_eq_equivRel,equivalence_def,reflexive_def])
+QED
+
+(* receive_events of a term stream retains equivalence *)
+Theorem ffi_eq_receive_events_term_irrel:
+  ∀conf src cs bufInit ffi1 ffi2.
+   LENGTH bufInit = SUC conf.payload_size ⇒
+   ffi_eq conf ffi1.ffi_state ffi2.ffi_state ⇒
+   ffi_wf ffi1.ffi_state ⇒
+   ffi_wf ffi2.ffi_state ⇒
+   ffi1.oracle = comms_ffi_oracle conf ⇒
+   ffi2.oracle = comms_ffi_oracle conf ⇒
+   ffi_term_stream conf ffi1 src cs ⇒
+   ffi_term_stream conf ffi2 src cs ⇒
+   ffi_eq conf
+     (update_state ffi1.ffi_state (comms_ffi_oracle conf)
+        (receive_events_raw conf bufInit src cs))
+     (update_state ffi2.ffi_state (comms_ffi_oracle conf)
+        (receive_events_raw conf bufInit src cs))
+Proof
+  Induct_on ‘cs’ >>
+  rw[receive_events_raw_def,ZIP_def,update_state_def] >>
+  qmatch_goalsub_abbrev_tac ‘ffi_eq _ (update_state s1 _ _) (update_state s2 _ _)’ >>
+  rename1 ‘ZIP (h::cs,cs)’ >>
+  first_x_assum (qspecl_then [‘conf’,‘src’,‘h’,‘ffi1 with ffi_state := s1’,
+                              ‘ffi2 with ffi_state := s2’]
+                              assume_tac) >>
+  fs[receive_events_raw_def] >>
+  Cases_on ‘cs’
+  >- (rw[ZIP_def,update_state_def] >>
+      MAP_EVERY qunabbrev_tac [‘s2’,‘s1’] >>
+      SELECT_ELIM_TAC >> rw[]
+      >- (fs[ffi_term_stream_def,call_FFI_def,valid_receive_call_format_def] >>
+          last_x_assum (drule_then strip_assume_tac) >>
+          rfs[AllCaseEqs()] >> rw[MAP_ZIP]) >>
+      SELECT_ELIM_TAC >> rw[]
+      >- (fs[ffi_term_stream_def,call_FFI_def,valid_receive_call_format_def] >>
+          first_x_assum (drule_then strip_assume_tac) >>
+          rfs[AllCaseEqs()] >> rw[MAP_ZIP]) >>
+      fs[comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()] >>
+      ntac 2 (pop_assum mp_tac >> DEEP_INTRO_TAC some_intro) >> rw[] >>
+      fs[] >> metis_tac[ffi_eq_pres]) >>
+  first_x_assum irule >>
+  MAP_EVERY qunabbrev_tac [‘s1’,‘s2’] >>
+  ‘∃x.
+    comms_ffi_oracle conf "receive" ffi1.ffi_state src
+      (MAP FST (ZIP (bufInit,h))) =
+    Oracle_return x (MAP SND (ZIP (bufInit,h)))’
+    by (fs[ffi_term_stream_def,valid_receive_call_format_def,call_FFI_def] >>
+        rfs[AllCaseEqs()] >>
+        rpt (first_x_assum (qspec_then ‘bufInit’ assume_tac)) >>
+        rfs[] >> rw[MAP_ZIP]) >>
+  ‘∃y.
+    comms_ffi_oracle conf "receive" ffi2.ffi_state src
+      (MAP FST (ZIP (bufInit,h))) =
+    Oracle_return y (MAP SND (ZIP (bufInit,h)))’
+    by (fs[ffi_term_stream_def,valid_receive_call_format_def,call_FFI_def] >>
+        rfs[AllCaseEqs()] >>
+        rpt (first_x_assum (qspec_then ‘bufInit’ assume_tac)) >>
+        rfs[] >> rw[MAP_ZIP]) >> rw[]
+  >- (fs[comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()] >>
+      pop_assum kall_tac >> pop_assum mp_tac >>
+      DEEP_INTRO_TAC some_intro >> rw[] >>
+      PairCases_on ‘x’ >> fs[] >>
+      metis_tac[strans_pres_wf])
+  >- (fs[comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()] >>
+      pop_assum mp_tac >> DEEP_INTRO_TAC some_intro >> rw[] >>
+      PairCases_on ‘y’ >> fs[] >>
+      metis_tac[strans_pres_wf])
+  >- (fs[ffi_term_stream_def,valid_receive_call_format_def] >>
+      first_x_assum (drule_then assume_tac) >>
+      fs[call_FFI_def,comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()])
+  >- (fs[comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()] >>
+      pop_assum mp_tac >>
+      DEEP_INTRO_TAC some_intro >> rw[] >>
+      qpat_x_assum ‘(some (m,ns). strans _ _ (ARecv _ m) ns) = _’ mp_tac >>
+      DEEP_INTRO_TAC some_intro >> rw[] >>
+      fs[] >> metis_tac[ffi_eq_pres])
+  >- (rename1 ‘h1::t’ >>
+      fs[ffi_term_stream_def,call_FFI_def,valid_receive_call_format_def] >>
+      rpt (first_x_assum (qspec_then ‘bufInit’ assume_tac)) >>
+      rfs[AllCaseEqs()] >>
+      ‘MAP FST (ZIP (bufInit,h)) = bufInit ∧
+       MAP SND (ZIP (bufInit,h)) = h’
+        suffices_by (rw[] >> fs[] >> rw[] >>
+                     qpat_x_assum ‘ffi_term_stream conf (ffi2 with <|ffi_state := _;io_events := _|>)
+                                                   src (h1::t)’ kall_tac >>
+                     qmatch_asmsub_abbrev_tac ‘ffi_term_stream conf ffi1M src (h1::t)’ >>
+                     qmatch_goalsub_abbrev_tac ‘ffi_term_stream conf ffi1M2 src (h1::t)’ >>
+                     ‘ffi_term_stream conf ffi1M = ffi_term_stream conf ffi1M2’
+                      suffices_by metis_tac[] >>
+                     irule ffi_eq_term_stream >>
+                     MAP_EVERY qunabbrev_tac [‘ffi1M’,‘ffi1M2’] >>
+                     fs[comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()] >>
+                     ntac 2 (qpat_x_assum ‘(some (m,ns). _ _ _ (_ _ m) ns) = _’ mp_tac >>
+                             DEEP_INTRO_TAC some_intro >> rw[]) >>
+                     fs[] >> metis_tac[strans_pres_wf,ffi_eq_pres,ffi_eq_equivRel,
+                                       equivalence_def,reflexive_def]) >>
+      metis_tac[MAP_ZIP])
+  >- (rename1 ‘h1::t’ >>
+      fs[ffi_term_stream_def,call_FFI_def,valid_receive_call_format_def] >>
+      rpt (first_x_assum (qspec_then ‘bufInit’ assume_tac)) >>
+      rfs[AllCaseEqs()] >>
+      ‘MAP FST (ZIP (bufInit,h)) = bufInit ∧
+       MAP SND (ZIP (bufInit,h)) = h’
+        suffices_by (rw[] >> fs[] >> rw[] >>
+                     qpat_x_assum ‘ffi_term_stream conf (ffi1 with <|ffi_state := _;io_events := _|>)
+                                                   src (h1::t)’ kall_tac >>
+                     qmatch_asmsub_abbrev_tac ‘ffi_term_stream conf ffi2M src (h1::t)’ >>
+                     qmatch_goalsub_abbrev_tac ‘ffi_term_stream conf ffi2M2 src (h1::t)’ >>
+                     ‘ffi_term_stream conf ffi2M = ffi_term_stream conf ffi2M2’
+                      suffices_by metis_tac[] >>
+                     irule ffi_eq_term_stream >>
+                     MAP_EVERY qunabbrev_tac [‘ffi2M’,‘ffi2M2’] >>
+                     fs[comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()] >>
+                     ntac 2 (qpat_x_assum ‘(some (m,ns). _ _ _ (_ _ m) ns) = _’ mp_tac >>
+                             DEEP_INTRO_TAC some_intro >> rw[]) >>
+                     fs[] >> metis_tac[strans_pres_wf,ffi_eq_pres,ffi_eq_equivRel,
+                                       equivalence_def,reflexive_def]) >>
+      metis_tac[MAP_ZIP])
+QED
 
 (* receive_events of a divg stream retain equivalence *)
 Theorem ffi_eq_receive_events_divg_irrel:
-  ∀cs bufInit ffi1 ffi2.
+  ∀conf src cs bufInit ffi1 ffi2.
    LENGTH bufInit = SUC conf.payload_size ⇒
    ffi_eq conf ffi1.ffi_state ffi2.ffi_state ⇒
    ffi_wf ffi1.ffi_state ⇒
@@ -2518,7 +2771,7 @@ Proof
   rw[receive_events_raw_def,ZIP_def,update_state_def] >>
   qmatch_goalsub_abbrev_tac ‘ffi_eq _ (update_state s1 _ _) (update_state s2 _ _)’ >>
   rename1 ‘ZIP (h::cs,cs)’ >>
-  first_x_assum (qspecl_then [‘h’,‘ffi1 with ffi_state := s1’,
+  first_x_assum (qspecl_then [‘conf’,‘src’,‘h’,‘ffi1 with ffi_state := s1’,
                               ‘ffi2 with ffi_state := s2’]
                               assume_tac) >>
   fs[receive_events_raw_def] >>
@@ -2602,7 +2855,7 @@ QED
 
 (* receive_events of a fail stream retain equivalence *)
 Theorem ffi_eq_receive_events_fail_irrel:
-  ∀cs bufInit ffi1 ffi2.
+  ∀conf src cs bufInit ffi1 ffi2.
    LENGTH bufInit = SUC conf.payload_size ⇒
    ffi_eq conf ffi1.ffi_state ffi2.ffi_state ⇒
    ffi_wf ffi1.ffi_state ⇒
@@ -2622,7 +2875,7 @@ Proof
   rw[receive_events_raw_def,ZIP_def,update_state_def] >>
   qmatch_goalsub_abbrev_tac ‘ffi_eq _ (update_state s1 _ _) (update_state s2 _ _)’ >>
   rename1 ‘ZIP (h::cs,cs)’ >>
-  first_x_assum (qspecl_then [‘h’,‘ffi1 with ffi_state := s1’,
+  first_x_assum (qspecl_then [‘conf’,‘src’,‘h’,‘ffi1 with ffi_state := s1’,
                               ‘ffi2 with ffi_state := s2’]
                               assume_tac) >>
   fs[receive_events_raw_def] >>
@@ -3032,7 +3285,7 @@ Proof
       rw[cEval_equiv_def])
   >- ((* Receive Case *)
       qabbrev_tac ‘rec = App Opapp [Var (Short "receiveloop"); Con NONE []]’ >>
-      qabbrev_tac ‘lsa = App Opapp [App Opapp [Var conf.append; rec]; convDatumList conf l]’ >>
+      qabbrev_tac ‘lsa = App Opapp [App Opapp [Var conf.append; convDatumList conf l]; rec]’ >>
       qabbrev_tac ‘lsc = App Opapp [Var conf.concat; lsa]’ >>
       rw (buffer_size_def::eval_sl) >>
       rename1 ‘ALL_DISTINCT
@@ -3050,83 +3303,185 @@ Proof
         by fs[cpEval_valid_def] >>
       fs[] >> rename1 ‘_ conf cSt1.ffi src cs’
       (* Terminating Stream Case *)
-      >- (‘ffi_term_stream conf cSt2.ffi src cs’
-            by metis_tac[ffi_eq_term_stream] >>
-          rw[receiveloop_def] >>
-          (* PERFORM RECEIVELOOP *)
-          (* evaluate left *)
-          qmatch_goalsub_abbrev_tac ‘nsBind "receiveloop" (Recclosure cEnvR1I _ _)’ >>
-          qmatch_goalsub_abbrev_tac ‘evaluate (cStR1 with clock := _) cEnvR1 [rec]’ >>
-          qspecl_then [‘conf’,‘cs’,‘cEnvR1’,‘cEnvR1I’,‘cStR1’,‘src’,‘LENGTH cSt1.refs’,
+      >- (rw[receiveloop_def] >>
+          (* Evaluate Left *)
+          qmatch_goalsub_abbrev_tac ‘nsBind "receiveloop" (Recclosure cEnv1RI _ _)’ >>
+          qmatch_goalsub_abbrev_tac ‘evaluate (cSt1R with clock := _) cEnv1R _’ >>
+          qspecl_then [‘conf’,‘cs’,‘cEnv1R’,‘cEnv1RI’,‘cSt1R’,‘src’,‘LENGTH cSt1.refs’,
                        ‘REPLICATE (conf.payload_size + 1) 0w’]
                       assume_tac receiveloop_correct_term >>
           pop_assum mp_tac >> impl_tac
           >- (rw[]
-              >- (fs[Abbr ‘cEnvR1I’,cpEval_valid_def,env_asm_def,in_module_def,has_v_def] >>
-                  ntac 61 (pop_assum kall_tac) >>
-                  ntac 3 (last_x_assum kall_tac) >>
-                  last_x_assum (assume_tac o REWRITE_RULE [Once EQ_SYM_EQ]) >>
-                  rfs[] >> rw[])
+              >- (fs[Abbr ‘cEnv1RI’,cpEval_valid_def,env_asm_def,in_module_def,has_v_def] >>
+                  rfs[] >> fs[])
               >- fs[cpEval_valid_def]
-              >- (qunabbrev_tac ‘cEnvR1’ >> rw (receiveloop_def::eval_sl))
-              >- (qunabbrev_tac ‘cEnvR1I’ >> rw eval_sl)
-              >- (qunabbrev_tac ‘cStR1’ >> rw[store_lookup_def,EL_LENGTH_APPEND])
-              >- (qunabbrev_tac ‘cStR1’ >> rw[])) >>
+              >- (qunabbrev_tac ‘cEnv1R’ >> rw (receiveloop_def::eval_sl))
+              >- (qunabbrev_tac ‘cEnv1RI’ >> rw eval_sl)
+              >- (qunabbrev_tac ‘cSt1R’ >> rw[store_lookup_def,EL_LENGTH_APPEND])
+              >- (qunabbrev_tac ‘cSt1R’ >> rw[])) >>
           disch_then strip_assume_tac >>
-          qunabbrev_tac ‘rec’ >>
-          rename1 ‘evaluate (_ with clock := rc1_1) _ [_] = (_ with clock := rc2_1,_)’ >>
-          dxrule_then assume_tac evaluate_add_to_clock >>
-          fs[] >> Q.REFINE_EXISTS_TAC ‘mc + rc1_1’ >> simp[] >>
-          pop_assum kall_tac >>
-          (* evaluate right *)
-          qabbrev_tac ‘rec = App Opapp [Var (Short "receiveloop"); Con NONE []]’ >>
-          qabbrev_tac ‘cEnvR2I = cEnv2 with v:= nsBind "buff" (Loc (LENGTH cSt2.refs)) cEnv2.v’ >>
-          qmatch_goalsub_abbrev_tac ‘evaluate (cStR2 with clock := _) cEnvR2 [rec]’ >>
-          qspecl_then [‘conf’,‘cs’,‘cEnvR2’,‘cEnvR2I’,‘cStR2’,‘src’,‘LENGTH cSt2.refs’,
+          rfs[] >>
+          ‘ck_equiv_hol cEnv1R (LIST_TYPE ^DATUM --> LIST_TYPE ^DATUM)
+                              (App Opapp [Var conf.append; convDatumList conf l]) ($++ l)’
+            by (irule ck_equiv_hol_App >>
+                qexists_tac ‘LIST_TYPE ^DATUM’ >> rw[]
+                >- (irule convDatumList_corr >>
+                    qunabbrev_tac ‘cEnv1R’ >>
+                    fs[cpEval_valid_def,env_asm_def,has_v_def,
+                       in_module_def,receiveloop_def] >>
+                    rfs[] >> fs[]) >>
+                qunabbrev_tac ‘cEnv1R’ >>
+                rw (ck_equiv_hol_def::receiveloop_def::eval_sl) >>
+                fs[cpEval_valid_def,env_asm_def,has_v_def,in_module_def] >>
+                rw[state_component_equality]) >>
+          drule_all_then strip_assume_tac ck_equiv_hol_apply_custom_App >>
+          qpat_x_assum ‘evaluate _ _ [rec] = _’ kall_tac >>
+          qpat_x_assum ‘_ (MAP unpad cs) _’ kall_tac >>
+          qpat_x_assum ‘ck_equiv_hol _ _ _ _’ kall_tac >>
+          pop_assum (qspec_then ‘0’ assume_tac) >> fs[] >>
+          ‘ck_equiv_hol cEnv1R (LIST_TYPE ^DATUM --> ^DATUM) (Var conf.concat) FLAT’
+            by (qunabbrev_tac ‘cEnv1R’ >>
+                rw (ck_equiv_hol_def::receiveloop_def::eval_sl) >>
+                fs[cpEval_valid_def,env_asm_def,has_v_def,in_module_def] >>
+                rw[state_component_equality]) >>
+          drule_all_then strip_assume_tac ck_equiv_hol_apply_custom_App >>
+          qpat_x_assum ‘evaluate _ _ [App Opapp [App Opapp _; _]] = _’ kall_tac >>
+          qpat_x_assum ‘ck_equiv_hol _ _ _ _’ kall_tac >>
+          qmatch_asmsub_rename_tac
+            ‘∀dc.
+              evaluate (_ with clock := bc1F1 + dc) _ _ =
+                (_ with clock := dc + bc2F1, Rval [cVrF1])’ >>
+          Q.REFINE_EXISTS_TAC ‘bc1F1 + mc’ >>
+          simp[] >>
+          (* Evaluate Right *)
+          qmatch_goalsub_abbrev_tac ‘nsBind "receiveloop" (Recclosure cEnv2RI _ _)’ >>
+          qmatch_goalsub_abbrev_tac ‘evaluate (cSt2R with clock := _) cEnv2R [App Opapp _]’ >>
+          qspecl_then [‘conf’,‘cs’,‘cEnv2R’,‘cEnv2RI’,‘cSt2R’,‘src’,‘LENGTH cSt2.refs’,
                        ‘REPLICATE (conf.payload_size + 1) 0w’]
                       assume_tac receiveloop_correct_term >>
           pop_assum mp_tac >> impl_tac
           >- (rw[]
-              >- (fs[Abbr ‘cEnvR2I’,cpEval_valid_def,env_asm_def,in_module_def,has_v_def] >>
-                  ntac 40 (pop_assum kall_tac) >>
-                  ntac 26 (last_x_assum kall_tac) >>
-                  last_x_assum (assume_tac o REWRITE_RULE [Once EQ_SYM_EQ]) >>
-                  rfs[] >> rw[])
+              >- (fs[Abbr ‘cEnv2RI’,cpEval_valid_def,env_asm_def,in_module_def,has_v_def] >>
+                  rfs[] >> fs[])
               >- fs[cpEval_valid_def]
-              >- (qunabbrev_tac ‘cEnvR2’ >> rw (receiveloop_def::eval_sl))
-              >- (qunabbrev_tac ‘cEnvR2I’ >> rw eval_sl)
-              >- (qunabbrev_tac ‘cStR2’ >> rw[store_lookup_def,EL_LENGTH_APPEND])
-              >- (qunabbrev_tac ‘cStR2’ >> rw[])) >>
+              >- (qunabbrev_tac ‘cEnv2R’ >> rw (receiveloop_def::eval_sl))
+              >- (qunabbrev_tac ‘cEnv2RI’ >> rw eval_sl)
+              >- (qunabbrev_tac ‘cSt2R’ >> rw[store_lookup_def,EL_LENGTH_APPEND])
+              >- (qunabbrev_tac ‘cSt2R’ >> rw[] >>
+                  metis_tac[ffi_eq_term_stream])) >>
           disch_then strip_assume_tac >>
-          qunabbrev_tac ‘rec’ >>
-          rename1 ‘evaluate (_ with clock := arc1_2) _ [_] = (_ with clock := arc2_2,_)’ >>
-          dxrule_then assume_tac evaluate_add_to_clock >>
-          fs[] >> Q.REFINE_EXISTS_TAC ‘mc + arc1_2’ >> simp[] >>
-          pop_assum kall_tac >>
-          (* PERFORM LIST OPS *)
-          cheat (*
-          rename1 ‘LIST_TYPE (LIST_TYPE WORD) (MAP unpad cs) ulv’ >>
-          ‘ck_equiv_hol cEnvR1 ^DATUM
-                       (App Opapp
-                        [Var conf.concat;
-                         App Opapp
-                           [App Opapp [Var conf.append;
-                                       convDatumList conf l];
-                            Lit ulv]])
-                      (FLAT (l++ulv))’
-            by
-                       =
-
-          ‘store_lookup’
-                rename [‘(LIST_TYPE WORD --> LIST_TYPE WORD --> LIST_TYPE WORD) $++ vA’,
-                        ‘(LIST_TYPE ^DATUM --> LIST_TYPE ^DATUM --> LIST_TYPE ^DATUM) $++ vB’] >>
-                ‘vA = vB’
-                  suffices_by rw[]
-                metis_tac[EQ_SYM_EQ]
-
-
-          conf cs envM envR s
-          drule_all_then strip_assume_tac receiveloop_correct_term *))
+          rfs[] >>
+          ‘ck_equiv_hol cEnv2R (LIST_TYPE ^DATUM --> LIST_TYPE ^DATUM)
+                              (App Opapp [Var conf.append; convDatumList conf l]) ($++ l)’
+            by (irule ck_equiv_hol_App >>
+                qexists_tac ‘LIST_TYPE ^DATUM’ >> rw[]
+                >- (irule convDatumList_corr >>
+                    qunabbrev_tac ‘cEnv2R’ >>
+                    fs[cpEval_valid_def,env_asm_def,has_v_def,
+                       in_module_def,receiveloop_def] >>
+                    rfs[] >> fs[]) >>
+                qunabbrev_tac ‘cEnv2R’ >>
+                rw (ck_equiv_hol_def::receiveloop_def::eval_sl) >>
+                fs[cpEval_valid_def,env_asm_def,has_v_def,in_module_def] >>
+                rw[state_component_equality]) >>
+          drule_all_then strip_assume_tac ck_equiv_hol_apply_custom_App >>
+          qpat_x_assum ‘evaluate _ _ [rec] = _’ kall_tac >>
+          qpat_x_assum ‘_ (MAP unpad cs) _’ kall_tac >>
+          qpat_x_assum ‘ck_equiv_hol _ _ _ _’ kall_tac >>
+          pop_assum (qspec_then ‘0’ assume_tac) >> fs[] >>
+          ‘ck_equiv_hol cEnv2R (LIST_TYPE ^DATUM --> ^DATUM) (Var conf.concat) FLAT’
+            by (qunabbrev_tac ‘cEnv2R’ >>
+                rw (ck_equiv_hol_def::receiveloop_def::eval_sl) >>
+                fs[cpEval_valid_def,env_asm_def,has_v_def,in_module_def] >>
+                rw[state_component_equality]) >>
+          drule_all_then strip_assume_tac ck_equiv_hol_apply_custom_App >>
+          qpat_x_assum ‘evaluate _ _ [App Opapp [App Opapp _; _]] = _’ kall_tac >>
+          qpat_x_assum ‘ck_equiv_hol _ _ _ _’ kall_tac >>
+          qmatch_asmsub_rename_tac
+            ‘∀dc.
+              evaluate (_ with clock := abc1F2 + dc) _ _ =
+                (_ with clock := dc + abc2F2, Rval [cVrF2])’ >>
+          Q.REFINE_EXISTS_TAC ‘abc1F2 + mc’ >>
+          simp[] >>
+          (* Move to apply the inductive hypothesis *)
+          MAP_EVERY qunabbrev_tac [‘cEnv1RI’,‘cEnv1R’,‘cSt1R’,‘cEnv2RI’,‘cEnv2R’,‘cSt2R’] >>
+          rpt (qpat_x_assum ‘∀dc. evaluate (_ with clock := _ + dc) _ [App _ _] = _’ kall_tac) >>
+          unite_nums "guff1" >>
+          unite_nums "guff2" >>
+          qmatch_goalsub_abbrev_tac
+            ‘∃mc.
+              cEval_equiv conf
+                (evaluate (cSt1T with clock := guff1 + mc) cEnv1T code1)
+                (evaluate (cSt2T with clock := guff2 + mc) cEnv2T code2)’ >>
+          ‘∃mc.
+            cEval_equiv conf
+              (evaluate (cSt1T with clock := mc) cEnv1T code1)
+              (evaluate (cSt2T with clock := mc) cEnv2T code2)’
+            suffices_by metis_tac[clock_irrel] >>
+          MAP_EVERY qunabbrev_tac [‘cSt1T’,‘cEnv1T’,‘code1’,‘cSt2T’,‘cEnv2T’,‘code2’] >>
+          first_x_assum irule >> rw[]
+          (* Satisfy inductive hypothesis conditions *)
+          >- (irule ffi_eq_receive_events_term_irrel >> fs[cpEval_valid_def] >>
+              metis_tac[ffi_eq_term_stream]) >>
+          qmatch_asmsub_rename_tac ‘cpEval_valid _ cpNum _ pSt _ _ _’ >>
+          qexists_tac ‘cpNum’ >>
+          qexists_tac ‘<|bindings := pSt.bindings |+ (s,FLAT (l ++ MAP unpad cs));
+                         queues   := FEMPTY|>’ >>
+          rw[cpEval_valid_def] >> fs[cpEval_valid_def]
+          >- (fs[env_asm_def,has_v_def,in_module_def] >> rfs[] >> fs[])
+          >- (irule enc_ok_bind >> fs[letfuns_def])
+          >- (fs[pSt_pCd_corr_def,pFv_def] >> rw[] >>
+              Cases_on ‘vn = s’ >>
+              rw[FLOOKUP_UPDATE])
+          >- (fs[sem_env_cor_def] >> rw[]
+              >- (fs[env_asm_def,has_v_def,in_module_def] >> rfs[] >> fs[]) >>
+              rw[nsLookup_nsBind_compute]
+              >- fs[FLOOKUP_UPDATE] >>
+              first_x_assum irule >>
+              fs[FLOOKUP_UPDATE])
+          >- (qmatch_goalsub_abbrev_tac ‘ffi_state_cor _ _ _ newFFI’ >>
+              ‘ffi_wf newFFI ∧ (FST cSt1.ffi.ffi_state = FST newFFI)’
+                by (qunabbrev_tac ‘newFFI’ >> rw[]
+                    >- (irule ffi_wf_receive_events_term_irrel >>
+                        rw[])
+                    >- (irule ffi_num_receive_events_term_irrel >>
+                        rw[])) >>
+              qmatch_asmsub_abbrev_tac ‘update_state oldFFI _ _’ >>
+              rpt (qpat_x_assum ‘Abbrev _’ kall_tac) >>
+              MAP_EVERY PairCases_on [‘oldFFI’,‘newFFI’] >>
+              fs[ffi_state_cor_def] >> qexistsl_tac [‘newFFI1’,‘newFFI2’] >>
+              rw[] >> metis_tac[ffi_eq_equivRel,equivalence_def,reflexive_def])
+          >- (irule ffi_wf_receive_events_term_irrel >>
+              rw[])
+          >- (fs[env_asm_def,has_v_def,in_module_def] >> rfs[] >> fs[])
+          >- (irule enc_ok_bind >> fs[letfuns_def])
+          >- (fs[pSt_pCd_corr_def,pFv_def] >> rw[] >>
+              Cases_on ‘vn = s’ >>
+              rw[FLOOKUP_UPDATE])
+          >- (fs[sem_env_cor_def] >> rw[]
+              >- (fs[env_asm_def,has_v_def,in_module_def] >> rfs[] >> fs[]) >>
+              rw[nsLookup_nsBind_compute]
+              >- fs[FLOOKUP_UPDATE] >>
+              first_x_assum irule >>
+              fs[FLOOKUP_UPDATE])
+          >- (qmatch_goalsub_abbrev_tac ‘ffi_state_cor _ _ _ newFFI’ >>
+              ‘ffi_wf newFFI ∧ (FST cSt2.ffi.ffi_state = FST newFFI)’
+                by (‘ffi_term_stream conf cSt2.ffi src cs’
+                      by metis_tac[ffi_eq_term_stream] >>
+                    qunabbrev_tac ‘newFFI’ >> rw[]
+                    >- (irule ffi_wf_receive_events_term_irrel >>
+                        rw[])
+                    >- (irule ffi_num_receive_events_term_irrel >>
+                        rw[])) >>
+              qmatch_asmsub_abbrev_tac ‘update_state oldFFI _ _’ >>
+              rpt (qpat_x_assum ‘Abbrev _’ kall_tac) >>
+              MAP_EVERY PairCases_on [‘oldFFI’,‘newFFI’] >>
+              fs[ffi_state_cor_def] >> qexistsl_tac [‘newFFI1’,‘newFFI2’] >>
+              rw[] >> metis_tac[ffi_eq_equivRel,equivalence_def,reflexive_def])
+          >- (irule ffi_wf_receive_events_term_irrel >>
+              rw[] >>
+              metis_tac[ffi_eq_term_stream])) >>
+      rw eval_sl
       (* Divergent Stream Case *)
       >- (‘ffi_divg_stream conf cSt2.ffi src cs’
             by metis_tac[ffi_eq_divg_stream] >>
