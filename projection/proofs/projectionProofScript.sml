@@ -65,24 +65,6 @@ Proof
   metis_tac[SUBSET_DEF,gen_fresh_name_same]
 QED
 
-Theorem MEM_perm_endpoint:
-  ∀e fv1 fv2 fv3.
-  MEM fv1 (free_var_names_endpoint(perm_endpoint fv2 fv3 e)) = MEM (perm1 fv2 fv3 fv1) (free_var_names_endpoint e)
-Proof
-  Induct >> rw[perm_endpoint_def,payloadLangTheory.free_var_names_endpoint_def,EQ_IMP_THM,MEM_FILTER,perm1_cancel,MEM_MAP] >> rw[perm1_cancel] >>
-  TRY(fs[perm1_def] >> every_case_tac >> fs[] >> NO_TAC) >>
-  disj1_tac >>
-  qexists_tac ‘perm1 fv2 fv3 fv1’ >>
-  rw[perm1_cancel]
-QED
-
-Theorem MEM_perm_network:
-  ∀n fv1 fv2 fv3.
-  MEM fv1 (free_var_names_network(perm_network fv2 fv3 n)) = MEM (perm1 fv2 fv3 fv1) (free_var_names_network n)
-Proof
-  Induct >> rw[perm_network_def,payloadLangTheory.free_var_names_network_def,MEM_perm_endpoint]
-QED
-
 (* endpoint_to_choice compilation step generates a choice_free_network *)
 Theorem choice_free_network_compile_network_fv:
   ∀epn fv. choice_free_network (compile_network_fv fv epn)
@@ -370,18 +352,6 @@ Proof
   rveq >> fs[] >> rveq >> fs[] >> metis_tac[FST,SND,split_sel_free_variables]
 QED
 
-MATCH_MP (SUBSET_TRANS |> PURE_REWRITE_RULE [GSYM AND_IMP_INTRO]) (SPEC_ALL project'_free_variables_SUBSET)
-
-Theorem projection_free_variables_SUBSET:
-  ∀s c procs.
-  set(free_var_names_network (compile_network s c procs)) ⊆
-  IMAGE FST (free_variables c)
-Proof
-  Induct_on ‘procs’ >> rw[compile_network_gen_def,free_var_names_network_def] >>
-  match_mp_tac(MATCH_MP (SUBSET_TRANS |> IMP_CANON |> hd) (SPEC_ALL project'_free_variables_SUBSET)) >>
-  rw[]
-QED
-
 Theorem projection_variables_SUBSET:
   ∀s c procs.
   set(var_names_network (compile_network s c procs)) ⊆
@@ -396,8 +366,8 @@ Theorem projection_free_variables_SUBSET:
   set(free_var_names_network (compile_network s c procs)) ⊆
   IMAGE FST (free_variables c)
 Proof
-  Induct_on ‘procs’ >> rw[compile_network_gen_def,var_names_network_def] >>
-  MATCH_ACCEPT_TAC project'_variables_SUBSET
+  Induct_on ‘procs’ >> rw[compile_network_gen_def,free_var_names_network_def] >>
+  match_mp_tac(MATCH_MP (SUBSET_TRANS |> IMP_CANON |> hd) (SPEC_ALL project'_free_variables_SUBSET)) >> rw[]
 QED
 
 Theorem endpoint_to_payload_free_var_names:
@@ -521,6 +491,24 @@ Proof
   Induct_on ‘n1’ >> rw[perm_network_def] >> rw[perm_network_def]
 QED
 
+Theorem MEM_perm_endpoint:
+  ∀e fv1 fv2 fv3.
+  MEM fv1 (free_var_names_endpoint(perm_endpoint fv2 fv3 e)) = MEM (perm1 fv2 fv3 fv1) (free_var_names_endpoint e)
+Proof
+  Induct >> rw[perm_endpoint_def,payloadLangTheory.free_var_names_endpoint_def,EQ_IMP_THM,MEM_FILTER,perm1_cancel,MEM_MAP] >> rw[perm1_cancel] >>
+  TRY(fs[perm1_def] >> every_case_tac >> fs[] >> NO_TAC) >>
+  disj1_tac >>
+  qexists_tac ‘perm1 fv2 fv3 fv1’ >>
+  rw[perm1_cancel]
+QED
+
+Theorem MEM_perm_network:
+  ∀n fv1 fv2 fv3.
+  MEM fv1 (free_var_names_network(perm_network fv2 fv3 n)) = MEM (perm1 fv2 fv3 fv1) (free_var_names_network n)
+Proof
+  Induct >> rw[perm_network_def,payloadLangTheory.free_var_names_network_def,MEM_perm_endpoint]
+QED
+        
 Theorem perm_network_rotate:
   ∀v1 v2 n1 n2.
   perm_network v1 v2 n1 = n2 ⇒
@@ -772,7 +760,7 @@ Proof
           simp[gen_fresh_name_same]) >-
          (dep_rewrite.DEP_ONCE_REWRITE_TAC[free_var_names_compile_to_payload_network] >>
           conj_tac >- simp[choice_free_network_compile_network_fv] >>
-          dep_rewrite.DEP_ONCE_REWRITE_TAC[MEM_free_vars_compile_network'] >>
+          dep_rewrite.DEP_ONCE_REWRITE_TAC[endpoint_to_choiceProofTheory.MEM_free_vars_compile_network'] >>
           simp[gen_fresh_name_same] >>
           match_mp_tac(CONTRAPOS(SPEC_ALL free_var_names_var_names_network)) >>
           simp[gen_fresh_name_same])
