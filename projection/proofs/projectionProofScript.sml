@@ -65,6 +65,23 @@ Proof
   metis_tac[SUBSET_DEF,gen_fresh_name_same]
 QED
 
+Theorem MEM_perm_endpoint:
+  ∀e fv1 fv2 fv3.
+  MEM fv1 (free_var_names_endpoint(perm_endpoint fv2 fv3 e)) = MEM (perm1 fv2 fv3 fv1) (free_var_names_endpoint e)
+Proof
+  Induct >> rw[perm_endpoint_def,payloadLangTheory.free_var_names_endpoint_def,EQ_IMP_THM,MEM_FILTER,perm1_cancel,MEM_MAP] >> rw[perm1_cancel] >>
+  TRY(fs[perm1_def] >> every_case_tac >> fs[] >> NO_TAC) >>
+  disj1_tac >>
+  qexists_tac ‘perm1 fv2 fv3 fv1’ >>
+  rw[perm1_cancel]
+QED
+
+Theorem MEM_perm_network:
+  ∀n fv1 fv2 fv3.
+  MEM fv1 (free_var_names_network(perm_network fv2 fv3 n)) = MEM (perm1 fv2 fv3 fv1) (free_var_names_network n)
+Proof
+  Induct >> rw[perm_network_def,payloadLangTheory.free_var_names_network_def,MEM_perm_endpoint]
+QED
 
 (* endpoint_to_choice compilation step generates a choice_free_network *)
 Theorem choice_free_network_compile_network_fv:
@@ -781,12 +798,20 @@ Proof
    (match_mp_tac BISIM_SYM >> match_mp_tac restrict_network_bisim >> simp[]) >>
   MAP_EVERY qunabbrev_tac [‘a1’,‘a2’] >>
   dep_rewrite.DEP_ONCE_REWRITE_TAC[GSYM perm_network'] >>
-  conj_tac >- cheat >>
+  conj_tac >-
+    (MAP_EVERY qunabbrev_tac [‘fv1’,‘fv2’] >>
+     simp[gen_fresh_name_same] >>
+     match_mp_tac gen_fresh_nameE >>
+     simp[projection_variables_eq] >>
+     metis_tac[free_var_names_var_names_network,SUBSET_DEF,SUBSET_TRANS,
+               IMAGE_SUBSET,trans_s_variables_mono,projection_variables_SUBSET]) >>
   qmatch_goalsub_abbrev_tac ‘BISIM_REL _ (restrict_network _ a1) (restrict_network _ a2)’ >>
   match_mp_tac BISIM_TRANS >>
   qexists_tac ‘a1’ >>
   conj_tac >-
-   (match_mp_tac restrict_network_bisim >> simp[] >> cheat) >>
+   (match_mp_tac restrict_network_bisim >> simp[] >>
+    qunabbrev_tac ‘a1’ >> simp[MEM_perm_network] >>
+    rw[perm1_def]) >>
   match_mp_tac BISIM_SYM >>
   match_mp_tac BISIM_TRANS >>
   qexists_tac ‘a2’ >>
