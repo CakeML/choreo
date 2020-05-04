@@ -309,6 +309,20 @@ val MEM_free_vars_compile_network = Q.store_thm("MEM_free_vars_compile_network",
   >> rw[free_var_names_network_def,compile_network_fv_def,MEM_FILTER]
   >> fs[var_names_network_def,MEM_free_vars_compile_endpoint]);
 
+val MEM_free_vars_compile_endpoint' = Q.store_thm("MEM_free_vars_compile_endpoint'",
+  `!p fv. ~MEM fv (var_names_endpoint p) ==>
+          MEM fv (free_var_names_endpoint (compile_endpoint fv' p)) = MEM fv (free_var_names_endpoint p)`,
+  Induct >> rpt strip_tac
+  >> rw[free_var_names_endpoint_def,endpoint_to_choiceTheory.compile_endpoint_def,MEM_FILTER]
+  >> fs[var_names_endpoint_def] >> metis_tac[free_names_are_names_endpoint]);
+
+val MEM_free_vars_compile_network' = Q.store_thm("MEM_free_vars_compile_network'",
+  `!n fv fv'. ~MEM fv (var_names_network n) ==>
+          MEM fv (free_var_names_network (compile_network_fv fv' n)) = MEM fv (free_var_names_network n)`,
+  Induct >> rpt strip_tac
+  >> rw[free_var_names_network_def,compile_network_fv_def,MEM_FILTER]
+  >> fs[var_names_network_def,MEM_free_vars_compile_endpoint']);
+
 val compile_endpoint_support = Q.store_thm("compile_endpoint_support",
   `!e fv. MEM fv (free_var_names_endpoint (compile_endpoint fv e))
    ==> MEM fv (free_var_names_endpoint e)

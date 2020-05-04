@@ -106,6 +106,57 @@ Proof
   res_tac >> fs[]
 QED
 
+Theorem payload_free_var_names_var_names:
+  MEM fv (payloadLang$free_var_names_endpoint e) ⇒ MEM fv (var_names_endpoint e)
+Proof
+  Induct_on ‘e’ >> rw[payloadLangTheory.var_names_endpoint_def,payloadLangTheory.free_var_names_endpoint_def,MEM_FILTER] >>
+  res_tac >> fs[]
+QED
+
+Theorem payload_free_var_names_var_names_network:
+  MEM fv (payloadLang$free_var_names_network n) ⇒ MEM fv (payloadLang$var_names_network n)
+Proof
+  Induct_on ‘n’ >> rw[payloadLangTheory.var_names_endpoint_def,payloadLangTheory.free_var_names_endpoint_def,payloadLangTheory.var_names_network_def,payloadLangTheory.free_var_names_network_def,MEM_FILTER] >>
+  res_tac >> fs[payload_free_var_names_var_names]
+QED
+
+Theorem free_var_names_var_names_network:
+  MEM fv (endpointLang$free_var_names_network n) ⇒ MEM fv (endpointLang$var_names_network n)
+Proof
+  Induct_on ‘n’ >> rw[endpointLangTheory.var_names_endpoint_def,endpointLangTheory.free_var_names_endpoint_def,endpointLangTheory.var_names_network_def,endpointLangTheory.free_var_names_network_def,MEM_FILTER] >>
+  res_tac >> fs[free_var_names_var_names]
+QED
+
+Theorem var_names_compile_to_payload:
+  choice_free_endpoint n ⇒
+  var_names_endpoint(endpoint_to_payload$compile_endpoint n) = var_names_endpoint n
+Proof
+  Induct_on ‘n’ >> rw[payloadLangTheory.var_names_endpoint_def,endpointLangTheory.var_names_endpoint_def,endpoint_to_payloadTheory.compile_endpoint_def,MEM_FILTER,choice_free_endpoint_def]
+QED
+
+Theorem var_names_compile_to_payload_network:
+  choice_free_network n ⇒
+  var_names_network(compile_network conf n) = var_names_network n
+Proof
+  Induct_on ‘n’ >> rw[payloadLangTheory.var_names_endpoint_def,payloadLangTheory.free_var_names_endpoint_def,payloadLangTheory.var_names_network_def,payloadLangTheory.free_var_names_network_def,MEM_FILTER,endpoint_to_payloadTheory.compile_network_def,choice_free_network_def,endpointLangTheory.var_names_network_def] >>
+  res_tac >> fs[var_names_compile_to_payload]
+QED
+
+Theorem free_var_names_compile_to_payload:
+  choice_free_endpoint n ⇒
+  free_var_names_endpoint(endpoint_to_payload$compile_endpoint n) = free_var_names_endpoint n
+Proof
+  Induct_on ‘n’ >> rw[payloadLangTheory.free_var_names_endpoint_def,endpointLangTheory.free_var_names_endpoint_def,endpoint_to_payloadTheory.compile_endpoint_def,MEM_FILTER,choice_free_endpoint_def]
+QED
+
+Theorem free_var_names_compile_to_payload_network:
+  choice_free_network n ⇒
+  free_var_names_network(compile_network conf n) = free_var_names_network n
+Proof
+  Induct_on ‘n’ >> rw[payloadLangTheory.free_var_names_endpoint_def,payloadLangTheory.free_var_names_endpoint_def,payloadLangTheory.free_var_names_network_def,payloadLangTheory.free_var_names_network_def,MEM_FILTER,endpoint_to_payloadTheory.compile_network_def,choice_free_network_def,endpointLangTheory.free_var_names_network_def] >>
+  res_tac >> fs[free_var_names_compile_to_payload]
+QED
+
 Theorem junkcong_compile_network_fv:
   ∀fv e1 e2.
   junkcong {fv}
@@ -212,6 +263,19 @@ Proof
   Induct_on ‘c’ >> rw[split_sel_def,variables_def]
 QED
 
+Theorem free_variables_variables:
+  free_variables c ⊆ variables c
+Proof
+  Induct_on ‘c’ >> rw[free_variables_def,variables_def] >> fs[SUBSET_DEF] >> rw[] >> res_tac
+QED
+
+Theorem split_sel_free_variables:
+  split_sel p1 p2 c = SOME(b,c') ⇒
+  free_variables c' = free_variables c
+Proof
+  Induct_on ‘c’ >> rw[split_sel_def,free_variables_def]
+QED
+
 Theorem project'_variables_eq:
   ∀proc c.
   project_ok proc c ⇒
@@ -269,10 +333,44 @@ Proof
   rveq >> metis_tac[split_sel_variables]
 QED
 
+Theorem project'_free_variables_SUBSET:
+  ∀proc c.
+  set (free_var_names_endpoint (project' proc c)) ⊆ IMAGE FST (free_variables c ∩ {(a,proc) | a=a})
+Proof
+  ho_match_mp_tac project_ind >> rw[project_def,free_var_names_endpoint_def,free_variables_def] >>
+  res_tac >> fs[SUBSET_DEF] >>
+  TRY(rw[PULL_EXISTS,MEM_MAP,MEM_FILTER] >> res_tac >> fs[] >> NO_TAC) >>
+  rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
+  fs[free_var_names_endpoint_def] >>
+  rw[] >> res_tac >>
+  rveq >> fs[] >> rveq >> fs[] >> metis_tac[FST,SND,split_sel_free_variables]
+QED
+
+MATCH_MP (SUBSET_TRANS |> PURE_REWRITE_RULE [GSYM AND_IMP_INTRO]) (SPEC_ALL project'_free_variables_SUBSET)
+
+Theorem projection_free_variables_SUBSET:
+  ∀s c procs.
+  set(free_var_names_network (compile_network s c procs)) ⊆
+  IMAGE FST (free_variables c)
+Proof
+  Induct_on ‘procs’ >> rw[compile_network_gen_def,free_var_names_network_def] >>
+  match_mp_tac(MATCH_MP (SUBSET_TRANS |> IMP_CANON |> hd) (SPEC_ALL project'_free_variables_SUBSET)) >>
+  rw[]
+QED
+
 Theorem projection_variables_SUBSET:
   ∀s c procs.
   set(var_names_network (compile_network s c procs)) ⊆
   IMAGE FST (variables c)
+Proof
+  Induct_on ‘procs’ >> rw[compile_network_gen_def,var_names_network_def] >>
+  MATCH_ACCEPT_TAC project'_variables_SUBSET
+QED
+
+Theorem projection_free_variables_SUBSET:
+  ∀s c procs.
+  set(free_var_names_network (compile_network s c procs)) ⊆
+  IMAGE FST (free_variables c)
 Proof
   Induct_on ‘procs’ >> rw[compile_network_gen_def,var_names_network_def] >>
   MATCH_ACCEPT_TAC project'_variables_SUBSET
@@ -633,7 +731,28 @@ Proof
   qpat_abbrev_tac ‘fv1 = gen_fresh_name _’ >>
   qpat_abbrev_tac ‘fv2 = gen_fresh_name _’ >>
   qmatch_goalsub_abbrev_tac ‘BISIM_REL _ a1 a2’ >>
-  ‘~MEM fv1 (free_var_names_network a1) ∧ ~MEM fv2 (free_var_names_network a1)’ by cheat >>
+  ‘~MEM fv1 (free_var_names_network a1) ∧ ~MEM fv2 (free_var_names_network a1)’
+    by(unabbrev_all_tac >>
+       conj_asm1_tac >-
+         (dep_rewrite.DEP_ONCE_REWRITE_TAC[free_var_names_compile_to_payload_network] >>
+          conj_tac >- simp[choice_free_network_compile_network_fv] >>
+          match_mp_tac (compile_network_support |> ONCE_REWRITE_RULE[MONO_NOT_EQ]) >>
+          match_mp_tac (projection_free_variables_SUBSET |> REWRITE_RULE[SUBSET_DEF,Once MONO_NOT_EQ]) >>
+          match_mp_tac(MATCH_MP IMAGE_SUBSET (SPEC_ALL free_variables_variables) |> REWRITE_RULE[SUBSET_DEF,Once MONO_NOT_EQ]) >>
+          imp_res_tac trans_s_variables_mono >>
+          dxrule_then dxrule SUBSET_TRANS >>
+          strip_tac >>
+          match_mp_tac(IMAGE_SUBSET |> CONV_RULE(STRIP_QUANT_CONV(RAND_CONV(PURE_REWRITE_CONV[SUBSET_DEF,Once MONO_NOT_EQ]))) |> MP_CANON) >>
+          goal_assum drule >>
+          dep_rewrite.DEP_ONCE_REWRITE_TAC[GSYM projection_variables_eq] >>
+          simp[gen_fresh_name_same]) >-
+         (dep_rewrite.DEP_ONCE_REWRITE_TAC[free_var_names_compile_to_payload_network] >>
+          conj_tac >- simp[choice_free_network_compile_network_fv] >>
+          dep_rewrite.DEP_ONCE_REWRITE_TAC[MEM_free_vars_compile_network'] >>
+          simp[gen_fresh_name_same] >>
+          match_mp_tac(CONTRAPOS(SPEC_ALL free_var_names_var_names_network)) >>
+          simp[gen_fresh_name_same])
+      ) >>
   ‘~MEM fv1 (free_var_names_network a2) ∧ ~MEM fv2 (free_var_names_network a2)’ by cheat >>
   match_mp_tac BISIM_TRANS >>
   qexists_tac ‘restrict_network (λx. x ≠ fv1 ∧ x ≠ fv2) a1’ >>
