@@ -59,6 +59,13 @@ Proof
   fs[]
 QED
 
+Theorem gen_fresh_nameE:
+  ∀l. set l' ⊆ set l ⇒ ¬MEM (gen_fresh_name l) l'
+Proof
+  metis_tac[SUBSET_DEF,gen_fresh_name_same]
+QED
+
+
 (* endpoint_to_choice compilation step generates a choice_free_network *)
 Theorem choice_free_network_compile_network_fv:
   ∀epn fv. choice_free_network (compile_network_fv fv epn)
@@ -753,7 +760,16 @@ Proof
           match_mp_tac(CONTRAPOS(SPEC_ALL free_var_names_var_names_network)) >>
           simp[gen_fresh_name_same])
       ) >>
-  ‘~MEM fv1 (free_var_names_network a2) ∧ ~MEM fv2 (free_var_names_network a2)’ by cheat >>
+  ‘~MEM fv1 (free_var_names_network a2) ∧ ~MEM fv2 (free_var_names_network a2)’
+    by(unabbrev_all_tac >>
+       conj_asm1_tac >>
+         (dep_rewrite.DEP_ONCE_REWRITE_TAC[free_var_names_compile_to_payload_network] >>
+          conj_tac >- simp[choice_free_network_compile_network_fv] >>
+          dep_rewrite.DEP_ONCE_REWRITE_TAC[MEM_free_vars_compile_network'] >>
+          conj_tac >> match_mp_tac gen_fresh_nameE >>
+          simp[projection_variables_eq] >>
+          metis_tac[free_var_names_var_names_network,SUBSET_DEF,SUBSET_TRANS,
+                    IMAGE_SUBSET,trans_s_variables_mono,projection_variables_SUBSET])) >>
   match_mp_tac BISIM_TRANS >>
   qexists_tac ‘restrict_network (λx. x ≠ fv1 ∧ x ≠ fv2) a1’ >>
   conj_tac >-
