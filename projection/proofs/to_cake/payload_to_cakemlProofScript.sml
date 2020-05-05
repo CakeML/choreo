@@ -4252,10 +4252,6 @@ Proof
   simp[FLOOKUP_DEF, FAPPLY_FUPDATE_THM] >> Cases_on ‘k1 = k2’ >> simp[]
 QED
 
-Definition padded_queues_def:
-  padded_queues conf qs = ∀k pm. MEM pm (qlk qs k) ⇒ ∃m. pm = pad conf m
-End
-
 Theorem normalised_EQ_NIL:
   normalised fm ∧ k ∈ FDOM fm ⇒ fm ' k ≠ []
 Proof
@@ -4901,6 +4897,7 @@ Theorem network_NPar_forward_correctness:
   net_wf n ∧ (* equivalent to ALL_DISTINCT(MAP FST(endpoints n)) *)
   ~net_has_node n p ∧
   normalised s.queues ∧
+  padded_queues conf s.queues ∧
   conf.payload_size > 0 ∧
   st1.ffi.oracle = comms_ffi_oracle conf ∧
   st1.ffi.ffi_state = (p,s.queues,n) ∧
@@ -5118,6 +5115,7 @@ Theorem network_NPar_forward_correctness':
   net_wf n ∧ (* equivalent to ALL_DISTINCT(MAP FST(endpoints n)) *)
   ~net_has_node n p ∧
   normalised s.queues ∧
+  padded_queues conf s.queues ∧
   conf.payload_size > 0 ∧
   st1.ffi.oracle = comms_ffi_oracle conf ∧
   st1.ffi.ffi_state = (p,s.queues,n) ∧
@@ -5165,6 +5163,8 @@ Theorem network_NPar_forward_correctness_reduction:
   ~net_has_node n p ∧
   conf.payload_size > 0 ∧
   normalised s.queues ∧
+  padded_queues conf s.queues ∧
+  padded_network conf n ∧
   st1.ffi.oracle = comms_ffi_oracle conf ∧
   st1.ffi.ffi_state = (p,s.queues,n) ∧
   st2.ffi.oracle = comms_ffi_oracle conf ∧
@@ -5196,6 +5196,8 @@ Proof
             st2.ffi.oracle = comms_ffi_oracle conf ∧
             st2.ffi.ffi_state = (p,s'.queues,n') ∧
             pSt_pCd_corr s c ∧ normalised s.queues ∧
+            padded_queues conf s.queues ∧
+            padded_network conf n ∧
             sem_env_cor conf s env1 ∧
             enc_ok conf env1 (letfuns c) vs1
             ⇒
@@ -5243,9 +5245,10 @@ Proof
   >- (fs [Abbr‘st1'’]
       \\ drule NPar_trans_l_cases
       \\ rw [] \\ fs []
+      >- metis_tac [trans_padded_pres,padded_network_def]
       >- metis_tac [trans_pSt_pCd_corr_pres]
-      \\ drule payload_trans_normalised
-      \\ rw [normalised_network_def,normalised_def])
+      >- metis_tac [payload_trans_normalised,normalised_network_def,normalised_def]
+      \\ metis_tac [trans_padded_pres,padded_network_def])
   \\ rw []
   \\ CONV_TAC SWAP_VARS_CONV \\  qexists_tac ‘env2'’
   \\ CONV_TAC SWAP_VARS_CONV \\  qexists_tac ‘vs2'’
@@ -5267,6 +5270,8 @@ Theorem network_NPar_forward_correctness_reduction':
   ~net_has_node n p ∧
   conf.payload_size > 0 ∧
   normalised s.queues ∧
+  padded_queues conf s.queues ∧
+  padded_network conf n ∧
   st1.ffi.oracle = comms_ffi_oracle conf ∧
   st1.ffi.ffi_state = (p,s.queues,n) ∧
   pSt_pCd_corr s c ∧
@@ -5311,6 +5316,7 @@ Theorem network_forward_correctness:
   REPN n ∧
   net_wf n ∧
   normalised_network n ∧
+  padded_network conf n ∧
   conf.payload_size > 0 ∧
   net_has_node n p ∧
   net_find p n  = SOME (NEndpoint p s  c ) ∧
@@ -5341,6 +5347,7 @@ Proof
       \\ rw [normalised_network_def])
   >- fs [net_wf_filter]
   >- fs [not_net_has_node_net_filter]
+  >- metis_tac [net_find_padded]
   \\ drule_then (qspec_then ‘p’ mp_tac) net_find_filter_trans
   \\ impl_tac >- fs [net_has_node_IS_SOME_net_find]
   \\ rw []
@@ -5353,6 +5360,7 @@ Theorem network_forward_correctness':
   REPN n ∧
   net_wf n ∧
   normalised_network n ∧
+  padded_network conf n ∧
   conf.payload_size > 0 ∧
   net_has_node n p ∧
   net_find p n  = SOME (NEndpoint p s  c ) ∧
@@ -5383,6 +5391,7 @@ Proof
       \\ rw [normalised_network_def])
   >- fs [net_wf_filter]
   >- fs [not_net_has_node_net_filter]
+  >- metis_tac [net_find_padded]
   \\ drule_then (qspec_then ‘p’ mp_tac) net_find_filter_trans
   \\ impl_tac >- fs [net_has_node_IS_SOME_net_find]
   \\ rw []
@@ -5395,6 +5404,7 @@ Theorem network_forward_correctness_reduction:
   REPN n ∧
   net_wf n ∧
   normalised_network n ∧
+  padded_network conf n ∧
   conf.payload_size > 0 ∧
   net_has_node n p ∧
   net_find p n  = SOME (NEndpoint p s  c ) ∧
@@ -5425,6 +5435,8 @@ Proof
       \\ rw [normalised_network_def])
   >- fs [net_wf_filter]
   >- fs [not_net_has_node_net_filter]
+  >- metis_tac [net_filter_padded]
+  >- metis_tac [net_find_padded]
   \\ drule_then (qspec_then ‘p’ mp_tac) net_find_filter_reduction
   \\ impl_tac >- fs [net_has_node_IS_SOME_net_find]
   \\ rw []
@@ -5437,6 +5449,7 @@ Theorem network_forward_correctness_reduction':
   REPN n ∧
   net_wf n ∧
   normalised_network n ∧
+  padded_network conf n ∧
   conf.payload_size > 0 ∧
   net_has_node n p ∧
   net_find p n  = SOME (NEndpoint p s  c ) ∧
@@ -5467,6 +5480,8 @@ Proof
       \\ rw [normalised_network_def])
   >- fs [net_wf_filter]
   >- fs [not_net_has_node_net_filter]
+  >- metis_tac [net_filter_padded]
+  >- metis_tac [net_find_padded]
   \\ drule_then (qspec_then ‘p’ mp_tac) net_find_filter_reduction
   \\ impl_tac >- fs [net_has_node_IS_SOME_net_find]
   \\ rw []

@@ -2642,4 +2642,77 @@ Definition padded_network_def:
 ∧ padded_network conf (NEndpoint p s c) = padded_queues conf s.queues
 End
 
+Theorem qlk_qpush_eq:
+  ∀q p1 d p2. qlk (qpush q p1 d) p2 = (if p1 = p2
+                                      then qlk q p1 ++ [d]
+                                      else qlk q p2)
+Proof
+  rw [qlk_def,qpush_def,fget_def,FLOOKUP_UPDATE]
+QED
+
+Theorem trans_LSend_padded:
+  ∀n conf n' p d q.
+   trans conf n (LSend p d q) n'
+   ⇒ ∃m. d = pad conf m
+Proof
+  Induct
+  \\ rw []
+  \\ TRY (drule trans_struct_pres_NPar)
+  \\ TRY (drule trans_struct_pres_NEnpoint)
+  \\ rw [] \\ fs []
+  \\ pop_assum (ASSUME_TAC o ONCE_REWRITE_RULE [trans_cases]) \\ fs []
+  \\ metis_tac []
+  \\ metis_tac []
+QED
+
+Theorem trans_padded_pres:
+  ∀n conf n'.
+   trans conf n LTau n' ∧ padded_network conf n
+   ⇒ padded_network conf n'
+Proof
+  let val trans_tac =
+      rw [] \\ rfs [padded_network_def,padded_queues_def]
+      \\ TRY (drule trans_struct_pres_NPar)
+      \\ TRY (drule trans_struct_pres_NEnpoint)
+      \\ rw [] \\ fs []
+      \\ pop_assum (ASSUME_TAC o ONCE_REWRITE_RULE [trans_cases]) \\ fs []
+      \\ rveq \\ rfs [padded_network_def,padded_queues_def] \\ fs []
+  in
+    ‘∀conf n T n'.
+      trans conf n T n'
+      ⇒ T = LTau ∧ padded_network conf n
+        ⇒ padded_network conf n'’
+    suffices_by metis_tac []
+    \\ ho_match_mp_tac trans_strongind
+    \\ rw [padded_network_def,padded_queues_def]
+    \\ TRY (qmatch_asmsub_rename_tac ‘trans conf n1 (LSend _ _ _)    n2’)
+    \\ TRY (qmatch_asmsub_rename_tac ‘trans conf n3 (LReceive _ _ _) n4’)
+    >- (qpat_x_assum ‘trans _ n1 _ _’ mp_tac
+        \\ qid_spec_tac ‘n2’
+        \\ Induct_on ‘n1’ \\ trans_tac)
+    >- (qpat_x_assum ‘trans _ n3 _ _’ mp_tac
+        \\ qid_spec_tac ‘n4’
+        \\ Induct_on ‘n3’ \\ trans_tac
+        \\ rw [] \\ Cases_on ‘p1 = k’ \\ fs []
+        \\ metis_tac [trans_LSend_padded,qlk_qpush_eq])
+    >- (qpat_x_assum ‘trans _ n3 _ _’ mp_tac
+        \\ qid_spec_tac ‘n4’
+        \\ Induct_on ‘n3’ \\ trans_tac
+        \\ rw [] \\ Cases_on ‘p1 = k’ \\ fs []
+        \\ metis_tac [trans_LSend_padded,qlk_qpush_eq])
+    >- (qpat_x_assum ‘trans _ n1 _ _’ mp_tac
+        \\ qid_spec_tac ‘n2’
+        \\ Induct_on ‘n1’ \\ trans_tac)
+  end
+  \\ Cases_on ‘p1 = k’ \\ fs [] \\ rveq \\ rfs []
+  \\ first_x_assum irule \\ fs []
+  \\ qexists_tac ‘k’ \\ fs []
+QED
+
+Theorem empty_q_padded:
+  ∀n conf. empty_q n ⇒ padded_network conf n
+Proof
+  Induct \\ rw [] \\ fs [empty_q_def,padded_network_def,padded_queues_def]
+QED
+
 val _ = export_theory ();

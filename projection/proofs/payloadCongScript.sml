@@ -779,4 +779,24 @@ Proof
   \\ Cases_on ‘p = l’ \\ fs [net_has_node_def]
 QED
 
+(* Every endpoint in a padded network is padded *)
+Theorem net_find_padded:
+  ∀n conf p s c.
+   padded_network conf n ∧ net_find p n = SOME (NEndpoint p s c)
+   ⇒ padded_queues conf s.queues
+Proof
+  Induct \\ rw [] \\ fs [net_find_def,padded_network_def]
+  \\ Cases_on ‘net_find p n’ \\ fs []
+  \\ metis_tac []
+QED
+
+(* A network remains padded after filtering *)
+Theorem net_filter_padded:
+  ∀n p conf. padded_network conf n ⇒ padded_network conf (net_filter p n)
+Proof
+  Induct \\ rw [] \\ fs [padded_network_def,net_filter_def]
+  \\ EVERY_CASE_TAC \\ fs [padded_network_def]
+QED
+
+
 val _ = export_theory ()

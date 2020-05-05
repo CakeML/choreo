@@ -59,6 +59,7 @@ Proof
   >- (irule net_wf_ALL_DISTINCT_eq
       \\ rw [Abbr‘pEPN1’,endpoints_projection,procsOf_all_distinct])
   >- (irule empty_q_normalised_network \\ rw [Abbr‘pEPN1’,projection_empty_q])
+  >- rw [Abbr‘pEPN1’,projection_empty_q,empty_q_padded]
   >- rw [net_has_node_IS_SOME_net_find,IS_SOME_EXISTS]
   \\ asm_exists_tac
   \\ fs []
@@ -142,11 +143,11 @@ Proof
   >- (irule net_wf_ALL_DISTINCT_eq
       \\ rw [Abbr‘pEPN1’,endpoints_projection,procsOf_all_distinct])
   >- (irule empty_q_normalised_network \\ rw [Abbr‘pEPN1’,projection_empty_q])
+  >- rw [Abbr‘pEPN1’,projection_empty_q,empty_q_padded]
   >- rw [net_has_node_IS_SOME_net_find,IS_SOME_EXISTS]
   \\ asm_exists_tac
   \\ fs []
 QED
-
 
 Theorem compile_network_fv_net_end:
   ∀l fv s. net_end (compile_network_fv fv (compile_network s chorLang$Nil l))
