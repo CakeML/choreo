@@ -2631,4 +2631,15 @@ Proof
   \\ rw [net_end_def]
 QED
 
+Definition padded_queues_def:
+  padded_queues conf qs = ∀k pm. MEM pm (qlk qs k) ⇒ ∃m. pm = pad conf m
+End
+
+Definition padded_network_def:
+  padded_network conf NNil = T
+∧ padded_network conf (NPar n1 n2) =
+   (padded_network conf n1 ∧ padded_network conf n2)
+∧ padded_network conf (NEndpoint p s c) = padded_queues conf s.queues
+End
+
 val _ = export_theory ();
