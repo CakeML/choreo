@@ -3297,6 +3297,9 @@ Proof
       MAP_EVERY qunabbrev_tac [‘lsa’,‘lsc’] >>
       rename1 ‘receiveloop conf (MAP (CHR o w2n) src)’ >>
       qspecl_then [‘conf’,‘src’,‘cSt1.ffi’] assume_tac ffi_gets_stream >>
+      ‘conf.payload_size > 0’
+        by fs[cpEval_valid_def] >>
+      fs[] >> pop_assum kall_tac >>
       ‘ffi_wf cSt1.ffi.ffi_state ∧ cSt1.ffi.oracle = comms_ffi_oracle conf’
         by fs[cpEval_valid_def] >>
       ‘ffi_wf cSt2.ffi.ffi_state ∧ cSt2.ffi.oracle = comms_ffi_oracle conf’
