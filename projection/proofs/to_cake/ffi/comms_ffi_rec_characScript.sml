@@ -317,11 +317,12 @@ Theorem ffi_ARecv_term_stream:
     x.oracle = comms_ffi_oracle conf ∧
     y.oracle = comms_ffi_oracle conf ∧
     strans conf x.ffi_state (ARecv src h) y.ffi_state ∧
+    ~final h ∧
     LENGTH h = SUC conf.payload_size ∧
     ffi_term_stream conf y src cs ⇒
     ffi_term_stream conf x src (h::cs)
 Proof
-  cheat
+  rw[] >> Cases_on ‘cs’ >> fs[ffi_term_stream_def] >> cheat
 QED
 
 Definition ffi_divg_stream_def:
@@ -426,6 +427,7 @@ Theorem ffi_ARecv_divg_stream:
     x.oracle = comms_ffi_oracle conf ∧
     y.oracle = comms_ffi_oracle conf ∧
     strans conf x.ffi_state (ARecv src h) y.ffi_state ∧
+    ~final h ∧
     LENGTH h = SUC conf.payload_size ∧
     ffi_divg_stream conf y src cs ⇒
     ffi_divg_stream conf x src (h::cs)
@@ -552,6 +554,7 @@ Theorem ffi_ARecv_fail_stream:
     x.oracle = comms_ffi_oracle conf ∧
     y.oracle = comms_ffi_oracle conf ∧
     strans conf x.ffi_state (ARecv src h) y.ffi_state ∧
+    ~final h ∧
     LENGTH h = SUC conf.payload_size ∧
     ffi_fail_stream conf y src cs ⇒
     ffi_fail_stream conf x src (h::cs)
