@@ -5095,8 +5095,100 @@ Proof
                       qspec_then ‘b:bool’ o
                       mp_then Any (mp_tac o Q.GEN ‘b’)) >>
           simp[] >> cheat) >> cheat)
-  >- ((* if / guard -> T *) cheat)
-  >- ((* if / guard -> F *) cheat)
+  >- ((* if / guard -> T *)
+   qpat_assum ‘cpEval_valid _ _ _ _ (IfThen _ _ _) _ _’ (strip_assume_tac o REWRITE_RULE[cpEval_valid_def]) >>
+   simp[find_evalform ‘If _  _ _’, generic_casebind,
+        bind_assoc, o_UNCURRY_R, C_UNCURRY_L, o_ABS_R, C_ABS_L] >>
+   simp[evaluate_def] >>
+   drule w1ckV_is_1w >>
+   strip_tac >>
+   drule_then (qspec_then ‘cSt1’ $
+               qx_choosel_then [‘ck1’,‘ck2’,‘refs1’,‘cmlV’] strip_assume_tac)
+               ck_equiv_hol_apply >>
+   Q.REFINE_EXISTS_TAC ‘ck1 + mc’ >> simp[] >>
+   pop_assum kall_tac >>
+   qpat_x_assum ‘cpEval_valid _ _ _ _ (IfThen _ _ _) _ _’ strip_assume_tac >>
+   drule_then drule nsLookup_cpEval_valid >>
+   strip_tac >> simp[] >>
+   fs[LIST_TYPE_def,WORD_def] >> rveq >>
+   simp[do_app_def,terminationTheory.do_eq_def,Boolv_def,do_if_def] >>
+   fs[letfuns_def] >>
+   drule enc_ok_take >> strip_tac >>
+
+   fs[cpFFI_valid_def] >>
+   ‘∀sp d. pSt1.queues ≠
+            normalise_queues (pSt1.queues |+ (sp,d::qlk pSt1.queues sp))’
+   by (simp[fmap_EXT, FDOM_normalise_queues] >>
+       rw[] >> Cases_on ‘sp ∈ FDOM pSt1.queues’ >> simp[]
+       >- (disj2_tac >> qexists_tac ‘sp’ >>
+           simp[qlk_def, fget_def, FLOOKUP_DEF, FAPPLY_normalise_queues])>>
+       disj1_tac >> simp[EXTENSION] >> metis_tac[]) >>
+   fs[optionTheory.some_def, EXISTS_PROD] >> rw[] >>
+   qabbrev_tac ‘cSt1' = cSt1 with refs := cSt1.refs ++ refs1’ >>
+   ‘ffi_eq conf cSt1'.ffi.ffi_state cSt2.ffi.ffi_state’
+     by simp[Abbr‘cSt1'’] >>
+   first_assum (mp_then (Pos last) mp_tac ffi_irrel) >>
+   disch_then (first_assum o mp_then (Pos last) mp_tac) >>
+   disch_then (qspecl_then [‘cEnv1’, ‘TAKE (LENGTH (letfuns pCd2)) vs1’] mp_tac) >> impl_tac
+   >- (fs[cpEval_valid_def, nsOptBind_def,Abbr ‘cSt1'’,
+       letfuns_def, enc_ok_def] >>
+       fs[sem_env_cor_def] >>
+       Cases_on ‘cEnv1.v’ >>
+       fs[nsLookup_def, nsBind_def, AllCaseEqs()] >> dsimp[] >>
+       csimp[FLOOKUP_DEF, DISJ_IMP_THM, FORALL_AND_THM,
+             FAPPLY_FUPDATE_THM] >> metis_tac[FLOOKUP_DEF]) >>
+   disch_then $ qx_choose_then ‘MC’ assume_tac >>
+   qexists_tac ‘MC’ >> dxrule cEval_equiv_bump_clocks >> simp[])
+  >- ((* if / guard -> F *)
+   qpat_assum ‘cpEval_valid _ _ _ _ (IfThen _ _ _) _ _’ (strip_assume_tac o REWRITE_RULE[cpEval_valid_def]) >>
+   simp[find_evalform ‘If _  _ _’, generic_casebind,
+        bind_assoc, o_UNCURRY_R, C_UNCURRY_L, o_ABS_R, C_ABS_L] >>
+   simp[evaluate_def] >>
+   drule w1ckV_is_1w >>
+   strip_tac >>
+   drule_then (qspec_then ‘cSt1’ $
+               qx_choosel_then [‘ck1’,‘ck2’,‘refs1’,‘cmlV’] strip_assume_tac)
+               ck_equiv_hol_apply >>
+   Q.REFINE_EXISTS_TAC ‘ck1 + mc’ >> simp[] >>
+   pop_assum kall_tac >>
+   qpat_x_assum ‘cpEval_valid _ _ _ _ (IfThen _ _ _) _ _’ strip_assume_tac >>
+   drule_then drule nsLookup_cpEval_valid >>
+   strip_tac >> simp[] >>
+   fs[LIST_TYPE_def,WORD_def] >> rveq >>
+   qmatch_goalsub_abbrev_tac ‘do_app arefs _ [v1;v2]’ >>
+   ‘do_app arefs Equality [v1;v2] = SOME(arefs,Rval(Boolv F))’
+     by(Cases_on ‘w’ >>
+        fs[Abbr ‘arefs’,Abbr ‘v2’,Abbr ‘v1’,do_app_def,terminationTheory.do_eq_def,
+           LIST_TYPE_def,WORD_def,ctor_same_type_def,same_type_def,lit_same_type_def] >>
+        rveq >> fs[] >>
+        rw[] >>
+        rename1 ‘ll ≠ []’ >> Cases_on ‘ll’ >>
+        fs[LIST_TYPE_def,terminationTheory.do_eq_def,
+           ctor_same_type_def,same_type_def,lit_same_type_def]) >>
+   pop_assum SUBST_ALL_TAC >>
+   MAP_EVERY qunabbrev_tac [‘v1’,‘v2’,‘arefs’] >>
+   simp[do_if_def] >>
+   fs[cpFFI_valid_def] >>
+   ‘∀sp d. pSt1.queues ≠
+            normalise_queues (pSt1.queues |+ (sp,d::qlk pSt1.queues sp))’
+   by (simp[fmap_EXT, FDOM_normalise_queues] >>
+       rw[] >> Cases_on ‘sp ∈ FDOM pSt1.queues’ >> simp[]
+       >- (disj2_tac >> qexists_tac ‘sp’ >>
+           simp[qlk_def, fget_def, FLOOKUP_DEF, FAPPLY_normalise_queues])>>
+       disj1_tac >> simp[EXTENSION] >> metis_tac[]) >>
+   fs[optionTheory.some_def, EXISTS_PROD] >> rw[] >>
+   qabbrev_tac ‘cSt1' = cSt1 with refs := cSt1.refs ++ refs1’ >>
+   ‘ffi_eq conf cSt1'.ffi.ffi_state cSt2.ffi.ffi_state’
+     by simp[Abbr‘cSt1'’] >>
+   first_assum (mp_then (Pos last) mp_tac ffi_irrel) >>
+   disch_then (first_assum o mp_then (Pos last) mp_tac) >>
+   disch_then (qspecl_then [‘cEnv1’, ‘DROP (LENGTH (letfuns e1)) vs1’] mp_tac) >> impl_tac
+   >- (fs[cpEval_valid_def, nsOptBind_def,Abbr ‘cSt1'’,
+       letfuns_def, enc_ok_def] >>
+       fs[sem_env_cor_def] >>
+       metis_tac[enc_ok_drop]) >>
+   disch_then $ qx_choose_then ‘MC’ assume_tac >>
+   qexists_tac ‘MC’ >> dxrule cEval_equiv_bump_clocks >> simp[])
   >- ((* let *)
    ‘∃hv vs cl. vs1 = hv::vs ∧
                          nsLookup cEnv1.v (getLetID conf hv) = SOME cl ∧
