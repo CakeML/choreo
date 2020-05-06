@@ -2793,15 +2793,48 @@ Proof
   SELECT_ELIM_TAC >> rw[]
   >- (Cases_on ‘cs’ >>
       rfs[ffi_term_stream_def,valid_receive_call_format_def,call_FFI_def,AllCaseEqs()] >>
-      cheat) >>
-  cheat
+      ‘MAP FST (ZIP (bufInit1,h)) = bufInit1 ∧
+       MAP SND (ZIP (bufInit1,h)) = h’
+        suffices_by (rw[] >> fs[] >> rw[] >>
+                     first_x_assum (qspec_then ‘bufInit1’ mp_tac) >>
+                     impl_tac >> rw[] >> metis_tac[]) >>
+      metis_tac[MAP_ZIP]) >>
+  rename1 ‘ffi_eq conf (update_state x _ _) _’ >>
+  qspecl_then [‘conf’,‘src’,‘cs’,‘h’,‘bufInit2’,‘ffi1 with ffi_state := x’,‘ffi2’]
+              assume_tac ffi_eq_receive_events_term_irrel >>
+  fs[receive_events_raw_def] >> pop_assum irule >>
+  rw[] >> fs[comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()]
+  >- (pop_assum mp_tac >> DEEP_INTRO_TAC some_intro >> rw[] >>
+      fs[] >> metis_tac[strans_pres_wf])
+  >- (Cases_on ‘cs’ >>
+      fs[ffi_term_stream_def,valid_receive_call_format_def] >>
+      first_x_assum (drule_then assume_tac) >>
+      fs[call_FFI_def,comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()])
+  >- (pop_assum mp_tac >> DEEP_INTRO_TAC some_intro >> rw[] >>
+      fs[] >>
+      ‘MAP SND (ZIP (bufInit1,h)) = h’
+        by metis_tac[functional_ARecv] >>
+      fs[] >> rw[] >>
+      irule ffi_eq_pres >>
+      qexistsl_tac [‘ARecv src h’,‘ffi1.ffi_state’,‘ffi1.ffi_state’] >>
+      rw[] >> metis_tac[ffi_eq_equivRel,equivalence_def,reflexive_def])
+  >- (‘ffi_term_stream conf (ffi1 with ffi_state := x) = ffi_term_stream conf ffi2’
+        suffices_by rw[] >>
+      irule ffi_eq_term_stream >> rw[] >>
+      pop_assum mp_tac >> DEEP_INTRO_TAC some_intro >> rw[] >>
+      fs[] >- metis_tac[strans_pres_wf] >>
+      ‘MAP SND (ZIP (bufInit1,h)) = h’
+        by metis_tac[functional_ARecv] >>
+      fs[] >> rw[] >>
+      metis_tac[ffi_eq_pres,ffi_eq_equivRel,equivalence_def,reflexive_def])
 QED
 
 
 (* receive_events of a divg stream retain equivalence *)
 Theorem ffi_eq_receive_events_divg_irrel:
-  ∀conf src cs bufInit ffi1 ffi2.
-   LENGTH bufInit = SUC conf.payload_size ⇒
+  ∀conf src cs bufInit1 bufInit2 ffi1 ffi2.
+   LENGTH bufInit1 = SUC conf.payload_size ⇒
+   LENGTH bufInit2 = SUC conf.payload_size ⇒
    ffi_eq conf ffi1.ffi_state ffi2.ffi_state ⇒
    ffi_wf ffi1.ffi_state ⇒
    ffi_wf ffi2.ffi_state ⇒
@@ -2811,16 +2844,16 @@ Theorem ffi_eq_receive_events_divg_irrel:
    ffi_divg_stream conf ffi2 src cs ⇒
    ffi_eq conf
      (update_state ffi1.ffi_state (comms_ffi_oracle conf)
-        (receive_events_raw conf bufInit src cs))
+        (receive_events_raw conf bufInit1 src cs))
      (update_state ffi2.ffi_state (comms_ffi_oracle conf)
-        (receive_events_raw conf bufInit src cs))
+        (receive_events_raw conf bufInit2 src cs))
 Proof
   Induct_on ‘cs’
   >- rw[receive_events_raw_def,ZIP_def,update_state_def] >>
   rw[receive_events_raw_def,ZIP_def,update_state_def] >>
   qmatch_goalsub_abbrev_tac ‘ffi_eq _ (update_state s1 _ _) (update_state s2 _ _)’ >>
   rename1 ‘ZIP (h::cs,cs)’ >>
-  first_x_assum (qspecl_then [‘conf’,‘src’,‘h’,‘ffi1 with ffi_state := s1’,
+  first_x_assum (qspecl_then [‘conf’,‘src’,‘h’,‘h’,‘ffi1 with ffi_state := s1’,
                               ‘ffi2 with ffi_state := s2’]
                               assume_tac) >>
   fs[receive_events_raw_def] >>
@@ -2828,43 +2861,45 @@ Proof
   MAP_EVERY qunabbrev_tac [‘s1’,‘s2’] >>
   ‘∃x.
     comms_ffi_oracle conf "receive" ffi1.ffi_state src
-      (MAP FST (ZIP (bufInit,h))) =
-    Oracle_return x (MAP SND (ZIP (bufInit,h)))’
+      (MAP FST (ZIP (bufInit1,h))) =
+    Oracle_return x (MAP SND (ZIP (bufInit1,h)))’
     by (fs[ffi_divg_stream_def,valid_receive_call_format_def,call_FFI_def] >>
         rfs[AllCaseEqs()] >>
-        rpt (first_x_assum (qspec_then ‘bufInit’ assume_tac)) >>
+        rpt (first_x_assum (qspec_then ‘bufInit1’ assume_tac)) >>
         rfs[] >> rw[MAP_ZIP]) >>
   ‘∃y.
     comms_ffi_oracle conf "receive" ffi2.ffi_state src
-      (MAP FST (ZIP (bufInit,h))) =
-    Oracle_return y (MAP SND (ZIP (bufInit,h)))’
+      (MAP FST (ZIP (bufInit2,h))) =
+    Oracle_return y (MAP SND (ZIP (bufInit2,h)))’
     by (fs[ffi_divg_stream_def,valid_receive_call_format_def,call_FFI_def] >>
         rfs[AllCaseEqs()] >>
-        rpt (first_x_assum (qspec_then ‘bufInit’ assume_tac)) >>
-        rfs[] >> rw[MAP_ZIP]) >> rw[]
+        rpt (first_x_assum (qspec_then ‘bufInit2’ assume_tac)) >>
+        rfs[] >> rw[MAP_ZIP]) >>
+  ‘LENGTH h = SUC conf.payload_size’
+    by (fs[ffi_divg_stream_def,valid_receive_call_format_def] >>
+        first_x_assum (drule_then assume_tac) >>
+        fs[call_FFI_def,comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()]) >>
+  rw[]
   >- (fs[comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()] >>
-      pop_assum kall_tac >> pop_assum mp_tac >>
+      ntac 2 (pop_assum kall_tac) >> pop_assum mp_tac >>
       DEEP_INTRO_TAC some_intro >> rw[] >>
       PairCases_on ‘x’ >> fs[] >>
       metis_tac[strans_pres_wf])
   >- (fs[comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()] >>
-      pop_assum mp_tac >> DEEP_INTRO_TAC some_intro >> rw[] >>
+      pop_assum kall_tac >> pop_assum mp_tac >> DEEP_INTRO_TAC some_intro >> rw[] >>
       PairCases_on ‘y’ >> fs[] >>
       metis_tac[strans_pres_wf])
-  >- (fs[ffi_divg_stream_def,valid_receive_call_format_def] >>
-      first_x_assum (drule_then assume_tac) >>
-      fs[call_FFI_def,comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()])
   >- (fs[comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()] >>
-      pop_assum mp_tac >>
+      qpat_x_assum ‘(some (m,ns). strans _ _ (ARecv _ m) ns) = _’ mp_tac >>
       DEEP_INTRO_TAC some_intro >> rw[] >>
       qpat_x_assum ‘(some (m,ns). strans _ _ (ARecv _ m) ns) = _’ mp_tac >>
       DEEP_INTRO_TAC some_intro >> rw[] >>
-      fs[] >> metis_tac[ffi_eq_pres])
+      fs[] >> metis_tac[ffi_eq_pres,MAP_ZIP])
   >- (fs[ffi_divg_stream_def,call_FFI_def,valid_receive_call_format_def] >>
-      rpt (first_x_assum (qspec_then ‘bufInit’ assume_tac)) >>
+      rpt (first_x_assum (qspec_then ‘bufInit1’ assume_tac)) >>
       rfs[AllCaseEqs()] >>
-      ‘MAP FST (ZIP (bufInit,h)) = bufInit ∧
-       MAP SND (ZIP (bufInit,h)) = h’
+      ‘MAP FST (ZIP (bufInit1,h)) = bufInit1 ∧
+       MAP SND (ZIP (bufInit1,h)) = h’
         suffices_by (rw[] >> fs[] >> rw[] >>
                      qpat_x_assum ‘ffi_divg_stream conf (ffi2 with <|ffi_state := _;io_events := _|>)
                                                    src cs’ kall_tac >>
@@ -2881,10 +2916,10 @@ Proof
                                        equivalence_def,reflexive_def]) >>
       metis_tac[MAP_ZIP])
   >- (fs[ffi_divg_stream_def,call_FFI_def,valid_receive_call_format_def] >>
-      rpt (first_x_assum (qspec_then ‘bufInit’ assume_tac)) >>
+      rpt (first_x_assum (qspec_then ‘bufInit2’ assume_tac)) >>
       rfs[AllCaseEqs()] >>
-      ‘MAP FST (ZIP (bufInit,h)) = bufInit ∧
-       MAP SND (ZIP (bufInit,h)) = h’
+      ‘MAP FST (ZIP (bufInit2,h)) = bufInit2 ∧
+       MAP SND (ZIP (bufInit2,h)) = h’
         suffices_by (rw[] >> fs[] >> rw[] >>
                      qpat_x_assum ‘ffi_divg_stream conf (ffi1 with <|ffi_state := _;io_events := _|>)
                                                    src cs’ kall_tac >>
@@ -2919,13 +2954,49 @@ Theorem ffi_ARecv_receive_events_divg_irrel:
      (update_state ffi2.ffi_state (comms_ffi_oracle conf)
         (receive_events_raw conf bufInit2 src cs))
 Proof
-  cheat
+  rw[update_state_def,receive_events_raw_def] >>
+  SELECT_ELIM_TAC >> rw[]
+  >- (rfs[ffi_divg_stream_def,valid_receive_call_format_def,call_FFI_def,AllCaseEqs()] >>
+      ‘MAP FST (ZIP (bufInit1,h)) = bufInit1 ∧
+       MAP SND (ZIP (bufInit1,h)) = h’
+        suffices_by (rw[] >> fs[] >> rw[] >>
+                     first_x_assum (qspec_then ‘bufInit1’ mp_tac) >>
+                     impl_tac >> rw[] >> metis_tac[]) >>
+      metis_tac[MAP_ZIP]) >>
+  rename1 ‘ffi_eq conf (update_state x _ _) _’ >>
+  qspecl_then [‘conf’,‘src’,‘cs’,‘h’,‘bufInit2’,‘ffi1 with ffi_state := x’,‘ffi2’]
+              assume_tac ffi_eq_receive_events_divg_irrel >>
+  fs[receive_events_raw_def] >> pop_assum irule >>
+  rw[] >> fs[comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()]
+  >- (pop_assum mp_tac >> DEEP_INTRO_TAC some_intro >> rw[] >>
+      fs[] >> metis_tac[strans_pres_wf])
+  >- (fs[ffi_divg_stream_def,valid_receive_call_format_def] >>
+      first_x_assum (drule_then assume_tac) >>
+      fs[call_FFI_def,comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()])
+  >- (pop_assum mp_tac >> DEEP_INTRO_TAC some_intro >> rw[] >>
+      fs[] >>
+      ‘MAP SND (ZIP (bufInit1,h)) = h’
+        by metis_tac[functional_ARecv] >>
+      fs[] >> rw[] >>
+      irule ffi_eq_pres >>
+      qexistsl_tac [‘ARecv src h’,‘ffi1.ffi_state’,‘ffi1.ffi_state’] >>
+      rw[] >> metis_tac[ffi_eq_equivRel,equivalence_def,reflexive_def])
+  >- (‘ffi_divg_stream conf (ffi1 with ffi_state := x) = ffi_divg_stream conf ffi2’
+        suffices_by rw[] >>
+      irule ffi_eq_divg_stream >> rw[] >>
+      pop_assum mp_tac >> DEEP_INTRO_TAC some_intro >> rw[] >>
+      fs[] >- metis_tac[strans_pres_wf] >>
+      ‘MAP SND (ZIP (bufInit1,h)) = h’
+        by metis_tac[functional_ARecv] >>
+      fs[] >> rw[] >>
+      metis_tac[ffi_eq_pres,ffi_eq_equivRel,equivalence_def,reflexive_def])
 QED
 
 (* receive_events of a fail stream retain equivalence *)
 Theorem ffi_eq_receive_events_fail_irrel:
-  ∀conf src cs bufInit ffi1 ffi2.
-   LENGTH bufInit = SUC conf.payload_size ⇒
+  ∀conf src cs bufInit1 bufInit2 ffi1 ffi2.
+   LENGTH bufInit1 = SUC conf.payload_size ⇒
+   LENGTH bufInit2 = SUC conf.payload_size ⇒
    ffi_eq conf ffi1.ffi_state ffi2.ffi_state ⇒
    ffi_wf ffi1.ffi_state ⇒
    ffi_wf ffi2.ffi_state ⇒
@@ -2935,16 +3006,16 @@ Theorem ffi_eq_receive_events_fail_irrel:
    ffi_fail_stream conf ffi2 src cs ⇒
    ffi_eq conf
      (update_state ffi1.ffi_state (comms_ffi_oracle conf)
-        (receive_events_raw conf bufInit src cs))
+        (receive_events_raw conf bufInit1 src cs))
      (update_state ffi2.ffi_state (comms_ffi_oracle conf)
-        (receive_events_raw conf bufInit src cs))
+        (receive_events_raw conf bufInit2 src cs))
 Proof
   Induct_on ‘cs’
   >- rw[receive_events_raw_def,ZIP_def,update_state_def] >>
   rw[receive_events_raw_def,ZIP_def,update_state_def] >>
   qmatch_goalsub_abbrev_tac ‘ffi_eq _ (update_state s1 _ _) (update_state s2 _ _)’ >>
   rename1 ‘ZIP (h::cs,cs)’ >>
-  first_x_assum (qspecl_then [‘conf’,‘src’,‘h’,‘ffi1 with ffi_state := s1’,
+  first_x_assum (qspecl_then [‘conf’,‘src’,‘h’,‘h’,‘ffi1 with ffi_state := s1’,
                               ‘ffi2 with ffi_state := s2’]
                               assume_tac) >>
   fs[receive_events_raw_def] >>
@@ -2952,43 +3023,45 @@ Proof
   MAP_EVERY qunabbrev_tac [‘s1’,‘s2’] >>
   ‘∃x.
     comms_ffi_oracle conf "receive" ffi1.ffi_state src
-      (MAP FST (ZIP (bufInit,h))) =
-    Oracle_return x (MAP SND (ZIP (bufInit,h)))’
+      (MAP FST (ZIP (bufInit1,h))) =
+    Oracle_return x (MAP SND (ZIP (bufInit1,h)))’
     by (fs[ffi_fail_stream_def,valid_receive_call_format_def,call_FFI_def] >>
         rfs[AllCaseEqs()] >>
-        rpt (first_x_assum (qspec_then ‘bufInit’ assume_tac)) >>
+        rpt (first_x_assum (qspec_then ‘bufInit1’ assume_tac)) >>
         rfs[] >> rw[MAP_ZIP]) >>
   ‘∃y.
     comms_ffi_oracle conf "receive" ffi2.ffi_state src
-      (MAP FST (ZIP (bufInit,h))) =
-    Oracle_return y (MAP SND (ZIP (bufInit,h)))’
+      (MAP FST (ZIP (bufInit2,h))) =
+    Oracle_return y (MAP SND (ZIP (bufInit2,h)))’
     by (fs[ffi_fail_stream_def,valid_receive_call_format_def,call_FFI_def] >>
         rfs[AllCaseEqs()] >>
-        rpt (first_x_assum (qspec_then ‘bufInit’ assume_tac)) >>
-        rfs[] >> rw[MAP_ZIP]) >> rw[]
+        rpt (first_x_assum (qspec_then ‘bufInit2’ assume_tac)) >>
+        rfs[] >> rw[MAP_ZIP]) >>
+  ‘LENGTH h = SUC conf.payload_size’
+    by (fs[ffi_fail_stream_def,valid_receive_call_format_def] >>
+        first_x_assum (drule_then assume_tac) >>
+        fs[call_FFI_def,comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()]) >>
+  rw[]
   >- (fs[comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()] >>
-      pop_assum kall_tac >> pop_assum mp_tac >>
+      ntac 2 (pop_assum kall_tac) >> pop_assum mp_tac >>
       DEEP_INTRO_TAC some_intro >> rw[] >>
       PairCases_on ‘x’ >> fs[] >>
       metis_tac[strans_pres_wf])
   >- (fs[comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()] >>
-      pop_assum mp_tac >> DEEP_INTRO_TAC some_intro >> rw[] >>
+      pop_assum kall_tac >> pop_assum mp_tac >> DEEP_INTRO_TAC some_intro >> rw[] >>
       PairCases_on ‘y’ >> fs[] >>
       metis_tac[strans_pres_wf])
-  >- (fs[ffi_fail_stream_def,valid_receive_call_format_def] >>
-      first_x_assum (drule_then assume_tac) >>
-      fs[call_FFI_def,comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()])
   >- (fs[comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()] >>
-      pop_assum mp_tac >>
+      qpat_x_assum ‘(some (m,ns). strans _ _ (ARecv _ m) ns) = _’ mp_tac >>
       DEEP_INTRO_TAC some_intro >> rw[] >>
       qpat_x_assum ‘(some (m,ns). strans _ _ (ARecv _ m) ns) = _’ mp_tac >>
       DEEP_INTRO_TAC some_intro >> rw[] >>
-      fs[] >> metis_tac[ffi_eq_pres])
+      fs[] >> metis_tac[ffi_eq_pres,MAP_ZIP])
   >- (fs[ffi_fail_stream_def,call_FFI_def,valid_receive_call_format_def] >>
-      rpt (first_x_assum (qspec_then ‘bufInit’ assume_tac)) >>
+      rpt (first_x_assum (qspec_then ‘bufInit1’ assume_tac)) >>
       rfs[AllCaseEqs()] >>
-      ‘MAP FST (ZIP (bufInit,h)) = bufInit ∧
-       MAP SND (ZIP (bufInit,h)) = h’
+      ‘MAP FST (ZIP (bufInit1,h)) = bufInit1 ∧
+       MAP SND (ZIP (bufInit1,h)) = h’
         suffices_by (rw[] >> fs[] >> rw[] >>
                      qpat_x_assum ‘ffi_fail_stream conf (ffi2 with <|ffi_state := _;io_events := _|>)
                                                    src cs’ kall_tac >>
@@ -3005,10 +3078,10 @@ Proof
                                        equivalence_def,reflexive_def]) >>
       metis_tac[MAP_ZIP])
   >- (fs[ffi_fail_stream_def,call_FFI_def,valid_receive_call_format_def] >>
-      rpt (first_x_assum (qspec_then ‘bufInit’ assume_tac)) >>
+      rpt (first_x_assum (qspec_then ‘bufInit2’ assume_tac)) >>
       rfs[AllCaseEqs()] >>
-      ‘MAP FST (ZIP (bufInit,h)) = bufInit ∧
-       MAP SND (ZIP (bufInit,h)) = h’
+      ‘MAP FST (ZIP (bufInit2,h)) = bufInit2 ∧
+       MAP SND (ZIP (bufInit2,h)) = h’
         suffices_by (rw[] >> fs[] >> rw[] >>
                      qpat_x_assum ‘ffi_fail_stream conf (ffi1 with <|ffi_state := _;io_events := _|>)
                                                    src cs’ kall_tac >>
@@ -3043,7 +3116,42 @@ Theorem ffi_ARecv_receive_events_fail_irrel:
      (update_state ffi2.ffi_state (comms_ffi_oracle conf)
         (receive_events_raw conf bufInit2 src cs))
 Proof
-  cheat
+  rw[update_state_def,receive_events_raw_def] >>
+  SELECT_ELIM_TAC >> rw[]
+  >- (rfs[ffi_fail_stream_def,valid_receive_call_format_def,call_FFI_def,AllCaseEqs()] >>
+      ‘MAP FST (ZIP (bufInit1,h)) = bufInit1 ∧
+       MAP SND (ZIP (bufInit1,h)) = h’
+        suffices_by (rw[] >> fs[] >> rw[] >>
+                     first_x_assum (qspec_then ‘bufInit1’ mp_tac) >>
+                     impl_tac >> rw[] >> metis_tac[]) >>
+      metis_tac[MAP_ZIP]) >>
+  rename1 ‘ffi_eq conf (update_state x _ _) _’ >>
+  qspecl_then [‘conf’,‘src’,‘cs’,‘h’,‘bufInit2’,‘ffi1 with ffi_state := x’,‘ffi2’]
+              assume_tac ffi_eq_receive_events_fail_irrel >>
+  fs[receive_events_raw_def] >> pop_assum irule >>
+  rw[] >> fs[comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()]
+  >- (pop_assum mp_tac >> DEEP_INTRO_TAC some_intro >> rw[] >>
+      fs[] >> metis_tac[strans_pres_wf])
+  >- (fs[ffi_fail_stream_def,valid_receive_call_format_def] >>
+      first_x_assum (drule_then assume_tac) >>
+      fs[call_FFI_def,comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()])
+  >- (pop_assum mp_tac >> DEEP_INTRO_TAC some_intro >> rw[] >>
+      fs[] >>
+      ‘MAP SND (ZIP (bufInit1,h)) = h’
+        by metis_tac[functional_ARecv] >>
+      fs[] >> rw[] >>
+      irule ffi_eq_pres >>
+      qexistsl_tac [‘ARecv src h’,‘ffi1.ffi_state’,‘ffi1.ffi_state’] >>
+      rw[] >> metis_tac[ffi_eq_equivRel,equivalence_def,reflexive_def])
+  >- (‘ffi_fail_stream conf (ffi1 with ffi_state := x) = ffi_fail_stream conf ffi2’
+        suffices_by rw[] >>
+      irule ffi_eq_fail_stream >> rw[] >>
+      pop_assum mp_tac >> DEEP_INTRO_TAC some_intro >> rw[] >>
+      fs[] >- metis_tac[strans_pres_wf] >>
+      ‘MAP SND (ZIP (bufInit1,h)) = h’
+        by metis_tac[functional_ARecv] >>
+      fs[] >> rw[] >>
+      metis_tac[ffi_eq_pres,ffi_eq_equivRel,equivalence_def,reflexive_def])
 QED
 
 (* FFI IRRELEVANCE TO EVALUATION THEOREM
