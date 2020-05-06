@@ -4263,6 +4263,243 @@ Proof
   simp[EXTENSION] >> disch_then $ qspec_then ‘k’ mp_tac >> simp[]
 QED
 
+Definition npadded_queues_def[simp]:
+  npadded_queues c NNil = T ∧
+  npadded_queues c (NPar n1 n2) = (npadded_queues c n1 ∧ npadded_queues c n2) ∧
+  npadded_queues c (NEndpoint _ s _) = padded_queues c s.queues
+End
+
+Theorem trans_sends_padded_messages:
+  trans c n1 (LSend src msg dest) n2 ⇒ ∃m0. msg = pad c m0
+Proof
+  Induct_on ‘trans’ >> simp[] >> metis_tac[]
+QED
+
+Theorem qlk_update_if:
+  qlk (q |+ (k1,v)) k2 = if k1 = k2 then v else qlk q k2
+Proof
+  rw[qlk_update, qlk_update2]
+QED
+
+Theorem qpush_preserves_padded_queues:
+  padded_queues c q ⇒ padded_queues c (qpush q sp (pad c d))
+Proof
+  simp[padded_queues_def, qpush_def, qlk_update_if] >> strip_tac >>
+  rpt gen_tac >> rw[] >> metis_tac[]
+QED
+
+Theorem strans_receives_padded_messages:
+  ∀p Q N. padded_queues c Q ∧ strans c (p,Q,N) (ARecv sp bs) s1 ⇒
+          ∃m. bs = pad c m
+Proof
+  Induct_on ‘strans’ >> simp[] >> rw[]
+  >- (fs[padded_queues_def] >> metis_tac[MEM]) >>
+  metis_tac[trans_sends_padded_messages, qpush_preserves_padded_queues]
+QED
+
+Theorem strans_preserves_padded_queues:
+  ∀p0 Q0 N0 p Q N. strans c (p0,Q0,N0) L (p,Q,N) ∧ padded_queues c Q0 ⇒
+                   padded_queues c Q
+Proof
+  Induct_on ‘strans’ >> simp[] >> rw[]
+  >- (fs[padded_queues_def, qlk_update_if] >> rw[] >> metis_tac[MEM]) >>
+  metis_tac[trans_sends_padded_messages, qpush_preserves_padded_queues]
+QED
+
+Theorem lengths_always_exist[simp]:
+  ∃l. LENGTH l = c
+Proof
+  qexists_tac ‘REPLICATE c ARB’ >> simp[]
+QED
+
+Theorem ffi_fail_stream_impossible:
+  ∀sp cs s p' Q N.
+    s.oracle = comms_ffi_oracle conf ∧
+    padded_queues conf Q ∧ s.ffi_state = (p',Q,N) ⇒
+    ¬ffi_fail_stream conf s sp cs
+Proof
+  Induct_on ‘cs’ >>
+  simp[ffi_fail_stream_def, call_FFI_def, comms_ffi_oracle_def,
+       valid_receive_call_format_def, ffi_receive_def,
+       AllCaseEqs()]
+  >- (simp[LEFT_EXISTS_AND_THM, FORALL_PROD] >> rpt strip_tac >>
+      DEEP_INTRO_TAC some_intro >> simp[FORALL_PROD] >>
+      strip_tac >> drule_all strans_receives_padded_messages >>
+      metis_tac[pad_LENGTH, ADD1]) >>
+  rpt strip_tac >> rename [‘final h’] >> Cases_on ‘final h’ >> simp[] >>
+  DEEP_INTRO_TAC some_intro >> simp[FORALL_PROD] >>
+  qx_genl_tac [‘msg’, ‘p''’, ‘Q'’, ‘N'’] >> strip_tac >>
+  rename [‘ARecv sp msg’, ‘msg ≠ m'’] >>
+  Cases_on ‘m' = msg’ >> simp[] >>
+  drule_all_then strip_assume_tac strans_receives_padded_messages >>
+  simp[pad_LENGTH] >> qexists_tac ‘msg’ >> simp[pad_LENGTH] >>
+  first_x_assum irule >> simp[] >> metis_tac[strans_preserves_padded_queues]
+QED
+
+Overload compat_list = “SC isPREFIX”;
+
+Theorem nonprefix_commonprefix:
+  ¬(l1 ≼ l2) ⇒
+  ∃p e s1 s2. l1 = p ++ e::s1 ∧ l2 = p ++ s2 ∧ (s2 ≠ [] ⇒ HD s2 ≠ e)
+Proof
+  qid_spec_tac ‘l2’ >> Induct_on ‘l1’ >> simp[] >> Cases_on ‘l2’ >> simp[] >>
+  rw[] >- (qexists_tac ‘[]’ >> csimp[]) >>
+  rename [‘h1::l1 = _ ++ _ ++ _’, ‘h2::l2 = _ ++ _’, ‘l1 ≼ l2’] >>
+  reverse (Cases_on ‘h1 = h2’) >- (qexists_tac ‘[]’ >> csimp[]) >>
+  first_x_assum $ drule_then
+                $ qx_choosel_then [‘p’, ‘e’, ‘s1’, ‘s2’]
+                $ strip_assume_tac >>
+  qexists_tac ‘h1::p’>> simp[]
+QED
+
+
+Theorem incompat_list:
+  ¬compat_list l1 l2 ⇒
+  ∃p e1 e2 s1 s2. l1 = p ++ e1::s1 ∧ l2 = p ++ e2::s2 ∧ e1 ≠ e2
+Proof
+  simp[SC_DEF] >> qid_spec_tac ‘l2’ >> Induct_on ‘l1’ >> simp[] >>
+  Cases_on ‘l2’ >> simp[] >>
+  rename [‘h1::l1’] >> qx_gen_tac ‘h2’ >>
+  reverse (Cases_on ‘h1 = h2’) >> simp[] >- (qexists_tac ‘[]’ >> simp[]) >>
+  strip_tac >>
+  first_x_assum $ drule_all_then $ qx_choose_then ‘p’ $ strip_assume_tac >>
+  qexists_tac ‘h1::p’ >> simp[]
+QED
+
+Definition compatible_queues_def:
+  compatible_queues q1 q2 ⇔ ∀k. compat_list (qlk q1 k) (qlk q2 k)
+End
+
+Theorem functional_ARecv_nonemptyQ:
+  ∀p Q N rest.
+    strans c (p,Q,N) (ARecv src m1) s3 ∧ qlk Q src = m2::rest ⇒
+    m1 = m2
+Proof
+  Induct_on ‘strans’ >> simp[qpush_def, qlk_update_if] >> rw[]
+QED
+
+Theorem normQs_idem_over_update[simp]:
+  normalise_queues (normalise_queues fm |+ (k,v)) =
+  normalise_queues (fm |+ (k,v))
+Proof
+  csimp[fmap_EXT, EXTENSION, FDOM_normalise_queues,
+        FAPPLY_normalise_queues] >> rw[]>>
+  csimp[FAPPLY_FUPDATE_THM, FAPPLY_normalise_queues] >> rw[] >>
+  csimp[] >> fs[FAPPLY_FUPDATE_THM, FAPPLY_normalise_queues]
+QED
+
+Theorem ffi_eq_normQs:
+  ffi_eq c (p1,Q1,N1) (p1,normalise_queues Q1,N1)
+Proof
+  simp[ffi_eq_def] >>
+  ‘∀s0 s1. (∃p q n. s0 = (p,q,n) ∧ s1 = (p,normalise_queues q,n)) ⇒
+           BISIM_REL (strans c) s0 s1’ suffices_by metis_tac[] >>
+  ho_match_mp_tac bisimulationTheory.BISIM_REL_coind >>
+  simp[PULL_EXISTS, FORALL_PROD, FORALL_AND_THM] >>
+  conj_tac
+  >- (Induct_on ‘strans’ >> rw[]
+      >- (rename [‘qlk q k = d::ds’] >>
+          ‘normalise_queues (normalise_queues q |+ (k,ds)) =
+           normalise_queues(q |+ (k,ds)) ∧
+           qlk (normalise_queues q) k = d::ds’
+            suffices_by metis_tac[strans_rules] >>
+          simp[]) >>
+      metis_tac[strans_rules]) >>
+  Induct_on ‘strans’ >> rw[] >> fs[] >>
+  metis_tac[strans_rules, normalise_queues_idem, normalise_queues_qpush]
+QED
+
+Theorem ffi_wf_ignores_queues:
+  ffi_wf (p,Q,N) = ffi_wf (p,FEMPTY,N)
+Proof
+  simp[ffi_wf_def]
+QED
+
+Theorem normalise_update_qlk[simp]:
+  normalise_queues (q |+ (k,qlk q k)) = normalise_queues q
+Proof
+  csimp[fmap_EXT, EXTENSION, FAPPLY_normalise_queues, FDOM_normalise_queues,
+        FAPPLY_FUPDATE_THM, AllCaseEqs(), qlk_def, fget_def,
+        FLOOKUP_DEF] >>
+  rw[] >> csimp[] >> metis_tac[]
+QED
+
+Theorem ffi_eq_over_common_queues:
+  ∀p1 p2 Q1 Q2 N1 N2.
+    ffi_wf (p1,Q1,N1) ∧ ffi_wf (p2,Q2,N2) ∧ ffi_eq c (p1,Q1,N1) (p2,Q2,N2) ∧
+    qlk Q1 k = p ++ rest1 ∧ qlk Q2 k = p ++ rest2 ⇒
+    ffi_eq c (p1,normalise_queues(Q1 |+ (k,rest1)),N1)
+             (p2,normalise_queues(Q2 |+ (k,rest2)),N2)
+Proof
+  Induct_on ‘p’ >> simp[]
+  >- (rw[] >> simp[] >> metis_tac[ffi_eq_normQs, ffi_eq_TRANS, ffi_eq_SYM]) >>
+  rw[] >>
+  qabbrev_tac ‘Q1' = normalise_queues(Q1 |+ (k,p++rest1))’ >>
+  qabbrev_tac ‘Q2' = normalise_queues(Q2 |+ (k,p++rest2))’ >>
+  ‘strans c (p1,Q1,N1) (ARecv k h) (p1,Q1',N1) ∧
+   strans c (p2,Q2,N2) (ARecv k h) (p2,Q2',N2)’
+    by metis_tac[strans_rules] >>
+  ‘ffi_wf (p1,Q1',N1) ∧ ffi_wf (p2,Q2',N2)’
+    by metis_tac[strans_pres_wf] >> fs[] >>
+  ‘qlk Q1' k = p ++ rest1 ∧ qlk Q2' k = p ++ rest2’
+    by (simp[Abbr‘Q1'’, Abbr‘Q2'’, FAPPLY_normalise_queues]) >>
+  ‘ffi_eq c (p1,Q1',N1) (p2,Q2',N2)’ by metis_tac[ffi_eq_pres] >>
+  first_x_assum drule_all >> simp[Abbr‘Q1'’, Abbr‘Q2'’]
+QED
+
+Theorem normalise_queues_update_CONS[simp]:
+  normalise_queues (fm |+ (k, h::t)) =
+  normalise_queues fm |+ (k, h::t)
+Proof
+  csimp[fmap_EXT,FDOM_normalise_queues, EXTENSION, FAPPLY_normalise_queues,
+        AllCaseEqs(), FAPPLY_FUPDATE_THM] >> rw[] >> metis_tac[]
+QED
+
+Theorem ffi_eq_pres_compatible_queues:
+  ffi_wf (p1,Q1,N1) ∧ ffi_wf (p2,Q2,N2) ∧ ffi_eq c (p1,Q1,N1) (p2,Q2,N2) ⇒
+  compatible_queues Q1 Q2
+Proof
+  CCONTR_TAC >> fs[compatible_queues_def] >>
+  drule_then (qx_choose_then ‘p’ $ strip_assume_tac) incompat_list >>
+  qpat_x_assum ‘¬compat_list _ _’ kall_tac >>
+  ‘ffi_eq c (p1,normalise_queues (Q1 |+ (k,e1::s1)),N1)
+            (p2,normalise_queues (Q2 |+ (k,e2::s2)),N2)’
+    by metis_tac[ffi_eq_over_common_queues] >>
+  fs[] >>
+  qmatch_assum_abbrev_tac ‘ffi_eq _ (_, Q1', _) (_, Q2', _)’ >>
+  ‘qlk Q1' k = e1::s1 ∧ qlk Q2' k = e2::s2’
+    by simp[Abbr‘Q1'’, Abbr‘Q2'’] >>
+  ‘strans c (p1,Q1',N1) (ARecv k e1) (p1,normalise_queues(Q1' |+ (k,s1)),N1) ∧
+   strans c (p2,Q2',N2) (ARecv k e2) (p2,normalise_queues(Q2' |+ (k,s2)),N2)’
+    by metis_tac[strans_rules] >>
+  ‘∃s3. strans c (p2,Q2',N2) (ARecv k e1) s3’
+    by metis_tac[ffi_eq_bisimulation_L] >>
+  metis_tac[functional_ARecv_nonemptyQ, ffi_wf_ignores_queues]
+QED
+
+(*Definition receives_def:
+  (receives c (p,Q,N) [] ⇔ T) ∧
+  (receives c (p,Q,N) ((sp,m) :: rest) ⇔
+     ∃p' Q' N'. strans c (p,Q,N) (ARecv sp m) (p',Q',N') ∧
+                receives c (p,Q',N') rest)
+End
+
+Theorem ffi_eq_pres_padded_queues0:
+  ffi_wf (p1,Q1,N1) ∧ ffi_wf (p2,Q2,N2) ∧ ffi_eq c (p1,Q1,N1) (p2,Q2,N2) ∧
+  padded_queues c Q1 ⇒ padded_queues c Q2
+Proof
+  strip_tac >> CCONTR_TAC >>
+  fs[padded_queues_def] >>
+  ‘compatible_queues Q1 Q2’ by metis_tac[ffi_eq_pres_compatible_queues] >>
+  fs[compatible_queues_def] >>
+  ‘compat_list (qlk Q1 k) (qlk Q2 k)’ by metis_tac[] >>
+  rename [‘pm ≠ pad c _’] >>
+  ‘∃p s. qlk Q2 k = p ++ pm::s’ by metis_tac[MEM_SPLIT] >>
+  ‘qlk Q1 k ≼ qlk Q2 k’
+    by (fs[SC_DEF] >> metis_tac[IS_PREFIX_APPEND, MEM_APPEND, MEM]) >>
+  fs[IS_PREFIX_APPEND] >> fs[]
+*)
+
 (* FORWARD CORRECTNESS
     Just the spec :) *)
 Theorem endpoint_forward_correctness:
@@ -4744,70 +4981,125 @@ Proof
       drule_then
         (assume_tac o SIMP_RULE (srw_ss()) []) cEval_equiv_bump_clocks >>
       qexists_tac ‘M’ >> simp[])
-  >- ((* double receiveloop *) cheat )
+  >- ((* double receiveloop *)
+      simp[find_evalform ‘Let _ _ _’, find_evalform ‘App _ _’,
+           find_evalform ‘Lit _’,
+           generic_casebind, bind_assoc, o_UNCURRY_R, C_UNCURRY_L, o_ABS_R,
+           C_ABS_L, evaluate_nonsing] >>
+      simp[do_app_def, store_alloc_def] >>
+      simp[find_evalform ‘Letrec _ _’] >> simp[nsOptBind_def] >>
+      qabbrev_tac ‘cEB = λb. if b then cEnv2 else cEnv1’ >>
+      ‘cEnv1 = cEB F ∧ cEnv2 = cEB T’ by simp[Abbr‘cEB’] >> simp[] >>
+      qabbrev_tac ‘cSB = λb. if b then cSt2 else cSt1’ >>
+      ‘cSt1 = cSB F ∧ cSt2 = cSB T’ by simp[Abbr‘cSB’] >> simp[] >>
+      qabbrev_tac ‘bndbuf = λ(s:plffi state) (v:(string,string,v)namespace).
+                               nsBind "buff" (Loc (LENGTH s.refs)) v’ >>
+      simp[] >>
+      qabbrev_tac
+        ‘bre = build_rec_env (receiveloop conf (MAP (CHR o w2n) p1))’ >>
+      simp[] >>
+      qabbrev_tac
+        ‘cZs = λc. [W8array (REPLICATE (c.payload_size + 1) 0w) : v store_v]’ >>
+      simp[] >>
+      qabbrev_tac
+      ‘cS1B = λb mc. cSB b with <|
+                         clock := mc; refs := (cSB b).refs ++ cZs conf |>’ >>
+      simp[] >>
+      qabbrev_tac
+      ‘cE1B = λb. cEB b with
+                      v := bre (cEB b with v := bndbuf (cSB b) (cEB b).v)
+                               (bndbuf (cSB b) (cEB b).v)
+      ’ >> simp[] >>
+      ntac 2(
+           ONCE_REWRITE_TAC [find_evalform ‘App _ _’] >>
+           simp[evaluate_nonsing,
+                generic_casebind,
+                bind_assoc, o_UNCURRY_R, C_UNCURRY_L, o_ABS_R, C_ABS_L,
+                find_evalform ‘Var _’, option_bind, find_evalform ‘Con _ _’]
+           )>>
+      ‘ffi_wf cSt1.ffi.ffi_state ∧ cSt1.ffi.oracle = comms_ffi_oracle conf’
+        by fs[cpEval_valid_def] >>
+      ‘∀b. nsLookup (cE1B b).v (Short "receiveloop") =
+            SOME (Recclosure (cEB b with v := bndbuf (cSB b) (cEB b).v)
+                    (receiveloop conf (MAP (CHR o w2n) p1)) "receiveloop")’
+        by simp[Abbr‘bre’, Abbr‘cE1B’, build_rec_env_def, receiveloop_def] >>
+      ‘∀b. nsLookup (bndbuf (cSB b) (cEB b).v) (Short "buff") =
+           SOME (Loc (LENGTH (cSB b).refs))’
+        by simp[Abbr‘bndbuf’] >>
+      qpat_x_assum ‘’
+      Q.SUBGOAL_THEN ‘ffi_wf cSt2.ffi.ffi_state ∧ cSt2.ffi.oracle = comms_ffi_oracle conf’
+       MP_TAC >- simp[] >> strip_tac >>
+      reverse (drule_all_then (qspec_then ‘p1’ strip_assume_tac)
+               ffi_gets_stream)
+      >- ((* fail_stream *)
+          first_assum (mp_then (Pos last) mp_tac receiveloop_correct_fail) >>
+          disch_then (first_x_assum o
+                      qspec_then ‘b:bool’ o
+                      mp_then Any (mp_tac o Q.GEN ‘b’)) >>
+          simp[] >> cheat) >> cheat)
   >- ((* if / guard -> T *) cheat)
   >- ((* if / guard -> F *) cheat)
   >- ((* let *)
-      ‘∃hv vs cl. vs1 = hv::vs ∧
-                  nsLookup cEnv1.v (getLetID conf hv) = SOME cl ∧
-                  (LIST_TYPE (LIST_TYPE WORD) --> LIST_TYPE WORD) f cl’
-       by (fs[cpEval_valid_def, letfuns_def] >>
-           Cases_on ‘vs1’ >> fs[enc_ok_def] >> metis_tac[]) >>
-      simp[compile_endpoint_def] >>
-      simp[find_evalform ‘Let _  _ _ ’, generic_casebind,
-           bind_assoc, o_UNCURRY_R, C_UNCURRY_L, o_ABS_R, C_ABS_L] >>
-      ‘ck_equiv_hol cEnv1 (LIST_TYPE (LIST_TYPE WORD) --> LIST_TYPE WORD)
-                    (Var (getLetID conf hv)) f’
-        by (simp[ck_equiv_hol_def, find_evalform ‘Var _’]>>
-            metis_tac[APPEND_NIL]) >>
-      fs[EVERY_MEM, MEM_EL, PULL_EXISTS, IS_SOME_EXISTS, EL_MAP] >>
-      qpat_x_assum ‘∀n:num. _’
-                   (mp_tac o
-                    SIMP_RULE (srw_ss()) [GSYM RIGHT_EXISTS_IMP_THM,
-                                          SKOLEM_THM]) >>
-      disch_then $ (qx_choose_then ‘nv’ strip_assume_tac) >>
-      ‘MAP (THE o FLOOKUP pSt1.bindings) vl = GENLIST nv (LENGTH vl)’
-        by simp[Once LIST_EQ_REWRITE, EL_MAP] >> fs[] >>
-      ‘ck_equiv_hol cEnv1 (LIST_TYPE (LIST_TYPE WORD))
-                    (convList conf (MAP (Var o Short o ps2cs) vl))
-                    (GENLIST nv (LENGTH vl))’
-        by (irule convList_corr >>
-            simp[EVERY_MEM, MEM_ZIP, PULL_EXISTS, EL_MAP] >>
-            ‘env_asm cEnv1 conf’ by fs[cpEval_valid_def] >> simp[] >>
-            qx_gen_tac ‘m’ >> strip_tac >>
-            irule ck_equiv_hol_Var >>
-            fs[cpEval_valid_def, sem_env_cor_def]) >>
-      dxrule_all_then assume_tac ck_equiv_hol_App >>
-      drule_then (qspec_then ‘cSt1’ $
-                  qx_choosel_then [‘ck1’, ‘ck2’, ‘refs1’, ‘cmlV’]
-                                  strip_assume_tac)
-                 ck_equiv_hol_apply >>
-      Q.REFINE_EXISTS_TAC ‘ck1 + mc’ >> simp[] >>
-      fs[cpFFI_valid_def] >>
-      ‘∀sp d. pSt1.queues ≠
-              normalise_queues (pSt1.queues |+ (sp,d::qlk pSt1.queues sp))’
-        by (simp[fmap_EXT, FDOM_normalise_queues] >>
-            rw[] >> Cases_on ‘sp ∈ FDOM pSt1.queues’ >> simp[]
-            >- (disj2_tac >> qexists_tac ‘sp’ >>
-                simp[qlk_def, fget_def, FLOOKUP_DEF, FAPPLY_normalise_queues])>>
-            disj1_tac >> simp[EXTENSION] >> metis_tac[]) >>
-      fs[optionTheory.some_def, EXISTS_PROD] >> rw[] >>
-      qabbrev_tac ‘cSt1' = cSt1 with refs := cSt1.refs ++ refs1’ >>
-      ‘ffi_eq conf cSt1'.ffi.ffi_state cSt2.ffi.ffi_state’
-        by simp[Abbr‘cSt1'’] >>
-      first_assum (mp_then (Pos last) mp_tac ffi_irrel) >>
-      disch_then (first_assum o mp_then (Pos last) mp_tac) >>
-      qpat_abbrev_tac ‘cEnv1' = cEnv1 with v := nsOptBind _ _ _’ >>
-      disch_then (qspecl_then [‘cEnv1'’, ‘vs’] mp_tac) >> impl_tac
-      >- (fs[cpEval_valid_def, Abbr‘cEnv1'’, nsOptBind_def, Abbr‘cSt1'’,
-             letfuns_def, enc_ok_def] >>
-          fs[sem_env_cor_def] >>
-          Cases_on ‘cEnv1.v’ >>
-          fs[nsLookup_def, nsBind_def, AllCaseEqs()] >> dsimp[] >>
-          csimp[FLOOKUP_DEF, DISJ_IMP_THM, FORALL_AND_THM,
-                FAPPLY_FUPDATE_THM] >> metis_tac[FLOOKUP_DEF]) >>
-      disch_then $ qx_choose_then ‘MC’ assume_tac >>
-      qexists_tac ‘MC’ >> dxrule cEval_equiv_bump_clocks >> simp[])
+   ‘∃hv vs cl. vs1 = hv::vs ∧
+                         nsLookup cEnv1.v (getLetID conf hv) = SOME cl ∧
+                         (LIST_TYPE (LIST_TYPE WORD) --> LIST_TYPE WORD) f cl’
+     by (fs[cpEval_valid_def, letfuns_def] >>
+         Cases_on ‘vs1’ >> fs[enc_ok_def] >> metis_tac[]) >>
+   simp[compile_endpoint_def] >>
+   simp[find_evalform ‘Let _  _ _ ’, generic_casebind,
+        bind_assoc, o_UNCURRY_R, C_UNCURRY_L, o_ABS_R, C_ABS_L] >>
+   ‘ck_equiv_hol cEnv1 (LIST_TYPE (LIST_TYPE WORD) --> LIST_TYPE WORD)
+    (Var (getLetID conf hv)) f’
+     by (simp[ck_equiv_hol_def, find_evalform ‘Var _’]>>
+         metis_tac[APPEND_NIL]) >>
+   fs[EVERY_MEM, MEM_EL, PULL_EXISTS, IS_SOME_EXISTS, EL_MAP] >>
+   qpat_x_assum ‘∀n:num. _’
+                (mp_tac o
+                 SIMP_RULE (srw_ss()) [GSYM RIGHT_EXISTS_IMP_THM,
+                                       SKOLEM_THM]) >>
+   disch_then $ (qx_choose_then ‘nv’ strip_assume_tac) >>
+   ‘MAP (THE o FLOOKUP pSt1.bindings) vl = GENLIST nv (LENGTH vl)’
+     by simp[Once LIST_EQ_REWRITE, EL_MAP] >> fs[] >>
+   ‘ck_equiv_hol cEnv1 (LIST_TYPE (LIST_TYPE WORD))
+    (convList conf (MAP (Var o Short o ps2cs) vl))
+    (GENLIST nv (LENGTH vl))’
+     by (irule convList_corr >>
+         simp[EVERY_MEM, MEM_ZIP, PULL_EXISTS, EL_MAP] >>
+         ‘env_asm cEnv1 conf’ by fs[cpEval_valid_def] >> simp[] >>
+         qx_gen_tac ‘m’ >> strip_tac >>
+         irule ck_equiv_hol_Var >>
+         fs[cpEval_valid_def, sem_env_cor_def]) >>
+   dxrule_all_then assume_tac ck_equiv_hol_App >>
+   drule_then (qspec_then ‘cSt1’ $
+               qx_choosel_then [‘ck1’, ‘ck2’, ‘refs1’, ‘cmlV’]
+               strip_assume_tac)
+              ck_equiv_hol_apply >>
+   Q.REFINE_EXISTS_TAC ‘ck1 + mc’ >> simp[] >>
+   fs[cpFFI_valid_def] >>
+   ‘∀sp d. pSt1.queues ≠
+               normalise_queues (pSt1.queues |+ (sp,d::qlk pSt1.queues sp))’
+     by (simp[fmap_EXT, FDOM_normalise_queues] >>
+         rw[] >> Cases_on ‘sp ∈ FDOM pSt1.queues’ >> simp[]
+         >- (disj2_tac >> qexists_tac ‘sp’ >>
+             simp[qlk_def, fget_def, FLOOKUP_DEF, FAPPLY_normalise_queues])>>
+         disj1_tac >> simp[EXTENSION] >> metis_tac[]) >>
+   fs[optionTheory.some_def, EXISTS_PROD] >> rw[] >>
+   qabbrev_tac ‘cSt1' = cSt1 with refs := cSt1.refs ++ refs1’ >>
+   ‘ffi_eq conf cSt1'.ffi.ffi_state cSt2.ffi.ffi_state’
+     by simp[Abbr‘cSt1'’] >>
+   first_assum (mp_then (Pos last) mp_tac ffi_irrel) >>
+   disch_then (first_assum o mp_then (Pos last) mp_tac) >>
+   qpat_abbrev_tac ‘cEnv1' = cEnv1 with v := nsOptBind _ _ _’ >>
+   disch_then (qspecl_then [‘cEnv1'’, ‘vs’] mp_tac) >> impl_tac
+   >- (fs[cpEval_valid_def, Abbr‘cEnv1'’, nsOptBind_def, Abbr‘cSt1'’,
+          letfuns_def, enc_ok_def] >>
+       fs[sem_env_cor_def] >>
+       Cases_on ‘cEnv1.v’ >>
+       fs[nsLookup_def, nsBind_def, AllCaseEqs()] >> dsimp[] >>
+       csimp[FLOOKUP_DEF, DISJ_IMP_THM, FORALL_AND_THM,
+             FAPPLY_FUPDATE_THM] >> metis_tac[FLOOKUP_DEF]) >>
+   disch_then $ qx_choose_then ‘MC’ assume_tac >>
+   qexists_tac ‘MC’ >> dxrule cEval_equiv_bump_clocks >> simp[])
 QED
 
 Theorem NPar_trans_l_cases_full:
