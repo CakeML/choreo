@@ -2681,7 +2681,7 @@ Proof
           rfs[AllCaseEqs()] >> rw[MAP_ZIP]) >>
       fs[comms_ffi_oracle_def,ffi_receive_def,AllCaseEqs()] >>
       ntac 2 (pop_assum mp_tac >> DEEP_INTRO_TAC some_intro) >> rw[] >>
-      fs[] >> 
+      fs[] >>
       ‘MAP SND (ZIP (bufInit2,h)) = MAP SND (ZIP (bufInit1,h))’
         by metis_tac[ZIP_SND_SAME] >>
       fs[] >> rw[] >>
@@ -4697,6 +4697,20 @@ Proof
   fs[IS_PREFIX_APPEND] >> fs[]
 *)
 
+Theorem cEval_equiv_ignores_refs_clock[simp]:
+  cEval_equiv c (state_clock_fupd f x1, r1) (x2, r2) =
+  cEval_equiv c (x1,r1) (x2,r2) ∧
+  cEval_equiv c (x1,r1) (state_clock_fupd f x2, r2) =
+  cEval_equiv c (x1,r1) (x2,r2) ∧
+  cEval_equiv c (state_refs_fupd rf x1, r1) (x2, r2) =
+  cEval_equiv c (x1,r1) (x2,r2) ∧
+  cEval_equiv c (x1,r1) (state_refs_fupd rf x2, r2) =
+  cEval_equiv c (x1,r1) (x2,r2)
+Proof
+  simp[cEval_equiv_def]
+QED
+
+
 (* FORWARD CORRECTNESS
     Just the spec :) *)
 Theorem endpoint_forward_correctness:
@@ -5214,26 +5228,36 @@ Proof
                 bind_assoc, o_UNCURRY_R, C_UNCURRY_L, o_ABS_R, C_ABS_L,
                 find_evalform ‘Var _’, option_bind, find_evalform ‘Con _ _’]
            )>>
-      ‘ffi_wf cSt1.ffi.ffi_state ∧ cSt1.ffi.oracle = comms_ffi_oracle conf’
-        by fs[cpEval_valid_def] >>
+(*      ‘ffi_wf cSt1.ffi.ffi_state ∧ cSt1.ffi.oracle = comms_ffi_oracle conf’
+        by fs[cpEval_valid_def] >> *)
+      ‘∀b. nsLookup (bndbuf (cSB b) (cEB b).v) (Short "buff") =
+           SOME (Loc (LENGTH (cSB b).refs))’
+        by simp[Abbr‘bndbuf’] >>
+      ‘∀b. env_asm (cEB b with v := bndbuf (cSB b) (cEB b).v) conf’
+        by (simp[Abbr‘bndbuf’] >> fs[cpEval_valid_def, Abbr‘cEB’] >> rw[]) >>
       ‘∀b. nsLookup (cE1B b).v (Short "receiveloop") =
             SOME (Recclosure (cEB b with v := bndbuf (cSB b) (cEB b).v)
                     (receiveloop conf (MAP (CHR o w2n) p1)) "receiveloop")’
         by simp[Abbr‘bre’, Abbr‘cE1B’, build_rec_env_def, receiveloop_def] >>
-      ‘∀b. nsLookup (bndbuf (cSB b) (cEB b).v) (Short "buff") =
-           SOME (Loc (LENGTH (cSB b).refs))’
-        by simp[Abbr‘bndbuf’] >>
-      qpat_x_assum ‘’
-      Q.SUBGOAL_THEN ‘ffi_wf cSt2.ffi.ffi_state ∧ cSt2.ffi.oracle = comms_ffi_oracle conf’
-       MP_TAC >- simp[] >> strip_tac >>
+      ‘conf.payload_size > 0’ by fs[cpEval_valid_def] >>
+      ‘ffi_wf (cS1B T 0).ffi.ffi_state ∧
+       (cS1B T 0).ffi.oracle = comms_ffi_oracle conf’
+        by rw[Abbr‘cS1B’, Abbr‘cSB’] >>
       reverse (drule_all_then (qspec_then ‘p1’ strip_assume_tac)
                ffi_gets_stream)
       >- ((* fail_stream *)
           first_assum (mp_then (Pos last) mp_tac receiveloop_correct_fail) >>
-          disch_then (first_x_assum o
-                      qspec_then ‘b:bool’ o
-                      mp_then Any (mp_tac o Q.GEN ‘b’)) >>
-          simp[] >> cheat) >> cheat)
+          disch_then (first_x_assum o qspec_then ‘T’ o mp_then Any mp_tac) >>
+          simp[] >> simp[Abbr‘cS1B’, store_lookup_def, EL_APPEND2, Abbr‘cZs’]>>
+          disch_then $ qx_choosel_then [‘ck21’, ‘ck22’, ‘finalBuf’, ‘refs2’]
+                     $ assume_tac >>
+          Q.REFINE_EXISTS_TAC ‘ck21 + mc’ >>
+          dxrule evaluate_add_to_clock >> simp[] >> disch_then kall_tac >>
+          qmatch_goalsub_abbrev_tac
+            ‘cEval_equiv _ _
+               (_ with <| clock := _; refs := Refs2; ffi := FFI2|> , Error2)’>>
+          simp[] >> cheat)
+      >> cheat)
   >- ((* if / guard -> T *)
    qpat_assum ‘cpEval_valid _ _ _ _ (IfThen _ _ _) _ _’ (strip_assume_tac o REWRITE_RULE[cpEval_valid_def]) >>
    simp[find_evalform ‘If _  _ _’, generic_casebind,
