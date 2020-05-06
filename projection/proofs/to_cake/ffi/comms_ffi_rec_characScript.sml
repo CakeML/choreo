@@ -322,7 +322,29 @@ Theorem ffi_ARecv_term_stream:
     ffi_term_stream conf y src cs ⇒
     ffi_term_stream conf x src (h::cs)
 Proof
-  rw[] >> Cases_on ‘cs’ >> fs[ffi_term_stream_def] >> cheat
+  rw[] >> Cases_on ‘cs’ >> fs[ffi_term_stream_def] >>
+  rw[valid_receive_call_format_def,call_FFI_def,comms_ffi_oracle_def,
+     ffi_receive_def] >> DEEP_INTRO_TAC some_intro >> reverse (rw[])
+  >- (qexists_tac ‘(h,y.ffi_state)’ >> rw[]) >>
+  rename1 ‘(λ(m,ns). _ _ _ (_ _ m) ns) xI’ >>
+  PairCases_on ‘xI’ >> fs[] >>
+  ‘xI0 = h’
+    by metis_tac[functional_ARecv] >>
+  fs[] >> rw[] >>
+  qmatch_goalsub_abbrev_tac ‘ffi_term_stream _ nffi _ _’ >>
+  ‘ffi_term_stream conf y = ffi_term_stream conf nffi’
+    suffices_by (rw[] >> fs[]) >>
+  irule ffi_eq_term_stream >> rw[]
+  >- metis_tac[strans_pres_wf]
+  >- (qunabbrev_tac ‘nffi’ >> rw[] >> metis_tac[strans_pres_wf])
+  >- (qunabbrev_tac ‘nffi’ >> rw[]) >>
+  qunabbrev_tac ‘nffi’ >> rw[] >>
+  irule ffi_eq_pres >>
+  rename1 ‘ARecv param h’ >>
+  qexistsl_tac [‘ARecv param h’,‘x.ffi_state’,
+                ‘x.ffi_state’] >>
+  rw[] >>
+  metis_tac[ffi_eq_equivRel,equivalence_def,reflexive_def]
 QED
 
 Definition ffi_divg_stream_def:
@@ -432,7 +454,29 @@ Theorem ffi_ARecv_divg_stream:
     ffi_divg_stream conf y src cs ⇒
     ffi_divg_stream conf x src (h::cs)
 Proof
-  cheat
+  rw[] >>  fs[ffi_divg_stream_def] >>
+  rw[valid_receive_call_format_def,call_FFI_def,comms_ffi_oracle_def,
+     ffi_receive_def] >> DEEP_INTRO_TAC some_intro >> reverse (rw[])
+  >- (qexists_tac ‘(h,y.ffi_state)’ >> rw[]) >>
+  rename1 ‘(λ(m,ns). _ _ _ (_ _ m) ns) xI’ >>
+  PairCases_on ‘xI’ >> fs[] >>
+  ‘xI0 = h’
+    by metis_tac[functional_ARecv] >>
+  fs[] >> rw[] >>
+  qmatch_goalsub_abbrev_tac ‘ffi_divg_stream _ nffi _ _’ >>
+  ‘ffi_divg_stream conf y = ffi_divg_stream conf nffi’
+    suffices_by (rw[] >> fs[]) >>
+  irule ffi_eq_divg_stream >> rw[]
+  >- metis_tac[strans_pres_wf]
+  >- (qunabbrev_tac ‘nffi’ >> rw[] >> metis_tac[strans_pres_wf])
+  >- (qunabbrev_tac ‘nffi’ >> rw[]) >>
+  qunabbrev_tac ‘nffi’ >> rw[] >>
+  irule ffi_eq_pres >>
+  rename1 ‘ARecv param h’ >>
+  qexistsl_tac [‘ARecv param h’,‘x.ffi_state’,
+                ‘x.ffi_state’] >>
+  rw[] >>
+  metis_tac[ffi_eq_equivRel,equivalence_def,reflexive_def]
 QED
 
 Definition ffi_fail_stream_def:
@@ -559,7 +603,29 @@ Theorem ffi_ARecv_fail_stream:
     ffi_fail_stream conf y src cs ⇒
     ffi_fail_stream conf x src (h::cs)
 Proof
-  cheat
+  rw[] >>  fs[ffi_fail_stream_def] >>
+  rw[valid_receive_call_format_def,call_FFI_def,comms_ffi_oracle_def,
+     ffi_receive_def] >> DEEP_INTRO_TAC some_intro >> reverse (rw[])
+  >- (qexists_tac ‘(h,y.ffi_state)’ >> rw[]) >>
+  rename1 ‘(λ(m,ns). _ _ _ (_ _ m) ns) xI’ >>
+  PairCases_on ‘xI’ >> fs[] >>
+  ‘xI0 = h’
+    by metis_tac[functional_ARecv] >>
+  fs[] >> rw[] >>
+  qmatch_goalsub_abbrev_tac ‘ffi_fail_stream _ nffi _ _’ >>
+  ‘ffi_fail_stream conf y = ffi_fail_stream conf nffi’
+    suffices_by (rw[] >> fs[]) >>
+  irule ffi_eq_fail_stream >> rw[]
+  >- metis_tac[strans_pres_wf]
+  >- (qunabbrev_tac ‘nffi’ >> rw[] >> metis_tac[strans_pres_wf])
+  >- (qunabbrev_tac ‘nffi’ >> rw[]) >>
+  qunabbrev_tac ‘nffi’ >> rw[] >>
+  irule ffi_eq_pres >>
+  rename1 ‘ARecv param h’ >>
+  qexistsl_tac [‘ARecv param h’,‘x.ffi_state’,
+                ‘x.ffi_state’] >>
+  rw[] >>
+  metis_tac[ffi_eq_equivRel,equivalence_def,reflexive_def]
 QED
 
 Theorem ffi_gets_stream:
