@@ -2749,6 +2749,26 @@ Proof
       metis_tac[MAP_ZIP])
 QED
 
+Theorem ffi_ARecv_receive_events_term_irrel:
+  ∀conf src h cs bufInit1 bufInit2 ffi1 ffi2.
+   LENGTH bufInit = SUC conf.payload_size ⇒
+   strans conf ffi1.ffi_state (ARecv src h) ffi2.ffi_state ⇒
+   ffi_wf ffi1.ffi_state ⇒
+   ffi_wf ffi2.ffi_state ⇒
+   ffi1.oracle = comms_ffi_oracle conf ⇒
+   ffi2.oracle = comms_ffi_oracle conf ⇒
+   ffi_term_stream conf ffi1 src (h::cs) ⇒
+   ffi_term_stream conf ffi2 src cs ⇒
+   ffi_eq conf
+     (update_state ffi1.ffi_state (comms_ffi_oracle conf)
+        (receive_events_raw conf bufInit1 src (h::cs)))
+     (update_state ffi2.ffi_state (comms_ffi_oracle conf)
+        (receive_events_raw conf bufInit2 src cs))
+Proof
+  cheat
+QED
+
+
 (* receive_events of a divg stream retain equivalence *)
 Theorem ffi_eq_receive_events_divg_irrel:
   ∀conf src cs bufInit ffi1 ffi2.
@@ -2853,6 +2873,25 @@ Proof
       metis_tac[MAP_ZIP])
 QED
 
+Theorem ffi_ARecv_receive_events_divg_irrel:
+  ∀conf src h cs bufInit1 bufInit2 ffi1 ffi2.
+   LENGTH bufInit = SUC conf.payload_size ⇒
+   strans conf ffi1.ffi_state (ARecv src h) ffi2.ffi_state ⇒
+   ffi_wf ffi1.ffi_state ⇒
+   ffi_wf ffi2.ffi_state ⇒
+   ffi1.oracle = comms_ffi_oracle conf ⇒
+   ffi2.oracle = comms_ffi_oracle conf ⇒
+   ffi_divg_stream conf ffi1 src (h::cs) ⇒
+   ffi_divg_stream conf ffi2 src cs ⇒
+   ffi_eq conf
+     (update_state ffi1.ffi_state (comms_ffi_oracle conf)
+        (receive_events_raw conf bufInit1 src (h::cs)))
+     (update_state ffi2.ffi_state (comms_ffi_oracle conf)
+        (receive_events_raw conf bufInit2 src cs))
+Proof
+  cheat
+QED
+
 (* receive_events of a fail stream retain equivalence *)
 Theorem ffi_eq_receive_events_fail_irrel:
   ∀conf src cs bufInit ffi1 ffi2.
@@ -2955,6 +2994,25 @@ Proof
                      fs[] >> metis_tac[strans_pres_wf,ffi_eq_pres,ffi_eq_equivRel,
                                        equivalence_def,reflexive_def]) >>
       metis_tac[MAP_ZIP])
+QED
+
+Theorem ffi_ARecv_receive_events_fail_irrel:
+  ∀conf src h cs bufInit1 bufInit2 ffi1 ffi2.
+   LENGTH bufInit = SUC conf.payload_size ⇒
+   strans conf ffi1.ffi_state (ARecv src h) ffi2.ffi_state ⇒
+   ffi_wf ffi1.ffi_state ⇒
+   ffi_wf ffi2.ffi_state ⇒
+   ffi1.oracle = comms_ffi_oracle conf ⇒
+   ffi2.oracle = comms_ffi_oracle conf ⇒
+   ffi_fail_stream conf ffi1 src (h::cs) ⇒
+   ffi_fail_stream conf ffi2 src cs ⇒
+   ffi_eq conf
+     (update_state ffi1.ffi_state (comms_ffi_oracle conf)
+        (receive_events_raw conf bufInit1 src (h::cs)))
+     (update_state ffi2.ffi_state (comms_ffi_oracle conf)
+        (receive_events_raw conf bufInit2 src cs))
+Proof
+  cheat
 QED
 
 (* FFI IRRELEVANCE TO EVALUATION THEOREM
