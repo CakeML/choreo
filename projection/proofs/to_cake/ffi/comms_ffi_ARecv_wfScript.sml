@@ -3,13 +3,17 @@ open pairTheory
      pred_setTheory
      relationTheory
      listTheory
-     rich_listTheory;
+     finite_mapTheory;
 open payloadSemTheory
      payloadLangTheory
+     payloadPropsTheory
      comms_ffi_modelTheory
-     comms_ffi_consTheory;
+     comms_ffi_consTheory
+     comms_ffi_propsTheory;
 
 val _ = new_theory "comms_ffi_ARecv_wf";
+
+(* Basic Queue/Endpoint/Network Observables *)
 
 Definition non_empty_queues_def:
   non_empty_queues (qs : proc |-> datum list) =
@@ -21,7 +25,7 @@ Definition queue_length_def:
     LENGTH (qlk qs sp)
 End
 
-Definition total_queues_data:
+Definition total_queues_data_def:
   total_queues_data (qs : proc |-> datum list) =
     FOLDL $+ 0 (MAP (queue_length qs) (non_empty_queues qs))
 End
@@ -60,7 +64,6 @@ Definition endpoint_await_receive_def:
   (endpoint_await_receive _  (Let _ _ _ _)  = 0)
 End
 
-
 Definition net_await_send_def:
   (net_await_send NNil = 0) ∧
   (net_await_send (NPar n1 n2) = net_await_send n1 + net_await_send n2) ∧
@@ -73,41 +76,7 @@ Definition net_await_receive_def:
   (net_await_receive (NEndpoint _ st e) = endpoint_await_receive st e)
 End
 
-
-
-Definition total_state_info_def:
-  total_state_info ((_,q,N) : total_state) =
-    (net_size N, net_await_send N, total_queues_data q)
-End
-
-(* Total State Relation *)
-Definition TSR_def:
-  TSR (x : total_state) (y : total_state) ⇔
-    ($< LEX ($< LEX $<)) (total_state_info x) (total_state_info y)
-End
-
-Theorem WF_TSR:
-  WF TSR
-Proof
-  ‘WF (($< : num -> num -> bool) LEX (($< : num -> num -> bool) LEX ($< : num -> num -> bool)))’
-    by (irule WF_LEX >> rw[] >>
-        irule WF_LEX >> rw[]) >>
-  fs[WF_DEF,TSR_def] >> rw[] >>
-  rename1 ‘B w’ >>
-  first_x_assum (qspec_then ‘IMAGE total_state_info B’ mp_tac) >>
-  impl_tac
-  >- (rw[IMAGE_DEF,IN_DEF] >>
-      metis_tac[]) >>
-  rw[IN_DEF] >>
-  qmatch_asmsub_rename_tac ‘∀b. _ b (_ x) ⇒ (∀x. b ≠ _ x ∨ ¬B x)’ >>
-  qexists_tac ‘x’ >> rw[] >>
-  qmatch_goalsub_rename_tac ‘¬B b’ >>
-  first_x_assum (qspec_then ‘total_state_info b’ assume_tac) >>
-  rfs[] >>
-  first_x_assum (qspec_then ‘b’ assume_tac) >>
-  rw[]
-QED
-
+(* Variation in Observables over trans steps *)
 Theorem LReceive_net_props:
   ∀conf N1 sp d rp N2.
     trans conf N1 (LReceive sp d rp) N2 ⇒
@@ -135,29 +104,187 @@ Proof
   Cases_on ‘net_size N1 > net_size N2’ >> rw[]
 QED
 
-(*
 Theorem LTau_net_props:
   ∀conf N1 N2.
     conf.payload_size > 0 ∧
     trans conf N1 LTau N2 ⇒
     (net_size N1 > net_size N2) ∨
     (net_size N1 = net_size N2 ∧
-     net_await_send N1 > net_await_send N2)
+     net_await_send N1 > net_await_send N2) ∨
+    (net_size N1 = net_size N2 ∧
+     net_await_send N1 = net_await_send N2 ∧
+     net_await_receive N1 > net_await_receive N2)
 Proof
   Induct_on ‘trans’ >>
+  rw[net_size_def,net_await_send_def,net_await_receive_def,
+     endpoint_size_def,endpoint_await_send_def,endpoint_await_receive_def,
+     queue_length_def] >>
+  Cases_on ‘net_size N1 > net_size N2’ >> rw[] >>
+  drule_all_then strip_assume_tac LReceive_net_props >>
+  drule_all_then strip_assume_tac LSend_net_props >>
   rw[]
-  rw[net_size_def,net_await_send_def,endpoint_size_def,
-     endpoint_await_send_def]
-  >- (drule_all_then strip_assume_tac LReceive_net_props >>
-      drule_all_then strip_assume_tac LSend_net_props >>
-      rw[])
-  >- (drule_all_then strip_assume_tac LReceive_net_props >>
-      drule_all_then strip_assume_tac LSend_net_props >>
-      rw[])
-  Cases_on ‘net_size N1 > net_size N2’ >> rw[]
 QED
 
-*)
+(* Taking Observables up to total_state and producing a relation*)
+Definition total_state_info_def:
+  total_state_info ((_,q,N) : total_state) =
+    (net_size N, net_await_send N, net_await_receive N, total_queues_data q)
+End
+
+Definition TSR_def:
+  TSR (x : total_state) (y : total_state) ⇔
+    ($< LEX ($< LEX ($< LEX $<))) (total_state_info x) (total_state_info y)
+End
+
+Theorem transitive_TSR:
+  transitive TSR
+Proof
+  rw[transitive_def,TSR_def,LEX_DEF] >>
+  qmatch_goalsub_rename_tac ‘_ (total_state_info x) (total_state_info z)’ >>
+  MAP_EVERY PairCases_on [‘x’,‘z’] >>
+  fs[total_state_info_def] >>
+  rename1 ‘total_state_info y’ >>
+  PairCases_on ‘y’ >>
+  fs[total_state_info_def]
+QED
+
+Theorem WF_TSR:
+  WF TSR
+Proof
+  ‘WF ($LEX ($< : num -> num -> bool)
+            ($LEX ($< : num -> num -> bool)
+                  ($LEX ($< : num -> num -> bool)
+                        ($< : num -> num -> bool)
+                  )
+            )
+      )’
+    by ntac 3 (irule WF_LEX >> rw[]) >>
+  fs[WF_DEF,TSR_def] >> rw[] >>
+  rename1 ‘B w’ >>
+  first_x_assum (qspec_then ‘IMAGE total_state_info B’ mp_tac) >>
+  impl_tac
+  >- (rw[IMAGE_DEF,IN_DEF] >>
+      metis_tac[]) >>
+  rw[IN_DEF] >>
+  qmatch_asmsub_rename_tac ‘∀b. _ b (_ x) ⇒ (∀x. b ≠ _ x ∨ ¬B x)’ >>
+  qexists_tac ‘x’ >> rw[] >>
+  qmatch_goalsub_rename_tac ‘¬B b’ >>
+  first_x_assum (qspec_then ‘total_state_info b’ assume_tac) >>
+  rfs[] >>
+  first_x_assum (qspec_then ‘b’ assume_tac) >>
+  rw[]
+QED
+
+(* Relation over strans level changes *)
+Theorem internal_trans_TSR:
+  ∀conf c q1 N1 q2 N2.
+    conf.payload_size > 0 ∧
+    internal_trans conf c (q1,N1) (q2,N2) ⇒
+    TSR (c,q2,N2) (c,q1,N1)
+Proof
+  rw[internal_trans_def,TSR_def,LEX_DEF,total_state_info_def] >>
+  drule_all_then assume_tac LTau_net_props>>
+  rw[]
+QED
+
+Theorem emit_trans_TSR:
+  ∀conf c q1 N1 q2 N2.
+    conf.payload_size > 0 ∧
+    emit_trans conf c (q1,N1) (q2,N2) ⇒
+    TSR (c,q2,N2) (c,q1,N1)
+Proof
+  rw[emit_trans_def,TSR_def,LEX_DEF,total_state_info_def] >>
+  drule_all_then assume_tac LSend_net_props>>
+  rw[]
+QED
+
+Theorem active_trans_TSR:
+  ∀conf c q1 N1 q2 N2.
+    conf.payload_size > 0 ∧
+    active_trans conf c (q1,N1) (q2,N2) ⇒
+    TSR (c,q2,N2) (c,q1,N1)
+Proof
+  rw[active_trans_def] >>
+  metis_tac[internal_trans_TSR,emit_trans_TSR]
+QED
+
+Theorem output_trans_TSR:
+  ∀conf c q1 N1 sp d q2 N2.
+    conf.payload_size > 0 ∧
+    output_trans conf c (q1,N1) (sp,d) (q2,N2) ⇒
+    TSR (c,q2,N2) (c,q1,N1)
+Proof
+  rw[output_trans_def,TSR_def,LEX_DEF,total_state_info_def,total_queues_data_def,
+     non_empty_queues_def] >> cheat
+  (*
+  ‘FDOM (normalise_queues q2) = set (non_empty_queues q2)’
+        by (rw[non_empty_queues_def] >>
+            metis_tac[SET_TO_LIST_INV,FDOM_FINITE]) >>
+  rw[] >>
+  DB.find "SET_TO_LIST_INSERT"    
+  Induct_on ‘non_empty_queues q2’
+  >- (rw[] >> qpat_x_assum ‘[] = _’ (assume_tac o REWRITE_RULE [Once EQ_SYM_EQ]) >>
+      rw[FOLDL] >>
+      ‘non_empty_queues q1 = [sp]’
+        suffices_by (rw[MAP,queue_length_def] >>
+                     ‘qlk (normalise_queues q1) sp = d::qlk q2 sp’
+                        suffices_by rw[] >>
+                     qpat_x_assum ‘normalise_queues q1 = _’ SUBST1_TAC >>
+                     rw[]) >>
+      rw[non_empty_queues_def] >>
+      ‘FDOM (normalise_queues q2) = set (non_empty_queues q2)’
+        by rw[non_empty_queues_def] >>
+      fs[non_empty_queues_def] >>
+      qspec_then ‘FDOM (normalise_queues q2)’ assume_tac SET_TO_LIST_IN_MEM >>
+      pop_assum mp_tac >> impl_tac
+      >- metis_tac[FDOM_FINITE] >>
+      disch_tac >>
+      ‘∀x. ¬(MEM x (SET_TO_LIST (FDOM (normalise_queues q2))))’
+        suffices_by (simp[])
+      DB.find "EMPTY"
+      simp[]
+      assume_tac (GSYM SET_TO_LIST_EMPTY) >>
+      fs[]
+      DB.match [] “(s ≠ ∅) ⇔ _”
+  Cases_on ‘qlk q2 sp’
+  >- (‘non_empty_queues q1 = sp::non_empty_queues q2’
+        by (rw[non_empty_queues_def] >>
+            DB.find "SET_TO_LIST"
+  rw[non_empty_queues_def,SET_TO_LIST_DEF]
+  *)
+QED
+
+Theorem active_trans_TC_TSR:
+  ∀conf c q1 N1 q2 N2.
+    conf.payload_size > 0 ∧
+    TC (active_trans conf c) (q1,N1) (q2,N2) ⇒
+    TSR (c,q2,N2) (c,q1,N1)
+Proof
+  rw[] >> pop_assum mp_tac >>
+  MAP_EVERY qabbrev_tac [‘s1 = (q1,N1)’,‘s2 = (q2,N2)’] >>
+  ntac 2 (pop_assum kall_tac) >>
+  MAP_EVERY qid_spec_tac [‘s2’,‘s1’] >>
+  ho_match_mp_tac TC_INDUCT >> rw[]
+  >- (MAP_EVERY PairCases_on [‘s1’,‘s2’] >>
+      metis_tac[active_trans_TSR])
+  >- metis_tac[transitive_TSR,transitive_def]
+QED
+
+Theorem internal_trans_TC_TSR:
+  ∀conf c q1 N1 q2 N2.
+    conf.payload_size > 0 ∧
+    TC (internal_trans conf c) (q1,N1) (q2,N2) ⇒
+    TSR (c,q2,N2) (c,q1,N1)
+Proof
+  rw[] >> pop_assum mp_tac >>
+  MAP_EVERY qabbrev_tac [‘s1 = (q1,N1)’,‘s2 = (q2,N2)’] >>
+  ntac 2 (pop_assum kall_tac) >>
+  MAP_EVERY qid_spec_tac [‘s2’,‘s1’] >>
+  ho_match_mp_tac TC_INDUCT >> rw[]
+  >- (MAP_EVERY PairCases_on [‘s1’,‘s2’] >>
+      metis_tac[internal_trans_TSR])
+  >- metis_tac[transitive_TSR,transitive_def]
+QED
 
 Triviality WF_prop:
   ∀Q R.
@@ -175,13 +302,58 @@ Proof
   qexists_tac ‘min’ >> rw[]
 QED
 
+Theorem WF_ARecv_total_state:
+  ∀conf.
+    conf.payload_size > 0 ⇒
+    WF (λs1 s2. ∃sp d. strans conf s2 (ARecv sp d) s1)
+Proof
+  rw[] >>
+  qmatch_goalsub_abbrev_tac ‘WF R’ >>
+  ‘∀x y. (R x y ⇒ TSR x y)’
+    suffices_by (rw[] >> metis_tac[WF_prop,WF_TSR]) >>
+  qunabbrev_tac ‘R’ >>
+  rw[] >>
+  MAP_EVERY PairCases_on [‘x’,‘y’] >>
+  ‘x0 = y0’
+    by metis_tac[strans_pres_pnum,FST] >>
+  fs[] >> rw[] >>
+  drule_all_then strip_assume_tac strans_receive_deconstruct >>
+  drule_all_then strip_assume_tac RTC_TC_RC >>
+  qpat_x_assum ‘RTC (internal_trans _ _) _ _’ kall_tac >>
+  drule_all_then strip_assume_tac RTC_TC_RC >>
+  qpat_x_assum ‘RTC (active_trans _ _) _ _’ kall_tac >>
+  fs[RC_DEF] >> rfs[] >> rw[] >>
+  metis_tac[active_trans_TC_TSR,internal_trans_TC_TSR,
+            active_trans_TSR,internal_trans_TSR,
+            output_trans_TSR,transitive_TSR,
+            transitive_def]
+QED
 
-Theorem WF_ARecv:
+Theorem WF_ARecv_ffi_state:
   ∀conf.
     conf.payload_size > 0 ⇒
     WF (λs1 s2. ∃sp d. strans conf s2.ffi_state (ARecv sp d) s1.ffi_state)
 Proof
-  cheat
+  rw[] >>
+  drule_all_then assume_tac WF_ARecv_total_state >>
+  fs[WF_DEF] >> rw[] >>
+  rename1 ‘B w’ >>
+  first_x_assum (qspec_then ‘IMAGE (λx. x.ffi_state) B’ mp_tac) >>
+  impl_tac
+  >- (rw[IMAGE_DEF,IN_DEF] >>
+      metis_tac[]) >>
+  rw[IN_DEF] >>
+  qmatch_asmsub_rename_tac ‘∀s1.
+                              (∃sp d. strans conf x.ffi_state (ARecv sp d) s1) ⇒
+                              ∀x. s1 ≠ x.ffi_state ∨ ¬B x’ >>
+  qexists_tac ‘x’ >> rw[] >>
+  qmatch_goalsub_rename_tac ‘¬B b’ >>
+  first_x_assum (qspec_then ‘(λx. x.ffi_state) b’ assume_tac) >>
+  pop_assum mp_tac >>
+  impl_tac >- metis_tac[] >>
+  rw[] >>
+  first_x_assum (qspec_then ‘b’ assume_tac) >>
+  rw[]
 QED
 
 val _ = export_theory ();

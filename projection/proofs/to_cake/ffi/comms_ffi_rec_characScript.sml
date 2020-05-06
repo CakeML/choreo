@@ -531,7 +531,7 @@ Theorem ffi_gets_stream:
 Proof
   rw[] >>
   ‘WF (λs1 s2. ∃sp d. strans conf s2.ffi_state (ARecv sp d) s1.ffi_state)’
-    by metis_tac[WF_ARecv] >>
+    by metis_tac[WF_ARecv_ffi_state] >>
   qpat_x_assum ‘conf.payload_size > 0’ kall_tac >>
   ntac 2 (last_x_assum mp_tac) >>
   qid_spec_tac ‘st’ >>
