@@ -311,6 +311,19 @@ Proof
           metis_tac[ffi_eq_def,BISIM_REL_def,BISIM_def]))
 QED
 
+Theorem ffi_ARecv_term_stream:
+  ∀conf x y src h cs.
+    ffi_wf x.ffi_state ∧
+    x.oracle = comms_ffi_oracle conf ∧
+    y.oracle = comms_ffi_oracle conf ∧
+    strans conf x.ffi_state (ARecv src h) y.ffi_state ∧
+    LENGTH h = SUC conf.payload_size ∧
+    ffi_term_stream conf y src cs ⇒
+    ffi_term_stream conf x src (h::cs)
+Proof
+  cheat
+QED
+
 Definition ffi_divg_stream_def:
   (ffi_divg_stream conf st src (c1::cs) =
     (¬final c1 ∧
@@ -405,6 +418,19 @@ Proof
       first_x_assum (qspec_then ‘MO’ assume_tac) >>
       fs[GSYM pairTheory.FORALL_PROD] >>
       metis_tac[ffi_eq_def,BISIM_REL_def,BISIM_def])
+QED
+
+Theorem ffi_ARecv_divg_stream:
+  ∀conf x y src h cs.
+    ffi_wf x.ffi_state ∧
+    x.oracle = comms_ffi_oracle conf ∧
+    y.oracle = comms_ffi_oracle conf ∧
+    strans conf x.ffi_state (ARecv src h) y.ffi_state ∧
+    LENGTH h = SUC conf.payload_size ∧
+    ffi_divg_stream conf y src cs ⇒
+    ffi_divg_stream conf x src (h::cs)
+Proof
+  cheat
 QED
 
 Definition ffi_fail_stream_def:
@@ -518,6 +544,19 @@ Proof
       first_x_assum (qspec_then ‘MO’ assume_tac) >>
       fs[GSYM pairTheory.FORALL_PROD] >>
       metis_tac[ffi_eq_def,BISIM_REL_def,BISIM_def])
+QED
+
+Theorem ffi_ARecv_fail_stream:
+  ∀conf x y src h cs.
+    ffi_wf x.ffi_state ∧
+    x.oracle = comms_ffi_oracle conf ∧
+    y.oracle = comms_ffi_oracle conf ∧
+    strans conf x.ffi_state (ARecv src h) y.ffi_state ∧
+    LENGTH h = SUC conf.payload_size ∧
+    ffi_fail_stream conf y src cs ⇒
+    ffi_fail_stream conf x src (h::cs)
+Proof
+  cheat
 QED
 
 Theorem ffi_gets_stream:
