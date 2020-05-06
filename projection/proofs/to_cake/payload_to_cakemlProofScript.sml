@@ -4612,6 +4612,15 @@ Proof
   simp[ffi_wf_def]
 QED
 
+Theorem normalise_queues_FUPDATE_NIL[simp]:
+  normalise_queues (fm |+ (k, [])) = normalise_queues fm \\ k
+Proof
+  csimp[fmap_EXT, FDOM_normalise_queues, AllCaseEqs(),
+        FAPPLY_normalise_queues, EXTENSION, FAPPLY_FUPDATE_THM] >>
+  simp[DOMSUB_FAPPLY_THM, FAPPLY_normalise_queues] >> metis_tac[]
+QED
+
+
 Theorem normalise_update_qlk[simp]:
   normalise_queues (q |+ (k,qlk q k)) = normalise_queues q
 Proof
@@ -4698,16 +4707,16 @@ Proof
 *)
 
 Theorem cEval_equiv_ignores_refs_clock[simp]:
-  cEval_equiv c (state_clock_fupd f x1, r1) (x2, r2) =
-  cEval_equiv c (x1,r1) (x2,r2) ∧
-  cEval_equiv c (x1,r1) (state_clock_fupd f x2, r2) =
-  cEval_equiv c (x1,r1) (x2,r2) ∧
-  cEval_equiv c (state_refs_fupd rf x1, r1) (x2, r2) =
-  cEval_equiv c (x1,r1) (x2,r2) ∧
-  cEval_equiv c (x1,r1) (state_refs_fupd rf x2, r2) =
-  cEval_equiv c (x1,r1) (x2,r2)
+  cEval_equiv c (state_clock_fupd f x1, r1) s =
+  cEval_equiv c (x1,r1) s ∧
+  cEval_equiv c s (state_clock_fupd f x2, r2) =
+  cEval_equiv c s (x2,r2) ∧
+  cEval_equiv c (state_refs_fupd rf x1, r1) s =
+  cEval_equiv c (x1,r1) s ∧
+  cEval_equiv c s (state_refs_fupd rf x2, r2) =
+  cEval_equiv c s (x2,r2)
 Proof
-  simp[cEval_equiv_def]
+  Cases_on ‘s’ >> simp[cEval_equiv_def]
 QED
 
 
@@ -5193,6 +5202,28 @@ Proof
         (assume_tac o SIMP_RULE (srw_ss()) []) cEval_equiv_bump_clocks >>
       qexists_tac ‘M’ >> simp[])
   >- ((* double receiveloop *)
+      ‘strans conf cSt1.ffi.ffi_state (ARecv p1 d) cSt2.ffi.ffi_state’
+        by (pop_assum mp_tac >>
+            simp[cpFFI_valid_def] >>
+            qmatch_abbrev_tac ‘option_CASE P _ _ ⇒ _’ >>
+            ‘P = SOME(p1,d)’ suffices_by simp[] >>
+            simp[Abbr‘P’] >> DEEP_INTRO_TAC some_intro >> simp[FORALL_PROD] >>
+            reverse conj_tac
+            >- (qexistsl_tac [‘p1’, ‘d’] >> simp[] >>
+                ‘normalise_queues pSt1.queues = pSt1.queues’
+                  by metis_tac[normalised_def] >> simp[] >>
+                fs[qlk_def, fget_def, FLOOKUP_DEF, AllCaseEqs()] >>
+                simp[fmap_EXT, EXTENSION] >> conj_tac >- metis_tac[]>>
+                simp[FAPPLY_FUPDATE_THM, AllCaseEqs()]) >>
+            qx_genl_tac [‘k’, ‘m’] >>
+            ‘normalise_queues pSt1.queues = pSt1.queues’
+              by metis_tac[normalised_def] >>
+            Cases_on ‘tl’ >>
+            fs[qlk_def, fget_def, FLOOKUP_DEF, AllCaseEqs()] >>
+            Cases_on ‘k = p1’ >>
+            csimp[fmap_EXT, EXTENSION, FAPPLY_FUPDATE_THM, AllCaseEqs(),
+                  DOMSUB_FAPPLY_NEQ] >>
+            metis_tac[]) >>
       simp[find_evalform ‘Let _ _ _’, find_evalform ‘App _ _’,
            find_evalform ‘Lit _’,
            generic_casebind, bind_assoc, o_UNCURRY_R, C_UNCURRY_L, o_ABS_R,
@@ -5239,6 +5270,9 @@ Proof
             SOME (Recclosure (cEB b with v := bndbuf (cSB b) (cEB b).v)
                     (receiveloop conf (MAP (CHR o w2n) p1)) "receiveloop")’
         by simp[Abbr‘bre’, Abbr‘cE1B’, build_rec_env_def, receiveloop_def] >>
+      ‘∀b mc c'. (cS1B b mc).refs = (cSB b).refs ++ cZs conf ∧
+                 (cS1B b mc).clock = mc ∧
+                 cS1B b mc with clock := c' = cS1B b c'’ by simp[Abbr‘cS1B’]>>
       ‘conf.payload_size > 0’ by fs[cpEval_valid_def] >>
       ‘ffi_wf (cS1B T 0).ffi.ffi_state ∧
        (cS1B T 0).ffi.oracle = comms_ffi_oracle conf’
@@ -5246,18 +5280,149 @@ Proof
       reverse (drule_all_then (qspec_then ‘p1’ strip_assume_tac)
                ffi_gets_stream)
       >- ((* fail_stream *)
+          ‘ffi_fail_stream conf (cS1B F 0).ffi p1 (d::cs)’
+            by (irule ffi_ARecv_fail_stream >>
+                simp[Abbr‘cS1B’, Abbr‘cSB’] >> rpt conj_tac >>
+                TRY (fs[cpEval_valid_def] >> NO_TAC)
+                >- metis_tac[final_inter_mutexc]
+                >- (‘∃m0. d = pad conf m0’
+                     by metis_tac[padded_queues_def, MEM]>>
+                    simp[pad_LENGTH]) >>
+                goal_assum (first_assum o mp_then (Pos last) mp_tac) >>
+                fs[]) >>
           first_assum (mp_then (Pos last) mp_tac receiveloop_correct_fail) >>
-          disch_then (first_x_assum o qspec_then ‘T’ o mp_then Any mp_tac) >>
-          simp[] >> simp[Abbr‘cS1B’, store_lookup_def, EL_APPEND2, Abbr‘cZs’]>>
-          disch_then $ qx_choosel_then [‘ck21’, ‘ck22’, ‘finalBuf’, ‘refs2’]
+          disch_then (first_assum o qspec_then ‘F’ o mp_then Any mp_tac) >>
+          simp[] >> simp[store_lookup_def, EL_APPEND2, Abbr‘cZs’]>>
+          disch_then $ qx_choosel_then [‘ck11’, ‘ck12’, ‘finalBuf1’, ‘refs1’]
                      $ assume_tac >>
-          Q.REFINE_EXISTS_TAC ‘ck21 + mc’ >>
+          Q.REFINE_EXISTS_TAC ‘ck11 + mc’ >>
           dxrule evaluate_add_to_clock >> simp[] >> disch_then kall_tac >>
-          qmatch_goalsub_abbrev_tac
-            ‘cEval_equiv _ _
-               (_ with <| clock := _; refs := Refs2; ffi := FFI2|> , Error2)’>>
-          simp[] >> cheat)
-      >> cheat)
+          (* now simplify cSt2 evaluation *)
+          last_assum (mp_then (Pos last) mp_tac receiveloop_correct_fail) >>
+          disch_then (first_assum o qspec_then ‘T’ o mp_then Any mp_tac) >>
+          simp[store_lookup_def, EL_APPEND2] >>
+          disch_then $ qx_choosel_then [‘ck021’, ‘ck22’, ‘finalBuf2’, ‘refs2’]
+                     $ assume_tac >>
+          Q.REFINE_EXISTS_TAC ‘ck021 + mc’ >>
+          dxrule evaluate_add_to_clock >> simp[] >> disch_then kall_tac >>
+          simp[cEval_equiv_def, Abbr‘cS1B’, Abbr‘cSB’] >> fs[] >>
+          conj_tac
+          >- (fs[cpEval_valid_def] >>
+              irule ffi_ARecv_receive_events_fail_irrel >> simp[]) >>
+          cheat (* last elements of fail stream must be equal *))
+      >- ((* diverging stream *) ALL_TAC >>
+          ‘ffi_divg_stream conf (cS1B F 0).ffi p1 (d::cs)’
+            by (irule ffi_ARecv_divg_stream >>
+                simp[Abbr‘cS1B’, Abbr‘cSB’] >> rpt conj_tac >>
+                TRY (fs[cpEval_valid_def] >> NO_TAC)
+                >- metis_tac[final_inter_mutexc]
+                >- (‘∃m0. d = pad conf m0’
+                     by metis_tac[padded_queues_def, MEM]>>
+                    simp[pad_LENGTH]) >>
+                goal_assum (first_assum o mp_then (Pos last) mp_tac) >>
+                fs[]) >>
+          first_assum (mp_then (Pos last) mp_tac receiveloop_correct_divg) >>
+          disch_then (first_assum o qspec_then ‘F’ o mp_then Any mp_tac) >>
+          simp[] >> simp[store_lookup_def, EL_APPEND2, Abbr‘cZs’]>>
+          disch_then $ qx_choosel_then [‘ck11’, ‘ck12’, ‘finalBuf1’, ‘refs1’]
+                     $ strip_assume_tac >>
+          Q.REFINE_EXISTS_TAC ‘ck11 + mc’ >>
+          dxrule evaluate_add_to_clock >> simp[] >> disch_then kall_tac >>
+          (* now simplify cSt2 evaluation *)
+          last_assum (mp_then (Pos last) mp_tac receiveloop_correct_divg) >>
+          disch_then (first_assum o qspec_then ‘T’ o mp_then Any mp_tac) >>
+          simp[store_lookup_def, EL_APPEND2] >>
+          disch_then $ qx_choosel_then [‘ck021’, ‘ck22’, ‘finalBuf2’, ‘refs2’]
+                     $ assume_tac >>
+          Q.REFINE_EXISTS_TAC ‘ck021 + mc’ >>
+          dxrule evaluate_add_to_clock >> simp[] >> disch_then kall_tac >>
+          simp[cEval_equiv_def, Abbr‘cS1B’, Abbr‘cSB’] >> fs[] >>
+          conj_tac
+          >- (fs[cpEval_valid_def] >>
+              irule ffi_ARecv_receive_events_divg_irrel >> simp[]) >>
+          cheat (* last elements of stream again a problem *)) >>
+      (* good stream *) ALL_TAC >>
+      ‘ffi_term_stream conf (cS1B F 0).ffi p1 (d::cs)’
+        by (irule ffi_ARecv_term_stream >>
+            simp[Abbr‘cS1B’, Abbr‘cSB’] >> rpt conj_tac >>
+            TRY (fs[cpEval_valid_def] >> NO_TAC)
+            >- metis_tac[final_inter_mutexc]
+            >- (‘∃m0. d = pad conf m0’
+                 by metis_tac[padded_queues_def, MEM]>>
+                simp[pad_LENGTH]) >>
+            goal_assum (first_assum o mp_then (Pos last) mp_tac) >>
+            fs[]) >>
+      first_assum (mp_then (Pos last) mp_tac receiveloop_correct_term) >>
+      disch_then (first_assum o qspec_then ‘F’ o mp_then Any mp_tac) >>
+      simp[] >> simp[store_lookup_def, EL_APPEND2, Abbr‘cZs’]>>
+      disch_then $ qx_choosel_then [‘ck11’, ‘ck12’, ‘finalBuf1’, ‘refs1’]
+                 $ strip_assume_tac >>
+      Q.REFINE_EXISTS_TAC ‘ck11 + mc’ >>
+      dxrule evaluate_add_to_clock >> simp[] >> disch_then kall_tac >>
+      (* now simplify cSt2 evaluation *)
+      last_assum (mp_then (Pos last) mp_tac receiveloop_correct_term) >>
+      disch_then (first_assum o qspec_then ‘T’ o mp_then Any mp_tac) >>
+      simp[store_lookup_def, EL_APPEND2] >>
+      disch_then $ qx_choosel_then [‘ck021’, ‘ck22’, ‘finalBuf2’, ‘refs2’]
+                 $ strip_assume_tac >>
+      Q.REFINE_EXISTS_TAC ‘ck021 + mc’ >>
+      dxrule evaluate_add_to_clock >> simp[] >> disch_then kall_tac >>
+      qabbrev_tac
+        ‘EVs =
+         receive_events_raw conf (REPLICATE (conf.payload_size + 1) 0w) p1’ >>
+      ONCE_REWRITE_TAC [find_evalform ‘App _ _’] >>
+      simp[evaluate_nonsing, find_evalform ‘Var _’, option_bind,
+           generic_casebind, bind_assoc, o_UNCURRY_R, C_UNCURRY_L,
+           o_ABS_R, C_ABS_L] >>
+      ‘∀b. env_asm (cE1B b) conf’
+        by simp[Abbr‘cE1B’, Abbr‘bre’, build_rec_env_def, receiveloop_def] >>
+      first_assum (qspec_then ‘b’ $
+                   mp_then (Pos hd) (assume_tac o Q.GEN ‘b’)
+                   convDatumList_corr) >>
+      qmatch_goalsub_abbrev_tac
+        ‘cS1B T 0 with <| clock := _; refs := R2; ffi := FF2 |>’ >>
+      first_assum (qspecl_then [‘T’, ‘SNOC (unpad d) ds’] $
+                   mp_then (Pos hd)
+                   (qspec_then ‘cS1B T 0 with <| refs := R2; ffi := FF2 |>’ $
+                    qx_choosel_then [‘cdlck1’, ‘cdlck2’, ‘cdlrefs’, ‘cdlV’] $
+                    strip_assume_tac)
+                   ck_equiv_hol_apply) >>
+      Q.REFINE_EXISTS_TAC ‘cdlck1 + mc’ >> simp[] >>
+      pop_assum kall_tac >>
+      first_assum (qspec_then ‘T’ $
+                   mp_then (Pos hd) strip_assume_tac lookup_append2) >>
+      simp[] >>
+      dxrule_all_then (qspec_then
+                       ‘cS1B T 0 with <| refs := R2 ++ cdlrefs; ffi := FF2|>’ $
+                       qx_choosel_then [‘appenv1’, ‘appE1’] $
+                       CONJUNCTS_THEN2 assume_tac $
+                       qx_choosel_then [‘apck1’, ‘apck2’, ‘aprefs’, ‘appcvlV’] $
+                       (strip_assume_tac o SIMP_RULE (srw_ss() ++ ARITH_ss) []))
+                      (INST_TYPE [“:γ” |-> “:plffi”] do_opapp_translate) >>
+      Q.REFINE_EXISTS_TAC ‘apck1 + mc + 1’ >> simp[dec_clock_def] >>
+      pop_assum kall_tac >>
+      qmatch_goalsub_abbrev_tac
+        ‘cS1B F 0 with <| clock := _; refs := R1; ffi := FF1 |>’ >>
+      first_x_assum (qspecl_then [‘F’, ‘ds’] $
+                     mp_then (Pos hd)
+                     (qspec_then ‘cS1B F 0 with <| refs := R1; ffi := FF1 |>’ $
+                      qx_choosel_then [‘apck00’, ‘cdlck0’, ‘cdlrefs1’, ‘dsV’] $
+                      strip_assume_tac)
+                     ck_equiv_hol_apply) >>
+      Q.REFINE_EXISTS_TAC ‘apck00 + mc’ >> simp[] >> pop_assum kall_tac >>
+      first_assum (qspec_then ‘F’ $
+                   mp_then (Pos hd) strip_assume_tac lookup_append2) >>
+      simp[] >>
+      dxrule_all_then (qspec_then
+                       ‘cS1B F 0 with <| refs := R1 ++ cdlrefs1; ffi := FF1|>’ $
+                       qx_choosel_then [‘appenv1'’, ‘appE1'’] $
+                       CONJUNCTS_THEN2 assume_tac $
+                       qx_choosel_then [‘apcj00’, ‘apck3’, ‘aprefs1’,
+                                        ‘appcvlV1’] $
+                       (strip_assume_tac o SIMP_RULE (srw_ss() ++ ARITH_ss) []))
+                      (INST_TYPE [“:γ” |-> “:plffi”] do_opapp_translate) >>
+      Q.REFINE_EXISTS_TAC ‘apcj00 + mc + 1’ >> simp[dec_clock_def] >>
+      cheat)
   >- ((* if / guard -> T *)
    qpat_assum ‘cpEval_valid _ _ _ _ (IfThen _ _ _) _ _’ (strip_assume_tac o REWRITE_RULE[cpEval_valid_def]) >>
    simp[find_evalform ‘If _  _ _’, generic_casebind,
