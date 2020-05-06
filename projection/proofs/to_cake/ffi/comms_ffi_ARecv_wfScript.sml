@@ -17,7 +17,7 @@ val _ = new_theory "comms_ffi_ARecv_wf";
 
 Definition non_empty_queues_def:
   non_empty_queues (qs : proc |-> datum list) =
-    SET_TO_LIST (FDOM (normalise_queues qs))
+    FDOM (normalise_queues qs)
 End
 
 Definition queue_length_def:
@@ -27,7 +27,7 @@ End
 
 Definition total_queues_data_def:
   total_queues_data (qs : proc |-> datum list) =
-    FOLDL $+ 0 (MAP (queue_length qs) (non_empty_queues qs))
+    SUM_IMAGE (queue_length qs) (non_empty_queues qs)
 End
 
 Definition endpoint_size_def:
@@ -215,43 +215,36 @@ Theorem output_trans_TSR:
     TSR (c,q2,N2) (c,q1,N1)
 Proof
   rw[output_trans_def,TSR_def,LEX_DEF,total_state_info_def,total_queues_data_def,
-     non_empty_queues_def] >> cheat
-  (*
-  ‘FDOM (normalise_queues q2) = set (non_empty_queues q2)’
-        by (rw[non_empty_queues_def] >>
-            metis_tac[SET_TO_LIST_INV,FDOM_FINITE]) >>
-  rw[] >>
-  DB.find "SET_TO_LIST_INSERT"    
-  Induct_on ‘non_empty_queues q2’
-  >- (rw[] >> qpat_x_assum ‘[] = _’ (assume_tac o REWRITE_RULE [Once EQ_SYM_EQ]) >>
-      rw[FOLDL] >>
-      ‘non_empty_queues q1 = [sp]’
-        suffices_by (rw[MAP,queue_length_def] >>
-                     ‘qlk (normalise_queues q1) sp = d::qlk q2 sp’
-                        suffices_by rw[] >>
-                     qpat_x_assum ‘normalise_queues q1 = _’ SUBST1_TAC >>
-                     rw[]) >>
-      rw[non_empty_queues_def] >>
-      ‘FDOM (normalise_queues q2) = set (non_empty_queues q2)’
-        by rw[non_empty_queues_def] >>
-      fs[non_empty_queues_def] >>
-      qspec_then ‘FDOM (normalise_queues q2)’ assume_tac SET_TO_LIST_IN_MEM >>
-      pop_assum mp_tac >> impl_tac
-      >- metis_tac[FDOM_FINITE] >>
-      disch_tac >>
-      ‘∀x. ¬(MEM x (SET_TO_LIST (FDOM (normalise_queues q2))))’
-        suffices_by (simp[])
-      DB.find "EMPTY"
-      simp[]
-      assume_tac (GSYM SET_TO_LIST_EMPTY) >>
-      fs[]
-      DB.match [] “(s ≠ ∅) ⇔ _”
-  Cases_on ‘qlk q2 sp’
-  >- (‘non_empty_queues q1 = sp::non_empty_queues q2’
-        by (rw[non_empty_queues_def] >>
-            DB.find "SET_TO_LIST"
-  rw[non_empty_queues_def,SET_TO_LIST_DEF]
-  *)
+     non_empty_queues_def,SUM_IMAGE_THM] >>
+  Cases_on ‘sp ∈ FDOM (normalise_queues q2)’ >>
+  rw [SUM_IMAGE_DELETE,queue_length_def] >>
+  ‘qlk (normalise_queues q1) sp = d::qlk q2 sp’
+    by (qpat_x_assum ‘normalise_queues q1 = _’ SUBST1_TAC >>
+        rw[]) >>
+  fs[]
+  >- (‘SUM_IMAGE (queue_length q2) (FDOM (normalise_queues q2)) < SUM_IMAGE (queue_length q1) (FDOM (normalise_queues q2))’
+        suffices_by rw[] >>
+      irule SUM_IMAGE_MONO_LESS >>
+      rw[FDOM_FINITE]
+      >- (rw[queue_length_def] >>
+          rename1 ‘LENGTH (qlk _ x) ≤ LENGTH (qlk _ x)’ >>
+          Cases_on ‘x = sp’
+          >- rw[] >>
+          ‘qlk (normalise_queues q1) x = qlk q2 x’
+            suffices_by rw[] >>
+          qpat_x_assum ‘normalise_queues q1 = _’ SUBST1_TAC >>
+          rw[]) >>
+      qexists_tac ‘sp’ >> rw[queue_length_def])
+  >- (‘SUM_IMAGE (queue_length q2) (FDOM (normalise_queues q2)) = SUM_IMAGE (queue_length q1) (FDOM (normalise_queues q2))’
+        suffices_by rw[] >>
+      irule SUM_IMAGE_CONG >> rw[queue_length_def] >>
+      rename1 ‘LENGTH (qlk _ x) = LENGTH (qlk _ x)’ >>
+      ‘qlk (normalise_queues q1) x = qlk q2 x’
+        suffices_by rw[] >>
+      qpat_x_assum ‘normalise_queues q1 = _’ SUBST1_TAC >>
+      ‘x ≠ sp’
+        suffices_by rw[] >>
+      metis_tac[])
 QED
 
 Theorem active_trans_TC_TSR:
