@@ -2189,13 +2189,36 @@ QED
 
 (* CAKEML EQUIVALENCE *)
 (* Basic Definition *)
+Definition result_eq_def:
+  result_eq crA crB ⇔
+    case (crA,crB) of
+    (* Can't compare timeouts *)
+      (Rerr (Rabort Rtimeout_error),_) => F
+    | (_,Rerr (Rabort Rtimeout_error)) => F
+    (* An ffi error can be equivalent even with different mutable inputs *)
+    | (Rerr (Rabort (Rffi_error (Final_event f1 i1 m1 o1))),
+       Rerr (Rabort (Rffi_error (Final_event f2 i2 m2 o2))))
+        => (f1 = f2) ∧ (i1 = i2) ∧ (o1 = o2)
+    (* Everything else must be identical *)
+    | _ => crA = crB
+End
+
 Definition cEval_equiv_def:
   cEval_equiv conf (csA,crA) (csB,crB) ⇔
     ffi_eq conf csA.ffi.ffi_state csB.ffi.ffi_state ∧
-    crA = crB ∧
-    crA ≠ Rerr (Rabort Rtimeout_error)
+    result_eq crA crB
 End
 (* Transitive *)
+Theorem result_eq_trans:
+  ∀p1 p2 p3.
+    result_eq p1 p2 ∧
+    result_eq p2 p3
+    ⇒ result_eq p1 p3
+Proof
+  rw[result_eq_def] >>
+  EVERY_CASE_TAC >> rw[]
+QED
+
 Theorem cEval_equiv_trans:
   ∀conf p1 p2 p3.
    cEval_equiv conf p1 p2 ∧
@@ -2205,7 +2228,7 @@ Proof
   rw [] \\ Cases_on ‘p1’ \\ Cases_on ‘p2’ \\ Cases_on ‘p3’
   \\ fs [cEval_equiv_def] \\ qspec_then ‘conf’ assume_tac ffi_eq_equivRel
   \\ fs [equivalence_def,transitive_def]
-  \\ metis_tac []
+  \\ metis_tac [result_eq_trans]
 QED
 (* Irrelevance of extra time/fuel to equivalence *)
 Theorem clock_irrel:
@@ -2226,12 +2249,16 @@ Proof
     = (q with clock := eck1 + q.clock,r)’
     by (Q.ISPECL_THEN [‘(cSt1 with clock := mc)’,‘cEnv1’, ‘cExps1’,‘q’,‘r’,‘eck1’]
                       assume_tac evaluate_add_to_clock >>
-        rfs[]) >>
+        rfs[] >> pop_assum mp_tac >> impl_tac
+        >- (fs[result_eq_def] >> EVERY_CASE_TAC >> rw[]) >>
+        rw[]) >>
   ‘evaluate (cSt2 with clock := eck2 + mc) cEnv2 cExps2
     = (q' with clock := eck2 + q'.clock,r')’
     by (Q.ISPECL_THEN [‘(cSt2 with clock := mc)’,‘cEnv2’, ‘cExps2’,‘q'’,‘r'’,‘eck2’]
                       assume_tac evaluate_add_to_clock >>
-        rfs[]) >>
+        rfs[] >> pop_assum mp_tac >> impl_tac
+        >- (fs[result_eq_def] >> EVERY_CASE_TAC >> rw[]) >>
+        rw[]) >>
   rw[cEval_equiv_def]
 QED
 
@@ -3170,7 +3197,7 @@ Theorem ffi_irrel:
 Proof
   Induct_on ‘pCd’ >> rw[compile_endpoint_def]
   >- ((* Nil Case *)
-      rw (cEval_equiv_def::eval_sl_nf))
+      rw (result_eq_def::cEval_equiv_def::eval_sl_nf))
   >- ((* Send Case *)
       rw eval_sl_nf >>
       ‘∃ha_s. FLOOKUP pSt.bindings s = SOME ha_s’
@@ -3479,7 +3506,7 @@ Proof
                 rpt (qpat_x_assum ‘store_lookup _ _ = _’ (K ALL_TAC)) >>
                 rw[store_lookup_def])) >>
       simp[] >> first_x_assum (K ALL_TAC) >>
-      rw[cEval_equiv_def])
+      rw[result_eq_def,cEval_equiv_def])
   >- ((* Receive Case *)
       qabbrev_tac ‘rec = App Opapp [Var (Short "receiveloop"); Con NONE []]’ >>
       qabbrev_tac ‘lsa = App Opapp [App Opapp [Var conf.append; convDatumList conf l]; rec]’ >>
@@ -3737,7 +3764,7 @@ Proof
           fs[] >> Q.REFINE_EXISTS_TAC ‘mc + arc1_2’ >> simp[] >>
           pop_assum kall_tac >>
           (* COMPARE RESULTS *)
-          qexists_tac ‘0’ >> rw[cEval_equiv_def] >>
+          qexists_tac ‘0’ >> rw[result_eq_def,cEval_equiv_def] >>
           MAP_EVERY qunabbrev_tac [‘cStR1’,‘cStR2’] >>
           rw[] >>
           ntac 2 (qpat_x_assum ‘ffi_divg_stream _ _ _ _’ mp_tac) >>
@@ -3807,7 +3834,7 @@ Proof
           fs[] >> Q.REFINE_EXISTS_TAC ‘mc + arc1_2’ >> simp[] >>
           pop_assum kall_tac >>
           (* COMPARE RESULTS *)
-          qexists_tac ‘0’ >> rw[cEval_equiv_def] >>
+          qexists_tac ‘0’ >> rw[result_eq_def,cEval_equiv_def] >>
           MAP_EVERY qunabbrev_tac [‘cStR1’,‘cStR2’] >>
           rw[] >>
           ntac 2 (qpat_x_assum ‘ffi_fail_stream _ _ _ _’ mp_tac) >>
@@ -4363,10 +4390,10 @@ Theorem cEval_equiv_bump_clocks:
                    (evaluate (st2 with clock := clk2) e2 l2)
 Proof
   map_every Cases_on [‘evaluate st1 e1 l1’, ‘evaluate st2 e2 l2’] >>
-  simp[cEval_equiv_def] >> rw[] >>
-  dxrule_then (qspec_then ‘clk2 - st2.clock’ mp_tac) evaluate_add_to_clock >>
+  simp[result_eq_def,cEval_equiv_def] >> EVERY_CASE_TAC >> rw[] >>
   dxrule_then (qspec_then ‘clk1 - st1.clock’ mp_tac) evaluate_add_to_clock >>
-  simp[cEval_equiv_def]
+  dxrule_then (qspec_then ‘clk2 - st2.clock’ mp_tac) evaluate_add_to_clock >>
+  rw[result_eq_def,cEval_equiv_def] 
 QED
 
 Theorem strans_dest_check':
@@ -5309,7 +5336,7 @@ Proof
           conj_tac
           >- (fs[cpEval_valid_def] >>
               irule ffi_ARecv_receive_events_fail_irrel >> simp[]) >>
-          cheat (* last elements of fail stream must be equal *))
+          rw[result_eq_def])
       >- ((* diverging stream *) ALL_TAC >>
           ‘ffi_divg_stream conf (cS1B F 0).ffi p1 (d::cs)’
             by (irule ffi_ARecv_divg_stream >>
@@ -5340,7 +5367,7 @@ Proof
           conj_tac
           >- (fs[cpEval_valid_def] >>
               irule ffi_ARecv_receive_events_divg_irrel >> simp[]) >>
-          cheat (* last elements of stream again a problem *)) >>
+          rw[result_eq_def]) >>
       (* good stream *) ALL_TAC >>
       ‘ffi_term_stream conf (cS1B F 0).ffi p1 (d::cs)’
         by (irule ffi_ARecv_term_stream >>
