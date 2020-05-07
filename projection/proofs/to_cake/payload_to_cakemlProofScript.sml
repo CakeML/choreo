@@ -4746,7 +4746,6 @@ Proof
   Cases_on ‘s’ >> simp[cEval_equiv_def]
 QED
 
-
 (* FORWARD CORRECTNESS
     Just the spec :) *)
 Theorem endpoint_forward_correctness:
@@ -5449,7 +5448,146 @@ Proof
                        (strip_assume_tac o SIMP_RULE (srw_ss() ++ ARITH_ss) []))
                       (INST_TYPE [“:γ” |-> “:plffi”] do_opapp_translate) >>
       Q.REFINE_EXISTS_TAC ‘apcj00 + mc + 1’ >> simp[dec_clock_def] >>
-      cheat)
+      pop_assum kall_tac >>
+      rename [‘LIST_TYPE (LIST_TYPE _) (MAP _ _) wl2’,
+              ‘do_opapp [partialapp2; wl2]’] >>
+      qpat_assum ‘( _ --> _ ) _ partialapp2’
+                 (mp_then (Pos hd) mp_tac
+                  (INST_TYPE [“:γ” |-> “:plffi”] do_opapp_translate)) >>
+      disch_then (qpat_assum ‘LIST_TYPE _ _ wl2’ o
+                  mp_then (Pos hd)
+                  (qspec_then
+                       ‘cS1B T 0 with <| refs := R2 ++ cdlrefs ++ aprefs;
+                        ffi := FF2|>’ $
+                  qx_choosel_then [‘appenv22’, ‘appE2’] $
+                  CONJUNCTS_THEN2 assume_tac $
+                  qx_choosel_then [‘apci00’, ‘apck4’, ‘aprefs2’,
+                                   ‘appcvlV2’] $
+                  (strip_assume_tac o SIMP_RULE (srw_ss() ++ ARITH_ss) []))) >>
+      Q.REFINE_EXISTS_TAC ‘apci00 + mc + 1’ >> simp[dec_clock_def] >>
+      pop_assum kall_tac >>
+      rename [‘LIST_TYPE (LIST_TYPE _) (_ :: _) wl1’,
+              ‘do_opapp [partialapp1; wl1]’] >>
+      qpat_assum ‘( _ --> _ ) _ partialapp1’
+                 (mp_then (Pos hd)
+                  (qpat_assum ‘LIST_TYPE _ _ wl1’ o
+                   mp_then (Pos hd)
+                   (qspec_then ‘cS1B F 0 with <|
+                      refs := R1 ++ cdlrefs1 ++ aprefs1; ffi := FF1|>’ $
+                    qx_choosel_then [‘appenv21’, ‘appE1''’] $
+                    CONJUNCTS_THEN2 assume_tac $
+                    qx_choosel_then [‘apch00’, ‘apck5’, ‘aprefs0’, ‘appcvlV3’] $
+                    (strip_assume_tac o SIMP_RULE (srw_ss() ++ ARITH_ss) [])))
+                  (INST_TYPE [“:γ” |-> “:plffi”] do_opapp_translate)) >>
+      Q.REFINE_EXISTS_TAC ‘apch00 + mc + 1’ >> simp[dec_clock_def] >>
+      pop_assum kall_tac >>
+      qmatch_goalsub_abbrev_tac
+        ‘cS1B F 0 with <| clock := _; refs := R11; ffi := _ |>’ >>
+      qmatch_goalsub_abbrev_tac
+        ‘cS1B T 0 with <| clock := _; refs := R22; ffi := _ |>’ >>
+      first_assum (qspec_then ‘T’ $
+                   mp_then (Pos hd) (qx_choose_then ‘cat2V’ $ strip_assume_tac)
+                     lookup_concat) >>
+      first_assum (qspec_then ‘F’ $
+                   mp_then (Pos hd) (qx_choose_then ‘cat1V’ $ strip_assume_tac)
+                     lookup_concat) >>
+      simp[] >> rpt (qpat_x_assum ‘nsLookup _ _.concat = SOME _’ kall_tac)>>
+      qpat_assum ‘( _ --> _ ) _ cat2V’
+                 (mp_then (Pos hd)
+                  (qpat_assum ‘LIST_TYPE _ _ appcvlV2’ o
+                   mp_then (Pos hd)
+                   (qspec_then ‘cS1B T 0 with <| refs := R22; ffi := FF2|>’ $
+                    qx_choosel_then [‘catenv2’, ‘catexp2’] $
+                    CONJUNCTS_THEN2 assume_tac $
+                    qx_choosel_then [‘apcg00’, ‘ck6’, ‘refs6’, ‘catres2’] $
+                    (strip_assume_tac o SIMP_RULE (srw_ss() ++ ARITH_ss) [])))
+                  (INST_TYPE [“:γ” |-> “:plffi”] do_opapp_translate)) >>
+      Q.REFINE_EXISTS_TAC ‘mc + apcg00 + 1’ >> simp[dec_clock_def] >>
+      pop_assum kall_tac >>
+      qpat_assum ‘( _ --> _ ) _ cat1V’
+                 (mp_then (Pos hd)
+                  (qpat_assum ‘LIST_TYPE _ _ appcvlV3’ o
+                   mp_then (Pos hd)
+                   (qspec_then ‘cS1B F 0 with <| refs := R11; ffi := FF1|>’ $
+                    qx_choosel_then [‘catenv1’, ‘catexp1’] $
+                    CONJUNCTS_THEN2 assume_tac $
+                    qx_choosel_then [‘apcf00’, ‘ck7’, ‘refs7’, ‘catres1’] $
+                    (strip_assume_tac o SIMP_RULE (srw_ss() ++ ARITH_ss) [])))
+                  (INST_TYPE [“:γ” |-> “:plffi”] do_opapp_translate)) >>
+      Q.REFINE_EXISTS_TAC ‘mc + apcf00 + 1’ >> simp[dec_clock_def] >>
+      pop_assum kall_tac >>
+      ‘cpEval_valid conf p
+         (cEB T with v := nsBind (ps2cs v) catres2 (cEB T).v)
+         (pSt1 with <| bindings := pSt1.bindings |+
+                          (v, FLAT ds ++ unpad d ++ FLAT (MAP unpad cs));
+                       queues := FEMPTY |>)
+         e
+         vs2
+         (cS1B T 0 with <| refs := R22 ++ refs6; ffi := FF2|>)’
+      by (fs[cpEval_valid_def, Abbr‘FF2’, letfuns_def] >> conj_tac
+          >- (fs[pSt_pCd_corr_def, FLOOKUP_DEF, AllCaseEqs()] >> metis_tac[])>>
+          conj_tac
+          >- (fs[sem_env_cor_def, FLOOKUP_DEF, AllCaseEqs(), FAPPLY_FUPDATE_THM,
+                 DISJ_IMP_THM, FORALL_AND_THM] >>
+              dsimp[] >> fs[FLAT_SNOC]) >>
+          ‘∃pn1 N1 Q1 pn2 N2 Q2.
+             (cSB F).ffi.ffi_state = (pn1,Q1,N1) ∧
+             (cSB T).ffi.ffi_state = (pn2,Q2,N2)’
+                by metis_tac[TypeBase.nchotomy_of “:α#β”] >>
+          fs[Abbr‘cS1B’] >> conj_asm2_tac
+          >- (qmatch_abbrev_tac ‘ffi_state_cor _ _ _ somestate’ >>
+              ‘∃pn N Q. somestate = (pn,Q,N)’
+                by metis_tac[TypeBase.nchotomy_of “:α#β”] >>
+              rfs[ffi_state_cor_def] >>
+              ‘p = pn’ suffices_by metis_tac[ffi_eq_REFL] >>
+              qpat_assum ‘ffi_term_stream _ (cSB T).ffi _ _’
+                         (mp_then (Pos last) mp_tac
+                          ffi_num_receive_events_term_irrel) >>
+              simp[Abbr‘EVs’] >> metis_tac[FST, LENGTH_REPLICATE, ADD1]) >>
+          simp[Abbr‘EVs’] >>
+          qpat_assum ‘ffi_term_stream _ (cSB T).ffi _ _’
+                     (mp_then (Pos last) mp_tac
+                      ffi_wf_receive_events_term_irrel) >>
+          simp[]) >>
+      ‘cpEval_valid conf p
+        (cEB F with v := nsBind (ps2cs v) catres1 (cEB F).v)
+        (pSt1 with <| bindings := pSt1.bindings |+
+                         (v, FLAT ds ++ unpad d ++ FLAT (MAP unpad cs));
+                      queues := FEMPTY |>)
+        e
+        vs1
+        (cS1B F 0 with <| refs := R11 ++ refs7; ffi := FF1|>)’
+        by (fs[cpEval_valid_def, Abbr‘FF1’, letfuns_def] >> conj_tac
+            >- (fs[sem_env_cor_def, FLOOKUP_DEF, AllCaseEqs(),
+                   FAPPLY_FUPDATE_THM, DISJ_IMP_THM, FORALL_AND_THM] >>
+                dsimp[]) >>
+            simp[Abbr‘cS1B’] >>
+            ‘∃pn1 N1 Q1 pn2 N2 Q2.
+               (cSB F).ffi.ffi_state = (pn1,Q1,N1) ∧
+               (cSB T).ffi.ffi_state = (pn2,Q2,N2)’
+              by metis_tac[TypeBase.nchotomy_of “:α#β”] >>
+            fs[ffi_state_cor_def] >>
+            qmatch_abbrev_tac ‘_ ∧ ffi_wf somestate’ >> conj_asm2_tac
+            >- (qpat_assum ‘ffi_term_stream _ (cSB F).ffi _ _’
+                (mp_then (Pos last) mp_tac ffi_num_receive_events_term_irrel) >>
+                simp[Abbr‘EVs’] >> rw[] >>
+                ‘∃pn Q N. somestate = (pn,Q,N)’
+                  by (PairCases_on ‘somestate’ >> simp[]) >>
+                simp[ffi_state_cor_def] >>
+                metis_tac[ffi_eq_REFL, FST, ADD1, LENGTH_REPLICATE]) >>
+            simp[Abbr‘EVs’] >>
+            qpat_assum ‘ffi_term_stream _ (cSB F).ffi _ _’
+                       (mp_then (Pos last) mp_tac
+                        ffi_wf_receive_events_term_irrel) >>
+            simp[Abbr‘somestate’]) >>
+      dxrule_then dxrule ffi_irrel >> impl_tac
+      >- (simp[Abbr‘FF1’, Abbr‘FF2’, Abbr‘cS1B’] >> rw[] >>
+          simp[Abbr‘EVs’] >> fs[cpEval_valid_def] >>
+          irule ffi_ARecv_receive_events_term_irrel >> simp[]) >>
+      disch_then (qx_choose_then ‘M’ assume_tac) >>
+      drule_then
+        (assume_tac o SIMP_RULE (srw_ss()) []) cEval_equiv_bump_clocks >>
+      qexists_tac ‘M’ >> simp[])
   >- ((* if / guard -> T *)
    qpat_assum ‘cpEval_valid _ _ _ _ (IfThen _ _ _) _ _’ (strip_assume_tac o REWRITE_RULE[cpEval_valid_def]) >>
    simp[find_evalform ‘If _  _ _’, generic_casebind,
