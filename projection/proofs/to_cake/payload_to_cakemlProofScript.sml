@@ -5777,15 +5777,15 @@ Proof
           >- (drule payload_trans_normalised
               \\ rw [normalised_network_def,normalised_def]
               \\ SELECT_ELIM_TAC \\ rw []
-              >- (asm_exists_tac \\ fs [])
+              >- metis_tac[]
               \\ qpat_x_assum ‘_ x’ (K ALL_TAC)
               \\ Cases_on ‘x'’ \\ fs []
-              \\ qpat_assum ‘s.queues = _’ (ONCE_REWRITE_TAC o single o GSYM)
-              \\ first_assum (mp_then Any mp_tac normalise_queues_dequeue_eq)
-              \\ impl_tac >- rw [normalised_def]
-              \\ disch_then (ONCE_REWRITE_TAC o single)
-              \\ irule (CONJUNCTS strans_rules |> hd)
-              \\ fs [qlk_normalise_queues])
+              \\ irule strans_receive_construct
+              \\ qmatch_goalsub_abbrev_tac ‘RTC (active_trans conf _) (q1,n)’
+              \\ qmatch_goalsub_abbrev_tac ‘RTC (internal_trans conf _) _ (q2,n)’
+              \\ qexistsl_tac [‘n’,‘q1’,‘q2’]
+              \\ MAP_EVERY qunabbrev_tac [‘q1’,‘q2’]
+              \\ rw[output_trans_def,RTC_REFL])
           \\ qpat_assum `trans _ (NEndpoint _ _ _) _ _`
                           (mp_tac o PURE_ONCE_REWRITE_RULE [trans_cases])
           \\ fs [] \\ rw []
