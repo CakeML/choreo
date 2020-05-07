@@ -295,8 +295,13 @@ Definition compile_endpoint_def:
     ) ∧
     (compile_endpoint conf vs (Receive p v l e) =
       Let (SOME (ps2cs v))
-          (Let (SOME "buff") (App Aw8alloc [Lit(IntLit(&(conf.payload_size + 1)));
-                                            Lit(Word8 0w)])
+          (Let (SOME "buff")
+                (if l = [] then
+                  App Aw8alloc [Lit(IntLit(&(conf.payload_size + 1)));
+                                Lit(Word8 0w)]
+                 else
+                  App Opapp [Var conf.fromList; convDatum conf (pad conf (LAST l))]
+                )
                (Letrec
                   (receiveloop conf (MAP (CHR o w2n) p))
                   (App Opapp
