@@ -606,6 +606,24 @@ Proof
       metis_tac[trans_sel])
 QED
 
+Theorem trans_ln_merge:
+  ∀c s τ l s' c'.
+  no_self_comunication c ∧ no_undefined_vars (s,c) ∧
+  trans (s,c) (τ,l) (s',c') ∧
+  trans_ln (s,c) (s'',c'') ∧
+  trans_ln (s',c') (s''',c''')
+  ⇒ trans_ln (s'',c'') (s''',c''') ∨ trans_ln (s''',c''') (s'',c'') 
+Proof
+  cheat
+QED        
+
+Theorem trans_ln_IMP_trans_s:
+  ∀a b. trans_ln a b ⇒ trans_s a b
+Proof
+  simp[trans_ln_def,trans_s_def] >> rpt GEN_TAC >>
+  match_mp_tac RTC_MONOTONE >> metis_tac[]
+QED
+           
 Theorem trans_s_ln:
   ∀s c s' c'.
   no_self_comunication c ∧ no_undefined_vars (s,c) ∧
@@ -614,8 +632,26 @@ Theorem trans_s_ln:
      trans_ln (s,c)   (s'',c'') ∧
      trans_s  (s',c') (s'',c'')
 Proof
-
-  cheat
+  simp[Once trans_s_def, RTC_eq_NRC,PULL_EXISTS] >>
+  Induct_on ‘n’ >> rw[] >- (metis_tac[trans_ln_def,trans_s_def,RTC_REFL]) >>
+  fs[NRC] >>
+  rename1 ‘trans _ α sc'’ >>
+  PairCases_on ‘sc'’ >>
+  PairCases_on ‘α’ >>
+  drule_all_then strip_assume_tac no_self_comunication_trans_pres >>
+  drule_all_then strip_assume_tac no_undefined_vars_trans_pres >>                 
+  drule_all_then strip_assume_tac trans_trans_ln >>
+  first_x_assum(drule_all_then strip_assume_tac) >>
+  drule_all_then strip_assume_tac trans_ln_merge >-
+   (fs[trans_ln_def] >>
+    drule_all_then strip_assume_tac RTC_RTC >>
+    goal_assum drule >>
+    simp[]) >>
+  fs[trans_ln_def] >>
+  drule_all_then strip_assume_tac RTC_RTC >>
+  fs[GSYM trans_ln_def] >>          
+  goal_assum drule >>
+  metis_tac[trans_s_def,RTC_RTC,trans_ln_IMP_trans_s]
 QED
 
 Theorem trans_s_sync:
