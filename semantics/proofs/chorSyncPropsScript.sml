@@ -625,11 +625,24 @@ Proof
   metis_tac[PAIR,FST,SND]
 QED
 
-Theorem trans_ln_NIL:
-  ∀s sc. trans_ln (s,Nil) sc ⇒ sc = (s,Nil)
+Theorem trans_ln_IMP_trans_s:
+  ∀a b. trans_ln a b ⇒ trans_s a b
 Proof
-  metis_tac[trans_s_NIL,trans_ln_IMP_trans_s]
+  simp[trans_ln_def,trans_s_def] >> rpt GEN_TAC >>
+  match_mp_tac RTC_MONOTONE >> metis_tac[]
 QED
+
+Theorem trans_ln_trans_ln:
+  trans_ln a b ∧ trans_ln b c ⇒ trans_ln a c
+Proof
+  metis_tac[trans_ln_def,RTC_RTC]
+QED
+
+(* Theorem trans_ln_NIL: *)
+(*   ∀s sc. trans_ln (s,Nil) sc ⇒ sc = (s,Nil) *)
+(* Proof *)
+(*   metis_tac[trans_s_NIL,trans_ln_IMP_trans_s] *)
+(* QED *)
 
 Theorem trans_ln_merge_lemma:
   ∀sc sc' sc''.
@@ -655,106 +668,390 @@ Proof
 QED
 
 Theorem trans_ln_merge:
-  ∀s c τ l s' c' s'' c'' s''' c'''.
+  ∀c s τ l s' c' s'' c'' s''' c'''.
   trans (s,c) (τ,l) (s',c') ∧
   no_self_comunication c ∧ no_undefined_vars (s,c) ∧
   trans_ln (s,c) (s'',c'') ∧
   trans_ln (s',c') (s''',c''')
   ⇒ ∃s'''' c''''. trans_ln (s'',c'') (s'''',c'''') ∧ trans_ln (s''',c''') (s'''',c'''')
 Proof
-  simp[GSYM PULL_FORALL,GSYM AND_IMP_INTRO] >>
-  ho_match_mp_tac trans_pairind >> rw[] >>
-  last_assum(mp_then Any mp_tac trans_ln_elim) >>
-  rw[chor_tl_def] >>
-  TRY(drule trans_ln_merge_lemma >>
-      disch_then(last_assum o mp_then Any strip_assume_tac) >>
-      FIRST[goal_assum drule,simp[Once CONJ_SYM] >> goal_assum drule] >>
-      simp[trans_ln_refl] >> NO_TAC)
-  >- (qexists_tac ‘s'''’ >> qexists_tac ‘c'''’ >> simp[trans_ln_refl] >>
-      match_mp_tac trans_ln_step >> simp[chor_tl_def] >>
-      metis_tac[trans_rules])
-  >- (qexists_tac ‘s'''’ >> qexists_tac ‘c'''’ >> simp[trans_ln_refl] >>
-      match_mp_tac trans_ln_step >> simp[chor_tl_def] >>
-      metis_tac[trans_rules])
-  >- (qexists_tac ‘s'''’ >> qexists_tac ‘c'''’ >> simp[trans_ln_refl] >>
-      match_mp_tac trans_ln_step >> simp[chor_tl_def] >>
-      metis_tac[trans_rules])
-  >- (qexists_tac ‘s'''’ >> qexists_tac ‘c'''’ >> simp[trans_ln_refl] >>
-      match_mp_tac trans_ln_step >> simp[chor_tl_def] >>
-      metis_tac[trans_rules])
-  >- (qexists_tac ‘s'''’ >> qexists_tac ‘c'''’ >> simp[trans_ln_refl] >>
-      match_mp_tac trans_ln_step >> simp[chor_tl_def] >>
-      metis_tac[trans_rules])
-  >- (fs[no_self_comunication_def] >>
-      ‘no_undefined_vars (s,c)’ by(fs[no_undefined_vars_def,free_variables_def]) >>
-      fs[] >>
-      drule_then (drule o REWRITE_RULE[FST]) lookup_fresh_after_trans >>
-      disch_then(qspec_then ‘v’ assume_tac) >>
-      drule trans_ln_elim >>
-      last_x_assum(qspecl_then [‘s’,‘c’] mp_tac) >>
-      simp[trans_ln_refl] >>
-      disch_then(qspecl_then [‘s'’,‘c''’] mp_tac) >>
-      simp[trans_ln_refl] >>
-      strip_tac >>
-      strip_tac >> rveq >-
-        (qexists_tac ‘s''''’ >> qexists_tac ‘c''''’ >>
-         conj_tac >> match_mp_tac trans_ln_step >> rw[chor_tl_def] >>
-         rfs[chor_tl_def] >> metis_tac[trans_if_true]) >>
-      rfs[chor_tl_def] >>
-      dxrule_then dxrule trans_ln_merge_lemma >>
-      rw[] >-
-        (rename1 ‘_ ∧ trans_ln (sss,ccc) _’ >>
-         qexists_tac ‘sss’ >> qexists_tac ‘ccc’ >>
-         simp[trans_ln_refl] >>
-         match_mp_tac trans_ln_step >> rw[chor_tl_def] >>
-         metis_tac[trans_ln_trans_ln,trans_if_true]) >>
-      qexists_tac ‘s''''’ >> qexists_tac ‘c''''’ >>
-      simp[trans_ln_refl] >>
-      match_mp_tac trans_ln_step >> rw[chor_tl_def] >>
-      metis_tac[trans_ln_trans_ln,trans_if_true])
-  >- (cheat)
-  >- (cheat)
-  >- (cheat)
-  >- (rfs[no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP] >>
-      metis_tac[])
-  >- (cheat)
-  >- (cheat)
-  >- (cheat)
-  >- (cheat)
-  >- (cheat)
-  >- (cheat)
-  >- (cheat)
-  >- (cheat)
-  >- (cheat)
-  >- (fs[no_self_comunication_def] >>
-      first_x_assum(fn thm => mp_tac thm >> impl_keep_tac) >-
-        (fs[no_undefined_vars_def,free_variables_def]) >>
-      disch_then drule >>
-      disch_then(qspecl_then [‘s'’,‘c'’] mp_tac) >>
-      simp[trans_ln_refl] >>
-      strip_tac >>
-      qpat_x_assum ‘trans_ln (_,Sel _ _ _ _) _’ assume_tac >>
-      drule_then strip_assume_tac trans_ln_elim >-
-        (fs[] >> rveq >>
-         goal_assum drule >>
-         match_mp_tac trans_ln_step >>
-         rw[chor_tl_def] >>
-         metis_tac[trans_sel]) >>
-      fs[chor_tl_def] >>
-      metis_tac[trans_ln_merge_lemma,trans_ln_trans_ln])
-QED
-
-Theorem trans_ln_IMP_trans_s:
-  ∀a b. trans_ln a b ⇒ trans_s a b
-Proof
-  simp[trans_ln_def,trans_s_def] >> rpt GEN_TAC >>
-  match_mp_tac RTC_MONOTONE >> metis_tac[]
-QED
-
-Theorem trans_ln_trans_ln:
-  trans_ln a b ∧ trans_ln b c ⇒ trans_ln a c
-Proof
-  metis_tac[trans_ln_def,RTC_RTC]
+  Induct
+  >- fs [Once trans_cases]
+  \\ rw []
+  \\  qpat_x_assum `trans _ _ _`
+                   (ASSUME_TAC o SIMP_RULE std_ss [Once trans_cases])
+  \\ rw [] >> rfs [] >> rw []
+  \\ last_assum(mp_then Any mp_tac trans_ln_elim)
+  \\ rw[chor_tl_def]
+  >- (map_every qexists_tac [‘s''''’,‘c''''’]
+      \\ simp [trans_ln_refl]
+      \\ irule trans_ln_step
+      \\ fs[chor_tl_def]
+      \\ metis_tac [trans_rules])
+  >- (qpat_x_assum ‘trans_ln (s',c) _’ (mp_then Any drule trans_ln_merge_lemma)
+      \\ rw [] \\ metis_tac [trans_ln_refl])
+  >- (map_every qexists_tac [‘s''''’,‘c''''’]
+      \\ simp [trans_ln_refl]
+      \\ irule trans_ln_step
+      \\ fs[chor_tl_def]
+      \\ metis_tac [trans_rules])
+  >- (qpat_x_assum ‘trans_ln (s',c') _’ (mp_then Any drule trans_ln_merge_lemma)
+      \\ rw [] \\ metis_tac [trans_ln_refl])
+  >- (fs[no_self_comunication_def]
+      \\ ‘no_undefined_vars (s',c)’ by(fs[no_undefined_vars_def,free_variables_def])
+      \\ fs[]
+      \\ first_x_assum (drule_then drule) \\ strip_tac
+      \\ drule_then (drule o REWRITE_RULE[FST]) lookup_fresh_after_trans
+      \\ disch_then(qspec_then ‘s’ assume_tac)
+      \\ drule trans_ln_elim
+      \\ first_x_assum(qspecl_then [‘s'’,‘c’] mp_tac)
+      \\ simp[trans_ln_refl]
+      \\ disch_then(qspecl_then [‘s''’,‘c1'’] mp_tac)
+      \\ simp[trans_ln_refl]
+      \\ strip_tac
+      \\ strip_tac \\ rveq
+      >- (qexists_tac ‘s'''''’ \\  qexists_tac ‘c'''''’
+          \\ conj_tac \\  match_mp_tac trans_ln_step \\  rw[chor_tl_def]
+          \\ rfs[chor_tl_def] \\  metis_tac[trans_if_true])
+      \\ rfs[chor_tl_def]
+      \\ dxrule_then dxrule trans_ln_merge_lemma
+      \\ rw[]
+      >- (rename1 ‘_ ∧ trans_ln (sss,ccc) _’
+          \\ qexists_tac ‘sss’ \\  qexists_tac ‘ccc’
+          \\ simp[trans_ln_refl]
+          \\ match_mp_tac trans_ln_step \\  rw[chor_tl_def]
+          \\ metis_tac[trans_ln_trans_ln,trans_if_true])
+      \\ qexists_tac ‘s'''''’ \\  qexists_tac ‘c'''''’
+      \\ simp[trans_ln_refl]
+      \\ match_mp_tac trans_ln_step \\  rw[chor_tl_def]
+      \\ metis_tac[trans_ln_trans_ln,trans_if_true])
+  >- (fs[no_self_comunication_def]
+      \\ ‘no_undefined_vars (s',c)’ by(fs[no_undefined_vars_def,free_variables_def])
+      \\ fs[]
+      \\ first_x_assum (drule_then drule) \\ strip_tac
+      \\ drule_then (drule o REWRITE_RULE[FST]) lookup_fresh_after_trans
+      \\ disch_then(qspec_then ‘s’ assume_tac)
+      \\ first_x_assum drule
+      \\ qpat_assum ‘trans_ln (s'',_) _’ (mp_then Any  mp_tac trans_ln_elim)
+      \\ rw []
+      >- (pop_assum (qspecl_then [‘s''’,‘c1'’] mp_tac) >> fs [trans_ln_refl]
+          \\ rw [] >> asm_exists_tac >> fs []
+          \\ irule trans_ln_step >> fs [chor_tl_def]
+          \\ metis_tac [trans_if_true])
+      \\ pop_assum irule \\ fs [chor_tl_def] \\ rfs [])
+  >- (fs[no_self_comunication_def]
+      \\ ‘no_undefined_vars (s',c')’ by(fs[no_undefined_vars_def,free_variables_def])
+      \\ fs[]
+      \\ first_x_assum (drule_then drule) \\ strip_tac
+      \\ drule_then (drule o REWRITE_RULE[FST]) lookup_fresh_after_trans
+      \\ disch_then(qspec_then ‘s’ assume_tac)
+      \\ drule trans_ln_elim
+      \\ first_x_assum(qspecl_then [‘s'’,‘c'’] mp_tac)
+      \\ simp[trans_ln_refl]
+      \\ disch_then(qspecl_then [‘s''’,‘c2'’] mp_tac)
+      \\ simp[trans_ln_refl]
+      \\ strip_tac
+      \\ strip_tac \\ rveq
+      >- (qexists_tac ‘s'''''’ \\  qexists_tac ‘c'''''’
+          \\ conj_tac \\  match_mp_tac trans_ln_step \\  rw[chor_tl_def]
+          \\ rfs[chor_tl_def] \\  metis_tac[trans_if_false])
+      \\ rfs[chor_tl_def]
+      \\ dxrule_then dxrule trans_ln_merge_lemma
+      \\ rw[]
+      >- (rename1 ‘_ ∧ trans_ln (sss,ccc) _’
+          \\ qexists_tac ‘sss’ \\  qexists_tac ‘ccc’
+          \\ simp[trans_ln_refl]
+          \\ match_mp_tac trans_ln_step \\  rw[chor_tl_def]
+          \\ metis_tac[trans_ln_trans_ln,trans_if_false])
+      \\ qexists_tac ‘s'''''’ \\  qexists_tac ‘c'''''’
+      \\ simp[trans_ln_refl]
+      \\ match_mp_tac trans_ln_step \\  rw[chor_tl_def]
+      \\ metis_tac[trans_ln_trans_ln,trans_if_false])
+  >- (fs[no_self_comunication_def]
+      \\ ‘no_undefined_vars (s',c')’ by(fs[no_undefined_vars_def,free_variables_def])
+      \\ fs[]
+      \\ first_x_assum (drule_then drule) \\ strip_tac
+      \\ drule_then (drule o REWRITE_RULE[FST]) lookup_fresh_after_trans
+      \\ disch_then(qspec_then ‘s’ assume_tac)
+      \\ first_x_assum drule
+      \\ qpat_assum ‘trans_ln (s'',_) _’ (mp_then Any  mp_tac trans_ln_elim)
+      \\ rw []
+      >- (pop_assum (qspecl_then [‘s''’,‘c2'’] mp_tac) >> fs [trans_ln_refl]
+          \\ rw [] >> asm_exists_tac >> fs []
+          \\ irule trans_ln_step >> fs [chor_tl_def]
+          \\ metis_tac [trans_if_false])
+      \\ pop_assum irule \\ fs [chor_tl_def] \\ rfs [])
+  >- (rfs[no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP] \\ metis_tac[])
+  >- (map_every qexists_tac [‘s''''’,‘c'''’]
+      \\ simp [trans_ln_refl]
+      \\ irule trans_ln_step
+      \\ fs[chor_tl_def]
+      \\ metis_tac [trans_rules])
+  >- (qpat_x_assum ‘trans_ln (s' |+ _,c) _’ (mp_then Any drule trans_ln_merge_lemma)
+      \\ rw [] \\ metis_tac [trans_ln_refl])
+  >- (fs[no_self_comunication_def]
+      \\ ‘∃d. FLOOKUP s' (s0,l0) = SOME d’
+         by(fs[no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP])
+      \\ ‘no_undefined_vars (s' |+ ((s,l),d),c)’
+        by(fs[no_undefined_vars_def,free_variables_def,SUBSET_DEF,DISJ_IMP_THM,FORALL_AND_THM]
+           \\ metis_tac[])
+      \\ drule lookup_fresh_after_trans \\  simp[]
+      \\ disch_then(qspecl_then [‘l0’,‘s0’] mp_tac) \\  rw[]
+      \\ drule semantics_add_irrelevant_state \\ simp[]
+      \\ disch_then drule
+      \\ disch_then(qspecl_then [‘s’,‘d’] assume_tac)
+      \\ first_x_assum (drule_then drule) \\ strip_tac
+      \\ drule trans_ln_elim
+      \\ first_x_assum(qspecl_then [‘s' |+ ((s,l),d)’,‘c’] mp_tac)
+      \\ simp[trans_ln_refl]
+      \\ disch_then(qspecl_then [‘s'' |+ ((s,l),d)’,‘c''''’] mp_tac)
+      \\ simp[trans_ln_refl]
+      \\ strip_tac
+      \\ strip_tac \\ rveq
+      >- (qexists_tac ‘s'''''’ \\  qexists_tac ‘c'''''’
+          \\ conj_tac \\  match_mp_tac trans_ln_step \\  rw[chor_tl_def]
+          \\ rfs[chor_tl_def] \\  metis_tac[trans_rules])
+      \\ fs [chor_tl_def]
+      \\ rfs [] \\ dxrule_all trans_ln_merge_lemma
+      \\ rw []
+      >- (qexists_tac ‘s''''’ \\  qexists_tac ‘c'''’ \\ fs [trans_ln_refl]
+          \\ irule trans_ln_step \\ fs [chor_tl_def]
+          \\ CONV_TAC EXISTS_AND_CONV
+          \\ conj_tac >- metis_tac [trans_ln_trans_ln]
+          \\ metis_tac [trans_rules])
+      \\ qexists_tac ‘s'''''’ \\  qexists_tac ‘c'''''’
+      \\ fs [chor_tl_def]
+      \\ match_mp_tac trans_ln_step \\  rw[chor_tl_def]
+      \\ metis_tac[trans_ln_trans_ln,trans_rules])
+  >- (fs[no_self_comunication_def]
+      \\ ‘∃d. FLOOKUP s' (s0,l0) = SOME d’
+         by(fs[no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP])
+      \\ ‘no_undefined_vars (s' |+ ((s,l),d),c)’
+        by(fs[no_undefined_vars_def,free_variables_def,SUBSET_DEF,DISJ_IMP_THM,FORALL_AND_THM]
+           \\ metis_tac[])
+      \\ drule lookup_fresh_after_trans \\  simp[]
+      \\ disch_then(qspecl_then [‘l0’,‘s0’] mp_tac) \\  rw[]
+      \\ drule semantics_add_irrelevant_state \\ simp[]
+      \\ disch_then drule
+      \\ disch_then(qspecl_then [‘s’,‘d’] assume_tac)
+      \\ first_x_assum (drule_then drule) \\ strip_tac
+      \\ fs [] \\ pop_assum drule \\ strip_tac
+      \\ qpat_assum ‘trans_ln (s'',_) _’ (mp_then Any  mp_tac trans_ln_elim)
+      \\ rw []
+      >- (pop_assum (qspecl_then [‘s'' |+ ((s,l),d)’,‘c''''’] mp_tac) >> fs [trans_ln_refl]
+          \\ rw [] >> asm_exists_tac >> fs []
+          \\ irule trans_ln_step >> fs [chor_tl_def]
+          \\ metis_tac [trans_rules])
+      \\ first_x_assum irule \\ fs [chor_tl_def] \\ rfs [])
+  >- (fs[no_self_comunication_def]
+      \\ ‘∃d. FLOOKUP s' (s0,l0) = SOME d’
+         by(fs[no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP])
+      \\ ‘no_undefined_vars (s' |+ ((s,l),d),c)’
+        by(fs[no_undefined_vars_def,free_variables_def,SUBSET_DEF,DISJ_IMP_THM,FORALL_AND_THM]
+           \\ metis_tac[])
+      \\ drule lookup_unwritten_after_trans \\  simp[]
+      \\ disch_then(qspecl_then [‘l0’,‘s0’] mp_tac) \\  rw[]
+      \\ drule semantics_add_irrelevant_state \\ simp[]
+      \\ disch_then drule
+      \\ disch_then(qspecl_then [‘s’,‘d’] assume_tac)
+      \\ first_x_assum (drule_then drule) \\ strip_tac
+      \\ drule trans_ln_elim
+      \\ first_x_assum(qspecl_then [‘s' |+ ((s,l),d)’,‘c’] mp_tac)
+      \\ simp[trans_ln_refl]
+      \\ disch_then(qspecl_then [‘s'' |+ ((s,l),d)’,‘c''''’] mp_tac)
+      \\ simp[trans_ln_refl]
+      \\ strip_tac
+      \\ strip_tac \\ rveq
+      >- (qexists_tac ‘s'''''’ \\  qexists_tac ‘c'''''’
+          \\ conj_tac \\  match_mp_tac trans_ln_step \\  rw[chor_tl_def]
+          \\ fs [] \\ rfs[chor_tl_def] \\  metis_tac[trans_rules])
+      \\ fs [chor_tl_def]
+      \\ rfs [] \\ dxrule_all trans_ln_merge_lemma
+      \\ rw []
+      >- (qexists_tac ‘s''''’ \\  qexists_tac ‘c'''’ \\ fs [trans_ln_refl]
+          \\ irule trans_ln_step \\ fs [chor_tl_def]
+          \\ CONV_TAC EXISTS_AND_CONV
+          \\ conj_tac >- metis_tac [trans_ln_trans_ln]
+          \\ metis_tac [trans_rules])
+      \\ qexists_tac ‘s'''''’ \\  qexists_tac ‘c'''''’
+      \\ fs [chor_tl_def]
+      \\ match_mp_tac trans_ln_step \\  rw[chor_tl_def]
+      \\ metis_tac[trans_ln_trans_ln,trans_rules])
+  >- (fs[no_self_comunication_def]
+      \\ ‘∃d. FLOOKUP s' (s0,l0) = SOME d’
+         by(fs[no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP])
+      \\ ‘no_undefined_vars (s' |+ ((s,l),d),c)’
+        by(fs[no_undefined_vars_def,free_variables_def,SUBSET_DEF,DISJ_IMP_THM,FORALL_AND_THM]
+           \\ metis_tac[])
+      \\ drule lookup_unwritten_after_trans \\  simp[]
+      \\ disch_then(qspecl_then [‘l0’,‘s0’] mp_tac) \\  rw[]
+      \\ drule semantics_add_irrelevant_state \\ simp[]
+      \\ disch_then drule
+      \\ disch_then(qspecl_then [‘s’,‘d’] assume_tac)
+      \\ first_x_assum (drule_then drule) \\ strip_tac
+      \\ fs [] \\ pop_assum drule \\ strip_tac
+      \\ qpat_assum ‘trans_ln (s'',_) _’ (mp_then Any  mp_tac trans_ln_elim)
+      \\ rw []
+      >- (pop_assum (qspecl_then [‘s'' |+ ((s,l),d)’,‘c''''’] mp_tac) >> fs [trans_ln_refl]
+          \\ rw [] >> asm_exists_tac >> fs []
+          \\ irule trans_ln_step >> fs [chor_tl_def]
+          \\ metis_tac [trans_rules])
+      \\ first_x_assum irule \\ fs [chor_tl_def] \\ rfs [])
+  >- (map_every qexists_tac [‘s''''’,‘c'''’]
+      \\ fs [trans_ln_refl] \\ irule trans_ln_step
+      \\ rw [chor_tl_def] \\ metis_tac [trans_rules])
+  >- (qpat_x_assum ‘trans_ln (s' |+ _,c) _’ (mp_then Any drule trans_ln_merge_lemma)
+      \\ rw [] \\ metis_tac [trans_ln_refl])
+  >- (fs[no_self_comunication_def]
+      \\ ‘no_undefined_vars (s' |+ ((s,l0),f (MAP (THE ∘ FLOOKUP s') (MAP (λv. (v,l0)) l))),c)’
+        by(fs[no_undefined_vars_def,free_variables_def
+              ,SUBSET_DEF,MEM_MAP,PULL_EXISTS
+              ,DISJ_IMP_THM,FORALL_AND_THM]
+           \\ metis_tac[])
+      \\ drule_then assume_tac no_undefined_FLOOKUP_let
+      \\ drule_then drule map_lookup_fresh_after_trans_tup
+      \\ disch_then(qspec_then ‘l’ assume_tac)
+      \\ drule semantics_add_irrelevant_state >> simp[] >> disch_then drule
+      \\ disch_then(qspecl_then [‘s’,‘f (MAP (THE ∘ FLOOKUP s') (MAP (λv. (v,l0)) l))’] assume_tac)
+      \\ first_x_assum (drule_then drule) \\ strip_tac
+      \\ qmatch_asmsub_abbrev_tac ‘((s,l0),d)’
+      \\ drule trans_ln_elim
+      \\ first_x_assum(qspecl_then [‘s' |+ ((s,l0),d)’,‘c’] mp_tac)
+      \\ simp[trans_ln_refl]
+      \\ disch_then(qspecl_then [‘s'' |+ ((s,l0),d)’,‘c''''’] mp_tac)
+      \\ simp[trans_ln_refl]
+      \\ UNABBREV_ALL_TAC
+      \\ strip_tac
+      \\ strip_tac \\ rveq
+      >- (qexists_tac ‘s'''''’ \\  qexists_tac ‘c'''''’
+          \\ conj_tac
+          \\ match_mp_tac trans_ln_step \\  rw[chor_tl_def]
+          \\ rfs[chor_tl_def]
+          >- metis_tac[trans_let]
+          \\ qexists_tac ‘LLet s l0 f l’
+          \\ qpat_x_assum ‘_ = _’ (assume_tac o GSYM)
+          \\ simp []
+          \\ irule trans_let
+          \\ fs[EVERY_MEM,IS_SOME_EXISTS,MEM_MAP,PULL_EXISTS]
+          \\ rw[] \\  res_tac
+          \\ metis_tac[lookup_fresh_after_trans,FST])
+      \\ fs [chor_tl_def]
+      \\ rfs [] \\ dxrule_all trans_ln_merge_lemma
+      \\ rw []
+      >- (qexists_tac ‘s''''’ \\  qexists_tac ‘c'''’ \\ fs [trans_ln_refl]
+          \\ irule trans_ln_step \\ fs [chor_tl_def]
+          \\ CONV_TAC EXISTS_AND_CONV
+          \\ conj_tac >- metis_tac [trans_ln_trans_ln]
+          \\ metis_tac [trans_rules])
+      \\ qexists_tac ‘s'''''’ \\  qexists_tac ‘c'''''’
+      \\ fs [chor_tl_def]
+      \\ match_mp_tac trans_ln_step \\  rw[chor_tl_def]
+      \\ metis_tac[trans_ln_trans_ln,trans_rules])
+  >- (fs[no_self_comunication_def]
+      \\ ‘no_undefined_vars (s' |+ ((s,l0),f (MAP (THE ∘ FLOOKUP s') (MAP (λv. (v,l0)) l))),c)’
+        by(fs[no_undefined_vars_def,free_variables_def
+              ,SUBSET_DEF,MEM_MAP,PULL_EXISTS
+              ,DISJ_IMP_THM,FORALL_AND_THM]
+           \\ metis_tac[])
+      \\ drule_then assume_tac no_undefined_FLOOKUP_let
+      \\ drule_then drule map_lookup_fresh_after_trans_tup
+      \\ disch_then(qspec_then ‘l’ assume_tac)
+      \\ drule semantics_add_irrelevant_state >> simp[] >> disch_then drule
+      \\ disch_then(qspecl_then [‘s’,‘f (MAP (THE ∘ FLOOKUP s') (MAP (λv. (v,l0)) l))’] assume_tac)
+      \\ first_x_assum (drule_then drule) \\ strip_tac
+      \\ fs [] \\ pop_assum drule \\ strip_tac
+      \\ qpat_assum ‘trans_ln (s'',_) _’ (mp_then Any  mp_tac trans_ln_elim)
+      \\ rw []
+      >- (qmatch_asmsub_abbrev_tac ‘((s,l0),d)’
+          \\ first_x_assum (qspecl_then [‘s'' |+ ((s,l0),d)’,‘c''''’] mp_tac) >> fs [trans_ln_refl]
+          \\ UNABBREV_ALL_TAC
+          \\ rw [] >> asm_exists_tac >> fs []
+          \\ irule trans_ln_step >> fs [chor_tl_def]
+          \\ qexists_tac ‘LLet s l0 f l’
+          \\ qpat_x_assum ‘_ = _’ (assume_tac o GSYM)
+          \\ simp []
+          \\ irule trans_let
+          \\ fs[EVERY_MEM,IS_SOME_EXISTS,MEM_MAP,PULL_EXISTS]
+          \\ rw[] \\  res_tac
+          \\ metis_tac[lookup_fresh_after_trans,FST])
+      \\ first_x_assum irule \\ fs [chor_tl_def] \\ rfs [])
+  >- (map_every qexists_tac [‘s'''’,‘c'''’]
+      \\ fs [trans_ln_refl] \\ irule trans_ln_step
+      \\ rw [chor_tl_def] \\ metis_tac [trans_rules])
+  >- (qpat_x_assum ‘trans_ln (s,c) _’ (mp_then Any drule trans_ln_merge_lemma)
+      \\ rw [] \\ metis_tac [trans_ln_refl])
+  >- (fs[no_self_comunication_def]
+      \\ ‘no_undefined_vars (s,c)’ by(fs[no_undefined_vars_def,free_variables_def])
+      \\ first_x_assum (drule_then drule) \\ strip_tac
+      \\ drule trans_ln_elim
+      \\ first_x_assum(qspecl_then [‘s’,‘c’] mp_tac)
+      \\ simp[trans_ln_refl]
+      \\ disch_then(qspecl_then [‘s'’,‘c''''’] mp_tac)
+      \\ simp[trans_ln_refl]
+      \\ strip_tac
+      \\ strip_tac \\ rveq
+      >- (qexists_tac ‘s''''’ \\  qexists_tac ‘c'''''’
+          \\ conj_tac \\  match_mp_tac trans_ln_step \\  rw[chor_tl_def]
+          \\ rfs[chor_tl_def] \\  metis_tac[trans_rules])
+      \\ fs [chor_tl_def]
+      \\ rfs [] \\ dxrule_all trans_ln_merge_lemma
+      \\ rw []
+      >- (qexists_tac ‘s'''’ \\  qexists_tac ‘c'''’ \\ fs [trans_ln_refl]
+          \\ irule trans_ln_step \\ fs [chor_tl_def]
+          \\ CONV_TAC EXISTS_AND_CONV
+          \\ conj_tac >- metis_tac [trans_ln_trans_ln]
+          \\ metis_tac [trans_rules])
+      \\ qexists_tac ‘s''''’ \\  qexists_tac ‘c'''''’
+      \\ fs [chor_tl_def]
+      \\ match_mp_tac trans_ln_step \\  rw[chor_tl_def]
+      \\ metis_tac[trans_ln_trans_ln,trans_rules])
+  >- (fs[no_self_comunication_def]
+      \\ ‘no_undefined_vars (s,c)’ by(fs[no_undefined_vars_def,free_variables_def])
+      \\ first_x_assum (drule_then drule) \\ strip_tac
+      \\ fs [] \\ pop_assum drule \\ strip_tac
+      \\ qpat_assum ‘trans_ln (s',_) _’ (mp_then Any  mp_tac trans_ln_elim)
+      \\ rw []
+      >- (pop_assum (qspecl_then [‘s'’,‘c''''’] mp_tac) >> fs [trans_ln_refl]
+          \\ rw [] >> asm_exists_tac >> fs []
+          \\ irule trans_ln_step >> fs [chor_tl_def]
+          \\ metis_tac [trans_rules])
+      \\ first_x_assum irule \\ fs [chor_tl_def] \\ rfs [])
+  >- (fs[no_self_comunication_def]
+      \\ ‘no_undefined_vars (s,c)’ by(fs[no_undefined_vars_def,free_variables_def])
+      \\ first_x_assum (drule_then drule) \\ strip_tac
+      \\ drule trans_ln_elim
+      \\ first_x_assum(qspecl_then [‘s’,‘c’] mp_tac)
+      \\ simp[trans_ln_refl]
+      \\ disch_then(qspecl_then [‘s'’,‘c''''’] mp_tac)
+      \\ simp[trans_ln_refl]
+      \\ strip_tac
+      \\ strip_tac \\ rveq
+      >- (qexists_tac ‘s''''’ \\  qexists_tac ‘c'''''’
+          \\ conj_tac \\  match_mp_tac trans_ln_step \\  rw[chor_tl_def]
+          \\ rfs[chor_tl_def] \\  metis_tac[trans_rules])
+      \\ fs [chor_tl_def]
+      \\ rfs [] \\ dxrule_all trans_ln_merge_lemma
+      \\ rw []
+      >- (qexists_tac ‘s'''’ \\  qexists_tac ‘c'''’ \\ fs [trans_ln_refl]
+          \\ irule trans_ln_step \\ fs [chor_tl_def]
+          \\ CONV_TAC EXISTS_AND_CONV
+          \\ conj_tac >- metis_tac [trans_ln_trans_ln]
+          \\ metis_tac [trans_rules])
+      \\ qexists_tac ‘s''''’ \\  qexists_tac ‘c'''''’
+      \\ fs [chor_tl_def]
+      \\ match_mp_tac trans_ln_step \\  rw[chor_tl_def]
+      \\ metis_tac[trans_ln_trans_ln,trans_rules])
+  \\ fs[no_self_comunication_def]
+  \\ ‘no_undefined_vars (s,c)’ by(fs[no_undefined_vars_def,free_variables_def])
+  \\ first_x_assum (drule_then drule) \\ strip_tac
+  \\ fs [] \\ pop_assum drule \\ strip_tac
+  \\ qpat_assum ‘trans_ln (s',_) _’ (mp_then Any  mp_tac trans_ln_elim)
+  \\ rw []
+  >- (pop_assum (qspecl_then [‘s'’,‘c''''’] mp_tac) >> fs [trans_ln_refl]
+      \\ rw [] >> asm_exists_tac >> fs []
+      \\ irule trans_ln_step >> fs [chor_tl_def]
+      \\ metis_tac [trans_rules])
+  \\ first_x_assum irule \\ fs [chor_tl_def] \\ rfs []
 QED
 
 Theorem trans_s_trans_s:
@@ -784,17 +1081,6 @@ Proof
   drule_all_then strip_assume_tac trans_ln_merge >>
   qexists_tac ‘s''''’ >> qexists_tac ‘c''''’ >>
   metis_tac[trans_ln_IMP_trans_s,trans_s_trans_s,trans_ln_trans_ln]
-QED
-
-Theorem trans_s_sync:
-  ∀s c s' c'.
-  no_self_comunication c ∧ no_undefined_vars (s,c) ∧
-  trans_s (s,c) (s',c')
-  ⇒ ∃s'' c''.
-     trans_sync (s,c)   (s'',c'') ∧
-     trans_s    (s',c') (s'',c'')
-Proof
-  cheat
 QED
 
 val _ = export_theory ()
