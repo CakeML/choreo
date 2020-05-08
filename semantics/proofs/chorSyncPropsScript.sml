@@ -613,12 +613,60 @@ Proof
   metis_tac[]
 QED
 
+Theorem trans_s_NIL:
+  ∀s sc. trans_s (s,Nil) sc ⇒ sc = (s,Nil)
+Proof
+  strip_tac >>
+  ‘∀sc sc'. (sc = (s,Nil)) ∧ (trans_s sc sc') ⇒ (sc' = (s,Nil))’
+    by(PURE_ONCE_REWRITE_TAC[trans_s_def] >>
+       ho_match_mp_tac RTC_lifts_invariants >>
+       rw[Once trans_cases] >>
+       fs[]) >>
+  metis_tac[PAIR,FST,SND]
+QED
+
+Theorem trans_ln_NIL:
+  ∀s sc. trans_ln (s,Nil) sc ⇒ sc = (s,Nil)
+Proof
+  metis_tac[trans_s_NIL,trans_ln_IMP_trans_s]
+QED
+
 Theorem trans_ln_merge_lemma:
+  ∀sc sc' sc''.
+  trans_ln (sc) (sc') ∧
+  trans_ln (sc) (sc'') ⇒
+  trans_ln (sc'') (sc') ∨ trans_ln (sc') (sc'')
+Proof
+  simp[trans_ln_def,GSYM AND_IMP_INTRO,GSYM PULL_FORALL] >>
+  ho_match_mp_tac RTC_STRONG_INDUCT >>
+  rw[] >>
+  pop_assum(strip_assume_tac o REWRITE_RULE[Once RTC_cases]) >>
+  rveq >- (disj1_tac >> match_mp_tac RTC_TRANS >>
+           rw[PULL_EXISTS] >> metis_tac[]) >>
+  fs[] >> rveq >>
+  first_x_assum drule >> strip_tac >>
+  fs[]
+QED
+        
+Theorem trans_ln_merge_lemma:
+  ∀s c s' c' s'' c''.
   trans_ln (s,c) (s',c') ∧
   trans_ln (s,c) (s'',c'') ⇒
   trans_ln (s'',c'') (s',c') ∨ trans_ln (s',c') (s'',c'')
 Proof
-  cheat
+  Induct_on ‘c’ >>
+  rw[] >>
+  imp_res_tac trans_ln_elim >>
+  fs[chor_tl_def] >>
+  rveq >> imp_res_tac trans_ln_NIL >>
+  fs[trans_ln_refl] >>
+  
+  
+                
+   (drule elim
+  simp[trans_ln_def,GSYM AND_IMP_INTRO,GSYM PULL_FORALL] >>
+  ho_match_mp_tac RTC_INDUCT
+
 QED
 
 Theorem trans_ln_refl:
