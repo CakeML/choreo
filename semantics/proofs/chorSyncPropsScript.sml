@@ -647,27 +647,6 @@ Proof
   first_x_assum drule >> strip_tac >>
   fs[]
 QED
-        
-Theorem trans_ln_merge_lemma:
-  ∀s c s' c' s'' c''.
-  trans_ln (s,c) (s',c') ∧
-  trans_ln (s,c) (s'',c'') ⇒
-  trans_ln (s'',c'') (s',c') ∨ trans_ln (s',c') (s'',c'')
-Proof
-  Induct_on ‘c’ >>
-  rw[] >>
-  imp_res_tac trans_ln_elim >>
-  fs[chor_tl_def] >>
-  rveq >> imp_res_tac trans_ln_NIL >>
-  fs[trans_ln_refl] >>
-  
-  
-                
-   (drule elim
-  simp[trans_ln_def,GSYM AND_IMP_INTRO,GSYM PULL_FORALL] >>
-  ho_match_mp_tac RTC_INDUCT
-
-QED
 
 Theorem trans_ln_refl:
   trans_ln sc sc
