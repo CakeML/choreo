@@ -616,21 +616,106 @@ QED
 Theorem trans_ln_merge_lemma:
   trans_ln (s,c) (s',c') ∧
   trans_ln (s,c) (s'',c'') ⇒
-  trans_ln (s'',c'') (s',c') ∨ trans_ln (s',c') (s'',c'') 
+  trans_ln (s'',c'') (s',c') ∨ trans_ln (s',c') (s'',c'')
 Proof
   cheat
 QED
-        
+
+Theorem trans_ln_refl:
+  trans_ln sc sc
+Proof
+  rw[trans_ln_def]
+QED
+
 Theorem trans_ln_merge:
-  ∀c s τ l s' c'.
-  no_self_comunication c ∧ no_undefined_vars (s,c) ∧
+  ∀s c τ l s' c' s'' c'' s''' c'''.
   trans (s,c) (τ,l) (s',c') ∧
+  no_self_comunication c ∧ no_undefined_vars (s,c) ∧
   trans_ln (s,c) (s'',c'') ∧
   trans_ln (s',c') (s''',c''')
-  ⇒ ∃s'''' c''''. trans_ln (s'',c'') (s'''',c'''') ∧ trans_ln (s''',c''') (s'''',c'''') 
+  ⇒ ∃s'''' c''''. trans_ln (s'',c'') (s'''',c'''') ∧ trans_ln (s''',c''') (s'''',c'''')
 Proof
-  cheat
-QED        
+  simp[GSYM PULL_FORALL,GSYM AND_IMP_INTRO] >>
+  ho_match_mp_tac trans_pairind >> rw[] >>
+  last_assum(mp_then Any mp_tac trans_ln_elim) >>
+  rw[chor_tl_def] >>
+  TRY(drule trans_ln_merge_lemma >>
+      disch_then(last_assum o mp_then Any strip_assume_tac) >>
+      FIRST[goal_assum drule,simp[Once CONJ_SYM] >> goal_assum drule] >>
+      simp[trans_ln_refl] >> NO_TAC)
+  >- (qexists_tac ‘s'''’ >> qexists_tac ‘c'''’ >> simp[trans_ln_refl] >>
+      match_mp_tac trans_ln_step >> simp[chor_tl_def] >>
+      metis_tac[trans_rules])
+  >- (qexists_tac ‘s'''’ >> qexists_tac ‘c'''’ >> simp[trans_ln_refl] >>
+      match_mp_tac trans_ln_step >> simp[chor_tl_def] >>
+      metis_tac[trans_rules])
+  >- (qexists_tac ‘s'''’ >> qexists_tac ‘c'''’ >> simp[trans_ln_refl] >>
+      match_mp_tac trans_ln_step >> simp[chor_tl_def] >>
+      metis_tac[trans_rules])
+  >- (qexists_tac ‘s'''’ >> qexists_tac ‘c'''’ >> simp[trans_ln_refl] >>
+      match_mp_tac trans_ln_step >> simp[chor_tl_def] >>
+      metis_tac[trans_rules])
+  >- (qexists_tac ‘s'''’ >> qexists_tac ‘c'''’ >> simp[trans_ln_refl] >>
+      match_mp_tac trans_ln_step >> simp[chor_tl_def] >>
+      metis_tac[trans_rules])
+  >- (fs[no_self_comunication_def] >>
+      ‘no_undefined_vars (s,c)’ by(fs[no_undefined_vars_def,free_variables_def]) >>
+      fs[] >>
+      drule_then (drule o REWRITE_RULE[FST]) lookup_fresh_after_trans >>
+      disch_then(qspec_then ‘v’ assume_tac) >>
+      drule trans_ln_elim >>
+      last_x_assum(qspecl_then [‘s’,‘c’] mp_tac) >>
+      simp[trans_ln_refl] >>
+      disch_then(qspecl_then [‘s'’,‘c''’] mp_tac) >>
+      simp[trans_ln_refl] >>
+      strip_tac >>
+      strip_tac >> rveq >-
+        (qexists_tac ‘s''''’ >> qexists_tac ‘c''''’ >>
+         conj_tac >> match_mp_tac trans_ln_step >> rw[chor_tl_def] >>
+         rfs[chor_tl_def] >> metis_tac[trans_if_true]) >>
+      rfs[chor_tl_def] >>
+      dxrule_then dxrule trans_ln_merge_lemma >>
+      rw[] >-
+        (rename1 ‘_ ∧ trans_ln (sss,ccc) _’ >>
+         qexists_tac ‘sss’ >> qexists_tac ‘ccc’ >>
+         simp[trans_ln_refl] >>
+         match_mp_tac trans_ln_step >> rw[chor_tl_def] >>
+         metis_tac[trans_ln_trans_ln,trans_if_true]) >>
+      qexists_tac ‘s''''’ >> qexists_tac ‘c''''’ >>
+      simp[trans_ln_refl] >>
+      match_mp_tac trans_ln_step >> rw[chor_tl_def] >>
+      metis_tac[trans_ln_trans_ln,trans_if_true])
+  >- (cheat)
+  >- (cheat)
+  >- (cheat)
+  >- (rfs[no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP] >>
+      metis_tac[])
+  >- (cheat)
+  >- (cheat)
+  >- (cheat)
+  >- (cheat)
+  >- (cheat)
+  >- (cheat)
+  >- (cheat)
+  >- (cheat)
+  >- (cheat)
+  >- (fs[no_self_comunication_def] >>
+      first_x_assum(fn thm => mp_tac thm >> impl_keep_tac) >-
+        (fs[no_undefined_vars_def,free_variables_def]) >>
+      disch_then drule >>
+      disch_then(qspecl_then [‘s'’,‘c'’] mp_tac) >>
+      simp[trans_ln_refl] >>
+      strip_tac >>
+      qpat_x_assum ‘trans_ln (_,Sel _ _ _ _) _’ assume_tac >>
+      drule_then strip_assume_tac trans_ln_elim >-
+        (fs[] >> rveq >>
+         goal_assum drule >>
+         match_mp_tac trans_ln_step >>
+         rw[chor_tl_def] >>
+         metis_tac[trans_sel]) >>
+      fs[chor_tl_def] >>
+      metis_tac[trans_ln_merge_lemma,trans_ln_trans_ln])
+QED
 
 Theorem trans_ln_IMP_trans_s:
   ∀a b. trans_ln a b ⇒ trans_s a b
@@ -666,7 +751,7 @@ Proof
   PairCases_on ‘sc'’ >>
   PairCases_on ‘α’ >>
   drule_all_then strip_assume_tac no_self_comunication_trans_pres >>
-  drule_all_then strip_assume_tac no_undefined_vars_trans_pres >>                 
+  drule_all_then strip_assume_tac no_undefined_vars_trans_pres >>
   drule_all_then strip_assume_tac trans_trans_ln >>
   first_x_assum(drule_all_then strip_assume_tac) >>
   drule_all_then strip_assume_tac trans_ln_merge >>
