@@ -524,15 +524,6 @@ Proof
            , epn_conf_def]
 QED
 
-Theorem conf_trans:
-  ∀epn epn' epn''.
-   ALL_DISTINCT (MAP FST (endpoints epn))
-   ⇒ epn ≅< epn' ∧ epn' ≅< epn'' ⇒ epn ≅< epn''
-Proof
-  rw [epn_conf_def]
-  \\ cheat
-QED
-
 Theorem projectS_fupdate_fresh:
   p <> p' ==>
   projectS p (s |+ ((v,p'),d)) = projectS p s
@@ -547,7 +538,7 @@ Proof
   \\ disch_then (mp_tac o AP_TERM “chor_size”) \\ EVAL_TAC \\ fs []
 QED
 
-Theorem compile_network_preservation:
+Theorem compile_network_preservation_ln:
    ∀s c α s' c'. compile_network_ok s c (procsOf c)
     ∧ trans (s,c) (α,[]) (s',c') ∧ chor_tl s c = (s',c')
     ⇒ ∃s'' c''. trans_ln (s',c') (s'',c'')
@@ -1123,6 +1114,41 @@ Proof
   \\ rw [freeprocs_def]
   \\ rw [freeprocs_def]
   \\ metis_tac []
+QED
+
+Theorem compile_network_preservation_trans_ln:
+  ∀s c s' c'.
+      compile_network_ok s  c (procsOf c) ∧
+      trans_ln (s,c) (s',c')
+    ⇒ ∃s'' c''. trans_ln (s',c') (s'',c'')
+       ∧ reduction^* (compile_network s   c   (procsOf c))
+                     (compile_network s'' c'' (procsOf c))
+Proof
+   ‘∀p q.
+    trans_ln p q
+    ⇒ ∀s c s' c'.
+       compile_network_ok s  c  (procsOf c) ∧
+       p = (s,c) ∧ q = (s',c')
+       ⇒ ∃s'' c''.
+          trans_ln (s',c') (s'',c'') ∧
+          reduction^* (compile_network s   c   (procsOf c))
+                      (compile_network s'' c'' (procsOf c))’
+   suffices_by metis_tac []
+   \\ ntac 3 strip_tac
+   \\ pop_assum (mp_tac o REWRITE_RULE [trans_ln_def])
+   \\ map_every qid_spec_tac [‘q’,‘p’]
+   \\ ho_match_mp_tac RTC_strongind
+   \\ rw []
+   >- (map_every qexists_tac [‘s’,‘c’] \\ fs [trans_ln_def])
+   \\ fs [GSYM trans_ln_def]
+   \\ Cases_on ‘chor_tl s c’
+   \\ drule_all compile_network_preservation_ln
+   \\ rw [] \\ fs []
+   \\ dxrule_all trans_ln_merge_lemma
+   \\ rw []
+   >- (metis_tac [])
+   \\ qexists_tac
+   \\ cheat
 QED
 
 Theorem compile_network_ok_project_ok:
@@ -2069,21 +2095,14 @@ Theorem compile_network_preservation:
               ∧ trans_s (s'',c'') (s''',c''')
               /\ p2 = (compile_network s''' c''' (procsOf c))
 Proof
-  rw[] >>
-  drule compile_network_reflection_lemma >>
-  simp[procsOf_all_distinct] >>
-  strip_tac >>
-  qexists_tac `s'''` >>
-  qexists_tac `Nil` >>
-  simp[] >>
-  rpt(dxrule_then strip_assume_tac reduction_list_trans) >>
-  drule semantics_globally_weakly_confluent >>
-  qpat_x_assum `trans_s (s,c) (s'',c'')` assume_tac >>
-  disch_then drule >>
-  strip_tac >>
-  rpt(dxrule_then strip_assume_tac list_trans_reduction) >>
-  imp_res_tac trans_s_nil >>
-  rveq >> simp[qcong_refl]
+  rw []
+  \\ drule_all trans_s_ln
+  \\ rw []
+  \\ drule_all compile_network_preservation_trans_ln
+  \\ rw [] \\ asm_exists_tac \\ fs []
+  \\ irule trans_s_trans_s
+  \\ IMP_RES_TAC trans_ln_IMP_trans_s
+  \\ asm_exists_tac \\ fs []
 QED
 
 val _ = export_theory ()
