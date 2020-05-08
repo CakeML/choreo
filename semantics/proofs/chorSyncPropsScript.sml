@@ -424,6 +424,26 @@ Inductive trans_l:
    ⇒ trans_l (tl ++ [τ]) (BAG_MERGE al (LIST_TO_BAG l) − {|τ|}) (s,c) (s'',c''))
 End
 
+Theorem trans_ln_step:
+  ∀p τ q r.
+  trans p (τ,[]) q ∧ q = UNCURRY chor_tl p ∧ trans_ln q r ⇒
+  trans_ln p r
+Proof
+  rw[trans_ln_def] >>
+  match_mp_tac(CONJUNCT2 (SPEC_ALL RTC_RULES)) >>
+  metis_tac[]
+QED
+
+Theorem trans_s_step:
+  ∀p τ l q r.
+  trans p (τ,l) q ∧ trans_s q r ⇒
+  trans_s p r
+Proof
+  rw[trans_s_def] >>
+  match_mp_tac(CONJUNCT2 (SPEC_ALL RTC_RULES)) >>
+  metis_tac[]
+QED
+
 Theorem trans_trans_ln:
   ∀c s τ l s' c'.
   no_self_comunication c ∧ no_undefined_vars (s,c) ∧
@@ -432,7 +452,158 @@ Theorem trans_trans_ln:
      trans_ln (s,c)  (s'',c'') ∧
      trans_s (s',c') (s'',c'')
 Proof
-  cheat
+  Induct
+  >- fs [Once trans_cases]
+  \\ rw []
+  \\  qpat_x_assum `trans _ _ _`
+                   (ASSUME_TAC o SIMP_RULE std_ss [Once trans_cases])
+  \\ rw [] >> rfs [] >> rw []
+  (* If-Normal *)
+  >- (qexists_tac ‘s'’ >> qexists_tac ‘c’ >>
+      simp[trans_s_def] >>
+      simp[trans_ln_def] >>
+      match_mp_tac RTC_SINGLE >>
+      rw[chor_tl_def] >>
+      metis_tac[trans_rules])
+  >- (qexists_tac ‘s'’ >> qexists_tac ‘c'’ >>
+      simp[trans_s_def] >>
+      simp[trans_ln_def] >>
+      match_mp_tac RTC_SINGLE >>
+      rw[chor_tl_def] >>
+      metis_tac[trans_rules])
+  >- (fs[no_self_comunication_def] >>
+      ‘no_undefined_vars (s',c)’ by fs[no_undefined_vars_def,free_variables_def] >>
+      ‘no_undefined_vars (s',c')’ by fs[no_undefined_vars_def,free_variables_def] >>
+      res_tac >>
+      Cases_on ‘FLOOKUP s' (s,l)’
+      >- (fs[no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP]) >>
+      drule lookup_fresh_after_trans >> simp[] >>
+      disch_then drule >>
+      disch_then(qspec_then ‘s’ assume_tac) >>
+      rename1 ‘FLOOKUP _ _= SOME d’ >>
+      Cases_on ‘d=[1w]’ >-
+        (rveq  >>
+         rename1 ‘trans_ln (s',c) (sss,ccc)’ >>
+         qexists_tac ‘sss’ >> qexists_tac ‘ccc’ >>
+         conj_tac >-
+           (match_mp_tac trans_ln_step >>
+            simp[chor_tl_def] >>
+            metis_tac[trans_if_true]) >>
+         match_mp_tac trans_s_step >>
+         metis_tac[trans_if_true]) >>
+      rename1 ‘trans_ln (s',c') (sss,ccc)’ >>
+      qexists_tac ‘sss’ >> qexists_tac ‘ccc’ >>
+      conj_tac >-
+       (match_mp_tac trans_ln_step >>
+        simp[chor_tl_def] >>
+        metis_tac[trans_if_false]) >>
+      match_mp_tac trans_s_step >>
+      metis_tac[trans_if_false])
+  >- (qexists_tac ‘s' |+ ((s,l),d)’ >>
+      qexists_tac ‘c’ >>
+      simp[trans_s_def] >>
+      simp[trans_ln_def] >>
+      match_mp_tac RTC_SINGLE >>
+      simp[chor_tl_def] >>
+      metis_tac[trans_rules])
+  >- (fs[no_self_comunication_def] >>
+      ‘∃d. FLOOKUP s' (s0,l0) = SOME d’
+        by(fs[no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP]) >>
+      ‘no_undefined_vars (s' |+ ((s,l),d),c)’
+        by(fs[no_undefined_vars_def,free_variables_def,SUBSET_DEF,DISJ_IMP_THM,FORALL_AND_THM] >>
+           metis_tac[]) >>
+      drule lookup_fresh_after_trans >> simp[] >>
+      disch_then(qspecl_then [‘l0’,‘s0’] mp_tac) >> rw[] >>
+      drule semantics_add_irrelevant_state >> simp[] >> disch_then drule >>
+      disch_then(qspecl_then [‘s’,‘d’] assume_tac) >>
+      first_x_assum(drule_all_then strip_assume_tac) >>
+      rename1 ‘trans_ln (s' |+ _,c) (sss,ccc)’ >>
+      qexists_tac ‘sss’ >> qexists_tac ‘ccc’ >>
+      conj_tac >-
+        (match_mp_tac trans_ln_step >> simp[chor_tl_def] >>
+         metis_tac[trans_com]) >>
+      match_mp_tac trans_s_step >>
+      metis_tac[trans_com])
+  >- (fs[no_self_comunication_def] >>
+      ‘∃d. FLOOKUP s' (s0,l0) = SOME d’
+        by(fs[no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP]) >>
+      ‘no_undefined_vars (s' |+ ((s,l),d),c)’
+        by(fs[no_undefined_vars_def,free_variables_def,SUBSET_DEF,DISJ_IMP_THM,FORALL_AND_THM] >>
+           metis_tac[]) >>
+      drule_all_then assume_tac lookup_unwritten_after_trans_tup >>
+      drule_then drule semantics_add_irrelevant_state_tup >>
+      disch_then(qspecl_then [‘s’,‘d’] mp_tac) >> rw[] >>
+      first_x_assum (drule_all_then strip_assume_tac) >>
+      rename1 ‘trans_ln (s' |+ _,c) (sss,ccc)’ >>
+      qexists_tac ‘sss’ >> qexists_tac ‘ccc’ >>
+      conj_tac >-
+        (match_mp_tac trans_ln_step >> simp[chor_tl_def] >>
+         metis_tac[trans_com]) >>
+      match_mp_tac trans_s_step >>
+      metis_tac[trans_com])
+  >- (qexists_tac ‘s' |+ ((s,l0),f (MAP (THE ∘ FLOOKUP s') (MAP (λv. (v,l0)) l)))’ >>
+      qexists_tac ‘c’ >>
+      simp[trans_s_def] >>
+      simp[trans_ln_def] >>
+      match_mp_tac RTC_SINGLE >>
+      rw[chor_tl_def] >>
+      metis_tac[trans_rules])
+  >- (fs[no_self_comunication_def] >>
+      ‘no_undefined_vars (s' |+ ((s,l0),f (MAP (THE ∘ FLOOKUP s') (MAP (λv. (v,l0)) l))),c)’
+        by(fs[no_undefined_vars_def,free_variables_def,SUBSET_DEF,MEM_MAP,PULL_EXISTS,
+              DISJ_IMP_THM,FORALL_AND_THM] >>
+           metis_tac[]) >>
+      drule_then assume_tac no_undefined_FLOOKUP_let >>
+      drule_then drule map_lookup_fresh_after_trans_tup >>
+      disch_then(qspec_then ‘l’ assume_tac) >>
+      drule semantics_add_irrelevant_state >> simp[] >> disch_then drule >>
+      disch_then(qspecl_then [‘s’,‘f (MAP (THE ∘ FLOOKUP s') (MAP (λv. (v,l0)) l))’] mp_tac) >>
+      strip_tac >>
+      first_x_assum (drule_all_then strip_assume_tac) >>
+      rename1 ‘trans_ln (s' |+ _,c) (sss,ccc)’ >>
+      qexists_tac ‘sss’ >> qexists_tac ‘ccc’ >>
+      conj_tac >-
+        (match_mp_tac trans_ln_step >> simp[chor_tl_def] >>
+         metis_tac[trans_let]) >>
+      match_mp_tac trans_s_step >>
+      simp[Once CONJ_SYM] >> goal_assum drule >>
+      qexists_tac ‘LLet s l0 f l’ >> qexists_tac ‘[]’ >>
+      qpat_x_assum ‘MAP _ _ = MAP _ _’ (assume_tac o GSYM) >>
+      simp[] >>
+      match_mp_tac trans_let >>
+      fs[EVERY_MEM,IS_SOME_EXISTS,MEM_MAP,PULL_EXISTS] >>
+      rw[] >> res_tac >>
+      metis_tac[lookup_fresh_after_trans,FST])
+  >- (qexists_tac ‘s’ >> qexists_tac ‘c’ >>
+      simp[trans_s_def] >>
+      simp[trans_ln_def] >>
+      match_mp_tac RTC_SINGLE >>
+      rw[chor_tl_def] >>
+      metis_tac[trans_rules])
+  >- (fs[no_self_comunication_def] >>
+      ‘no_undefined_vars (s,c)’
+        by(fs[no_undefined_vars_def,free_variables_def,SUBSET_DEF,DISJ_IMP_THM,FORALL_AND_THM] >>
+           metis_tac[]) >>
+      first_x_assum(drule_all_then strip_assume_tac) >>
+      rename1 ‘trans_ln (s,c) (sss,ccc)’ >>
+      qexists_tac ‘sss’ >> qexists_tac ‘ccc’ >>
+      conj_tac >-
+        (match_mp_tac trans_ln_step >> simp[chor_tl_def] >>
+         metis_tac[trans_sel]) >>
+      match_mp_tac trans_s_step >>
+      metis_tac[trans_sel])
+  >- (fs[no_self_comunication_def] >>
+      ‘no_undefined_vars (s,c)’
+        by(fs[no_undefined_vars_def,free_variables_def,SUBSET_DEF,DISJ_IMP_THM,FORALL_AND_THM] >>
+           metis_tac[]) >>
+      first_x_assum (drule_all_then strip_assume_tac) >>
+      rename1 ‘trans_ln (s,c) (sss,ccc)’ >>
+      qexists_tac ‘sss’ >> qexists_tac ‘ccc’ >>
+      conj_tac >-
+        (match_mp_tac trans_ln_step >> simp[chor_tl_def] >>
+         metis_tac[trans_sel]) >>
+      match_mp_tac trans_s_step >>
+      metis_tac[trans_sel])
 QED
 
 Theorem trans_s_ln:
@@ -443,6 +614,7 @@ Theorem trans_s_ln:
      trans_ln (s,c)   (s'',c'') ∧
      trans_s  (s',c') (s'',c'')
 Proof
+
   cheat
 QED
 
