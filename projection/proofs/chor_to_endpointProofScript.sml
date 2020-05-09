@@ -541,15 +541,15 @@ QED
 Theorem compile_network_preservation_ln:
    ∀s c α s' c'. compile_network_ok s c (procsOf c)
     ∧ trans (s,c) (α,[]) (s',c') ∧ chor_tl s c = (s',c')
-    ⇒ ∃s'' c''. trans_ln (s',c') (s'',c'')
+    ⇒ ∃c''. trans_ln (s',c') (s',c'')
        ∧ reduction^* (compile_network s   c   (procsOf c))
-                     (compile_network s'' c'' (procsOf c))
+                     (compile_network s'  c'' (procsOf c))
 Proof
   `∀s c α τ s' c'. trans (s,c) (α,τ) (s',c')
     ⇒ (compile_network_ok s c (procsOf c) ∧ τ = [] ∧ chor_tl s c = (s',c')
-    ⇒ ∃s'' c''. trans_ln (s',c') (s'',c'')
+    ⇒ ∃c''. trans_ln (s',c') (s',c'')
        ∧ reduction^* (compile_network s   c   (procsOf c))
-                     (compile_network s'' c'' (procsOf c)))`
+                     (compile_network s'  c'' (procsOf c)))`
   suffices_by metis_tac []
   \\ ho_match_mp_tac trans_pairind
   \\ rw [ compile_network_gen_def
@@ -563,7 +563,7 @@ Proof
         , chor_tl_def
         , fupdate_projectS]
   (* Com *)
-  >- (MAP_EVERY Q.EXISTS_TAC [`s |+ ((v2,p2),d)`,`c'`]
+  >- (MAP_EVERY Q.EXISTS_TAC [`c'`]
      \\ IMP_RES_TAC lookup_projectS
      \\ rw [trans_ln_def,fupdate_projectS]
      \\ MAP_EVERY Q.ABBREV_TAC [ `l = FILTER (λy. p1 ≠ y ∧ p2 ≠ y) (nub' (procsOf c'))`
@@ -604,7 +604,7 @@ Proof
         \\ MAP_EVERY Q.EXISTS_TAC [`d`,`[]`,`[]`]
         \\ rw [Abbr `s2q`, Abbr `s2`,Abbr `s'`,Abbr `s2'`,projectS_fupdate]))
   (* Sel-T *)
-  >- (MAP_EVERY Q.EXISTS_TAC [`s`,`c'`]
+  >- (MAP_EVERY Q.EXISTS_TAC [`c'`]
       \\ rw [trans_ln_def]
       \\ MAP_EVERY Q.ABBREV_TAC [ `l  = FILTER (λy. p1 ≠ y ∧ p2 ≠ y) (nub' (procsOf c'))`
                                 , `s1   = <| bindings := projectS p1 s;
@@ -640,7 +640,7 @@ Proof
          \\ ho_match_mp_tac trans_ext_choice_l_gen
          \\ rw []))
   (* Sel-F *)
-  >- (MAP_EVERY Q.EXISTS_TAC [`s`,`c'`]
+  >- (MAP_EVERY Q.EXISTS_TAC [`c'`]
       \\ rw [trans_ln_def]
       \\ MAP_EVERY Q.ABBREV_TAC [ `l  = FILTER (λy. p1 ≠ y ∧ p2 ≠ y) (nub' (procsOf c'))`
                                 , `s1   = <| bindings := projectS p1 s;
@@ -676,7 +676,7 @@ Proof
          \\ ho_match_mp_tac trans_ext_choice_r_gen
          \\ rw []))
   (* Let *)
-  >- (MAP_EVERY Q.EXISTS_TAC [`s |+ ((v,p),f (MAP (THE ∘ FLOOKUP s) (MAP (λv. (v,p)) vl)))`,`c'`]
+  >- (MAP_EVERY Q.EXISTS_TAC [`c'`]
      \\ rw [trans_ln_def]
      \\ MAP_EVERY Q.ABBREV_TAC [ `l  = FILTER (λy. p ≠ y) (nub' (procsOf c'))`
                                , `s' = s |+ ((v,p),f (MAP (THE ∘ FLOOKUP s) (MAP (λv. (v,p)) vl)))`
@@ -704,7 +704,7 @@ Proof
      >- (rw [projectS_fupdate] >> rpt AP_TERM_TAC
         \\ Induct_on `vl` >> rw [lookup_projectS']))
   (* If true *)
-  >- (MAP_EVERY Q.EXISTS_TAC [`s`,`cut_sel_upto p c'`]
+  >- (MAP_EVERY Q.EXISTS_TAC [`cut_sel_upto p c'`]
      \\ rw []
      >- (pop_assum (K ALL_TAC) >> pop_assum (K ALL_TAC)
         \\ Induct_on `c'` >> rw [trans_ln_def,cut_sel_upto_def,chor_tl_def]
@@ -883,7 +883,7 @@ Proof
      >- (`proc <> q` by(CCONTR_TAC >> fs[ALL_DISTINCT_APPEND] >> metis_tac[])
          \\ fs[project_def,cut_ext_choice_upto_presel_def,cut_ext_choice_upto_presel_cons]))
   (* If false *)
-  >- (MAP_EVERY Q.EXISTS_TAC [`s`,`cut_sel_upto p c'`]
+  >- (MAP_EVERY Q.EXISTS_TAC [`cut_sel_upto p c'`]
      \\ rw []
      >- (pop_assum (K ALL_TAC)
         \\ Induct_on `c'` >> rw [trans_ln_def,cut_sel_upto_def]
@@ -1116,39 +1116,66 @@ Proof
   \\ metis_tac []
 QED
 
+val _ = overload_on("tln",
+  ``(λp q. ∃τ. trans p (τ,[]) q ∧ q = UNCURRY chor_tl p)``
+);
+
+Theorem trans_ln_NRC:
+  ∀p q. trans_ln p q = ∃n. NRC tln n p q
+Proof
+  rw [Once trans_ln_def, Once RTC_eq_NRC,PULL_EXISTS]
+QED
+
+Theorem NRC_trans_ln:
+  ∀p q n. NRC tln n p q ⇒ trans_ln p q
+Proof
+  rw [trans_ln_NRC] \\ asm_exists_tac \\ fs []
+QED
+
+Theorem trans_ln_NRC_elim:
+  ∀p q n. NRC tln n p q ⇒ (p = q ∧ n = 0) ∨ (∃p'. NRC tln (n - 1) p p' ∧ tln p' q)
+Proof
+  rw[] \\ Cases_on ‘n’
+  >- (fs [NRC])
+  \\ ‘SUC n' = n' + 1’ by fs []
+  \\ pop_assum (fn t => pop_assum (ASSUME_TAC o ONCE_REWRITE_RULE [t]))
+  \\ pop_assum (ASSUME_TAC o ONCE_REWRITE_RULE [NRC_ADD_EQN])
+  \\ fs []
+  \\ rfs []
+  \\ metis_tac []
+QED
+
 Theorem compile_network_preservation_trans_ln:
-  ∀s c s' c'.
-      compile_network_ok s  c (procsOf c) ∧
-      trans_ln (s,c) (s',c')
+  ∀s c s' c' pn.
+    compile_network_ok s  c (procsOf c) ∧
+    trans_ln (s,c) (s',c')
     ⇒ ∃s'' c''. trans_ln (s',c') (s'',c'')
        ∧ reduction^* (compile_network s   c   (procsOf c))
                      (compile_network s'' c'' (procsOf c))
 Proof
-   ‘∀p q.
-    trans_ln p q
-    ⇒ ∀s c s' c'.
-       compile_network_ok s  c  (procsOf c) ∧
-       p = (s,c) ∧ q = (s',c')
-       ⇒ ∃s'' c''.
-          trans_ln (s',c') (s'',c'') ∧
-          reduction^* (compile_network s   c   (procsOf c))
-                      (compile_network s'' c'' (procsOf c))’
-   suffices_by metis_tac []
-   \\ ntac 3 strip_tac
-   \\ pop_assum (mp_tac o REWRITE_RULE [trans_ln_def])
-   \\ map_every qid_spec_tac [‘q’,‘p’]
-   \\ ho_match_mp_tac RTC_strongind
-   \\ rw []
-   >- (map_every qexists_tac [‘s’,‘c’] \\ fs [trans_ln_def])
-   \\ fs [GSYM trans_ln_def]
-   \\ Cases_on ‘chor_tl s c’
-   \\ drule_all compile_network_preservation_ln
-   \\ rw [] \\ fs []
-   \\ dxrule_all trans_ln_merge_lemma
-   \\ rw []
-   >- (metis_tac [])
-   \\ qexists_tac
-   \\ cheat
+  simp[Once trans_ln_NRC]
+  \\ rw [] \\ pop_assum mp_tac
+  \\ map_every qid_spec_tac [‘s'’,‘c'’,‘n’]
+  \\ ho_match_mp_tac COMPLETE_INDUCTION \\ rw []
+  (* \\ Induct_on ‘n’ \\  rw [] *)
+  (* >- (map_every qexists_tac [‘s’,‘c’] \\ fs [trans_ln_def]) *)
+  \\ Cases_on ‘n’
+  \\ fs [NRC] \\ rw []
+  >- (map_every qexists_tac [‘s’,‘c’] \\ fs [trans_ln_def])
+  \\ drule trans_ln_NRC_elim
+  \\ rw []
+  >- (fs [] \\ drule_all compile_network_preservation_ln
+      \\ rw [] \\ metis_tac [])
+  \\ first_x_assum (qspec_then ‘n'’ assume_tac) \\ fs []
+  \\ PairCases_on ‘p'’ \\ fs []
+  \\ first_x_assum (qspecl_then [‘p'1’,‘p'0’] mp_tac) \\ fs []
+  \\ impl_tac
+  >- (Cases_on ‘n'’ >- (rfs [] \\ drule trans_not_eq \\ fs [])
+      \\ fs [NRC] \\ metis_tac [])
+  \\ rw []
+  \\ map_every qexists_tac [‘s''’,‘c''’] \\ fs []
+  (* \\ drule trans_ln_elim \\ rw [] *) (* BAM! *)
+  \\  cheat
 QED
 
 Theorem compile_network_ok_project_ok:
