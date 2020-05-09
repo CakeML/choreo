@@ -1314,7 +1314,10 @@ QED
 Theorem procsOf_catchup_of:
   MEM h (procsOf (catchup_of α c)) ⇒ MEM h (procsOf c)
 Proof
-  cheat
+  Cases_on ‘α’ >> fs[catchup_of_def] >>
+  Induct_on ‘c’ >> fs[procsOf_def,cut_sel_upto_def] >>
+  rw[MEM_nub'] >>
+  fs[procsOf_def,MEM_nub']
 QED
 
 Theorem trans_procsOf:
@@ -1421,6 +1424,17 @@ Definition trans_ln_cut_def:
                  r = (FST q, catchup_of τ (SND q)))⃰
 End
 
+Theorem compile_network_ok_catchup_of:
+  compile_network_ok s c ps ⇒
+  compile_network_ok s (catchup_of τ c) ps
+Proof
+  Cases_on ‘τ’ >> fs[catchup_of_def] >>
+  Induct_on ‘c’ >> fs[cut_sel_upto_def] >>
+  rw[] >>
+  drule compile_network_ok_dest_sel >>
+  simp[]
+QED
+
 Theorem compile_network_preservation_trans_ln_cut:
   ∀s c s' c'.
     compile_network_ok s  c (procsOf c) ∧
@@ -1449,9 +1463,13 @@ Proof
    \\ Cases_on ‘chor_tl s c’
    \\ drule_all compile_network_preservation_ln_gen
    \\ rw [] \\ fs []
-   \\ ‘compile_network_ok q (catchup_of τ r) ps’ by cheat
+   \\ ‘compile_network_ok q (catchup_of τ r) ps’
+        by metis_tac[compile_network_ok_chor_tl,compile_network_ok_catchup_of]
    \\ first_x_assum drule
-   \\ impl_tac >- cheat
+   \\ impl_tac
+   >- (simp[] >>
+       fs[SUBSET_DEF] >> rw[] >> imp_res_tac procsOf_catchup_of >>
+       imp_res_tac trans_procsOf >> res_tac)
    \\ strip_tac
    \\ metis_tac[RTC_RTC]
 QED
@@ -1510,14 +1528,31 @@ Proof
   simp[]
 QED
 
+(* This probably requires assuming no_self_comunication or similar *)
 Theorem trans_ln_IMP_trans_ln_cut:
   ∀p q.
   trans_ln p q ⇒ ∃q'. trans_ln_cut p q' ∧ trans_ln q q'
 Proof
   simp[Once trans_ln_def] >>
   ho_match_mp_tac RTC_STRONG_INDUCT >>
-  rw[] >>
+  rw[] >-
+    (metis_tac[trans_ln_cut_def,trans_ln_def,RTC_REFL]) >>
+  qhdtm_x_assum ‘trans_ln_cut’ (strip_assume_tac o REWRITE_RULE[trans_ln_cut_def,Once RTC_cases]) >>
+  rveq >-
+    (cheat) >>
   cheat
+QED
+
+Theorem trans_ln_no_self_comunication:
+  ∀sc sc'.
+  trans_ln sc sc' ∧ no_self_comunication (SND sc) ⇒
+  no_self_comunication(SND sc')
+Proof
+  simp[trans_ln_def,Once CONJ_SYM] >>
+  ho_match_mp_tac RTC_lifts_invariants >>
+  rpt PairCases >>
+  rw[] >>
+  imp_res_tac no_self_comunication_trans_pres
 QED
 
 Theorem compile_network_preservation_trans_ln:
@@ -1537,7 +1572,11 @@ Proof
   disch_then drule >>
   strip_tac >>
   drule trans_ln_cut_IMP_trans_ln >>
-  impl_tac >- cheat >>
+  impl_tac >-
+    (drule compile_network_ok_no_self_comunication >>
+     strip_tac >>
+     imp_res_tac trans_ln_no_self_comunication >>
+     fs[]) >>
   strip_tac >>
   drule_then drule trans_ln_trans_ln >>
   strip_tac >>
