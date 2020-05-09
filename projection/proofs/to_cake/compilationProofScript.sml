@@ -16,7 +16,6 @@ Theorem compilation_preservation_junkcong:
    compile_network_ok s1 c1 (procsOf c1) ∧
    conf.payload_size > 0   ∧
    no_undefined_vars (s1,c1) ∧
-   no_self_comunication c1  ∧
    (* new stuff *)
    pEPN1 = projection conf s1 c1 (procsOf c1) ∧
    net_find p pEPN1  = SOME (NEndpoint p pSt1 pCd1 ) ∧
@@ -102,7 +101,6 @@ Theorem compilation_preservation:
    compile_network_ok s1 c1 (procsOf c1) ∧
    conf.payload_size > 0   ∧
    no_undefined_vars (s1,c1) ∧
-   no_self_comunication c1  ∧
    (* new stuff *)
    pEPN1 = projection conf s1 c1 (procsOf c1) ∧
    net_find p pEPN1  = SOME (NEndpoint p pSt1 pCd1 ) ∧
@@ -174,7 +172,6 @@ Theorem compilation_deadlock_freedom:
    compile_network_ok s1 c1 (procsOf c1) ∧
    conf.payload_size > 0   ∧
    no_undefined_vars (s1,c1) ∧
-   no_self_comunication c1  ∧
    (* new stuff *)
    pEPN1 = projection conf s1 c1 (procsOf c1) ∧
    net_find p pEPN1  = SOME (NEndpoint p pSt1 pCd1 ) ∧
@@ -191,6 +188,7 @@ Theorem compilation_deadlock_freedom:
         (cSt2 with clock := mc,Rval [Conv NONE []])
 Proof
   rw []
+  \\ imp_res_tac chor_to_endpointProofTheory.compile_network_ok_no_self_comunication
   \\ drule_all chor_deadlock_freedom
   \\ rw []
   \\ drule compilation_preservation_junkcong

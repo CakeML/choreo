@@ -618,7 +618,6 @@ struct
         |> eval_assm
         |> eval_assm
         |> eval_assm
-        |> eval_assm
         |> CONV_RULE(LAND_CONV(SIMP_CONV pure_ss [EQ_REFL]))
         |> C MP TRUTH
         |> CONV_RULE(LAND_CONV EVAL)

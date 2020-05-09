@@ -1741,7 +1741,7 @@ Proof
              reduction^* (compile_network s c pn) p2
              ∧ trans_s (s,c) (s'',Nil)
              ∧ p2 = compile_network s'' Nil pn`
-    suffices_by metis_tac[] >>
+    suffices_by metis_tac[compile_network_ok_no_self_comunication] >>
   ho_match_mp_tac COMPLETE_INDUCTION >>
   rpt strip_tac >>
   Cases_on `c` >-
@@ -2514,13 +2514,13 @@ Theorem compile_network_reflection:
     compile_network_ok s c (procsOf c)
     ∧ reduction^* (compile_network s c (procsOf c)) p2
     ∧ no_undefined_vars (s,c)
-    ∧ no_self_comunication c
     ==> ∃s'' c'' p3.
               reduction^* p2 p3
               ∧ trans_s (s,c) (s'',c'')
               ∧ qcong p3 (compile_network s'' c'' (procsOf c))
 Proof
   rw[] >>
+  imp_res_tac compile_network_ok_no_self_comunication >>
   drule compile_network_reflection_lemma >>
   simp[procsOf_all_distinct] >>
   strip_tac >>
@@ -2596,13 +2596,13 @@ Theorem compile_network_preservation:
     compile_network_ok s c (procsOf c)
     ∧ trans_s (s,c) (s'',c'')
     ∧ no_undefined_vars (s,c)
-    ∧ no_self_comunication c
     ==> ∃s''' c''' p2.
               reduction^* (compile_network s c (procsOf c)) p2
               ∧ trans_s (s'',c'') (s''',c''')
               /\ p2 = (compile_network s''' c''' (procsOf c))
 Proof
   rw []
+  \\ imp_res_tac compile_network_ok_no_self_comunication
   \\ drule_all trans_s_ln
   \\ rw []
   \\ drule_all compile_network_preservation_trans_ln

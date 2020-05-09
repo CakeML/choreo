@@ -189,7 +189,6 @@ Theorem projection_preservation_junkcong:
    ∧ conf.payload_size > 0
    ∧ trans_s (s,c) (s'',c'')
    ∧ no_undefined_vars (s,c)
-   ∧ no_self_comunication c
    ⇒ ∃s''' c''' epn.
       trans_s (s'',c'') (s''',c''') ∧
       junkcong {new_fv s c}
@@ -720,7 +719,6 @@ Theorem projection_preservation:
    ∧ conf.payload_size > 0
    ∧ trans_s (s,c) (s'',c'')
    ∧ no_undefined_vars (s,c)
-   ∧ no_self_comunication c
    ⇒ ∃s''' c''' epn.
       trans_s (s'',c'') (s''',c''') ∧
       (reduction conf)^* (projection conf s c (procsOf c))
