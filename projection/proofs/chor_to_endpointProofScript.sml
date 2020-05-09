@@ -1528,6 +1528,33 @@ Proof
   simp[]
 QED
 
+Theorem NRC_catchup:
+  ∀p c s.
+  no_self_comunication c ⇒
+  NRC (λp q. ∃τ. trans p (τ,[]) q ∧ q = UNCURRY chor_tl p)
+      (LENGTH (preSel p c))
+      (s,c) (s,cut_sel_upto p c)
+Proof
+  ho_match_mp_tac(fetch "-" "preSel_ind") >> rw[] >>
+  rw[preSel_def,NRC,chor_tl_def,PULL_EXISTS] >>
+  fs[no_self_comunication_def] >>
+  res_tac >>
+  simp[Once cut_sel_upto_def] >>
+  metis_tac[trans_rules]
+QED
+
+Theorem NRC_trans_ln_eq_deriv:
+  ∀n p q r.
+  NRC (λp q. ∃τ. trans p (τ,[]) q ∧ q = UNCURRY chor_tl p) n p q ∧
+  NRC (λp q. ∃τ. trans p (τ,[]) q ∧ q = UNCURRY chor_tl p) n p r ⇒
+  q = r
+Proof
+  Induct >> rw[] >>
+  fs[NRC] >> res_tac >>
+  rveq >>
+  res_tac
+QED
+
 Theorem trans_ln_IMP_trans_ln_cut:
   ∀p q.
   trans_ln p q ∧ no_self_comunication(SND p) ⇒ ∃q'. trans_ln_cut p q' ∧ trans_ln q q'
@@ -1540,7 +1567,54 @@ Proof
   imp_res_tac no_self_comunication_chor_tl >>
   rename1 ‘SUC n’ >>
   Cases_on ‘τ’ >-
-    cheat >>
+    (rename1 ‘LTau proc v’ >>
+     Cases_on ‘LENGTH(preSel proc (SND(UNCURRY chor_tl p))) > n’ >-
+       (drule NRC_catchup >>
+        disch_then(qspecl_then [‘proc’,‘FST(UNCURRY chor_tl p)’] mp_tac) >>
+        strip_tac >>
+        fs[PAIR] >>
+        qmatch_asmsub_abbrev_tac ‘NRC _ _ _ a1’ >> qexists_tac ‘a1’ >>
+        qunabbrev_tac ‘a1’ >>
+        conj_tac >-
+         (simp[trans_ln_cut_def] >>
+          match_mp_tac RTC_SUBSET >>
+          simp[] >>
+          goal_assum drule >>
+          simp[catchup_of_def]) >>
+        fs[GREATER_DEF] >>
+        imp_res_tac LESS_ADD >>
+        pop_assum(SUBST_ALL_TAC o GSYM) >>
+        FULL_SIMP_TAC std_ss [Once ADD_SYM] >>
+        FULL_SIMP_TAC std_ss [NRC_ADD_EQN] >>
+        pop_assum mp_tac >>
+        drule NRC_trans_ln_eq_deriv >>
+        disch_then(last_assum o mp_then Any mp_tac) >>
+        rpt strip_tac >> rveq >>
+        simp[trans_ln_def] >>
+        match_mp_tac NRC_RTC >>
+        goal_assum drule) >>
+     fs[GREATER_DEF,NOT_LESS] >>
+     imp_res_tac LESS_EQ_ADD_EXISTS >>
+     rveq >>
+     FULL_SIMP_TAC std_ss [Once ADD_SYM] >>
+     FULL_SIMP_TAC std_ss [NRC_ADD_EQN] >>
+     drule NRC_catchup >>
+     disch_then(qspecl_then [‘proc’,‘FST(UNCURRY chor_tl p)’] mp_tac) >>
+     strip_tac >>
+     fs[PAIR] >>
+     drule NRC_trans_ln_eq_deriv >>
+     disch_then(last_assum o mp_then Any mp_tac) >>
+     strip_tac >> rveq >> fs[] >>
+     first_x_assum(qspec_then ‘p'’ mp_tac) >>
+     impl_tac >- simp[] >>
+     disch_then drule >>
+     impl_tac >- (simp[] >> metis_tac[no_self_comunication_cut_sel_upto]) >>
+     strip_tac >>
+     simp[Once CONJ_SYM] >> goal_assum drule >>
+     fs[trans_ln_cut_def] >>
+     match_mp_tac RTC_TRANS >>
+     simp[PULL_EXISTS] >> goal_assum drule >>
+     simp[PULL_EXISTS,catchup_of_def]) >>
   first_x_assum(qspec_then ‘n’ mp_tac) >>
   simp[] >> disch_then drule >>
   simp[] >>
