@@ -1528,19 +1528,31 @@ Proof
   simp[]
 QED
 
-(* This probably requires assuming no_self_comunication or similar *)
 Theorem trans_ln_IMP_trans_ln_cut:
   ∀p q.
-  trans_ln p q ⇒ ∃q'. trans_ln_cut p q' ∧ trans_ln q q'
+  trans_ln p q ∧ no_self_comunication(SND p) ⇒ ∃q'. trans_ln_cut p q' ∧ trans_ln q q'
 Proof
-  simp[Once trans_ln_def] >>
-  ho_match_mp_tac RTC_STRONG_INDUCT >>
-  rw[] >-
+  simp[Once trans_ln_def,GSYM AND_IMP_INTRO,GSYM PULL_FORALL,RTC_eq_NRC,PULL_EXISTS] >>
+  CONV_TAC(RESORT_FORALL_CONV List.rev) >>
+  ho_match_mp_tac COMPLETE_INDUCTION >>
+  Cases >> rw[NRC] >-
     (metis_tac[trans_ln_cut_def,trans_ln_def,RTC_REFL]) >>
-  qhdtm_x_assum ‘trans_ln_cut’ (strip_assume_tac o REWRITE_RULE[trans_ln_cut_def,Once RTC_cases]) >>
-  rveq >-
-    (cheat) >>
-  cheat
+  imp_res_tac no_self_comunication_chor_tl >>
+  rename1 ‘SUC n’ >>
+  Cases_on ‘τ’ >-
+    cheat >>
+  first_x_assum(qspec_then ‘n’ mp_tac) >>
+  simp[] >> disch_then drule >>
+  simp[] >>
+  strip_tac >>
+  qexists_tac ‘q'’ >> simp[] >>
+  simp[trans_ln_cut_def] >>
+  match_mp_tac RTC_TRANS >>
+  fs[trans_ln_cut_def] >>
+  simp[Once CONJ_SYM] >>
+  goal_assum drule >>
+  goal_assum drule >>
+  simp[catchup_of_def]
 QED
 
 Theorem trans_ln_no_self_comunication:
@@ -1565,6 +1577,7 @@ Theorem compile_network_preservation_trans_ln:
 Proof
   rpt strip_tac >>
   drule trans_ln_IMP_trans_ln_cut >>
+  impl_tac >- metis_tac[compile_network_ok_no_self_comunication,SND] >>
   strip_tac >>
   drule compile_network_preservation_trans_ln_cut >>
   rename1 ‘trans_ln_cut (s,c) sc’ >>
