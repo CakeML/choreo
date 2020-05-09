@@ -538,19 +538,117 @@ Proof
   \\ disch_then (mp_tac o AP_TERM “chor_size”) \\ EVAL_TAC \\ fs []
 QED
 
-Theorem compile_network_preservation_ln:
-   ∀s c α s' c'. compile_network_ok s c (procsOf c)
-    ∧ trans (s,c) (α,[]) (s',c') ∧ chor_tl s c = (s',c')
-    ⇒ ∃c''. trans_ln (s',c') (s',c'')
-       ∧ reduction^* (compile_network s   c   (procsOf c))
-                     (compile_network s'  c'' (procsOf c))
+Definition catchup_of_def:
+  (catchup_of (LTau p ps) c = cut_sel_upto p c) ∧
+  catchup_of _ c = c
+End
+
+Theorem compile_network_ok_subset:
+  ∀s c ps qs.
+  compile_network_ok s c qs ∧ set ps ⊆ set qs ⇒
+  compile_network_ok s c ps
 Proof
-  `∀s c α τ s' c'. trans (s,c) (α,τ) (s',c')
-    ⇒ (compile_network_ok s c (procsOf c) ∧ τ = [] ∧ chor_tl s c = (s',c')
-    ⇒ ∃c''. trans_ln (s',c') (s',c'')
+  Induct_on ‘ps’ >>
+  rw[compile_network_gen_def] >- imp_res_tac compile_network_ok_project_ok >>
+  res_tac
+QED
+
+Theorem trans_ln_catchup_of:
+  ∀p τ.
+  no_self_comunication (SND p) ⇒
+  trans_ln p (FST p,catchup_of τ (SND p))
+Proof
+  Cases_on ‘τ’ >> fs[catchup_of_def,trans_ln_refl] >>
+  PairCases >> Induct_on ‘p1’ >>
+  fs[cut_sel_upto_def,trans_ln_refl,no_self_comunication_def] >>
+  rw[trans_ln_refl] >>
+  match_mp_tac trans_ln_step >>
+  rw[chor_tl_def] >>
+  metis_tac[trans_sel]
+QED
+
+Theorem trans_ln_cut_sel_upto:
+  ∀s c p.
+  no_self_comunication c ⇒
+  trans_ln (s,c) (s,cut_sel_upto p c)
+Proof
+  rw[] >>
+  qspecl_then [‘(s,c)’,‘LTau p ARB’] assume_tac trans_ln_catchup_of >>
+  fs[catchup_of_def]
+QED
+
+Theorem compile_network_ok_no_self_comunication:
+  ∀s c.
+  compile_network_ok s c (procsOf c) ⇒
+  no_self_comunication c
+Proof
+  rw[] >>
+  dxrule compile_network_ok_project_ok >>
+  simp[Once MONO_NOT_EQ] >>
+  Induct_on ‘c’ >>
+  rw[project_def,no_self_comunication_def,procsOf_def,nub'_def,procsOf_all_distinct] >>
+  res_tac >> fs[] >>
+  rw[MEM_FILTER,MEM_nub'] >>
+  rw[RIGHT_AND_OVER_OR,EXISTS_OR_THM] >-
+    (Cases_on ‘l = p’ >> simp[] >>
+     disj2_tac >>
+     qexists_tac ‘p’ >>
+     rw[] >>
+     rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
+     metis_tac[split_sel_project_ok,split_sel_project_ok2]) >-
+    (Cases_on ‘l = p’ >> simp[] >>
+     disj2_tac >>
+     qexists_tac ‘p’ >>
+     rw[] >>
+     rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
+     metis_tac[split_sel_project_ok,split_sel_project_ok2]) >-
+    (Cases_on ‘l = p’ >> simp[] >>
+     Cases_on ‘l0 = p’ >> simp[] >>
+     rpt disj2_tac >>
+     qexists_tac ‘p’ >>
+     rw[] >>
+     rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
+     metis_tac[split_sel_project_ok,split_sel_project_ok2]
+     ) >-
+    (Cases_on ‘l0 = p’ >> simp[] >>
+     rpt disj2_tac >>
+     qexists_tac ‘p’ >>
+     rw[] >>
+     rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
+     metis_tac[split_sel_project_ok,split_sel_project_ok2]
+     ) >-
+    (Cases_on ‘l = p’ >> simp[] >>
+     Cases_on ‘l0 = p’ >> simp[] >>
+     rpt disj2_tac >>
+     qexists_tac ‘p’ >>
+     rw[] >>
+     rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
+     metis_tac[split_sel_project_ok,split_sel_project_ok2]
+     ) >-
+    (Cases_on ‘l = p’ >> simp[] >>
+     Cases_on ‘l0 = p’ >> simp[] >>
+     rpt disj2_tac >>
+     qexists_tac ‘p’ >>
+     rw[] >>
+     rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
+     metis_tac[split_sel_project_ok,split_sel_project_ok2]
+     )
+QED
+
+Theorem compile_network_preservation_ln:
+   ∀s c α s' c' . compile_network_ok s c (procsOf c)
+    ∧ trans (s,c) (α,[]) (s',c') ∧ chor_tl s c = (s',c')
+    ⇒ trans_ln (s',c') (s',catchup_of α c')
+       ∧ reduction^* (compile_network s  c  (procsOf c))
+                      (compile_network s' (catchup_of α c') (procsOf c))
+Proof
+    `∀s c α τ s' c'. trans (s,c) (α,τ) (s',c')
+    ⇒ (compile_network_ok s c (procsOf c) ∧ τ = [] ∧ chor_tl s c = (s',c') ∧
+        no_self_comunication c
+    ⇒ trans_ln (s',c') (s',catchup_of α c')
        ∧ reduction^* (compile_network s   c   (procsOf c))
-                     (compile_network s'  c'' (procsOf c)))`
-  suffices_by metis_tac []
+                     (compile_network s'  (catchup_of α c') (procsOf c)))`
+  suffices_by metis_tac [compile_network_ok_no_self_comunication]
   \\ ho_match_mp_tac trans_pairind
   \\ rw [ compile_network_gen_def
         , procsOf_def
@@ -561,10 +659,13 @@ Proof
         , FILTER_FILTER
         , FOLDL
         , chor_tl_def
-        , fupdate_projectS]
+        , fupdate_projectS
+        , catchup_of_def
+        , trans_ln_refl
+        , no_self_comunication_def
+        , trans_ln_cut_sel_upto]
   (* Com *)
-  >- (MAP_EVERY Q.EXISTS_TAC [`c'`]
-     \\ IMP_RES_TAC lookup_projectS
+  >- (IMP_RES_TAC lookup_projectS
      \\ rw [trans_ln_def,fupdate_projectS]
      \\ MAP_EVERY Q.ABBREV_TAC [ `l = FILTER (λy. p1 ≠ y ∧ p2 ≠ y) (nub' (procsOf c'))`
                                , `s'   = s |+ ((v2,p2),d)`
@@ -604,8 +705,7 @@ Proof
         \\ MAP_EVERY Q.EXISTS_TAC [`d`,`[]`,`[]`]
         \\ rw [Abbr `s2q`, Abbr `s2`,Abbr `s'`,Abbr `s2'`,projectS_fupdate]))
   (* Sel-T *)
-  >- (MAP_EVERY Q.EXISTS_TAC [`c'`]
-      \\ rw [trans_ln_def]
+  >- (rw [trans_ln_def]
       \\ MAP_EVERY Q.ABBREV_TAC [ `l  = FILTER (λy. p1 ≠ y ∧ p2 ≠ y) (nub' (procsOf c'))`
                                 , `s1   = <| bindings := projectS p1 s;
                                              queue := [] |>`
@@ -640,8 +740,7 @@ Proof
          \\ ho_match_mp_tac trans_ext_choice_l_gen
          \\ rw []))
   (* Sel-F *)
-  >- (MAP_EVERY Q.EXISTS_TAC [`c'`]
-      \\ rw [trans_ln_def]
+  >- (rw [trans_ln_def]
       \\ MAP_EVERY Q.ABBREV_TAC [ `l  = FILTER (λy. p1 ≠ y ∧ p2 ≠ y) (nub' (procsOf c'))`
                                 , `s1   = <| bindings := projectS p1 s;
                                              queue := [] |>`
@@ -676,8 +775,7 @@ Proof
          \\ ho_match_mp_tac trans_ext_choice_r_gen
          \\ rw []))
   (* Let *)
-  >- (MAP_EVERY Q.EXISTS_TAC [`c'`]
-     \\ rw [trans_ln_def]
+  >- (rw [trans_ln_def]
      \\ MAP_EVERY Q.ABBREV_TAC [ `l  = FILTER (λy. p ≠ y) (nub' (procsOf c'))`
                                , `s' = s |+ ((v,p),f (MAP (THE ∘ FLOOKUP s) (MAP (λv. (v,p)) vl)))`
                                , `s1   = projectS p s`
@@ -693,6 +791,7 @@ Proof
                , cn_ignore_let , cn_ignore_state_update])
      \\ ASM_REWRITE_TAC []
      \\ pop_assum (K ALL_TAC)
+     \\ qpat_x_assum ‘no_self_comunication _’ kall_tac
      \\ ho_match_mp_tac RTC_SINGLE
      \\ rw [reduction_def]
      \\ ho_match_mp_tac trans_par_l
@@ -704,13 +803,7 @@ Proof
      >- (rw [projectS_fupdate] >> rpt AP_TERM_TAC
         \\ Induct_on `vl` >> rw [lookup_projectS']))
   (* If true *)
-  >- (MAP_EVERY Q.EXISTS_TAC [`cut_sel_upto p c'`]
-     \\ rw []
-     >- (pop_assum (K ALL_TAC) >> pop_assum (K ALL_TAC)
-        \\ Induct_on `c'` >> rw [trans_ln_def,cut_sel_upto_def,chor_tl_def]
-        \\ Cases_on `l0 = l` >> fs [project_def]
-        \\ ho_match_mp_tac RTC_TRANS \\ rw [chor_tl_def]
-        \\  metis_tac [trans_ln_def,trans_sel])
+  >- (rw []
      \\ MAP_EVERY Q.ABBREV_TAC [ `l = FILTER (λy. p ≠ y) (nub' (procsOf c' ⧺ procsOf c2))`
                                , `sq = <|bindings := projectS p s; queue := []|>`
                                ]
@@ -865,7 +958,7 @@ Proof
      \\ rpt(disch_then drule)
      \\ impl_tac
      >- (qpat_x_assum `_ = _ ++ _::_` kall_tac
-         >> fs[preSel_def] >> unabbrev_all_tac >> fs[]
+         >> fs[preSel_def] >> unabbrev_all_tac >> fs[no_self_comunication_def]
          >> rw[] >> rpt(first_x_assum drule) >> simp[]
          >> `proc <> p` by(CCONTR_TAC >> fs[])
          >> fs[project_def,split_sel_def]
@@ -883,14 +976,7 @@ Proof
      >- (`proc <> q` by(CCONTR_TAC >> fs[ALL_DISTINCT_APPEND] >> metis_tac[])
          \\ fs[project_def,cut_ext_choice_upto_presel_def,cut_ext_choice_upto_presel_cons]))
   (* If false *)
-  >- (MAP_EVERY Q.EXISTS_TAC [`cut_sel_upto p c'`]
-     \\ rw []
-     >- (pop_assum (K ALL_TAC)
-        \\ Induct_on `c'` >> rw [trans_ln_def,cut_sel_upto_def]
-        \\ Cases_on `l0 = l` >> fs [project_def]
-        \\ ho_match_mp_tac RTC_TRANS
-        \\ rw [chor_tl_def]
-        \\  metis_tac [trans_ln_def,trans_sel])
+  >- (rw []
      \\ MAP_EVERY Q.ABBREV_TAC [ `l = FILTER (λy. p ≠ y) (nub' (procsOf c1 ⧺ procsOf c'))`
                                , `sq = <|bindings := projectS p s; queue := []|>`
                                ]
@@ -1046,7 +1132,7 @@ Proof
      \\ rpt(disch_then drule)
      \\ impl_tac
      >- (qpat_x_assum `_ = _ ++ _::_` kall_tac
-         >> fs[preSel_def] >> unabbrev_all_tac >> fs[]
+         >> fs[preSel_def] >> unabbrev_all_tac >> fs[no_self_comunication_def]
          >> rw[] >> rpt(first_x_assum drule) >> simp[]
          >> `proc <> p` by(CCONTR_TAC >> fs[])
          >> fs[project_def,split_sel_def]
@@ -1073,6 +1159,27 @@ Proof
       \\ rw [freeprocs_def]
       \\ rw [freeprocs_def]
       \\ metis_tac [])
+  >- (CCONTR_TAC
+      \\ qpat_x_assum ‘p ∉ _’ mp_tac
+      \\ qpat_x_assum ‘trans _ (α,[]) _’ mp_tac
+      \\ rpt (pop_assum kall_tac)
+      \\ map_every qid_spec_tac [‘s’,‘v’,‘p’,‘c'''’,‘α’]
+      \\ Induct_on ‘c''’ \\ simp []
+      \\ ONCE_REWRITE_TAC [trans_cases]
+      \\ rw [freeprocs_def]
+      \\ rw [freeprocs_def]
+      \\ metis_tac [])
+  >- (fs [lcong_nil_simp]
+      \\ CCONTR_TAC
+      \\ qpat_x_assum ‘p ∉ _’ mp_tac
+      \\ qpat_x_assum ‘trans _ (α,[]) _’ mp_tac
+      \\ rpt (pop_assum kall_tac)
+      \\ map_every qid_spec_tac [‘s’,‘v’,‘p’,‘c''’,‘α’]
+      \\ Induct_on ‘c'''’ \\ simp []
+      \\ ONCE_REWRITE_TAC [trans_cases]
+      \\ rw [freeprocs_def]
+      \\ rw [freeprocs_def]
+      \\ metis_tac [lcong_nil_simp])
   >- (fs [lcong_nil_simp]
       \\ CCONTR_TAC
       \\ qpat_x_assum ‘p ∉ _’ mp_tac
@@ -1085,6 +1192,7 @@ Proof
       \\ rw [freeprocs_def]
       \\ metis_tac [lcong_nil_simp])
   >- (drule trans_not_eq \\ fs [])
+  >- (drule trans_not_eq \\ fs [])
   >- (CCONTR_TAC
       \\ ntac 5 (pop_assum kall_tac)
       \\ last_x_assum kall_tac
@@ -1094,17 +1202,81 @@ Proof
       \\ ONCE_REWRITE_TAC [trans_cases]
       \\ rw [freeprocs_def]
       \\ rw [freeprocs_def]
-      \\ metis_tac [])
+      \\ fs[freeprocs_def]
+      \\ fs[project_def]
+      \\ rw[]
+      \\ res_tac
+      \\ rfs[])
   >- (CCONTR_TAC
       \\ ntac 5 (pop_assum kall_tac)
       \\ last_x_assum kall_tac
       \\ rpt (pop_assum mp_tac)
-      \\ map_every qid_spec_tac [‘s’,‘p1’,‘b’,‘p2’,‘α’]
+      \\ map_every qid_spec_tac [‘s’,‘p1’,‘v1’,‘p2’,‘v2’,‘α’]
       \\ Induct_on ‘c'’ \\ simp []
       \\ ONCE_REWRITE_TAC [trans_cases]
       \\ rw [freeprocs_def]
       \\ rw [freeprocs_def]
-      \\ metis_tac [])
+      \\ fs[freeprocs_def]
+      \\ fs[project_def]
+      \\ rw[]
+      \\ res_tac
+      \\ rfs[])
+  >- (CCONTR_TAC
+      \\ ntac 5 (pop_assum kall_tac)
+      \\ last_x_assum kall_tac
+      \\ rpt (pop_assum mp_tac)
+      \\ map_every qid_spec_tac [‘s’,‘p1’,‘v1’,‘p2’,‘v2’,‘α’]
+      \\ Induct_on ‘c'’ \\ simp []
+      \\ ONCE_REWRITE_TAC [trans_cases]
+      \\ rw [freeprocs_def]
+      \\ rw [freeprocs_def]
+      \\ fs[freeprocs_def]
+      \\ fs[project_def]
+      \\ rw[]
+      \\ res_tac
+      \\ rfs[])
+  >- (CCONTR_TAC
+      \\ ntac 5 (pop_assum kall_tac)
+      \\ last_x_assum kall_tac
+      \\ rpt (pop_assum mp_tac)
+      \\ map_every qid_spec_tac [‘s’,‘p1’,‘v1’,‘p2’,‘v2’,‘α’]
+      \\ Induct_on ‘c'’ \\ simp []
+      \\ ONCE_REWRITE_TAC [trans_cases]
+      \\ rw [freeprocs_def]
+      \\ rw [freeprocs_def]
+      \\ fs[freeprocs_def]
+      \\ fs[project_def]
+      \\ rw[]
+      \\ res_tac
+      \\ rfs[])
+  >- (CCONTR_TAC
+      \\ ntac 5 (pop_assum kall_tac)
+      \\ last_x_assum kall_tac
+      \\ rpt (pop_assum mp_tac)
+      \\ map_every qid_spec_tac [‘s’,‘p1’,‘v1’,‘p2’,‘v2’,‘α’]
+      \\ Induct_on ‘c'’ \\ simp []
+      \\ ONCE_REWRITE_TAC [trans_cases]
+      \\ rw [freeprocs_def]
+      \\ rw [freeprocs_def]
+      \\ fs[freeprocs_def]
+      \\ fs[project_def]
+      \\ rw[]
+      \\ res_tac
+      \\ rfs[])
+  >- (CCONTR_TAC
+      \\ ntac 5 (pop_assum kall_tac)
+      \\ last_x_assum kall_tac
+      \\ rpt (pop_assum mp_tac)
+      \\ map_every qid_spec_tac [‘s’,‘p1’,‘v1’,‘p2’,‘v2’,‘α’]
+      \\ Induct_on ‘c'’ \\ simp []
+      \\ ONCE_REWRITE_TAC [trans_cases]
+      \\ rw [freeprocs_def]
+      \\ rw [freeprocs_def]
+      \\ fs[freeprocs_def]
+      \\ fs[project_def]
+      \\ rw[]
+      \\ res_tac
+      \\ rfs[])
   \\ CCONTR_TAC
   \\ ntac 4 (pop_assum kall_tac)
   \\ rpt (pop_assum mp_tac)
@@ -1113,36 +1285,239 @@ Proof
   \\ ONCE_REWRITE_TAC [trans_cases]
   \\ rw [freeprocs_def]
   \\ rw [freeprocs_def]
-  \\ metis_tac []
+  \\ fs[freeprocs_def]
+  \\ fs[project_def]
+  \\ rw[]
+  \\ res_tac
+  \\ rfs[]
 QED
 
-val _ = overload_on("tln",
-  ``(λp q. ∃τ. trans p (τ,[]) q ∧ q = UNCURRY chor_tl p)``
-);
-
-Theorem trans_ln_NRC:
-  ∀p q. trans_ln p q = ∃n. NRC tln n p q
+Theorem split_sel_nonproc_NONE:
+  ∀p p1 c.
+  ~MEM p (procsOf c) ⇒ split_sel p p1 c = NONE
 Proof
-  rw [Once trans_ln_def, Once RTC_eq_NRC,PULL_EXISTS]
+  ho_match_mp_tac split_sel_ind >>
+  rw[procsOf_def,MEM_nub'] >>
+  fs[split_sel_def]
 QED
 
-Theorem NRC_trans_ln:
-  ∀p q n. NRC tln n p q ⇒ trans_ln p q
+Theorem project_nonmember_nil:
+  ∀p c.
+  ~MEM p (procsOf c) ⇒ project' p c = Nil
 Proof
-  rw [trans_ln_NRC] \\ asm_exists_tac \\ fs []
+  ho_match_mp_tac project_ind >>
+  rw[project_def,procsOf_def,MEM_nub'] >>
+  rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
+  imp_res_tac split_sel_nonproc_NONE >> fs[]
 QED
 
-Theorem trans_ln_NRC_elim:
-  ∀p q n. NRC tln n p q ⇒ (p = q ∧ n = 0) ∨ (∃p'. NRC tln (n - 1) p p' ∧ tln p' q)
+Theorem procsOf_catchup_of:
+  MEM h (procsOf (catchup_of α c)) ⇒ MEM h (procsOf c)
 Proof
-  rw[] \\ Cases_on ‘n’
-  >- (fs [NRC])
-  \\ ‘SUC n' = n' + 1’ by fs []
-  \\ pop_assum (fn t => pop_assum (ASSUME_TAC o ONCE_REWRITE_RULE [t]))
-  \\ pop_assum (ASSUME_TAC o ONCE_REWRITE_RULE [NRC_ADD_EQN])
-  \\ fs []
-  \\ rfs []
-  \\ metis_tac []
+  cheat
+QED
+
+Theorem trans_procsOf:
+  ∀s c α l s' c' p.
+  trans (s,c) (α,l) (s',c') ∧ MEM p (procsOf c') ⇒ MEM p (procsOf c)
+Proof
+  simp[GSYM PULL_FORALL,GSYM AND_IMP_INTRO] >>
+  ho_match_mp_tac trans_pairind >>
+  rw[procsOf_def,MEM_nub'] >>
+  simp[]
+QED
+
+Theorem trans_label_procsOf_written:
+  ∀s c α l s' c' x.
+  trans (s,c) (α,l) (s',c') ∧ ~MEM h (procsOf c) ⇒
+  written α ≠ SOME (x,h)
+Proof
+  simp[GSYM PULL_FORALL,GSYM AND_IMP_INTRO] >>
+  ho_match_mp_tac trans_pairind >>
+  rw[procsOf_def,MEM_nub'] >>
+  simp[written_def]
+QED
+
+Theorem compile_network_preservation_ln_gen:
+   ∀s c α s' c' ps. compile_network_ok s c ps
+    ∧ trans (s,c) (α,[]) (s',c') ∧ chor_tl s c = (s',c')
+    ∧ set (procsOf c) ⊆ set ps ∧ ALL_DISTINCT ps
+    ⇒ trans_ln (s',c') (s',catchup_of α c')
+       ∧ reduction^* (compile_network s  c ps)
+                      (compile_network s' (catchup_of α c') ps)
+Proof
+  rpt GEN_TAC >> disch_then strip_assume_tac >>
+  imp_res_tac compile_network_ok_subset >>
+  drule_all_then strip_assume_tac compile_network_preservation_ln >>
+  simp[] >>
+  qspecl_then [‘λp. MEM p (procsOf c)’,‘ps’] assume_tac PERM_SPLIT >>
+  ‘PERM (FILTER (λp. MEM p (procsOf c)) ps) (procsOf c)’
+    by(match_mp_tac PERM_ALL_DISTINCT >>
+       rw[ALL_DISTINCT_FILTER,MEM_FILTER,FILTER_FILTER,EQ_IMP_THM] >>
+       fs[SUBSET_DEF] >> res_tac >> fs[] >-
+         (pop_assum(strip_assume_tac o REWRITE_RULE [MEM_SPLIT]) >>
+          fs[ALL_DISTINCT_APPEND,FILTER_APPEND,APPEND_EQ_SING] >>
+          fs[FILTER_EQ_NIL,EVERY_MEM]) >>
+       ‘ALL_DISTINCT (procsOf c)’ by(simp[procsOf_all_distinct]) >>
+       qpat_x_assum ‘MEM _ (procsOf _)’ (strip_assume_tac o REWRITE_RULE [MEM_SPLIT]) >>
+       fs[ALL_DISTINCT_APPEND,FILTER_APPEND,APPEND_EQ_SING] >>
+       fs[FILTER_EQ_NIL,EVERY_MEM]) >>
+  drule PERM_CONG >>
+  disch_then(qspecl_then [‘FILTER ($~ ∘ (λp. MEM p (procsOf c))) ps’,‘FILTER ($~ ∘ (λp. MEM p (procsOf c))) ps’] mp_tac) >>
+  simp[PERM_REFL] >>
+  strip_tac >>
+  dxrule_all PERM_TRANS >>
+  pop_assum kall_tac >>
+  strip_tac >>
+  fs[Once PERM_SYM] >>
+  match_mp_tac PERM_chor_compile_network_reduction' >>
+  goal_assum drule >>
+  conj_tac >-
+    (drule ALL_DISTINCT_PERM >> simp[]) >>
+  rename1 ‘procsOf c ++ rest’ >>
+  match_mp_tac PERM_chor_compile_network_reduction' >>
+  qexists_tac ‘rest ++ procsOf c’ >> simp[PERM_APPEND] >>
+  conj_asm1_tac >- (drule ALL_DISTINCT_PERM >> disch_then(mp_tac o GSYM) >>
+                    rw[] >> fs[ALL_DISTINCT_APPEND] >> metis_tac[]) >>
+  qhdtm_x_assum ‘PERM’ kall_tac >>
+  Induct_on ‘rest’ >>
+  simp[] >>
+  rw[] >>
+  res_tac >>
+  simp[compile_network_gen_def] >>
+  drule_then (mp_tac o ONCE_REWRITE_RULE[MONO_NOT_EQ]) trans_procsOf >>
+  disch_then drule >>
+  strip_tac >>
+  drule (CONTRAPOS procsOf_catchup_of) >>
+  disch_then(qspec_then ‘α’ assume_tac) >>
+  simp[project_nonmember_nil] >>
+  ‘projectS h s = projectS h s'’
+    by(rw[fmap_eq_flookup,GSYM lookup_projectS'] >>
+       CONV_TAC SYM_CONV >>
+       drule_then match_mp_tac lookup_unwritten_after_trans_tup >>
+       drule_then match_mp_tac trans_label_procsOf_written >>
+       simp[]) >>
+  pop_assum SUBST_ALL_TAC >>
+  match_mp_tac reduction_par_r >>
+  simp[]
+QED
+
+Theorem compile_network_ok_chor_tl:
+  ∀s c ps s' c'.
+  compile_network_ok s c ps ∧ chor_tl s c = (s',c') ⇒
+  compile_network_ok s' c' ps
+Proof
+  Induct_on ‘ps’ >> rw[compile_network_gen_def] >>
+  res_tac >>
+  Cases_on ‘c’ >> fs[chor_tl_def,project_def,AllCaseEqs()] >> rveq >>
+  fs[project_def] >>
+  rpt(PURE_FULL_CASE_TAC >> fs[] >> rveq) >>
+  metis_tac[split_sel_project_ok,split_sel_project_ok2]
+QED
+
+Definition trans_ln_cut_def:
+  trans_ln_cut = (λp r. ∃τ q. trans p (τ,[]) q ∧
+                 q = UNCURRY chor_tl p ∧
+                 r = (FST q, catchup_of τ (SND q)))⃰
+End
+
+Theorem compile_network_preservation_trans_ln_cut:
+  ∀s c s' c'.
+    compile_network_ok s  c (procsOf c) ∧
+    trans_ln_cut (s,c) (s',c')
+    ⇒ ∃s'' c''. trans_ln_cut (s',c') (s'',c'')
+       ∧ reduction^* (compile_network s   c   (procsOf c))
+                     (compile_network s'' c'' (procsOf c))
+Proof
+   ‘∀p q.
+    trans_ln_cut p q
+    ⇒ ∀s c s' c' ps.
+       compile_network_ok s  c ps ∧
+       p = (s,c) ∧ q = (s',c') ∧ set(procsOf c) ⊆ set(ps) ∧ ALL_DISTINCT ps
+       ⇒ ∃s'' c''.
+          trans_ln_cut (s',c') (s'',c'') ∧
+          reduction^* (compile_network s   c   ps)
+                      (compile_network s'' c'' ps)’
+   suffices_by metis_tac [SUBSET_REFL,procsOf_all_distinct]
+   \\ ntac 3 strip_tac
+   \\ pop_assum (mp_tac o REWRITE_RULE [trans_ln_cut_def])
+   \\ map_every qid_spec_tac [‘q’,‘p’]
+   \\ ho_match_mp_tac RTC_strongind
+   \\ rw []
+   >- (map_every qexists_tac [‘s’,‘c’] \\ fs [trans_ln_cut_def])
+   \\ fs [GSYM trans_ln_cut_def]
+   \\ Cases_on ‘chor_tl s c’
+   \\ drule_all compile_network_preservation_ln_gen
+   \\ rw [] \\ fs []
+   \\ ‘compile_network_ok q (catchup_of τ r) ps’ by cheat
+   \\ first_x_assum drule
+   \\ impl_tac >- cheat
+   \\ strip_tac
+   \\ metis_tac[RTC_RTC]
+QED
+
+Theorem no_self_comunication_cut_sel_upto:
+  !p c. no_self_comunication c ==> no_self_comunication(cut_sel_upto p c)
+Proof
+  Induct_on `c` >> rw[cut_sel_upto_def,no_self_comunication_def]
+QED
+
+Theorem no_undefined_vars_cut_sel_upto:
+  !p c. no_undefined_vars (s,c) ==> no_undefined_vars(s,cut_sel_upto p c)
+Proof
+  Induct_on `c` >> rw[cut_sel_upto_def,no_undefined_vars_def,free_variables_def] >>
+  metis_tac[no_undefined_vars_def]
+QED
+
+Theorem no_self_comunication_catchup_of:
+  ∀p τ.
+  no_self_comunication p ⇒
+  no_self_comunication (catchup_of τ p)
+Proof
+  Cases_on ‘τ’ >> fs[catchup_of_def] >>
+  metis_tac[no_self_comunication_cut_sel_upto]
+QED
+
+Theorem no_self_comunication_chor_tl:
+  ∀p.
+  no_self_comunication(SND p) ⇒
+  no_self_comunication (SND(UNCURRY chor_tl p))
+Proof
+  PairCases >> Cases_on ‘p1’ >> rw[no_self_comunication_def,chor_tl_def]
+QED
+
+Theorem trans_ln_cut_IMP_trans_ln:
+  ∀p q.
+  trans_ln_cut p q ∧ no_self_comunication(SND p) ⇒ trans_ln p q
+Proof
+  simp[trans_ln_cut_def,trans_ln_def,GSYM AND_IMP_INTRO,GSYM PULL_FORALL] >>
+  ho_match_mp_tac RTC_STRONG_INDUCT >>
+  rw[] >>
+  fs[] >>
+  imp_res_tac no_self_comunication_chor_tl >>
+  drule_then(qspec_then ‘τ’ mp_tac) no_self_comunication_catchup_of >>
+  strip_tac >>
+  fs[] >>
+  match_mp_tac RTC_TRANS >>
+  simp[PULL_EXISTS] >>
+  goal_assum drule >>
+  pop_assum kall_tac >>
+  drule trans_ln_catchup_of >>
+  disch_then(qspec_then ‘τ’ strip_assume_tac) >>
+  match_mp_tac(MP_CANON RTC_RTC) >>
+  fs[trans_ln_def] >>
+  goal_assum drule >>
+  simp[]
+QED
+
+Theorem trans_ln_IMP_trans_ln_cut:
+  ∀p q.
+  trans_ln p q ⇒ ∃q'. trans_ln_cut p q' ∧ trans_ln q q'
+Proof
+  simp[Once trans_ln_def] >>
+  ho_match_mp_tac RTC_STRONG_INDUCT >>
+  rw[] >>
+  cheat
 QED
 
 Theorem compile_network_preservation_trans_ln:
@@ -1153,29 +1528,21 @@ Theorem compile_network_preservation_trans_ln:
        ∧ reduction^* (compile_network s   c   (procsOf c))
                      (compile_network s'' c'' (procsOf c))
 Proof
-  simp[Once trans_ln_NRC]
-  \\ rw [] \\ pop_assum mp_tac
-  \\ map_every qid_spec_tac [‘s'’,‘c'’,‘n’]
-  \\ ho_match_mp_tac COMPLETE_INDUCTION \\ rw []
-  (* \\ Induct_on ‘n’ \\  rw [] *)
-  (* >- (map_every qexists_tac [‘s’,‘c’] \\ fs [trans_ln_def]) *)
-  \\ Cases_on ‘n’
-  \\ fs [NRC] \\ rw []
-  >- (map_every qexists_tac [‘s’,‘c’] \\ fs [trans_ln_def])
-  \\ drule trans_ln_NRC_elim
-  \\ rw []
-  >- (fs [] \\ drule_all compile_network_preservation_ln
-      \\ rw [] \\ metis_tac [])
-  \\ first_x_assum (qspec_then ‘n'’ assume_tac) \\ fs []
-  \\ PairCases_on ‘p'’ \\ fs []
-  \\ first_x_assum (qspecl_then [‘p'1’,‘p'0’] mp_tac) \\ fs []
-  \\ impl_tac
-  >- (Cases_on ‘n'’ >- (rfs [] \\ drule trans_not_eq \\ fs [])
-      \\ fs [NRC] \\ metis_tac [])
-  \\ rw []
-  \\ map_every qexists_tac [‘s''’,‘c''’] \\ fs []
-  (* \\ drule trans_ln_elim \\ rw [] *) (* BAM! *)
-  \\  cheat
+  rpt strip_tac >>
+  drule trans_ln_IMP_trans_ln_cut >>
+  strip_tac >>
+  drule compile_network_preservation_trans_ln_cut >>
+  rename1 ‘trans_ln_cut (s,c) sc’ >>
+  PairCases_on ‘sc’ >>
+  disch_then drule >>
+  strip_tac >>
+  drule trans_ln_cut_IMP_trans_ln >>
+  impl_tac >- cheat >>
+  strip_tac >>
+  drule_then drule trans_ln_trans_ln >>
+  strip_tac >>
+  goal_assum drule >>
+  simp[]
 QED
 
 Theorem compile_network_ok_project_ok:
@@ -1209,19 +1576,6 @@ Theorem procsOf_cut_sel_upto:
 Proof
   Induct_on `c1` >> rw[cut_sel_upto_def,procsOf_def,set_nub'] >>
   fs[SUBSET_DEF] >> metis_tac[]
-QED
-
-Theorem no_self_comunication_cut_sel_upto:
-  !p c. no_self_comunication c ==> no_self_comunication(cut_sel_upto p c)
-Proof
-  Induct_on `c` >> rw[cut_sel_upto_def,no_self_comunication_def]
-QED
-
-Theorem no_undefined_vars_cut_sel_upto:
-  !p c. no_undefined_vars (s,c) ==> no_undefined_vars(s,cut_sel_upto p c)
-Proof
-  Induct_on `c` >> rw[cut_sel_upto_def,no_undefined_vars_def,free_variables_def] >>
-  metis_tac[no_undefined_vars_def]
 QED
 
 Theorem compile_network_project:
