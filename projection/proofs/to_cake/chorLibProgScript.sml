@@ -4,6 +4,8 @@ open preamble chorLangTheory chorSemTheory projectionTheory
 
 val _ = new_theory "chorLibProg";
 
+val _ = temp_delsimps ["NORMEQ_CONV"];
+    
 val _ = translation_extends "basisProg";
 
 fun get_fun_name trm =
