@@ -2,6 +2,8 @@ open preamble choreoUtilsTheory endpointSemTheory endpointLangTheory;
 
 val _ = new_theory "endpointProps"
 
+ val _ = temp_delsimps ["NORMEQ_CONV"]
+
 val trans_enqueue' = Q.store_thm("trans_enqueue'",
   `∀s d p1 p2 e q.
      p1 ≠ p2
