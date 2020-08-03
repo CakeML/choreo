@@ -121,11 +121,8 @@ struct
                       "add_custom_command(\n",
                       "  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/"^p^".S\n",
                       String.concat [
-                        "  COMMAND ${CAKEML_COMPILER} --heap_size=1 --stack_size=1 --exclude_prelude=true --sexp=true < ${",
+                        "  COMMAND ${CAKEML_COMPILER} --exclude_prelude=true --sexp=true < ${",
                         p,"_dir}/",p,".sexp > ${CMAKE_CURRENT_BINARY_DIR}/",
-                        p,".S\n"],
-                      String.concat [
-                        "  COMMAND sed -i 's/cdecl\\(main\\)/cdecl\\(main_func\\)/' ${CMAKE_CURRENT_BINARY_DIR}/",
                         p,".S\n"],
                       ")\n\n"
                     ])
@@ -279,14 +276,26 @@ struct
           "#include <assert.h>\n",
           "#include <camkes.h>\n",
           "\n",
-          "extern unsigned int argc;\n",
-          "extern char **argv;\n",
+          "static char cml_memory[1024*1024*2];\n", (* TODO: parameterise *)
+          "unsigned int argc;\n",
+          "char **argv;\n",
           "\n",
-          "void main_func(void);\n",
+          "/* exported in cake.S */\n",
+          "extern void cml_main(void);\n",
+          "extern void *cml_heap;\n",
+          "extern void *cml_stack;\n",
+          "extern void *cml_stackend;\n",
           "\n",
           "/* run the control thread */\n",
           "int run(void) {\n",
-          "    main_func();\n",
+          "    unsigned long sz = 1024*1024; // 1 MB unit\n",
+          "    unsigned long cml_heap_sz = sz;    // Default: 1 MB heap\n", (* TODO: parameterise *)
+          "    unsigned long cml_stack_sz = sz;   // Default: 1 MB stack\n", (* TODO: parameterise *)
+          "\n",
+          "    cml_heap = cml_memory;\n",
+          "    cml_stack = cml_heap + cml_heap_sz;\n",
+          "    cml_stackend = cml_stack + cml_stack_sz;\n",
+          "    cml_main();\n",
           "    return 0;\n",
           "}\n",
           "\n",
