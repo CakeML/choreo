@@ -4,6 +4,7 @@ open pchorLangTheory pchorSemTheory
 open chorConfluenceTheory chorSyncPropsTheory choreoUtilsTheory
 
 val _ = new_theory "chor_to_pchorProof"
+
 (*
 Definition ptag_def:
   ptag (chorSem$LTau p n)      = (pchorSem$LTau p n)
@@ -122,4 +123,5 @@ Proof
   \\ asm_exists_tac \\ fs []
 QED
 *)
+
 val _ = export_theory ()

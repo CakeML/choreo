@@ -22,6 +22,8 @@ open evaluateTheory terminationTheory ml_translatorTheory
 
 val _ = new_theory "payload_to_cakemlProof";
 
+val _ = temp_delsimps ["NORMEQ_CONV"];
+
 infixr 1 $
 
 val _ = set_grammar_ancestry
