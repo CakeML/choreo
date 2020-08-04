@@ -42,7 +42,14 @@ val _ = Datatype`
           Eg:
               let e@p = f args in C
         *)
-       (* TODO: is this ok? *)
+
+       |  Letrec varN ((varN#proc) list) chor chor
+       (* Letrec f    xs                 C    C'
+          Recursive process definition, e.g.
+          letrec f xs = C in C'
+       *)
+
+       |  Call varN ((varN#proc) list)
 
        (* Selection *)
        |  Sel proc bool proc chor
