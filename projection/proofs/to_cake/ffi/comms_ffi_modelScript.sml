@@ -56,18 +56,18 @@ End
      Model of response to FFI calls based on transition system *)
 (* -- send call model *)
 Definition ffi_send_def:
-  ffi_send conf os dest data =
+  ffi_send conf os (dest:word8 list) data =
   if (LENGTH data ≠ SUC conf.payload_size) then
     Oracle_final FFI_failed
   else
-    case some ns. strans conf os (ASend dest data) ns of
+    case some ns. strans conf os (ASend (MAP (CHR o w2n) dest) data) ns of
       SOME ns =>  Oracle_return ns data
     | NONE    =>  Oracle_final FFI_diverged
 End
 (* -- receive call model *)
 Definition ffi_receive_def:
-  ffi_receive conf os src _ =
-    case some (m,ns). strans conf os (ARecv src m) ns of
+  ffi_receive conf os (src:word8 list) _ =
+    case some (m,ns). strans conf os (ARecv (MAP (CHR o w2n) src) m) ns of
       SOME (m,ns) =>  Oracle_return ns m
     | NONE        =>  Oracle_final FFI_diverged
 End

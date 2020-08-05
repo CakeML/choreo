@@ -38,7 +38,7 @@ val _ = set_grammar_ancestry
 val WORD8 = “WORD:word8 -> v -> bool”;
 Overload WORD8 = “WORD:word8 -> v -> bool”;
 val DATUM = “LIST_TYPE ^WORD8”;
-Type plffi[local] = “:word8 list # (word8 list |-> word8 list list) # network”
+Type plffi[local] = “:string # (string |-> word8 list list) # network”
 
 Theorem ps2cs_11[simp]:
   ps2cs x = ps2cs y ⇔ x = y
@@ -2325,7 +2325,7 @@ Proof
          comms_ffi_oracle_def] >>
       rfs[ffi_send_def] >>
       fs[some_def] >>
-      Cases_on ‘∃ns. strans conf ckFSt (ASend l (MAP SND d)) ns’ >>
+      Cases_on ‘∃ns. strans conf ckFSt (ASend (MAP (CHR o w2n) l) (MAP SND d)) ns’ >>
       fs[] >> qpat_x_assum ‘(@ns. _) = _’ mp_tac >>
       SELECT_ELIM_TAC >> metis_tac[strans_pres_wf])
   >- (MAP_EVERY qexists_tac [‘P’,‘l’] >> fs[])
@@ -2401,7 +2401,7 @@ Proof
       rw[] >>
       ‘∃s2.
         strans conf (ckFSt0,fQueue1,fNet1)
-                    (ASend l (MAP SND d))
+                    (ASend (MAP (CHR o w2n) l) (MAP SND d))
                     s2’
         by metis_tac[ffi_eq_def,bisimulationTheory.BISIM_REL_def,
                      bisimulationTheory.BISIM_def,pairTheory.FORALL_PROD] >>
@@ -2463,7 +2463,7 @@ Proof
   fs[] >> first_x_assum (K ALL_TAC) >>
   qmatch_asmsub_rename_tac ‘IO_event s l data’ >> rw[] >>
   ‘∃L. strans conf fs1 L fs1A ∧ strans conf fs2 L fs2A’
-    by (qexists_tac ‘ASend l (MAP FST data)’ >>
+    by (qexists_tac ‘ASend (MAP (CHR o w2n) l) (MAP FST data)’ >>
         qunabbrev_tac ‘fs1A’ >> qunabbrev_tac ‘fs2A’ >>
         ‘s = "send"’
           by fs[valid_send_event_format_def,valid_send_call_format_def] >>
@@ -2481,7 +2481,7 @@ Proof
         fs[valid_send_event_format_def,valid_send_call_format_def,comms_ffi_oracle_def,ffi_send_def,
           some_def] >>
         rfs[] >>
-        Cases_on ‘∃ns. strans conf si (ASend l (MAP SND data)) ns’ >> fs[] >>
+        Cases_on ‘∃ns. strans conf si (ASend (MAP (CHR o w2n) l) (MAP SND data)) ns’ >> fs[] >>
         metis_tac[])
   >- (metis_tac[strans_pres_wf])
   >- (metis_tac[strans_pres_wf])
@@ -2805,7 +2805,7 @@ Theorem ffi_ARecv_receive_events_term_irrel:
   ∀conf src h cs bufInit1 bufInit2 ffi1 ffi2.
    LENGTH bufInit1 = SUC conf.payload_size ⇒
    LENGTH bufInit2 = SUC conf.payload_size ⇒
-   strans conf ffi1.ffi_state (ARecv src h) ffi2.ffi_state ⇒
+   strans conf ffi1.ffi_state (ARecv (MAP (CHR o w2n) src) h) ffi2.ffi_state ⇒
    ffi_wf ffi1.ffi_state ⇒
    ffi_wf ffi2.ffi_state ⇒
    ffi1.oracle = comms_ffi_oracle conf ⇒
@@ -2845,7 +2845,7 @@ Proof
         by metis_tac[functional_ARecv] >>
       fs[] >> rw[] >>
       irule ffi_eq_pres >>
-      qexistsl_tac [‘ARecv src h’,‘ffi1.ffi_state’,‘ffi1.ffi_state’] >>
+      qexistsl_tac [‘ARecv (MAP (CHR o w2n) src) h’,‘ffi1.ffi_state’,‘ffi1.ffi_state’] >>
       rw[] >> metis_tac[ffi_eq_equivRel,equivalence_def,reflexive_def])
   >- (‘ffi_term_stream conf (ffi1 with ffi_state := x) = ffi_term_stream conf ffi2’
         suffices_by rw[] >>
@@ -2970,7 +2970,7 @@ Theorem ffi_ARecv_receive_events_divg_irrel:
   ∀conf src h cs bufInit1 bufInit2 ffi1 ffi2.
    LENGTH bufInit1 = SUC conf.payload_size ⇒
    LENGTH bufInit2 = SUC conf.payload_size ⇒
-   strans conf ffi1.ffi_state (ARecv src h) ffi2.ffi_state ⇒
+   strans conf ffi1.ffi_state (ARecv (MAP (CHR o w2n) src) h) ffi2.ffi_state ⇒
    ffi_wf ffi1.ffi_state ⇒
    ffi_wf ffi2.ffi_state ⇒
    ffi1.oracle = comms_ffi_oracle conf ⇒
@@ -3008,7 +3008,7 @@ Proof
         by metis_tac[functional_ARecv] >>
       fs[] >> rw[] >>
       irule ffi_eq_pres >>
-      qexistsl_tac [‘ARecv src h’,‘ffi1.ffi_state’,‘ffi1.ffi_state’] >>
+      qexistsl_tac [‘ARecv (MAP (CHR o w2n) src) h’,‘ffi1.ffi_state’,‘ffi1.ffi_state’] >>
       rw[] >> metis_tac[ffi_eq_equivRel,equivalence_def,reflexive_def])
   >- (‘ffi_divg_stream conf (ffi1 with ffi_state := x) = ffi_divg_stream conf ffi2’
         suffices_by rw[] >>
@@ -3132,7 +3132,7 @@ Theorem ffi_ARecv_receive_events_fail_irrel:
   ∀conf src h cs bufInit1 bufInit2 ffi1 ffi2.
    LENGTH bufInit1 = SUC conf.payload_size ⇒
    LENGTH bufInit2 = SUC conf.payload_size ⇒
-   strans conf ffi1.ffi_state (ARecv src h) ffi2.ffi_state ⇒
+   strans conf ffi1.ffi_state (ARecv (MAP (CHR o w2n) src) h) ffi2.ffi_state ⇒
    ffi_wf ffi1.ffi_state ⇒
    ffi_wf ffi2.ffi_state ⇒
    ffi1.oracle = comms_ffi_oracle conf ⇒
@@ -3170,7 +3170,7 @@ Proof
         by metis_tac[functional_ARecv] >>
       fs[] >> rw[] >>
       irule ffi_eq_pres >>
-      qexistsl_tac [‘ARecv src h’,‘ffi1.ffi_state’,‘ffi1.ffi_state’] >>
+      qexistsl_tac [‘ARecv (MAP (CHR o w2n) src) h’,‘ffi1.ffi_state’,‘ffi1.ffi_state’] >>
       rw[] >> metis_tac[ffi_eq_equivRel,equivalence_def,reflexive_def])
   >- (‘ffi_fail_stream conf (ffi1 with ffi_state := x) = ffi_fail_stream conf ffi2’
         suffices_by rw[] >>
@@ -3205,6 +3205,10 @@ Proof
       ‘∃ha_s. FLOOKUP pSt.bindings s = SOME ha_s’
         by fs[cpEval_valid_def,pSt_pCd_corr_def] >>
       fs[] >>
+      rename1 ‘sendloop conf proc’ >>
+      qabbrev_tac ‘(l:word8 list) = MAP (n2w o ORD) proc’ >>
+      Q.SUBGOAL_THEN ‘proc = MAP (CHR o w2n) l’ SUBST_ALL_TAC >- (rw[Abbr ‘l’,MAP_MAP_o,CHR_w2n_n2w_ORD]) >>
+      pop_assum kall_tac >>
       ‘ALL_DISTINCT (MAP (λ(x,y,z). x) (sendloop conf (MAP (CHR ∘ w2n) l))) = T’
         by EVAL_TAC >>
       first_x_assum SUBST1_TAC >>
@@ -3381,12 +3385,12 @@ Proof
         by (qunabbrev_tac ‘cSt1I’ >> simp[]) >>
       fs[] >>
       first_x_assum (K ALL_TAC) >>
-      ‘cpEval_valid conf cpNum cEnv1 pSt (Send l s n pCd) vs1 cSt1I’
+      ‘cpEval_valid conf cpNum cEnv1 pSt (Send (MAP (CHR o w2n) l) s n pCd) vs1 cSt1I’
         by (qunabbrev_tac ‘cSt1I’ >> fs[cpEval_valid_def]) >>
-      qpat_x_assum ‘cpEval_valid conf cpNum cEnv1 pSt (Send l s n pCd) vs1 cSt1’ (K ALL_TAC) >>
-      ‘cpEval_valid conf cpNum cEnv2 pSt (Send l s n pCd) vs2 cSt2I’
+      qpat_x_assum ‘cpEval_valid conf cpNum cEnv1 pSt (Send (MAP (CHR o w2n) l) s n pCd) vs1 cSt1’ (K ALL_TAC) >>
+      ‘cpEval_valid conf cpNum cEnv2 pSt (Send (MAP (CHR o w2n) l) s n pCd) vs2 cSt2I’
         by (qunabbrev_tac ‘cSt2I’ >> fs[cpEval_valid_def]) >>
-      qpat_x_assum ‘cpEval_valid conf cpNum cEnv2 pSt (Send l s n pCd) vs2 cSt2’ (K ALL_TAC) >>
+      qpat_x_assum ‘cpEval_valid conf cpNum cEnv2 pSt (Send (MAP (CHR o w2n) l) s n pCd) vs2 cSt2’ (K ALL_TAC) >>
       ‘ffi_eq conf (cSt1I).ffi.ffi_state (cSt2I).ffi.ffi_state’
         by simp[Abbr ‘cSt1I’, Abbr ‘cSt2I’] >>
       qpat_x_assum ‘ffi_eq conf (cSt1).ffi.ffi_state (cSt2).ffi.ffi_state’ (K ALL_TAC) >>
@@ -3451,12 +3455,12 @@ Proof
       ‘cSt2I.refs ++ drefs_2  = cSt2J.refs’
         by (qunabbrev_tac ‘cSt2J’ >> simp[]) >>
       fs[] >> first_x_assum (K ALL_TAC) >>
-      ‘cpEval_valid conf cpNum cEnv1 pSt (Send l s n pCd) vs1 cSt1J’
+      ‘cpEval_valid conf cpNum cEnv1 pSt (Send (MAP (CHR o w2n) l) s n pCd) vs1 cSt1J’
         by (qunabbrev_tac ‘cSt1J’ >> fs[cpEval_valid_def]) >>
-      qpat_x_assum ‘cpEval_valid conf cpNum cEnv pSt (Send l s n pCd) vs1 cSt1I’ (K ALL_TAC) >>
-      ‘cpEval_valid conf cpNum cEnv2 pSt (Send l s n pCd) vs2 cSt2J’
+      qpat_x_assum ‘cpEval_valid conf cpNum cEnv pSt (Send (MAP (CHR o w2n) l) s n pCd) vs1 cSt1I’ (K ALL_TAC) >>
+      ‘cpEval_valid conf cpNum cEnv2 pSt (Send (MAP (CHR o w2n) l) s n pCd) vs2 cSt2J’
         by (qunabbrev_tac ‘cSt2J’ >> fs[cpEval_valid_def]) >>
-      qpat_x_assum ‘cpEval_valid conf cpNum cEnv2 pSt (Send l s n pCd) vs2 cSt2I’ (K ALL_TAC) >>
+      qpat_x_assum ‘cpEval_valid conf cpNum cEnv2 pSt (Send (MAP (CHR o w2n) l) s n pCd) vs2 cSt2I’ (K ALL_TAC) >>
       ‘ffi_eq conf (cSt1J).ffi.ffi_state (cSt2J).ffi.ffi_state’
         by simp[Abbr ‘cSt1J’, Abbr ‘cSt2J’] >>
       qpat_x_assum ‘ffi_eq conf (cSt1I).ffi.ffi_state (cSt2I).ffi.ffi_state’ (K ALL_TAC) >>
@@ -3514,6 +3518,10 @@ Proof
       qabbrev_tac ‘lsa = App Opapp [App Opapp [Var conf.append; convDatumList conf l]; rec]’ >>
       qabbrev_tac ‘lsc = App Opapp [Var conf.concat; lsa]’ >>
       rw (buffer_size_def::eval_sl) >>
+      rename1 ‘receiveloop conf proc’ >>
+      qabbrev_tac ‘(l0:word8 list) = MAP (n2w o ORD) proc’ >>
+      Q.SUBGOAL_THEN ‘proc = MAP (CHR o w2n) l0’ SUBST_ALL_TAC >- (rw[Abbr ‘l0’,MAP_MAP_o,CHR_w2n_n2w_ORD]) >>
+      pop_assum kall_tac >>
       rename1 ‘ALL_DISTINCT
                    (MAP (λ(x,y,z). x) (receiveloop conf (MAP (CHR ∘ w2n) l0)))’ >>
       ‘ALL_DISTINCT
@@ -4343,8 +4351,9 @@ Proof
     suffices_by metis_tac[ffi_eq_pres, ffi_eq_REFL] >>
   ‘∃n'. trans c n0 (LReceive p m d) n'’ suffices_by metis_tac[strans_rules] >>
   ‘p ≠ d ∧ net_has_node n0 d’
-    by metis_tac[strans_dest_check, valid_send_dest_def, FST,
-                 ffi_has_node_def] >>
+    by(‘valid_send_dest (MAP (n2w o ORD) d) (p,q0,n0)’
+         by(match_mp_tac strans_dest_check >> simp[MAP_MAP_o,CHR_w2n_n2w_ORD] >> goal_assum drule) >>
+       fs[valid_send_dest_def,ffi_has_node_def,MAP_MAP_o,CHR_w2n_n2w_ORD]) >>
   metis_tac[trans_receive_cond]
 QED
 
@@ -4395,11 +4404,11 @@ Proof
   simp[result_eq_def,cEval_equiv_def] >> EVERY_CASE_TAC >> rw[] >>
   dxrule_then (qspec_then ‘clk1 - st1.clock’ mp_tac) evaluate_add_to_clock >>
   dxrule_then (qspec_then ‘clk2 - st2.clock’ mp_tac) evaluate_add_to_clock >>
-  rw[result_eq_def,cEval_equiv_def] 
+  rw[result_eq_def,cEval_equiv_def]
 QED
 
 Theorem strans_dest_check':
-  strans conf S1 (ASend dest bytes) S2 ⇒
+  strans conf S1 (ASend (MAP (CHR o w2n) dest) bytes) S2 ⇒
   valid_send_dest dest S1 ∧ valid_send_dest dest S2
 Proof
   strip_tac >>
@@ -4748,8 +4757,7 @@ Proof
   Cases_on ‘s’ >> simp[cEval_equiv_def]
 QED
 
-(* FORWARD CORRECTNESS
-    Just the spec :) *)
+(* FORWARD CORRECTNESS *)
 Theorem endpoint_forward_correctness:
   ∀conf p pSt1 pCd1 L pSt2 pCd2 vs1 vs2 cEnv1 cEnv2 cSt1 cSt2.
     trans conf (NEndpoint p pSt1 pCd1) L (NEndpoint p pSt2 pCd2) ∧
@@ -4773,6 +4781,10 @@ Proof
       simp[evaluate_letNONE, find_evalform ‘Letrec _ _’,
            (* Once evaluate_opapp, *)
            bind_assoc, o_UNCURRY_R, C_UNCURRY_L, o_ABS_R, C_ABS_L] >>
+      rename1 ‘sendloop conf pp’ >>
+      qabbrev_tac ‘(p2:word8 list) = MAP (n2w o ORD) pp’ >>
+      Q.SUBGOAL_THEN ‘pp = MAP (CHR o w2n) p2’ SUBST_ALL_TAC >- (rw[Abbr ‘p2’,MAP_MAP_o,CHR_w2n_n2w_ORD]) >>
+      pop_assum kall_tac >>
       qmatch_goalsub_abbrev_tac ‘sendloop conf data’ >>
       qabbrev_tac ‘
         Env1 = build_rec_env (sendloop conf data) cEnv1 cEnv1.v
@@ -4863,6 +4875,10 @@ Proof
       simp[evaluate_letNONE, find_evalform ‘Letrec _ _’,
            (* Once evaluate_opapp, *)
            bind_assoc, o_UNCURRY_R, C_UNCURRY_L, o_ABS_R, C_ABS_L] >>
+      rename1 ‘sendloop conf pp’ >>
+      qabbrev_tac ‘(p2:word8 list) = MAP (n2w o ORD) pp’ >>
+      Q.SUBGOAL_THEN ‘pp = MAP (CHR o w2n) p2’ SUBST_ALL_TAC >- (rw[Abbr ‘p2’,MAP_MAP_o,CHR_w2n_n2w_ORD]) >>
+      pop_assum kall_tac >>
       qmatch_goalsub_abbrev_tac ‘sendloop conf data’ >>
       qabbrev_tac ‘
         EnvN = λe. build_rec_env (sendloop conf data) e e.v
@@ -4996,6 +5012,10 @@ Proof
         by metis_tac[TypeBase.nchotomy_of “:α#β”] >>
       fs[ffi_state_cor_def] >> metis_tac[IS_PREFIX_TRANS, qpush_prefix])
   >- ((* receiveloop on left *)
+      rename1 ‘receiveloop conf pp’ >>
+      qabbrev_tac ‘(p1:word8 list) = MAP (n2w o ORD) pp’ >>
+      Q.SUBGOAL_THEN ‘pp = MAP (CHR o w2n) p1’ SUBST_ALL_TAC >- (rw[Abbr ‘p1’,MAP_MAP_o,CHR_w2n_n2w_ORD]) >>
+      pop_assum kall_tac >>
       simp[find_evalform ‘Let _ _ _’, find_evalform ‘App _ _’,
            find_evalform ‘Lit _’,
            generic_casebind, bind_assoc, o_UNCURRY_R, C_UNCURRY_L, o_ABS_R,
@@ -5034,15 +5054,15 @@ Proof
             simp[ffi_state_cor_def] >>
             disch_then $ CONJUNCTS_THEN2 SUBST_ALL_TAC
                        $ qx_choosel_then [‘Q'’, ‘N'’] strip_assume_tac >>
-            first_x_assum (qspec_then ‘p1’ mp_tac) >>
+            first_x_assum (qspec_then ‘MAP (CHR o w2n) p1’ mp_tac) >>
             ‘∃m. pad conf m = d’ by metis_tac[MEM, padded_queues_def] >>
-            Cases_on ‘qlk Q' p1’ >> simp[] >>
+            Cases_on ‘qlk Q' (MAP (CHR o w2n) p1)’ >> simp[] >>
             disch_then $ CONJUNCTS_THEN2 SUBST_ALL_TAC assume_tac >>
             ‘LENGTH h = SUC conf.payload_size’ by rw[pad_LENGTH] >>
             simp[] >>
-            ‘∃pn' Q2 N2. strans conf (pnum,Q,N) (ARecv p1 h) (pn', Q2, N2)’
+            ‘∃pn' Q2 N2. strans conf (pnum,Q,N) (ARecv (MAP (CHR o w2n) p1) h) (pn', Q2, N2)’
               suffices_by metis_tac[functional_ARecv] >>
-            ‘∃pn' Q2 N2. strans conf (pnum,Q',N') (ARecv p1 h) (pn', Q2, N2)’
+            ‘∃pn' Q2 N2. strans conf (pnum,Q',N') (ARecv (MAP (CHR o w2n) p1) h) (pn', Q2, N2)’
               by metis_tac [hd (CONJUNCTS strans_rules)] >>
             dxrule_then assume_tac ffi_eq_SYM >>
             drule_all ffi_eq_bisimulation_L >> simp[EXISTS_PROD] >>
@@ -5136,14 +5156,14 @@ Proof
             simp[ffi_state_cor_def] >>
             disch_then $ CONJUNCTS_THEN2 SUBST_ALL_TAC
                        $ qx_choosel_then [‘Qa’, ‘Na’] strip_assume_tac>>
-            first_assum $ qspec_then ‘p1’ mp_tac >>
+            first_assum $ qspec_then ‘MAP (CHR o w2n) p1’ mp_tac >>
             pop_assum (fn th => simp[]>> assume_tac th) >>
-            Cases_on ‘qlk Qa p1’ >> simp[] >>
+            Cases_on ‘qlk Qa (MAP (CHR o w2n) p1)’ >> simp[] >>
             disch_then $ CONJUNCTS_THEN2 (SUBST_ALL_TAC o SYM)
                        assume_tac >>
             ‘∃Qb Nb. strans conf
-                            (pnum,Qa,Na) (ARecv p1 d)
-                            (pnum,normalise_queues(Qa |+ (p1,t)),Na)’
+                            (pnum,Qa,Na) (ARecv (MAP (CHR o w2n) p1) d)
+                            (pnum,normalise_queues(Qa |+ (MAP (CHR o w2n) p1,t)),Na)’
               by metis_tac[strans_rules] >>
             dxrule_then assume_tac ffi_eq_SYM >>
             drule_all ffi_eq_bisimulation_L >>
@@ -5158,7 +5178,7 @@ Proof
             simp[ffi_state_cor_def] >>
             drule_then mp_tac strans_pres_pnum >> simp[] >>
             disch_then (SUBST_ALL_TAC o SYM) >> rw[] >>
-            qexistsl_tac [‘normalise_queues (Qa |+ (p1,t))’,‘Na’] >>
+            qexistsl_tac [‘normalise_queues (Qa |+ (MAP (CHR o w2n) p1,t))’,‘Na’] >>
             conj_tac >- metis_tac[strans_pres_wf] >>
             conj_tac
             >- (irule ffi_eq_pres >>
@@ -5166,7 +5186,7 @@ Proof
                 goal_assum (first_assum o mp_then (Pos last) mp_tac) >>
                 fs[] >> metis_tac[ffi_eq_SYM]) >>
             qx_gen_tac ‘k’ >> simp[qlk_def, fget_def, FLOOKUP_DEF] >>
-            Cases_on ‘k = p1’ >> simp[] >>
+            Cases_on ‘k = MAP (CHR o w2n) p1’ >> simp[] >>
             simp[FAPPLY_FUPDATE_THM] >>
             qpat_x_assum ‘∀sp. qlk pSt1.queues sp ≼ _ sp’ mp_tac >>
             simp[qlk_def, fget_def, FLOOKUP_DEF]) >>
@@ -5174,15 +5194,15 @@ Proof
       >- (simp[Abbr‘ff1’] >> qpat_x_assum ‘cpFFI_valid _ _ _ _ _ _’ mp_tac >>
           simp[cpFFI_valid_def, Abbr‘pSt1'’] >>
           qmatch_abbrev_tac ‘option_CASE P _ _ ⇒ _’ >>
-          ‘P = SOME (p1, d)’
+          ‘P = SOME (MAP (CHR o w2n) p1, d)’
             by (simp[Abbr‘P’] >> DEEP_INTRO_TAC some_intro >>
                 simp[FORALL_PROD] >> reverse conj_tac
-                >- (qexistsl_tac [‘p1’, ‘d’]>>
+                >- (qexistsl_tac [‘MAP (CHR o w2n) p1’, ‘d’]>>
                     simp[qlk_def, fget_def] >>
                     fs[normalised_def] >>
                     simp[fmap_EXT] >> conj_tac
                     >- (simp[FDOM_normalise_queues, EXTENSION] >>
-                        qx_gen_tac ‘k’ >> Cases_on ‘k = p1’ >> simp[]
+                        qx_gen_tac ‘k’ >> Cases_on ‘k = MAP (CHR o w2n) p1’ >> simp[]
                         >- fs[qlk_def, fget_def, FLOOKUP_DEF, AllCaseEqs()] >>
                         csimp[FAPPLY_FUPDATE_THM] >>
                         Cases_on ‘k ∈ FDOM pSt1.queues’ >> simp[] >>
@@ -5194,19 +5214,19 @@ Proof
                     fs[qlk_def, FLOOKUP_DEF, fget_def, AllCaseEqs()]) >>
                 qx_genl_tac [‘k’, ‘data’] >>
                 strip_tac >>
-                ‘k = p1’
+                ‘k = MAP (CHR o w2n) p1’
                   by (CCONTR_TAC >>
                       qpat_x_assum ‘_.queues = _’ mp_tac >>
                       simp[fmap_EXT] >> Cases_on ‘tl = []’
                       >- (disj1_tac >> simp[EXTENSION] >>
-                          qexists_tac ‘p1’ >> simp[FDOM_normalise_queues] >>
+                          qexists_tac ‘MAP (CHR o w2n) p1’ >> simp[FDOM_normalise_queues] >>
                           fs[qlk_def, fget_def, FLOOKUP_DEF, AllCaseEqs()]) >>
-                      disj2_tac >> qexists_tac ‘p1’ >>
+                      disj2_tac >> qexists_tac ‘MAP (CHR o w2n) p1’ >>
                       fs[qlk_def, fget_def, FLOOKUP_DEF, AllCaseEqs()] >>
                       simp[FAPPLY_normalise_queues, FAPPLY_FUPDATE_THM,
                            FDOM_normalise_queues]) >> pop_assum SUBST_ALL_TAC>>
                 simp[] >>
-                pop_assum (mp_tac o Q.AP_TERM ‘\fm. fm ' p1’) >>
+                pop_assum (mp_tac o Q.AP_TERM ‘\fm. fm ' (MAP (CHR o w2n) p1)’) >>
                 fs[qlk_def, fget_def, FLOOKUP_DEF, AllCaseEqs()] >>
                 simp[FAPPLY_normalise_queues]) >>
           simp[] >>
@@ -5230,14 +5250,18 @@ Proof
         (assume_tac o SIMP_RULE (srw_ss()) []) cEval_equiv_bump_clocks >>
       qexists_tac ‘M’ >> simp[])
   >- ((* double receiveloop *)
-      ‘strans conf cSt1.ffi.ffi_state (ARecv p1 d) cSt2.ffi.ffi_state’
+      rename1 ‘receiveloop conf pp’ >>
+      qabbrev_tac ‘(p1:word8 list) = MAP (n2w o ORD) pp’ >>
+      Q.SUBGOAL_THEN ‘pp = MAP (CHR o w2n) p1’ SUBST_ALL_TAC >- (rw[Abbr ‘p1’,MAP_MAP_o,CHR_w2n_n2w_ORD]) >>
+      pop_assum kall_tac >>
+      ‘strans conf cSt1.ffi.ffi_state (ARecv (MAP (CHR o w2n) p1) d) cSt2.ffi.ffi_state’
         by (pop_assum mp_tac >>
             simp[cpFFI_valid_def] >>
             qmatch_abbrev_tac ‘option_CASE P _ _ ⇒ _’ >>
-            ‘P = SOME(p1,d)’ suffices_by simp[] >>
+            ‘P = SOME(MAP (CHR o w2n) p1,d)’ suffices_by simp[] >>
             simp[Abbr‘P’] >> DEEP_INTRO_TAC some_intro >> simp[FORALL_PROD] >>
             reverse conj_tac
-            >- (qexistsl_tac [‘p1’, ‘d’] >> simp[] >>
+            >- (qexistsl_tac [‘MAP (CHR o w2n) p1’, ‘d’] >> simp[] >>
                 ‘normalise_queues pSt1.queues = pSt1.queues’
                   by metis_tac[normalised_def] >> simp[] >>
                 fs[qlk_def, fget_def, FLOOKUP_DEF, AllCaseEqs()] >>
@@ -5248,7 +5272,7 @@ Proof
               by metis_tac[normalised_def] >>
             Cases_on ‘tl’ >>
             fs[qlk_def, fget_def, FLOOKUP_DEF, AllCaseEqs()] >>
-            Cases_on ‘k = p1’ >>
+            Cases_on ‘k = MAP (CHR o w2n) p1’ >>
             csimp[fmap_EXT, EXTENSION, FAPPLY_FUPDATE_THM, AllCaseEqs(),
                   DOMSUB_FAPPLY_NEQ] >>
             metis_tac[]) >>
@@ -5609,7 +5633,6 @@ Proof
    simp[do_app_def,terminationTheory.do_eq_def,Boolv_def,do_if_def] >>
    fs[letfuns_def] >>
    drule enc_ok_take >> strip_tac >>
-
    fs[cpFFI_valid_def] >>
    ‘∀sp d. pSt1.queues ≠
             normalise_queues (pSt1.queues |+ (sp,d::qlk pSt1.queues sp))’

@@ -65,7 +65,7 @@ Proof
       fs[] >>
       drule_all_then strip_assume_tac qsame_irrel_internal >>
       rw[] >> metis_tac[])
-  >- (‘∀(x : word8 list |-> word8 list list) y. qsame x y ⇔ qsame y x’
+  >- (‘∀(x : string |-> word8 list list) y. qsame x y ⇔ qsame y x’
         by (rw[qsame_def] >> metis_tac[]) >>
       rename1 ‘qsame A B’ >>
       ‘qsame B A’ by metis_tac[] >>
@@ -77,7 +77,7 @@ Proof
       ‘q2MA = q2MB’
         by fs[input_trans_def] >>
       rw[] >> metis_tac[])
-  >- (‘∀(x : word8 list |-> word8 list list) y. qsame x y ⇔ qsame y x’
+  >- (‘∀(x : string |-> word8 list list) y. qsame x y ⇔ qsame y x’
         by (rw[qsame_def] >> metis_tac[]) >>
       rename1 ‘qsame A B’ >>
       ‘qsame B A’ by metis_tac[] >>
