@@ -490,10 +490,10 @@ Proof
   rw [] \\ Cases_on ‘c’
   \\ fs [ chor_tag_def,syncTrm_def,chor_match_def
         , chor_tl_def,no_self_comunication_def]
-  >- (Cases_on ‘FLOOKUP s (s',l) = SOME [1w]’
-     >- fs [trans_if_true]
-     \\ drule no_undefined_FLOOKUP_if \\ rw [] \\ fs []
-     \\ fs [trans_if_false])
+  >- (IF_CASES_TAC
+      >- fs [trans_if_true]
+      \\ drule no_undefined_FLOOKUP_if \\ rw [] \\ fs []
+      \\ fs [trans_if_false])
   >- (drule no_undefined_FLOOKUP_com \\ rw []
      \\  fs [trans_com])
   >- (drule no_undefined_FLOOKUP_let \\ rw []

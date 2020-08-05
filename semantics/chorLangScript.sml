@@ -4,7 +4,7 @@ val _ = new_theory "chorLang";
 
 val _ = type_abbrev( "varN" , ``: string``);
 
-val _ = type_abbrev( "proc" , ``: word8 list``); (* TODO: list -> mlvector? *)
+val _ = type_abbrev( "proc" , ``: string``); (* TODO: list -> mlvector? *)
 
 val _ = type_abbrev( "datum" , ``: word8 list``); (* TODO: list -> mlvector? *)
 

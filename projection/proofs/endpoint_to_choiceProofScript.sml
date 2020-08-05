@@ -964,7 +964,7 @@ val closing_distance_SUC_IMP = Q.store_thm("closing_distance_SUC_IMP",
           >> Cases_on `alpha` >> fs[decompile_label_def]
           >> TRY(match_mp_tac trans_par_r >> first_x_assum ACCEPT_TAC)
           >> imp_res_tac sender_is_endpoint
-          >> first_x_assum(qspec_then `l` assume_tac)
+          >> first_x_assum(qspec_then `s` assume_tac)
           >> rfs[] >> fs[endpoint_sends_fv_def,endpoints_def,FIND_APPEND]
           >> fs[GSYM FIND_o_NOT_MEM] >> match_mp_tac trans_par_r
           >> first_x_assum ACCEPT_TAC)
@@ -975,7 +975,7 @@ val closing_distance_SUC_IMP = Q.store_thm("closing_distance_SUC_IMP",
           >> imp_res_tac choice_rel_endpoints >> imp_res_tac(GSYM endpoint_names_trans) >> fs[]
           >> TRY(match_mp_tac trans_par_l >> first_x_assum ACCEPT_TAC)
           >> imp_res_tac sender_is_endpoint
-          >> first_x_assum(qspec_then `l` assume_tac)
+          >> first_x_assum(qspec_then `s` assume_tac)
           >> rfs[] >> fs[endpoint_sends_fv_def,endpoints_def,FIND_APPEND]
           >> fs[GSYM FIND_o_MEM, GSYM FIND_o_NOT_MEM]
           >> Q.ISPEC_THEN `SOME` (fn thm => fs[thm]) ETA_THM
@@ -1243,7 +1243,7 @@ val decompile_label_par_r = Q.store_thm("decompile_label_par_r",
   >> imp_res_tac endpoint_names_reduction
   >> every_case_tac >> fs[] >> rveq >> fs[FIND_o_NOT_MEM]
   >> rfs[]
-  >> `MEM l (MAP FST (endpoints n4))` by(fs[GSYM FIND_o_MEM])
+  >> `MEM s (MAP FST (endpoints n4))` by(fs[GSYM FIND_o_MEM])
   >> metis_tac[]);
 
 val decompile_label_par_r_trans = Q.store_thm("decompile_label_par_r_trans",
@@ -1444,7 +1444,8 @@ val choice_rel_trans_pres = Q.prove(
               >> rveq >> fs[]
               >> imp_res_tac choice_rel_int_choice_true
               >> imp_res_tac choice_rel_int_choice_false
-              >> rpt(first_x_assum (qspec_then `s` assume_tac))
+              >> rename1 ‘NEndpoint _ (st with bindings := _)’
+              >> rpt(first_x_assum (qspec_then `st` assume_tac))
               >> imp_res_tac choice_rel_endpoint_eq_junk
               >> PURE_ONCE_REWRITE_TAC [CONJ_SYM]
               >> simp[K0_def,K1_def]
