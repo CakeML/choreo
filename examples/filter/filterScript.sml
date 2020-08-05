@@ -13,10 +13,6 @@ val _ = translation_extends "chorLibProg";
 
 val n2w8 = “n2w:num -> word8”;
 
-val producer = “MAP (^n2w8 o ORD) "producer"” |> EVAL |> concl |> rhs;
-val filter = “MAP (^n2w8 o ORD) "filter"” |> EVAL |> concl |> rhs;
-val consumer = “MAP (^n2w8 o ORD) "consumer"” |> EVAL |> concl |> rhs;
-
 val msg1 = “MAP (^n2w8 o ORD) "This message should be filtered."” |> EVAL |> concl |> rhs;
 val msg2 = “MAP (^n2w8 o ORD) "A message such as this should be forwarded. It is absurdly long, so hopefully it will be split into distinct messages that will all be forwarded. Indeed, that would be great, wouldn't it? Hopefully, that will be exactly the behaviour you observe when you run this example."” |> EVAL |> concl |> rhs;
 val msg3 = “MAP (^n2w8 o ORD) "Drop this message."” |> EVAL |> concl |> rhs;
@@ -58,14 +54,14 @@ val _ = ml_prog_update (close_module NONE);
 Definition filter_def:
   filter test =
   FOLDR (λe c.
-         Let "v" ^producer e []
-         (Com ^producer "v" ^filter "v"
-          (Let "test" ^filter test ["v"]
-           (IfThen "test" ^filter
-            (Sel ^filter T ^consumer
-             (Com ^filter "v" ^consumer "v" c)
+         Let "v" "producer" e []
+         (Com "producer" "v" "filter" "v"
+          (Let "test" "filter" test ["v"]
+           (IfThen "test" "filter"
+            (Sel "filter" T "consumer"
+             (Com "filter" "v" "consumer" "v" c)
             )
-            (Sel ^filter F ^consumer c)
+            (Sel "filter" F "consumer" c)
            )
           )
          )

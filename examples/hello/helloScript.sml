@@ -12,9 +12,6 @@ val _ = translation_extends "chorLibProg";
 
 val n2w8 = “n2w:num -> word8”;
 
-val ping = “MAP (^n2w8 o ORD) "ping"” |> EVAL |> concl |> rhs;
-val pong = “MAP (^n2w8 o ORD) "pong"” |> EVAL |> concl |> rhs;
-
 val hello_world = “MAP (^n2w8 o ORD) "Hello World!"” |> EVAL |> concl |> rhs;
 
 Definition KHello_def :
@@ -30,10 +27,10 @@ val _ = ml_prog_update (close_module NONE);
 
 Definition hello_def:
   hello =
-  Let "v" ^ping (KHello) []
-   (Com ^ping "v" ^pong "v"
-     (Com ^pong "v" ^ping "v"
-       Nil
+  Let "v" "ping" (KHello) []
+   (Com "ping" "v" "pong" "v"
+     (Com "pong" "v" "ping" "v"
+       chorLang$Nil
      )
    )
 End
