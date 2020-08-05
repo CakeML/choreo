@@ -12,9 +12,6 @@ val _ = translation_extends "chorLibProg";
 
 val n2w8 = “n2w:num -> word8”;
 
-val ping = “MAP (^n2w8 o ORD) "ping"” |> EVAL |> concl |> rhs;
-val pong = “MAP (^n2w8 o ORD) "pong"” |> EVAL |> concl |> rhs;
-
 Definition KNil_def :
   KNil args = []
 End
@@ -28,10 +25,10 @@ val _ = ml_prog_update (close_module NONE);
 
 Definition pingpong_def:
   pingpong =
-  Let "v" ^ping (KNil) []
-   (Com ^ping "v" ^pong "v"
-     (Com ^pong "v" ^ping "v"
-       Nil
+  Let "v" "ping" (KNil) []
+   (Com "ping" "v" "pong" "v"
+     (Com "pong" "v" "ping" "v"
+       chorLang$Nil
      )
    )
 End

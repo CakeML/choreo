@@ -20,7 +20,7 @@ struct
   val queue_size = 1 (* TODO: factor out *)
 
   fun pnames chor =
-      “MAP (MAP (CHR o w2n)) (procsOf ^chor)”
+      “procsOf ^chor”
      |> EVAL
      |> concl
      |> rhs
@@ -29,7 +29,7 @@ struct
      |> map stringSyntax.fromHOLstring
 
   fun letfunstbl chor =
-     “MAP (λp. (MAP (CHR o w2n) p, letfunsOf p ^chor)) (procsOf ^chor)”
+     “MAP (λp. (p, chorSem$letfunsOf p ^chor)) (procsOf ^chor)”
      |> EVAL
      |> concl
      |> rhs
@@ -39,7 +39,7 @@ struct
      |> map (fn (n,l) => (stringSyntax.fromHOLstring n,fst(listSyntax.dest_list l)))
 
   fun rectbl chor =
-     “MAP (λp. (MAP (CHR o w2n) p, MAP (MAP (CHR o w2n)) (receiversOf p ^chor))) (procsOf ^chor)”
+     “MAP (λp. (p, receiversOf p ^chor)) (procsOf ^chor)”
      |> EVAL
      |> concl
      |> rhs
@@ -482,7 +482,7 @@ struct
 
   fun project_to_cake_with_letfuns chor p payload_size letmodule letfuns =
     let
-      val ptm = “MAP (^n2w8 o ORD) ^(stringSyntax.fromMLstring p)” |> EVAL |> concl |> rhs
+      val ptm = stringSyntax.fromMLstring p
       val conf =
           “base_conf with <|payload_size := ^(numSyntax.term_of_int payload_size);
                             letModule := ^(stringSyntax.fromMLstring letmodule)|>”
@@ -520,9 +520,9 @@ struct
 
   fun project_to_cake chor p payload_size =
     let
-      val ptm = “MAP (^n2w8 o ORD) ^(stringSyntax.fromMLstring p)” |> EVAL |> concl |> rhs
+      val ptm = stringSyntax.fromMLstring p
 
-      val letfun_names = “letfunsOf ^ptm ^chor” |> EVAL |> concl |> rhs |> listSyntax.dest_list |> fst
+      val letfun_names = “chorSem$letfunsOf ^ptm ^chor” |> EVAL |> concl |> rhs |> listSyntax.dest_list |> fst
 
       val letfuns = map obtain_letfun letfun_names
 
@@ -574,7 +574,7 @@ struct
       val conf = pc |> concl |> lhs |> rator |> rator |> rand
       val pCd1 = pc |> concl |> lhs |> rand
       val vs = pc |> concl |> lhs |> rator |> rand
-      val ptm = “MAP (^n2w8 o ORD) ^(stringSyntax.fromMLstring p)” |> EVAL |> concl |> rhs
+      val ptm = stringSyntax.fromMLstring p
 
       val oracle = “comms_ffi_oracle ^conf”
       val oracle_type = type_of oracle |> strip_fun |> fst |> C (curry List.nth) 1
@@ -612,7 +612,7 @@ struct
       compilation_preservation
         |> Q.SPEC ‘FEMPTY’
         |> SPEC chor
-        |> SPEC(mk_var("s2",“:string # word8 list |-> word8 list”))
+        |> SPEC(mk_var("s2",“:string # string |-> word8 list”))
         |> SPEC(mk_var("c2",“:chorLang$chor”))
         |> SPEC conf
         |> SPEC ptm
