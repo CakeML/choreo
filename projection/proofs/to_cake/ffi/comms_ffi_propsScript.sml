@@ -316,7 +316,7 @@ QED
 (* Send Validity Checks *)
 (* -- Destination *)
 Definition valid_send_dest_def:
-  valid_send_dest dest ffiSt = ((FST ffiSt ≠ dest) ∧ (ffi_has_node dest ffiSt))
+  valid_send_dest (dest:word8 list) ffiSt = ((FST ffiSt ≠ MAP (CHR o w2n) dest) ∧ (ffi_has_node (MAP (CHR o w2n) dest) ffiSt))
 End
 (* -- Call Format *)
 Definition valid_send_call_format_def:
@@ -335,7 +335,7 @@ End
 (* Receive Validity Checks *)
 (* -- Destination *)
 Definition valid_receive_src_def:
-  valid_receive_src src ffiSt = ((FST ffiSt ≠ src) ∧ (ffi_has_node src ffiSt))
+  valid_receive_src (src:word8 list) ffiSt = ((FST ffiSt ≠ (MAP (CHR o w2n) src)) ∧ (ffi_has_node (MAP (CHR o w2n) src) ffiSt))
 End
 (* -- Call Format *)
 Definition valid_receive_call_format_def:
@@ -356,11 +356,11 @@ Theorem strans_send_cond:
   ∀S1 dest conf.
     valid_send_dest dest S1 ⇒
     (∀bytes. ∃S2.
-      strans conf S1 (ASend dest bytes) S2)
+      strans conf S1 (ASend (MAP (CHR o w2n) dest) bytes) S2)
 Proof
   rw[] >> Cases_on ‘S1’ >> qmatch_goalsub_rename_tac ‘(P,R)’ >>
   Cases_on ‘R’  >> qmatch_goalsub_rename_tac ‘(P,Q1,N1)’ >>
-  ‘∃N2. trans conf N1 (LReceive P bytes dest) N2’
+  ‘∃N2. trans conf N1 (LReceive P bytes (MAP (CHR ∘ w2n) dest)) N2’
     suffices_by metis_tac[strans_rules] >>
   fs[valid_send_dest_def,ffi_has_node_def] >>
   metis_tac[trans_receive_cond]
@@ -369,7 +369,7 @@ QED
 Theorem strans_dest_check:
   ∀S1 dest conf.
     (∃bytes S2.
-      strans conf S1 (ASend dest bytes) S2) ⇒
+      strans conf S1 (ASend (MAP (CHR ∘ w2n) dest) bytes) S2) ⇒
     valid_send_dest dest S1
 Proof
   Induct_on ‘strans’ >>
