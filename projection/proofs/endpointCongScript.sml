@@ -504,7 +504,7 @@ Proof
      \\ UNABBREV_ALL_TAC
      \\ metis_tac [FILTER_ALL_DISTINCT])
  >- (rw []
-    \\ `REPN (compile_network s' c l')` by rw [chor_REPN_compile_network]
+    \\ `REPN (compile_network s' c l)` by rw [chor_REPN_compile_network]
     \\ IMP_RES_TAC rcong_REPN
     \\ fs [REPN_def])
 QED
@@ -542,7 +542,7 @@ Proof
      \\ UNABBREV_ALL_TAC
      \\ metis_tac [FILTER_ALL_DISTINCT])
  >- (rw []
-    \\ `REPN (compile_network s' c l')` by rw [pchor_REPN_compile_network]
+    \\ `REPN (compile_network s' c l)` by rw [pchor_REPN_compile_network]
     \\ IMP_RES_TAC rcong_REPN
     \\ fs [REPN_def])
 QED

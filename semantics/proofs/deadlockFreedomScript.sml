@@ -21,23 +21,25 @@ Proof
      \\ first_x_assum drule \\ disch_then drule
      \\ first_x_assum drule \\ disch_then drule
      \\ rw []
-     \\ Cases_on `FLOOKUP s' (s,l) = SOME [1w]`
+     \\ rename1 ‘IfThen v’
+     \\ Cases_on `FLOOKUP s' (v,s) = SOME [1w]`
      >- (qexists_tac `s''`
         \\ fs [trans_s_def]
         \\ ho_match_mp_tac RTC_TRANS
-        \\ metis_tac [trans_rules])
-     \\ Cases_on `FLOOKUP s' (s,l) = NONE`
+        \\ metis_tac [trans_if_true])
+     \\ Cases_on `FLOOKUP s' (v,s) = NONE`
      >- fs [no_undefined_vars_def,free_variables_def,FLOOKUP_DEF]
      \\ qexists_tac `s'''`
-     \\ `∃d. FLOOKUP s' (s,l) = SOME d ∧ d ≠ [1w]`
-        by (Cases_on `FLOOKUP s' (s,l)` \\ fs [])
+     \\ `∃d. FLOOKUP s' (v,s) = SOME d ∧ d ≠ [1w]`
+        by (Cases_on `FLOOKUP s' (v,s)` \\ fs [])
      \\ fs [trans_s_def]
      \\ ho_match_mp_tac RTC_TRANS
      \\ metis_tac [trans_rules])
   (* Communication *)
-  >- (`∃d. FLOOKUP s' (s0,l0) = SOME d`
-      by fs [no_undefined_vars_def,free_variables_def,FLOOKUP_DEF]
-     \\ `no_undefined_vars (s' |+ ((s,l),d),c) ∧ no_self_comunication c`
+  >- (rename1 ‘Com p1 v1 p2 v2’
+     \\ `∃d. FLOOKUP s' (v1,p1) = SOME d`
+        by fs [no_undefined_vars_def,free_variables_def,FLOOKUP_DEF]
+     \\ `no_undefined_vars (s' |+ ((v2,p2),d),c) ∧ no_self_comunication c`
         by fs [no_undefined_vars_def,free_variables_def
               , no_self_comunication_def
               , DELETE_SUBSET_INSERT]
@@ -48,15 +50,16 @@ Proof
      \\ ho_match_mp_tac RTC_TRANS
      \\ metis_tac [trans_com])
   (* Let *)
-  >- (`no_undefined_vars (s' |+ ((s,l0), f (MAP (THE ∘ FLOOKUP s')
-                                                (MAP (λv. (v,l0)) l))), c) ∧
-       no_self_comunication c`
+  >- (rename1 ‘Let v p f’
+      \\ `no_undefined_vars (s' |+ ((v,p), f (MAP (THE ∘ FLOOKUP s')
+                                              (MAP (λv. (v,p)) l))), c) ∧
+          no_self_comunication c`
        by fs [no_undefined_vars_def
              , free_variables_def
              , no_self_comunication_def
              , DELETE_SUBSET_INSERT]
       \\ first_x_assum drule \\ disch_then drule \\ rw []
-      \\ `EVERY IS_SOME (MAP (FLOOKUP s') (MAP (λv. (v,l0)) l))`
+      \\ `EVERY IS_SOME (MAP (FLOOKUP s') (MAP (λv. (v,p)) l))`
          by (last_assum mp_tac \\  rpt (pop_assum (K ALL_TAC))
             \\ rw [no_undefined_vars_def,free_variables_def]
             \\ Induct_on `l` \\ rw [IS_SOME_EXISTS,FLOOKUP_DEF])
@@ -65,12 +68,12 @@ Proof
       \\ ho_match_mp_tac RTC_TRANS
       \\ metis_tac [trans_let])
   (* Selection *)
-  >- (`no_undefined_vars (s,c) ∧ no_self_comunication c`
-      by fs [no_undefined_vars_def,free_variables_def
-            , no_self_comunication_def
-            , DELETE_SUBSET_INSERT]
+  >- (`no_undefined_vars (s',c) ∧ no_self_comunication c`
+        by fs [no_undefined_vars_def,free_variables_def
+               , no_self_comunication_def
+               , DELETE_SUBSET_INSERT]
       \\ first_x_assum drule \\ disch_then drule \\ rw []
-      \\ qexists_tac `s'`
+      \\ qexists_tac `s''`
       \\ fs [trans_s_def,no_self_comunication_def]
       \\ ho_match_mp_tac RTC_TRANS
       \\ metis_tac [trans_sel])

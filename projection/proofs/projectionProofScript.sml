@@ -177,7 +177,7 @@ Proof
   >- (imp_res_tac junkcong_par_rel_par >> rveq >> res_tac >> rveq >>
       metis_tac[junkcong_par,compile_network_fv_def])
   >- (imp_res_tac junkcong_endpoint_rel_endpoint >> rveq >>
-      qexists_tac ‘NEndpoint l s2 e’ >>
+      qexists_tac ‘NEndpoint s s2 e’ >>
       rw[compile_network_fv_def] >>
       drule_then match_mp_tac junkcong_swap_endpoint >> rw[] >>
       metis_tac[free_var_names_var_names])
@@ -630,17 +630,17 @@ Theorem perm_network:
 Proof
   Induct_on ‘n’ >> rw[compile_network_fv_def,compile_network_def,perm_network_def,var_names_network_def,payloadPropsTheory.junkcong_refl,perm_endpoint] >-
     metis_tac[payloadPropsTheory.junkcong_par] >>
-  rename1 ‘NEndpoint _ (perm_state _ _ ss)’ >>
+  rename1 ‘NEndpoint s (perm_state _ _ ss)’ >>
   match_mp_tac payloadPropsTheory.junkcong_trans >>
-  qexists_tac ‘NEndpoint l ((perm_state fv1 fv2 ss) with bindings := ((perm_state fv1 fv2 ss).bindings \\ fv1)) (compile_endpoint (compile_endpoint fv2 e))’ >>
+  qexists_tac ‘NEndpoint s ((perm_state fv1 fv2 ss) with bindings := ((perm_state fv1 fv2 ss).bindings \\ fv1)) (compile_endpoint (compile_endpoint fv2 e))’ >>
   conj_tac >- (match_mp_tac payloadPropsTheory.junkcong_remove_junk >> simp[] >>
                spose_not_then strip_assume_tac >>
                drule_then assume_tac endpoint_to_payload_free_var_names >>
                drule_then assume_tac compile_endpoint_support' >>
                drule free_var_names_var_names >> fs[]) >>
-  qmatch_goalsub_abbrev_tac ‘NEndpoint l sss’ >>
+  qmatch_goalsub_abbrev_tac ‘NEndpoint s sss’ >>
   match_mp_tac payloadPropsTheory.junkcong_trans >>
-  qexists_tac ‘NEndpoint l (sss with bindings := (sss.bindings \\ fv2)) (compile_endpoint (compile_endpoint fv2 e))’ >>
+  qexists_tac ‘NEndpoint s (sss with bindings := (sss.bindings \\ fv2)) (compile_endpoint (compile_endpoint fv2 e))’ >>
   qunabbrev_tac ‘sss’ >>
   conj_tac >- (match_mp_tac payloadPropsTheory.junkcong_remove_junk >> simp[] >>
                spose_not_then strip_assume_tac >>
@@ -651,15 +651,15 @@ Proof
   simp[perm_state_restrict] >>
   match_mp_tac payloadPropsTheory.junkcong_sym >>
   match_mp_tac payloadPropsTheory.junkcong_trans >>
-  qexists_tac ‘NEndpoint l (ss with bindings := (ss.bindings \\ fv1)) (compile_endpoint (compile_endpoint fv2 e))’ >>
+  qexists_tac ‘NEndpoint s (ss with bindings := (ss.bindings \\ fv1)) (compile_endpoint (compile_endpoint fv2 e))’ >>
   conj_tac >- (match_mp_tac payloadPropsTheory.junkcong_remove_junk >> simp[] >>
                spose_not_then strip_assume_tac >>
                drule_then assume_tac endpoint_to_payload_free_var_names >>
                drule_then assume_tac compile_endpoint_support' >>
                drule free_var_names_var_names >> fs[]) >>
-  qmatch_goalsub_abbrev_tac ‘NEndpoint l sss’ >>
+  qmatch_goalsub_abbrev_tac ‘NEndpoint s sss’ >>
   match_mp_tac payloadPropsTheory.junkcong_trans >>
-  qexists_tac ‘NEndpoint l (sss with bindings := (sss.bindings \\ fv2)) (compile_endpoint (compile_endpoint fv2 e))’ >>
+  qexists_tac ‘NEndpoint s (sss with bindings := (sss.bindings \\ fv2)) (compile_endpoint (compile_endpoint fv2 e))’ >>
   qunabbrev_tac ‘sss’ >>
   conj_tac >- (match_mp_tac payloadPropsTheory.junkcong_remove_junk >> simp[] >>
                spose_not_then strip_assume_tac >>
@@ -700,15 +700,17 @@ Proof
   Induct_on ‘n’ >> fs[payloadLangTheory.free_var_names_network_def,restrict_network_def,payloadPropsTheory.junkcong_refl] >-
    (metis_tac[payloadPropsTheory.junkcong_par]) >>
   rw[] >>
+  rename1 ‘NEndpoint p’ >>
+  rename1 ‘(s with bindings := _)’ >>
   ‘DRESTRICT s.bindings (λx. x ≠ fv1 ∧ x ≠ fv2) = s.bindings \\ fv1 \\ fv2’
     by(rw[fmap_eq_flookup,FLOOKUP_DRESTRICT,DOMSUB_FLOOKUP_THM] >> rw[] >> fs[]) >>
   pop_assum SUBST_ALL_TAC >>
   match_mp_tac payloadPropsTheory.junkcong_sym >>
   match_mp_tac payloadPropsTheory.junkcong_trans >>
-  qexists_tac ‘NEndpoint l (s with bindings := s.bindings \\ fv1) e’ >>
+  qexists_tac ‘NEndpoint p (s with bindings := s.bindings \\ fv1) e’ >>
   conj_tac >- (match_mp_tac payloadPropsTheory.junkcong_remove_junk >> simp[]) >>
   match_mp_tac payloadPropsTheory.junkcong_trans >>
-  qexists_tac ‘NEndpoint l ((s with bindings := s.bindings \\ fv1) with bindings := (s with bindings := s.bindings \\ fv1).bindings \\ fv2) e’ >>
+  qexists_tac ‘NEndpoint p ((s with bindings := s.bindings \\ fv1) with bindings := (s with bindings := s.bindings \\ fv1).bindings \\ fv2) e’ >>
   conj_tac >- (match_mp_tac payloadPropsTheory.junkcong_remove_junk >> simp[]) >>
   simp[payloadPropsTheory.junkcong_refl]
 QED

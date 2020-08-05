@@ -306,7 +306,7 @@ Proof
   \\ rw [net_filter_def,net_find_def]
   \\ fs [REPN_def,net_find_def,net_filter_def]
   \\ Cases_on ‘n’ \\ fs [REPN_def,net_find_def,net_filter_def]
-  \\ Cases_on ‘p = l’ \\ fs [net_wf_def,payload_rcong_refl]
+  \\ Cases_on ‘p = s’ \\ fs [net_wf_def,payload_rcong_refl]
   \\ metis_tac [payload_rcong_rules]
 QED
 
@@ -501,11 +501,12 @@ Proof
   \\ fs [] \\ rw []
   >- (first_x_assum (drule_then assume_tac)
       \\ Cases_on ‘n’ \\ fs [net_find_def,REPN_def]
-      \\ Cases_on ‘p = l’ \\ fs [OPTION_CHOICE_def]
+      \\ Cases_on ‘p = s'’ \\ fs [OPTION_CHOICE_def]
+      \\ rveq \\ fs[]
       \\ drule_then assume_tac trans_struct_pres_NEnpoint
       \\ fs [] \\ rveq \\ fs []
-      \\ ‘l = s’ by fs [Once trans_cases]
-      >- (disj1_tac \\ asm_exists_tac \\ fs [net_find_def,net_filter_def])
+      >- (‘p = s’ by fs [Once trans_cases] \\
+          disj1_tac \\ asm_exists_tac \\ fs [net_find_def,net_filter_def])
       \\ disj2_tac
       \\ rw [OPTION_CHOICE_def,net_find_def,net_filter_def]
       \\ metis_tac [trans_rules])
@@ -542,11 +543,11 @@ Proof
   \\ fs [] \\ rw []
   >- (first_x_assum (drule_then assume_tac)
       \\ Cases_on ‘n’ \\ fs [net_find_def,REPN_def]
-      \\ Cases_on ‘p = l’ \\ fs [OPTION_CHOICE_def]
+      \\ Cases_on ‘p = s'’ \\ fs [OPTION_CHOICE_def]
       \\ drule_then assume_tac trans_struct_pres_NEnpoint
       \\ fs [] \\ rveq \\ fs []
-      \\ ‘l = s’ by fs [Once trans_cases]
-      >- (disj1_tac \\ asm_exists_tac \\ fs [net_find_def,net_filter_def])
+      >- (‘p = s’ by fs [Once trans_cases] \\
+          disj1_tac \\ asm_exists_tac \\ fs [net_find_def,net_filter_def])
       \\ disj2_tac
       \\ rw [OPTION_CHOICE_def,net_find_def,net_filter_def]
       \\ metis_tac [trans_rules])
@@ -659,7 +660,7 @@ Proof
    >- (Cases_on ‘n’ \\ fs [REPN_def,net_find_def]
        \\ drule_then assume_tac trans_struct_pres_NEnpoint
        \\ fs [] \\ rveq \\ fs []
-       \\ Cases_on ‘p = l’ \\ fs [OPTION_CHOICE_def]
+       \\ Cases_on ‘p = s’ \\ fs [OPTION_CHOICE_def]
        \\ rveq \\ fs [net_find_def,net_filter_def]
        >- metis_tac [trans_rules]
        \\ drule_all net_filter_LReceive_cases
@@ -669,7 +670,7 @@ Proof
    >- (Cases_on ‘n’ \\ fs [REPN_def,net_find_def]
        \\ drule_then assume_tac trans_struct_pres_NEnpoint
        \\ fs [] \\ rveq \\ fs []
-       \\ Cases_on ‘p = l’ \\ fs [OPTION_CHOICE_def]
+       \\ Cases_on ‘p = s’ \\ fs [OPTION_CHOICE_def]
        \\ rveq \\ fs [net_find_def,net_filter_def]
        >- metis_tac [trans_rules]
        \\ drule_all net_filter_LSend_cases
@@ -776,7 +777,7 @@ Proof
   Induct \\ rw [net_wf_def,net_has_node_def,net_filter_def,DISJOINT_ALT,IN_DEF,REPN_def]
   \\ Cases_on ‘n’ \\ fs [REPN_def,net_filter_def]
   \\ TRY (first_x_assum irule)
-  \\ Cases_on ‘p = l’ \\ fs [net_has_node_def]
+  \\ Cases_on ‘p = s’ \\ fs [net_has_node_def]
 QED
 
 (* Every endpoint in a padded network is padded *)

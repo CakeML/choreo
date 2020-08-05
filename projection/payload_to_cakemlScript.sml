@@ -284,7 +284,7 @@ Definition compile_endpoint_def:
       let vv = Var(Short (ps2cs v)) in
            (Let NONE
              (Letrec
-                (sendloop conf (MAP (CHR o w2n) p))
+                (sendloop conf p)
                 (App Opapp [Var(Short "sendloop");
                             App Opapp [App Opapp [Var conf.drop; vv];
                             Lit(IntLit(&n))]
@@ -298,7 +298,7 @@ Definition compile_endpoint_def:
           (Let (SOME "buff") (App Aw8alloc [Lit(IntLit(&(conf.payload_size + 1)));
                                             Lit(Word8 0w)])
                (Letrec
-                  (receiveloop conf (MAP (CHR o w2n) p))
+                  (receiveloop conf p)
                   (App Opapp
                     [Var conf.concat;
                      App Opapp

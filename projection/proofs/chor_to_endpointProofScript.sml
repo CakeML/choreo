@@ -267,7 +267,7 @@ val prefix_project_eq = Q.store_thm("prefix_project_eq",
     ⇒ project' p c = projPre p (preSel p c) (project' p (cut_sel_upto p c))`,
   Induct_on `c`
   \\ rw []
-  \\ TRY (Cases_on `p = l0`)
+  \\ TRY (Cases_on `p = s0`)
   \\ rw [project_def,preSel_def,cut_sel_upto_def,projPre_def]
   \\ fs [project_def]
 );
@@ -590,43 +590,43 @@ Proof
   res_tac >> fs[] >>
   rw[MEM_FILTER,MEM_nub'] >>
   rw[RIGHT_AND_OVER_OR,EXISTS_OR_THM] >-
-    (Cases_on ‘l = p’ >> simp[] >>
+    (Cases_on ‘s = p’ >> simp[] >>
      disj2_tac >>
      qexists_tac ‘p’ >>
      rw[] >>
      rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
      metis_tac[split_sel_project_ok,split_sel_project_ok2]) >-
-    (Cases_on ‘l = p’ >> simp[] >>
+    (Cases_on ‘s = p’ >> simp[] >>
      disj2_tac >>
      qexists_tac ‘p’ >>
      rw[] >>
      rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
      metis_tac[split_sel_project_ok,split_sel_project_ok2]) >-
-    (Cases_on ‘l = p’ >> simp[] >>
-     Cases_on ‘l0 = p’ >> simp[] >>
+    (Cases_on ‘s0 = p’ >> simp[] >>
+     Cases_on ‘s2 = p’ >> simp[] >>
      rpt disj2_tac >>
      qexists_tac ‘p’ >>
      rw[] >>
      rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
      metis_tac[split_sel_project_ok,split_sel_project_ok2]
      ) >-
-    (Cases_on ‘l0 = p’ >> simp[] >>
+    (Cases_on ‘s = p’ >> simp[] >>
      rpt disj2_tac >>
      qexists_tac ‘p’ >>
      rw[] >>
      rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
      metis_tac[split_sel_project_ok,split_sel_project_ok2]
      ) >-
-    (Cases_on ‘l = p’ >> simp[] >>
-     Cases_on ‘l0 = p’ >> simp[] >>
+    (Cases_on ‘s0 = p’ >> simp[] >>
+     Cases_on ‘s = p’ >> simp[] >>
      rpt disj2_tac >>
      qexists_tac ‘p’ >>
      rw[] >>
      rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
      metis_tac[split_sel_project_ok,split_sel_project_ok2]
      ) >-
-    (Cases_on ‘l = p’ >> simp[] >>
-     Cases_on ‘l0 = p’ >> simp[] >>
+    (Cases_on ‘s0 = p’ >> simp[] >>
+     Cases_on ‘s = p’ >> simp[] >>
      rpt disj2_tac >>
      qexists_tac ‘p’ >>
      rw[] >>
@@ -864,7 +864,7 @@ Proof
              \\ fs[]
              \\ metis_tac[])
      \\ conj_tac
-     >- (`?qf. !proc. (qf:datum ->(datum,datum) alist) proc = []` by(qexists_tac `K []` \\ rw[])
+     >- (`?qf. !proc. (qf:proc ->(proc,datum) alist) proc = []` by(qexists_tac `K []` \\ rw[])
          \\ `!proc qff. <|bindings := projectS proc s; queue := qff proc|>
                        = <|bindings := projectS proc s; queue := qf proc ++ qff proc|>`
              by(rw[])
@@ -886,7 +886,7 @@ Proof
      \\ rpt(pop_assum mp_tac)
      \\ `!proc. project' proc (IfThen v p c' c2) = project' proc (if K T proc then IfThen v p c' c2 else c')`
         by(rw[])
-     \\ qabbrev_tac `iffy = (K T):datum -> bool`
+     \\ qabbrev_tac `iffy = (K T):proc -> bool`
      \\ pop_assum kall_tac
      \\ pop_assum (fn thm => Ho_Rewrite.PURE_ONCE_REWRITE_TAC [thm])
      \\ MAP_EVERY (W(curry Q.SPEC_TAC)) [`s`,`v`,`p`,`c2`,`l`,`c'`,`iffy`,`pn`]
@@ -1038,7 +1038,7 @@ Proof
              \\ fs[]
              \\ metis_tac[])
      \\ conj_tac
-     >- (`?qf. !proc. (qf:datum ->(datum,datum) alist) proc = []` by(qexists_tac `K []` \\ rw[])
+     >- (`?qf. !proc. (qf:proc ->(proc,datum) alist) proc = []` by(qexists_tac `K []` \\ rw[])
          \\ `!proc qff. <|bindings := projectS proc s; queue := qff proc|>
                        = <|bindings := projectS proc s; queue := qf proc ++ qff proc|>`
              by(rw[])
@@ -1060,7 +1060,7 @@ Proof
      \\ rpt(pop_assum mp_tac)
      \\ `!proc. project' proc (IfThen v p c1 c') = project' proc (if K T proc then IfThen v p c1 c' else c')`
         by(rw[])
-     \\ qabbrev_tac `iffy = (K T):datum -> bool`
+     \\ qabbrev_tac `iffy = (K T):proc -> bool`
      \\ pop_assum kall_tac
      \\ pop_assum (fn thm => Ho_Rewrite.PURE_ONCE_REWRITE_TAC [thm])
      \\ MAP_EVERY (W(curry Q.SPEC_TAC)) [`w`,`s`,`v`,`p`,`c1`,`l`,`c'`,`iffy`,`pn`]
@@ -1859,7 +1859,7 @@ Proof
                    \\ rw[MEM_FILTER])
            \\ conj_tac
            >- (rw[compile_network_project]
-               \\ `?qf. !proc. (qf:datum ->(datum,datum) alist) proc = []` by(qexists_tac `K []` \\ rw[])
+               \\ `?qf. !proc. (qf:proc ->(proc,datum) alist) proc = []` by(qexists_tac `K []` \\ rw[])
                \\ `!proc qff. <|bindings := projectS proc s; queue := qff proc|>
                              = <|bindings := projectS proc s; queue := qf proc ++ qff proc|>`
                    by(rw[])
@@ -1895,7 +1895,7 @@ Proof
            \\ rpt(pop_assum kall_tac) (* ? *)
            \\ `!proc. project' proc (IfThen v p c1 c2) = project' proc (if K T proc then IfThen v p c1 c2 else c1)`
               by(rw[])
-           \\ qabbrev_tac `iffy = (K T):datum -> bool`
+           \\ qabbrev_tac `iffy = (K T):proc -> bool`
            \\ pop_assum kall_tac
            \\ pop_assum (fn thm => Ho_Rewrite.PURE_ONCE_REWRITE_TAC [thm])
            \\ MAP_EVERY (W(curry Q.SPEC_TAC)) [`s`,`v`,`p`,`c2`,`l`,`c1`,`iffy`,`pn`]
@@ -2111,7 +2111,7 @@ Proof
                 \\ rw[MEM_FILTER])
         \\ conj_tac
         >- (rw[compile_network_project]
-            \\ `?qf. !proc. (qf:datum ->(datum,datum) alist) proc = []` by(qexists_tac `K []` \\ rw[])
+            \\ `?qf. !proc. (qf:proc ->(proc,datum) alist) proc = []` by(qexists_tac `K []` \\ rw[])
             \\ `!proc qff. <|bindings := projectS proc s; queue := qff proc|>
                           = <|bindings := projectS proc s; queue := qf proc ++ qff proc|>`
                 by(rw[])
@@ -2147,7 +2147,7 @@ Proof
         \\ rpt(pop_assum kall_tac) (* ? *)
         \\ `!proc. project' proc (IfThen v p c1 c2) = project' proc (if K T proc then IfThen v p c1 c2 else c2)`
            by(rw[])
-        \\ qabbrev_tac `iffy = (K T):datum -> bool`
+        \\ qabbrev_tac `iffy = (K T):proc -> bool`
         \\ pop_assum kall_tac
         \\ pop_assum (fn thm => Ho_Rewrite.PURE_ONCE_REWRITE_TAC [thm])
         \\ MAP_EVERY (W(curry Q.SPEC_TAC)) [`s`,`v`,`p`,`c2`,`l`,`c1`,`iffy`,`pn`]

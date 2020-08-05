@@ -525,8 +525,8 @@ Proof
       fs[] >> rveq >> fs[] >> rveq >> fs[]
       >- (* Send-last-payload *)
          (Cases_on `e` >> fs[compile_endpoint_def] >> rveq >> fs[] >>
-          rename1 `pad _ d` >> rename1 `NEndpoint l s (Send p v e)` >>
-          qexists_tac `NEndpoint l s e` >> qexists_tac `d` >>
+          rename1 `pad _ d` >> rename1 `NEndpoint s s0 (Send p v e)` >>
+          qexists_tac `NEndpoint s s0 e` >> qexists_tac `d` >>
           conj_tac >- rw[Once compile_message_def] >>
           conj_tac >- (fs[compile_state_def] >> metis_tac[trans_send]) >>
           fs[compile_state_def] >>
@@ -535,8 +535,8 @@ Proof
           fs[final_pad_LENGTH])
       >- (* Send-intermediate-payload *)
          (Cases_on `e` >> fs[compile_endpoint_def] >> rveq >> fs[] >>
-          rename1 `pad _ d` >> rename1 `NEndpoint l s (Send p v e)` >>
-          qexists_tac `NEndpoint l s e` >> qexists_tac `d` >>
+          rename1 `pad _ d` >> rename1 `NEndpoint s s0 (Send p v e)` >>
+          qexists_tac `NEndpoint s s0 e` >> qexists_tac `d` >>
           conj_tac >- rw[Once compile_message_def] >>
           conj_tac >- (fs[compile_state_def] >> metis_tac[trans_send]) >>
           rw[compile_network_def,Once compile_message_def,list_trans_def,DROP_LENGTH_TOO_LONG] >>
@@ -584,7 +584,8 @@ Proof
      (fs[payloadSemTheory.reduction_def] >>
       qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once payloadSemTheory.trans_cases]) >>
       fs[] >> rveq >> fs[] >> rveq >> fs[] >>
-      qexists_tac `NEndpoint l (s with queue := SNOC (s',d) s.queue) e` >>
+      rename1 ‘endpointLang$NEndpoint p st’ >>
+      qexists_tac `NEndpoint p (st with queue := SNOC (s',d) st.queue) e` >>
       rw[trans_enqueue] >>
       fs[compile_network_def] >>
       rw[Once compile_message_def] >-
@@ -596,7 +597,7 @@ Proof
       simp[compile_queue_SNOC] >>
       qmatch_goalsub_abbrev_tac `_ with queues := qa` >>
       disch_then(qspecl_then [`DROP conf.payload_size d`,
-                              `qa`,`compile_endpoint e`,`<|bindings := s.bindings|>`] mp_tac) >>
+                              `qa`,`compile_endpoint e`,`<|bindings := st.bindings|>`] mp_tac) >>
       fs[] >>
       match_mp_tac(DECIDE “∀x y. x = y ⇒ (x ⇒ y)”) >>
       rpt(AP_TERM_TAC ORELSE AP_THM_TAC) >>
@@ -689,7 +690,9 @@ Proof
               fs[SPLITP_APPEND,EXISTS_REPLICATE,APPEND_EQ_CONS] >>
               rveq >> fs[] >> fs[SPLITP]) >>
           rveq >>
-          qexists_tac `NEndpoint l <|bindings := s.bindings |+ (s', unpad d);
+          rename1 ‘NEndpoint p’ >>
+          rename1 ‘s.bindings’ >>
+          qexists_tac `NEndpoint p <|bindings := s.bindings |+ (s', unpad d);
                                      queue := q11 ++ q22|> ec` >>
           simp[compile_network_def,compile_queue_SNOC,reduction_def,compile_state_def] >>
           conj_tac >- simp[compile_queue_midskip_lemma] >>
@@ -699,7 +702,9 @@ Proof
          (Cases_on `e` >> fs[compile_endpoint_def,compile_state_def] >> rveq >>
           drule_all_then strip_assume_tac compile_queue_split >>
           rename1 `endpointLang$Receive p v exp` >>
-          qexists_tac `NEndpoint l <|queue := q11 ++ q22;bindings:=s.bindings |+ (v,ds)|> exp` >>
+          rename1 ‘NEndpoint q’ >>
+          rename1 ‘s.bindings’ >>
+          qexists_tac `NEndpoint q <|queue := q11 ++ q22;bindings:=s.bindings |+ (v,ds)|> exp` >>
           reverse conj_asm2_tac >-
             (rw[reduction_def] >>
              match_mp_tac(trans_dequeue |> SIMP_RULE (srw_ss()) []) >>
@@ -732,21 +737,27 @@ Proof
       >- (* If-L *)
          (Cases_on `e` >> fs[compile_endpoint_def,compile_state_def] >> rveq >>
           rename1 `compile_endpoint e1` >>
-          qexists_tac `NEndpoint l s e1` >>
+          rename1 ‘NEndpoint p’ >>
+          rename1 ‘NEndpoint _ s (IfThen _ _ _)’ >>
+          qexists_tac `NEndpoint p s e1` >>
           simp[compile_network_def] >>
           simp[reduction_def,compile_state_def] >>
           metis_tac[trans_if_true])
       >- (* If-R *)
          (Cases_on `e` >> fs[compile_endpoint_def,compile_state_def] >> rveq >>
           rename1 `compile_endpoint e1` >>
-          qexists_tac `NEndpoint l s e1` >>
+          rename1 ‘NEndpoint p’ >>
+          rename1 ‘NEndpoint _ s (IfThen _ _ _)’ >>
+          qexists_tac `NEndpoint p s e1` >>
           simp[compile_network_def] >>
           simp[reduction_def,compile_state_def] >>
           metis_tac[trans_if_false])
       >- (* Let *)
          (Cases_on `e` >> fs[compile_endpoint_def,compile_state_def] >> rveq >>
           rename1 `compile_endpoint e1` >>
-          qexists_tac `NEndpoint l (s with bindings := s.bindings |+ (s',f (MAP (THE ∘ FLOOKUP s.bindings) l'))) e1` >> (* TODO: generated names*)
+          rename1 ‘NEndpoint p’ >>
+          rename1 ‘NEndpoint _ s (Let v _ _ _)’ >>
+          qexists_tac `NEndpoint p (s with bindings := s.bindings |+ (v,f (MAP (THE ∘ FLOOKUP s.bindings) l))) e1` >>
           simp[compile_network_def] >>
           simp[reduction_def,compile_state_def] >>
           metis_tac[trans_let]))
