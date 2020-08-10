@@ -115,6 +115,17 @@ Inductive lcong:
     ⇒ lcong (h ++ [t1;t2] ++ t) (h ++ [t2;t1] ++ t))
 End
 
+Datatype:
+  chor_state =
+  <| vars : (varN #proc) |-> datum;
+     funs : (varN,'v) alist
+   |>
+End
+
+Datatype:
+ closure = Closure ((varN#proc) list) ((varN,closure) alist) chor
+End
+
 val _ = Parse.add_infix("τ≅",425,Parse.NONASSOC);
 val _ = Parse.overload_on("τ≅",``lcong``);
 
@@ -124,87 +135,90 @@ val [lcong_sym,lcong_refl,lcong_trans,lcong_reord] =
 
 Inductive trans:
   (* Communication *)
-  (∀e s v1 p1 v2 p2 d c.
-    FLOOKUP s (v1,p1) = SOME d
+  (∀s v1 p1 v2 p2 d c.
+    FLOOKUP s.vars (v1,p1) = SOME d
     ∧ p1 ≠ p2
-    ⇒ trans ((e,s),Com p1 v1 p2 v2 c) (LCom p1 v1 p2 v2,[]) ((e,s |+ ((v2,p2),d)),c))
+    ⇒ trans (s,Com p1 v1 p2 v2 c) (LCom p1 v1 p2 v2,[]) (s with vars := s.vars |+ ((v2,p2),d),c))
 
   (* Selection *)
-∧ (∀e s p1 b p2 c.
+∧ (∀s p1 b p2 c.
     p1 ≠ p2
-    ⇒ trans ((e,s),Sel p1 b p2 c) (LSel p1 b p2,[]) ((e,s),c))
+    ⇒ trans (s,Sel p1 b p2 c) (LSel p1 b p2,[]) (s,c))
 
   (* Let *)
-∧ (∀e s v p f vl c.
-    EVERY IS_SOME (MAP (FLOOKUP s) (MAP (λv. (v,p)) vl))
-    ⇒ trans ((e,s),Let v p f vl c)
+∧ (∀s v p f vl c.
+    EVERY IS_SOME (MAP (FLOOKUP s.vars) (MAP (λv. (v,p)) vl))
+    ⇒ trans (s,Let v p f vl c)
             (LLet v p f vl,[])
-            ((e,s |+ ((v,p),f(MAP (THE o FLOOKUP s) (MAP (λv. (v,p)) vl)))),c))
+            (s with vars := s.vars |+ ((v,p),f(MAP (THE o FLOOKUP s.vars) (MAP (λv. (v,p)) vl))),c))
 
   (* If (True) *)
-∧ (∀e s v p c1 c2.
-    FLOOKUP s (v,p) = SOME [1w]
-    ⇒ trans ((e,s),IfThen v p c1 c2) (LTau p v,[]) ((e,s),c1))
+∧ (∀s v p c1 c2.
+    FLOOKUP s.vars (v,p) = SOME [1w]
+    ⇒ trans (s,IfThen v p c1 c2) (LTau p v,[]) (s,c1))
 
   (* If (False) *)
-∧ (∀e s v p c1 c2.
-    FLOOKUP s (v,p) = SOME w ∧ w ≠ [1w]
-    ⇒ trans ((e,s),IfThen v p c1 c2) (LTau p v,[]) ((e,s),c2))
+∧ (∀s v p c1 c2.
+    FLOOKUP s.vars (v,p) = SOME w ∧ w ≠ [1w]
+    ⇒ trans (s,IfThen v p c1 c2) (LTau p v,[]) (s,c2))
 
    (* Letrec *)
-∧ (∀e s v params c1 c2 alpha l e' s' c3.
-    trans ((e |+ (v,params,c1),s),c1) (alpha,l) ((e',s'),c3)
+∧ (∀s v params c1 c2 alpha l s' c3.
+    trans (s with funs := (v,Closure params s.funs c1)::s.funs,c2) (alpha,l) (s',c3)
     ⇒ trans
-        ((e,s),Letrec v args c1 c2)
+        (s,Letrec v params c1 c2)
         (alpha,l)
-        ((e',s'),c3))
+        (s',c3))
 
    (* Call *)
-∧ (∀e s v args params c.
+∧ (∀s v args params s' c.
     ALL_DISTINCT args ∧
-    EVERY IS_SOME (MAP (FLOOKUP s) args) ∧
+    EVERY IS_SOME (MAP (FLOOKUP s.vars) args) ∧
     MAP FST params = MAP FST args ∧
-    FLOOKUP e v = SOME (params,c)
+    ALOOKUP s.funs v = SOME (Closure params s' c)
     ⇒ trans
-        ((e,s),Call v args)
+        (s,Call v args)
         (LRec vl,[])
-        ((e,(FEMPTY |++ ZIP (params,MAP (THE o FLOOKUP s) args))),c))
+        (s with <| vars := FEMPTY |++ ZIP (params,MAP (THE o FLOOKUP s.vars) args);
+                   funs := (v,Closure params s' c)::s'
+                 |>,
+         c))
 
   (* Swapping transitions / Structural congruence *)
-∧ (∀e s v p c1 c2 e' s' c1' c2' l l' alpha.
-    trans ((e,s),c1) (alpha,l) ((e',s'),c1')
-    ∧ trans ((e,s),c2) (alpha,l') ((e',s'),c2')
+∧ (∀s v p c1 c2 s' c1' c2' l l' alpha.
+    trans (s,c1) (alpha,l) (s',c1')
+    ∧ trans (s,c2) (alpha,l') (s',c2')
     ∧ l τ≅ l'
     ∧ p ∉ freeprocs alpha
-    ⇒ trans ((e,s),IfThen v p c1 c2) (alpha,l) ((e',s'),IfThen v p c1' c2'))
-∧ (∀e s c e' s' c' p1 v1 p2 v2 l alpha.
-    trans ((e,s),c) (alpha,l) ((e',s'),c')
+    ⇒ trans (s,IfThen v p c1 c2) (alpha,l) (s',IfThen v p c1' c2'))
+∧ (∀s c s' c' p1 v1 p2 v2 l alpha.
+    trans (s,c) (alpha,l) (s',c')
     ∧ p1 ∉ freeprocs alpha
     ∧ p2 ∉ freeprocs alpha
-    ⇒ trans ((e,s),Com p1 v1 p2 v2 c) (alpha,l) ((e',s'),Com p1 v1 p2 v2 c'))
-∧ (∀e s c e' s' c' p1 b p2 l alpha.
-    trans ((e,s),c) (alpha,l) ((e',s'),c')
+    ⇒ trans (s,Com p1 v1 p2 v2 c) (alpha,l) (s',Com p1 v1 p2 v2 c'))
+∧ (∀s c s' c' p1 b p2 l alpha.
+    trans (s,c) (alpha,l) (s',c')
     ∧ p1 ∉ freeprocs alpha
     ∧ p2 ∉ freeprocs alpha
-    ⇒ trans ((e,s),Sel p1 b p2 c) (alpha,l) ((e',s'),Sel p1 b p2 c'))
-∧ (∀e s c e' s' c' p v f vl l alpha.
-    trans ((e,s),c) (alpha,l) ((e',s'),c')
+    ⇒ trans (s,Sel p1 b p2 c) (alpha,l) (s',Sel p1 b p2 c'))
+∧ (∀s c s' c' p v f vl l alpha.
+    trans (s,c) (alpha,l) (s',c')
     ∧ p ∉ freeprocs alpha
-    ⇒ trans ((e,s),Let v p f vl c) (alpha,l) ((e',s'),Let v p f vl c'))
+    ⇒ trans (s,Let v p f vl c) (alpha,l) (s',Let v p f vl c'))
 
   (* Asynchrony *)
-∧ (∀e s c e' s' c' p1 v1 p2 v2 l alpha.
-    trans ((e,s),c) (alpha,l) ((e',s'),c')
+∧ (∀s c s' c' p1 v1 p2 v2 l alpha.
+    trans (s,c) (alpha,l) (s',c')
     ∧ p1 ∈ freeprocs alpha
     ∧ written alpha ≠ SOME (v1,p1)
     ∧ p2 ∉ freeprocs alpha
-    ⇒ trans ((e,s),Com p1 v1 p2 v2 c) (alpha,LCom p1 v1 p2 v2::l) ((e,s'),Com p1 v1 p2 v2 c'))
+    ⇒ trans (s,Com p1 v1 p2 v2 c) (alpha,LCom p1 v1 p2 v2::l) (s',Com p1 v1 p2 v2 c'))
 
-∧ (∀e s c e' s' c' p1 b p2 l alpha.
-    trans ((e,s),c) (alpha,l) ((e',s'),c')
+∧ (∀s c s' c' p1 b p2 l alpha.
+    trans (s,c) (alpha,l) (s',c')
     ∧ p1 ∈ freeprocs alpha
     ∧ p2 ∉ freeprocs alpha
-    ⇒ trans ((e,s),Sel p1 b p2 c) (alpha,LSel p1 b p2::l) ((e',s'),Sel p1 b p2 c'))
+    ⇒ trans (s,Sel p1 b p2 c) (alpha,LSel p1 b p2::l) (s',Sel p1 b p2 c'))
 End
 
 val _ = zip ["trans_com","trans_sel","trans_let","trans_if_true","trans_if_false",
