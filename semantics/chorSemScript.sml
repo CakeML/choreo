@@ -123,7 +123,7 @@ Datatype:
 End
 
 Datatype:
- closure = Closure ((varN#proc) list) ((varN,closure) alist) chor
+ closure = Closure ((varN#proc) list) (closure chor_state) chor
 End
 
 val _ = Parse.add_infix("τ≅",425,Parse.NONASSOC);
@@ -164,7 +164,7 @@ Inductive trans:
 
    (* Letrec *)
 ∧ (∀s v params c1 c2 alpha l s' c3.
-    trans (s with funs := (v,Closure params s.funs c1)::s.funs,c2) (alpha,l) (s',c3)
+    trans (s with funs := (v,Closure params s c1)::s.funs,c2) (alpha,l) (s',c3)
     ⇒ trans
         (s,Letrec v params c1 c2)
         (alpha,l)
@@ -179,8 +179,8 @@ Inductive trans:
     ⇒ trans
         (s,Call v args)
         (LRec vl,[])
-        (s with <| vars := FEMPTY |++ ZIP (params,MAP (THE o FLOOKUP s.vars) args);
-                   funs := (v,Closure params s' c)::s'
+        (s' with <| vars := FEMPTY |++ ZIP (params,MAP (THE o FLOOKUP s.vars) args);
+                    funs := (v,Closure params s' c)::s'.funs
                  |>,
          c))
 
