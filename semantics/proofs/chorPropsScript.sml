@@ -297,14 +297,6 @@ Proof
   metis_tac [trans_s_submap_gen]
 QED
 
-Definition free_variables_def:
-  (free_variables (Nil) = {}) /\
-  (free_variables (IfThen v p c1 c2) = {(v,p)} ∪ (free_variables c1 ∪ free_variables c2)) /\
-  (free_variables (Com p1 v1 p2 v2 c) = {(v1,p1)} ∪ (free_variables c DELETE (v2,p2))) /\
-  (free_variables (Let v p f vl c) = set(MAP (λv. (v,p)) vl) ∪ (free_variables c DELETE (v,p))) /\
-  (free_variables (Sel p b q c) = free_variables c)
-End
-
 Definition defined_vars_def:
   defined_vars (s,c) = FDOM s
 End

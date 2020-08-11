@@ -9,6 +9,7 @@ Datatype:
         | LCom proc varN proc varN
         | LSel proc bool proc
         | LLet varN proc (datum list -> datum) (varN list)
+        | LLetrec ((varN # proc) set)
         | LRec ((varN # proc) list)
 End
 
@@ -18,6 +19,7 @@ Definition freeprocs_def:
 ∧ freeprocs (LSel p1 b p2)     = {p1;p2}
 ∧ freeprocs (LSel p1 b p2)     = {p1;p2}
 ∧ freeprocs (LLet v p f vl)    = {p}
+∧ freeprocs (LLetrec vl)    = IMAGE SND vl
 ∧ freeprocs (LRec vl)          = set(MAP SND vl)
 End
 
@@ -34,15 +36,17 @@ Definition receiver_def:
 ∧ receiver (LCom p1 v1 p2 v2)  = SOME p2
 ∧ receiver (LSel p1 b p2)      = SOME p2
 ∧ receiver (LLet v p f vl)     = NONE
+∧ receiver (LLetrec vl)        = NONE
 ∧ receiver (LRec vl)           = NONE
 End
 
 Definition written_def:
-  written (LTau p n)          = NONE
-∧ written (LCom p1 v1 p2 v2) = SOME(v2,p2)
-∧ written (LSel p1 b p2)     = NONE
-∧ written (LLet v p f vl)    = SOME(v,p)
-∧ written (LRec vl)          = NONE
+  written (LTau p n)          = {}
+∧ written (LCom p1 v1 p2 v2) = {(v2,p2)}
+∧ written (LSel p1 b p2)     = {}
+∧ written (LLet v p f vl)    = {(v,p)}
+∧ written (LLetrec vl)       = vl
+∧ written (LRec vl)          = {}
 End
 
 Definition read_def:
@@ -50,6 +54,7 @@ Definition read_def:
 ∧ read (LCom p1 v1 p2 v2) = {(v1,p1)}
 ∧ read (LSel p1 b p2)     = {}
 ∧ read (LLet v p f vl)    = set(MAP (λv. (v,p)) vl)
+∧ read (LLetrec vl)       = vl
 ∧ read (LRec vl)          = set vl
 End
 
@@ -69,6 +74,7 @@ Theorem procsOf_all_distinct:
 Proof
   Induct_on `c` >> rw [procsOf_def,ALL_DISTINCT,all_distinct_nub']
 QED
+
 
 (* The set of all processes in a choreography that need to receive from a specific process *)
 Definition receiversOf_def:
@@ -91,6 +97,16 @@ Definition letfunsOf_def:
 ∧ letfunsOf pn (Let _ p f _ c)    = (if p = pn then f::letfunsOf pn c else  letfunsOf pn c)
 ∧ letfunsOf pn (Letrec _ _ c c')  = letfunsOf pn c ++ letfunsOf pn c'
 ∧ letfunsOf pn (Call _ _)           = []
+End
+
+Definition free_variables_def:
+  (free_variables (Nil) = {}) /\
+  (free_variables (IfThen v p c1 c2) = {(v,p)} ∪ (free_variables c1 ∪ free_variables c2)) ∧
+  (free_variables (Com p1 v1 p2 v2 c) = {(v1,p1)} ∪ (free_variables c DELETE (v2,p2))) ∧
+  (free_variables (Let v p f vl c) = set(MAP (λv. (v,p)) vl) ∪ (free_variables c DELETE (v,p))) ∧
+  (free_variables (Sel p b q c) = free_variables c) ∧
+  (free_variables (Letrec n vl c c') = ((free_variables c DIFF set vl) ∪ free_variables c')) ∧
+  (free_variables (Call n vl) = set vl)
 End
 
 Inductive lcong:
@@ -163,12 +179,16 @@ Inductive trans:
     ⇒ trans (s,IfThen v p c1 c2) (LTau p v,[]) (s,c2))
 
    (* Letrec *)
-∧ (∀s v params c1 c2 alpha l s' c3.
-    trans (s with funs := (v,Closure params s c1)::s.funs,c2) (alpha,l) (s',c3)
-    ⇒ trans
-        (s,Letrec v params c1 c2)
-        (alpha,l)
-        (s',c3))
+∧ (∀s v params c1 c2.
+    trans
+      (s,Letrec v params c1 c2)
+      (LLetrec (free_variables c1 DIFF set params),[])
+      (s with funs := (v,
+                       Closure params
+                               (s with vars := DRESTRICT s.vars
+                                                         (free_variables c1 DIFF set params))
+                               c1)::s.funs,
+       c2))
 
    (* Call *)
 ∧ (∀s v args params s' c.
@@ -179,7 +199,7 @@ Inductive trans:
     ⇒ trans
         (s,Call v args)
         (LRec vl,[])
-        (s' with <| vars := FEMPTY |++ ZIP (params,MAP (THE o FLOOKUP s.vars) args);
+        (s' with <| vars := (s'.vars ⊌ s.vars) |++ ZIP (params,MAP (THE o FLOOKUP s.vars) args);
                     funs := (v,Closure params s' c)::s'.funs
                  |>,
          c))
@@ -210,7 +230,7 @@ Inductive trans:
 ∧ (∀s c s' c' p1 v1 p2 v2 l alpha.
     trans (s,c) (alpha,l) (s',c')
     ∧ p1 ∈ freeprocs alpha
-    ∧ written alpha ≠ SOME (v1,p1)
+    ∧ (v1,p1) ∉ written alpha
     ∧ p2 ∉ freeprocs alpha
     ⇒ trans (s,Com p1 v1 p2 v2 c) (alpha,LCom p1 v1 p2 v2::l) (s',Com p1 v1 p2 v2 c'))
 
