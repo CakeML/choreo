@@ -204,7 +204,7 @@ End
 
 val _ = zip ["trans_com","trans_sel","trans_let","trans_if_true","trans_if_false",
               "trans_if_swap","trans_com_swap","trans_sel_swap","trans_let_swap",
-              "trans_com_async","trans_sel_async","trans_letrec"]
+              "trans_com_async","trans_sel_async","trans_fix"]
             (CONJUNCTS trans_rules) |> map save_thm;
 
 Theorem trans_pairind =
