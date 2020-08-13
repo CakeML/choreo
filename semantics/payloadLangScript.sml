@@ -17,6 +17,8 @@ Datatype:
            | Receive proc varN (datum list) endpoint
            | IfThen varN endpoint endpoint
            | Let varN (datum list -> datum) (varN list) endpoint
+           | Fix dvarN endpoint
+           | Call dvarN
 End
 
 Datatype:
@@ -41,41 +43,47 @@ Datatype:
               |>
 End
 
-val var_names_endpoint_def = Define `
+Definition var_names_endpoint_def:
    (var_names_endpoint Nil = [])
-/\ (var_names_endpoint (Send p v n e) = v::var_names_endpoint e)
-/\ (var_names_endpoint (Receive p v d e) = v::var_names_endpoint e)
-/\ (var_names_endpoint (IfThen v e1 e2) = v::var_names_endpoint e1 ++ var_names_endpoint e2)
-/\ (var_names_endpoint (Let v f vl e) = v::vl ++ var_names_endpoint e)
-`
+∧ (var_names_endpoint (Send p v n e) = v::var_names_endpoint e)
+∧ (var_names_endpoint (Receive p v d e) = v::var_names_endpoint e)
+∧ (var_names_endpoint (IfThen v e1 e2) = v::var_names_endpoint e1 ++ var_names_endpoint e2)
+∧ (var_names_endpoint (Let v f vl e) = v::vl ++ var_names_endpoint e)
+∧ (var_names_endpoint (Fix dv e) = var_names_endpoint e)
+∧ (var_names_endpoint (Call dv) = [])
+End
 
-val free_var_names_endpoint_def = Define `
+Definition free_var_names_endpoint_def:
    (free_var_names_endpoint Nil = [])
-/\ (free_var_names_endpoint (Send p v n e) = v::free_var_names_endpoint e)
-/\ (free_var_names_endpoint (Receive p v d e) = FILTER ($≠ v) (free_var_names_endpoint e))
-/\ (free_var_names_endpoint (IfThen v e1 e2) = v::free_var_names_endpoint e1 ++ free_var_names_endpoint e2)
-/\ (free_var_names_endpoint (Let v f vl e) = vl ++ FILTER ($≠ v) (free_var_names_endpoint e))
-`
+∧ (free_var_names_endpoint (Send p v n e) = v::free_var_names_endpoint e)
+∧ (free_var_names_endpoint (Receive p v d e) = FILTER ($≠ v) (free_var_names_endpoint e))
+∧ (free_var_names_endpoint (IfThen v e1 e2) = v::free_var_names_endpoint e1 ++ free_var_names_endpoint e2)
+∧ (free_var_names_endpoint (Let v f vl e) = vl ++ FILTER ($≠ v) (free_var_names_endpoint e))
+∧ (free_var_names_endpoint (Fix dv e) = free_var_names_endpoint e)
+∧ (free_var_names_endpoint (Call dv) = [])
+End
 
-val var_names_network_def = Define `
+Definition var_names_network_def:
    (var_names_network NNil = [])
-/\ (var_names_network (NEndpoint p s e) = var_names_endpoint e)
-/\ (var_names_network (NPar n1 n2) = var_names_network n1 ++ var_names_network n2)`
+∧ (var_names_network (NEndpoint p s e) = var_names_endpoint e)
+∧ (var_names_network (NPar n1 n2) = var_names_network n1 ++ var_names_network n2)
+End
 
-val free_var_names_network_def = Define `
+Definition free_var_names_network_def:
    (free_var_names_network NNil = [])
-/\ (free_var_names_network (NEndpoint p s e) = free_var_names_endpoint e)
-/\ (free_var_names_network (NPar n1 n2) = free_var_names_network n1 ++ free_var_names_network n2)`
+∧ (free_var_names_network (NEndpoint p s e) = free_var_names_endpoint e)
+∧ (free_var_names_network (NPar n1 n2) = free_var_names_network n1 ++ free_var_names_network n2)
+End
 
-val final_def = Define `
+Definition final_def:
   final (w::d) = (w = 7w:word8 \/ w = 6w:word8)
-  /\ final _ = F
-`
+  ∧ final _ = F
+End
 
-val intermediate_def = Define `
+Definition intermediate_def:
   intermediate (w::d) = (w = 2w:word8)
-  /\ intermediate _ = F
-`
+  ∧ intermediate _ = F
+End
 
 Definition fget_def:
   fget fm dv k =
@@ -178,6 +186,24 @@ Definition net_end_def:
 ∧ net_end (NEndpoint _ _ Nil) = T
 ∧ net_end (NPar l r) = (net_end l ∧ net_end r)
 ∧ net_end _ = F
+End
+
+Definition dsubst_def:
+   dsubst payloadLang$Nil dn e' = payloadLang$Nil
+∧ dsubst (Send p v n e) dn e' = Send p v n (dsubst e dn e')
+∧ dsubst (Receive p v d e) dn e' = Receive p v d (dsubst e dn e')
+∧ dsubst (IfThen v e1 e2) dn e' = IfThen v (dsubst e1 dn e') (dsubst e2 dn e')
+∧ dsubst (Let v f vl e) dn e' = Let v f vl (dsubst e dn e')
+∧ dsubst (Fix dn' e) dn e' =
+   (if dn = dn' then
+      Fix dn' e
+    else
+      Fix dn' (dsubst e dn e'))
+∧ dsubst (Call dn') dn e' =
+   (if dn = dn' then
+      e'
+    else
+      Call dn')
 End
 
 val _ = export_theory ()

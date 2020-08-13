@@ -2,11 +2,11 @@ open preamble payloadLangTheory
 
 val _ = new_theory "payloadSem";
 
-val _ = Datatype `
+Datatype:
  label = LSend proc datum proc
        | LReceive proc datum proc
        | LTau
-`
+End
 
 Inductive trans:
   (* Send-last-payload *)
@@ -111,29 +111,37 @@ Inductive trans:
     ⇒ trans conf (NPar n1 n2)
              α
              (NPar n1 n2'))
+
+  (* Recursion *)
+∧ (∀conf p s dn e alpha n.
+    trans conf (NEndpoint p s (dsubst e dn (Fix dn e))) alpha n
+    ⇒ trans conf (NEndpoint p s (Fix dn e)) alpha n)
 End
 
 val _ = zip ["trans_send_last_payload","trans_send_intermediate_payload",
              "trans_enqueue","trans_com_l","trans_com_r",
              "trans_dequeue_last_payload","trans_dequeue_intermediate_payload",
-             "trans_if_true","trans_if_false","trans_let","trans_par_l","trans_par_r"]
+             "trans_if_true","trans_if_false","trans_let","trans_par_l","trans_par_r","trans_fix"]
             (CONJUNCTS trans_rules) |> map save_thm;
 
-val reduction_def = Define `
-  reduction conf p q = trans conf p LTau q`
+Definition reduction_def:
+  reduction conf p q = trans conf p LTau q
+End
 
-val weak_tau_trans_def = Define `
+Definition weak_tau_trans_def:
   weak_tau_trans conf p alpha q =
-    ?p' q'. (reduction conf)^* p p' /\ trans conf p' alpha q' /\ (reduction conf)^* q' q`
+    ?p' q'. (reduction conf)^* p p' ∧ trans conf p' alpha q' ∧ (reduction conf)^* q' q
+End
 
-val weak_trans_def = Define `
+Definition weak_trans_def:
   weak_trans conf p alpha q =
-    if alpha = LTau then (reduction conf)^* p q else weak_tau_trans conf p alpha q`
+    if alpha = LTau then (reduction conf)^* p q else weak_tau_trans conf p alpha q
+End
 
-val sender_def = Define `
-  sender LTau = NONE /\
-  (sender (LReceive p d q) = SOME p) /\
+Definition sender_def:
+  sender LTau = NONE ∧
+  (sender (LReceive p d q) = SOME p) ∧
   (sender (LSend p d q) = SOME p)
-  `
+End
 
 val _ = export_theory ()
