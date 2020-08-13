@@ -28,6 +28,7 @@ Definition compile_endpoint_def :
     Receive p fv (IfThen fv (compile_endpoint fv e1) (compile_endpoint fv e2)))
 ∧ (compile_endpoint fv (IfThen v e1 e2) = IfThen v (compile_endpoint fv e1) (compile_endpoint fv e2))
 ∧ (compile_endpoint fv (Let v f vl e) = Let v f vl (compile_endpoint fv e))
+∧ (compile_endpoint fv (Fix dn e) = Fix dn (compile_endpoint fv e))
 End
 
 Definition compile_network_fv_def :
