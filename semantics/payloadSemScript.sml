@@ -133,7 +133,7 @@ Inductive trans:
           (NEndpoint p s (FCall dn args))
           LTau
           (NEndpoint p (s with <|bindings := bindings |++ ZIP(args,MAP (THE o FLOOKUP s.bindings) args);
-                                 funs := funs|>) e))
+                                 funs := (dn,Closure params (fun,bindings) e)::funs|>) e))
 End
 
 val _ = zip ["trans_send_last_payload","trans_send_intermediate_payload",
