@@ -8,6 +8,7 @@ val _ = new_theory "payloadLang";
 
 Datatype:
   state = <| bindings : varN |-> datum;
+             funs : (dvarN,'v) alist;
              queues : proc |-> datum list  |>
 End
 
@@ -19,12 +20,18 @@ Datatype:
            | Let varN (datum list -> datum) (varN list) endpoint
            | Fix dvarN endpoint
            | Call dvarN
+           | Letrec dvarN (varN list) endpoint endpoint
+           | FCall dvarN (varN list)
+End
+
+Datatype:
+ closure = Closure (varN list) ((dvarN,closure) alist # (varN |-> datum)) endpoint
 End
 
 Datatype:
   network = NNil
           | NPar network network
-          | NEndpoint proc state endpoint
+          | NEndpoint proc (closure state) endpoint
 End
 
 Datatype:
@@ -51,6 +58,8 @@ Definition var_names_endpoint_def:
 ∧ (var_names_endpoint (Let v f vl e) = v::vl ++ var_names_endpoint e)
 ∧ (var_names_endpoint (Fix dv e) = var_names_endpoint e)
 ∧ (var_names_endpoint (Call dv) = [])
+∧ (var_names_endpoint (Letrec dv vars e1 e2) = vars ++ var_names_endpoint e1 ++ var_names_endpoint e2)
+∧ (var_names_endpoint (FCall dv vars) = vars)
 End
 
 Definition free_var_names_endpoint_def:
@@ -61,6 +70,8 @@ Definition free_var_names_endpoint_def:
 ∧ (free_var_names_endpoint (Let v f vl e) = vl ++ FILTER ($≠ v) (free_var_names_endpoint e))
 ∧ (free_var_names_endpoint (Fix dv e) = free_var_names_endpoint e)
 ∧ (free_var_names_endpoint (Call dv) = [])
+∧ (free_var_names_endpoint (Letrec dv vars e1 e2) = FILTER (λn. ~MEM n vars) (free_var_names_endpoint e1) ++ free_var_names_endpoint e2)
+∧ (free_var_names_endpoint (FCall dv vars) = vars)
 End
 
 Definition var_names_network_def:
@@ -204,6 +215,10 @@ Definition dsubst_def:
       e'
     else
       Call dn')
+∧ dsubst (Letrec dn' vars e1 e2) dn e' =
+   Letrec dn' vars (dsubst e1 dn e') (dsubst e2 dn e')
+∧ dsubst (FCall dn' vars) dn e' =
+   FCall dn' vars
 End
 
 val _ = export_theory ()

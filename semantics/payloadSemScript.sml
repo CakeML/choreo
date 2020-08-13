@@ -112,16 +112,35 @@ Inductive trans:
              α
              (NPar n1 n2'))
 
-  (* Recursion *)
+  (* Recursion, fixpoint style *)
 ∧ (∀conf p s dn e alpha n.
     trans conf (NEndpoint p s (dsubst e dn (Fix dn e))) alpha n
     ⇒ trans conf (NEndpoint p s (Fix dn e)) alpha n)
+
+  (* Recursion, letrec style *)
+∧ (∀conf p s dn vars e1 e2.
+    trans conf
+          (NEndpoint p s (Letrec dn vars e1 e2))
+          LTau
+          (NEndpoint p (s with funs := (dn,Closure vars (s.funs,s.bindings) e1)::s.funs) e2))
+
+∧ (∀conf p s dn args params funs bindings e.
+    ALOOKUP s.funs dn = SOME(Closure params (funs,bindings) e) ∧
+    LENGTH args = LENGTH params ∧
+    EVERY (IS_SOME o FLOOKUP s.bindings) args
+    ⇒
+    trans conf
+          (NEndpoint p s (FCall dn args))
+          LTau
+          (NEndpoint p (s with <|bindings := bindings |++ ZIP(args,MAP (THE o FLOOKUP s.bindings) args);
+                                 funs := funs|>) e))
 End
 
 val _ = zip ["trans_send_last_payload","trans_send_intermediate_payload",
              "trans_enqueue","trans_com_l","trans_com_r",
              "trans_dequeue_last_payload","trans_dequeue_intermediate_payload",
-             "trans_if_true","trans_if_false","trans_let","trans_par_l","trans_par_r","trans_fix"]
+             "trans_if_true","trans_if_false","trans_let","trans_par_l","trans_par_r","trans_fix",
+             "trans_letrec","trans_call"]
             (CONJUNCTS trans_rules) |> map save_thm;
 
 Definition reduction_def:
