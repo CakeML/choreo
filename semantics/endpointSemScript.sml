@@ -2,15 +2,15 @@ open preamble endpointLangTheory
 
 val _ = new_theory "endpointSem";
 
-val _ = Datatype `
+Datatype:
  label = LSend proc datum proc
        | LReceive proc datum proc
        | LIntChoice proc bool proc
        | LExtChoice proc bool proc
        | LTau
-`
+End
 
-val (trans_rules,trans_ind,trans_cases) = Hol_reln `
+Inductive trans:
 
   (* Send *)
   (∀s v d p1 p2 e.
@@ -73,7 +73,7 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
     ⇒ trans (NPar n1 n2) LTau (NPar n1' n2'))
 
   (* Dequeue (aka Receive) *)
-∧ (∀s v p1 p2 e q1 q2.
+∧ (∀s v p1 d p2 e q1 q2.
     s.queue = q1 ++ [(p1,d)] ++ q2
     ∧ p1 ≠ p2
     ∧ EVERY (λ(p,_). p ≠ p1) q1
@@ -135,7 +135,12 @@ val (trans_rules,trans_ind,trans_cases) = Hol_reln `
     ⇒ trans (NPar n1 n2)
              alpha
              (NPar n1 n2'))
-`
+
+  (* Recursion *)
+∧ (∀p s dn e alpha n.
+    trans (NEndpoint p s (dsubst e dn (Fix dn e))) alpha n
+    ⇒ trans (NEndpoint p s (Fix dn e)) alpha n)
+End
 
 val _ = zip [ "trans_send","trans_enqueue"
             , "trans_com_l","trans_com_r"
@@ -146,18 +151,21 @@ val _ = zip [ "trans_send","trans_enqueue"
             , "trans_ext_choice_l","trans_ext_choice_r"
             , "trans_if_true","trans_if_false"
             , "trans_let"
-            , "trans_par_l","trans_par_r"]
+            , "trans_par_l","trans_par_r","trans_fix"]
             (CONJUNCTS trans_rules) |> map save_thm;
 
-val reduction_def = Define `
-  reduction p q = trans p LTau q`
+Definition reduction_def:
+  reduction p q = trans p LTau q
+End
 
-val weak_tau_trans_def = Define `
+Definition weak_tau_trans_def:
   weak_tau_trans p alpha q =
-    ?p' q'. reduction^* p p' /\ trans p' alpha q' /\ reduction^* q' q`
+    ?p' q'. reduction^* p p' /\ trans p' alpha q' /\ reduction^* q' q
+End
 
-val weak_trans_def = Define `
+Definition weak_trans_def:
   weak_trans p alpha q =
-    if alpha = LTau then reduction^* p q else weak_tau_trans p alpha q`
+    if alpha = LTau then reduction^* p q else weak_tau_trans p alpha q
+End
 
 val _ = export_theory ()
