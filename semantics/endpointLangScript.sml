@@ -90,11 +90,11 @@ End
 Definition dsubst_def:
    dsubst endpointLang$Nil dn e' = endpointLang$Nil
 ∧ dsubst (Send p v e) dn e' = Send p v (dsubst e dn e')
-∧ dsubst (Receive p v e) dn e' = dsubst e dn e'
+∧ dsubst (Receive p v e) dn e' = Receive p v (dsubst e dn e')
 ∧ dsubst (IntChoice b p e) dn e' = IntChoice b p (dsubst e dn e')
 ∧ dsubst (ExtChoice p e1 e2) dn e' = ExtChoice p (dsubst e1 dn e') (dsubst e2 dn e')
 ∧ dsubst (IfThen v e1 e2) dn e' = IfThen v (dsubst e1 dn e') (dsubst e2 dn e')
-∧ dsubst (Let v f vl e) dn e' = dsubst e dn e'
+∧ dsubst (Let v f vl e) dn e' = Let v f vl (dsubst e dn e')
 ∧ dsubst (Fix dn' e) dn e' =
    (if dn = dn' then
       Fix dn' e
