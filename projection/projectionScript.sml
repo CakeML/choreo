@@ -1,6 +1,7 @@
 open preamble chor_to_endpointTheory
               endpoint_to_choiceTheory
               endpoint_to_payloadTheory
+              payload_closureTheory
               payload_to_cakemlTheory
 
 val _ = new_theory "projection";
@@ -15,9 +16,10 @@ End
 
 Definition projection_def:
   projection conf s c l =
-    endpoint_to_payload$compile_network conf
-      (endpoint_to_choice$compile_network
-         (compile_network s c l))
+    payload_closure$compile_network
+      (endpoint_to_payload$compile_network conf
+        (endpoint_to_choice$compile_network
+           (compile_network s c l)))
 End
 
 Definition compilation_def:
