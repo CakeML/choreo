@@ -32,7 +32,11 @@ Definition letfuns_def:
   (letfuns (Send p v n e) = letfuns e) ∧
   (letfuns (Receive p v l e) = letfuns e) ∧
   (letfuns (IfThen v e1 e2) = letfuns e1 ++ letfuns e2) ∧
-  (letfuns (Let v f vl e) = f::letfuns e)
+  (letfuns (Let v f vl e) = f::letfuns e) ∧
+  (letfuns (Letrec dn args e1 e2) = letfuns e1 ++ letfuns e2) ∧
+  (letfuns (Fix s e) = letfuns e) ∧
+  (letfuns (FCall s v) = []) ∧
+  (letfuns (Call s) = [])
 End
 
 (* CakeML Helpers
@@ -264,6 +268,11 @@ Definition ps2cs_def:
   ps2cs ps =
     #"P"::ps
 End
+(* Similarly, add an F to the front of function names *)
+Definition ps2cs2_def:
+  ps2cs2 ps =
+    #"F"::ps
+End
 (* compile_endpoint conf vs e
 
    (Static parts of) the compilation of endoint e to CakeML.
@@ -320,7 +329,31 @@ Definition compile_endpoint_def:
      ast$Let (SOME (ps2cs v))
          (App Opapp [((ast$Var o (getLetID conf)) hv);
                      convList conf (MAP (Var o Short o ps2cs) vl)])
-         (compile_endpoint conf vs e))
+         (compile_endpoint conf vs e)) ∧
+    (compile_endpoint conf vs (payloadLang$Letrec dn args e1 e2) =
+     let vn = LENGTH(letfuns e1)
+     in
+       ast$Letrec
+         [(ps2cs2 dn,"",
+           Mat (Var(Short ""))
+               [(Pcon NONE (MAP (Pvar o ps2cs) args),
+                 compile_endpoint conf (TAKE vn vs) e1)]
+          )
+         ]
+         (compile_endpoint conf (DROP vn vs) e2)
+    ) ∧
+    (compile_endpoint conf vs (payloadLang$FCall dn args) =
+     App Opapp [Var(Short(ps2cs2 dn)); Con NONE (MAP (Var o Short o ps2cs) args) ]
+    ) ∧
+    (*** The following cases should never happen: payload_closure ***
+     *** should run before  payload_to_cakeml and compile away    ***
+     *** fixpoint ops.                                            ***)
+    (compile_endpoint conf vs (payloadLang$Call dn) =
+     Con NONE []
+    ) ∧
+    (compile_endpoint conf vs (payloadLang$Fix dn e1) =
+     Con NONE []
+    )
 End
 
 val _ = export_theory ();
