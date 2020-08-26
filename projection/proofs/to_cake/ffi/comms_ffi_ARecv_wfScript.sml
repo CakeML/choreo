@@ -46,7 +46,7 @@ End
 
 Definition endpoint_await_send_def:
   (endpoint_await_send _  Nil               = 0) ∧
-  (endpoint_await_send (st : state) (Send _ vn n _)   =
+  (endpoint_await_send (st : closure state) (Send _ vn n _)   =
     case FLOOKUP st.bindings vn of
       SOME x => LENGTH x - n
     | NONE   => 0) ∧
@@ -58,7 +58,7 @@ End
 Definition endpoint_await_receive_def:
   (endpoint_await_receive _  Nil            = 0) ∧
   (endpoint_await_receive _ (Send _ _ _ _)  = 0) ∧
-  (endpoint_await_receive (st : state) (Receive p _ _ _)   =
+  (endpoint_await_receive (st : closure state) (Receive p _ _ _)   =
     queue_length st.queues p) ∧
   (endpoint_await_receive _  (IfThen _ _ _) = 0) ∧
   (endpoint_await_receive _  (Let _ _ _ _)  = 0)

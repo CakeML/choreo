@@ -435,7 +435,7 @@ Definition perm_endpoint_def:
 End
 
 Definition perm_state_def:
-  perm_state v1 v2 (s:payloadLang$state) =
+  perm_state v1 v2 (s:'a payloadLang$state) =
   if v1 ∈ FDOM s.bindings ∧ v2 ∈ FDOM s.bindings then
     s with bindings := s.bindings |+ (v1,THE(FLOOKUP s.bindings v2)) |+ (v2,THE(FLOOKUP s.bindings v1))
   else if v1 ∈ FDOM s.bindings then

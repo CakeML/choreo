@@ -1999,7 +1999,7 @@ Definition pFv_def[simp]:
 End
 
 Definition pSt_pCd_corr_def:
-  pSt_pCd_corr (pSt :payloadLang$state) pCd ⇔ ∀vn. vn ∈ pFv pCd
+  pSt_pCd_corr (pSt :closure payloadLang$state) pCd ⇔ ∀vn. vn ∈ pFv pCd
                               ⇒ ∃vv. FLOOKUP pSt.bindings vn = SOME vv
 End
 
@@ -2020,7 +2020,7 @@ QED
 (* -- Check the semantic environment contains all the variable bindings in
       the payload state and also matches all the config assumptions        *)
 Definition sem_env_cor_def:
-    sem_env_cor conf (pSt :payloadLang$state) cEnv ⇔
+    sem_env_cor conf (pSt :closure payloadLang$state) cEnv ⇔
         env_asm cEnv conf ∧
         ∀ n v.  FLOOKUP pSt.bindings n = SOME v
                 ⇒ ∃v'.  nsLookup (cEnv.v) (Short (ps2cs n)) = SOME v' ∧
