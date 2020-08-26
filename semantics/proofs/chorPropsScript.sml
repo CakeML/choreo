@@ -445,6 +445,10 @@ Definition chor_tl_def:
     (if FLOOKUP s (v,p) = SOME [1w] then (s,c1)
      else if ∃w. FLOOKUP s (v,p) = SOME w ∧ w ≠ [1w] then (s,c2)
      else (s,IfThen v p c1 c2))
+(* TODO: these are not actually useful clauses of the definition;
+   it's just here as a stopgap measure to make things build. *)
+∧ chor_tl s (Fix vn c2) = (s,Nil)
+∧ chor_tl s (Call v) = (s,Nil)
 End
 
 (* Advances the choreography until the given tag
@@ -465,10 +469,15 @@ Definition syncTrm_def:
           (if chor_match τ c
            then chor_tl s c
            else syncTrm (chor_tl s c) τ)
+(* TODO: this is not a useful clause of the definition; it's just here as a stopgap measure
+         to make things build *)
+∧ syncTrm (s,Fix vn c2) τ = (s,Nil)
+∧ syncTrm (s,Call v) τ = (s,Nil)
 Termination
   WF_REL_TAC ‘measure (chor_size o SND o FST)’
   \\ rw [] \\ Cases_on ‘τ’ \\ fs [chor_match_def,chor_tl_def]
   \\ EVERY_CASE_TAC  \\ fs []
+  \\ fs[chor_size_def]
 End
 
 (* Alternative induction principle *)
