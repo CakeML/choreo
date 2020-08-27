@@ -297,7 +297,7 @@ Proof
   Induct_on ‘e’ >> rw[var_names_endpoint_def,dsubst_def] >>
   res_tac >> fs[]
 QED
-      
+
 val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
   `∀fvs p1 q1.
      junkcong fvs p1 q1
@@ -1361,7 +1361,7 @@ Proof
   res_tac >> fs[]
 QED
 
-  
+
 val closed_under_def = Define `
   closed_under s n = (set(partners_network n) ⊆ s)`
 
@@ -1512,7 +1512,7 @@ Theorem choice_free_endpoint_dsubstI:
 Proof
   Induct_on ‘e’ >> rw[choice_free_endpoint_def,dsubst_def]
 QED
-  
+
 val choice_free_network_no_choice = Q.store_thm("choice_free_network_no_choice",
   `!n1 n2 p1 b p2. trans n1 (LIntChoice p1 b p2) n2 /\ choice_free_network n1 ==> F`,
   rpt GEN_TAC
@@ -1603,11 +1603,40 @@ Proof
   >> metis_tac[choice_sender_is_endpoint]
 QED
 
+Inductive unfold_rel:
+  (* Reflexive *)
+  (∀n:endpointLang$network. unfold_rel n n)
+
+  (* Symmetric *)
+∧ (∀n1 n2.
+    unfold_rel n1 n2
+    ⇒ unfold_rel n2 n1)
+  (* Transitive *)
+∧ (∀n1 n2 n3.
+     unfold_rel n1 n2
+     ∧ unfold_rel n2 n3
+     ⇒ unfold_rel n1 n3)
+
+  (* Unfold *)
+∧ (∀p s e dn.
+    unfold_rel (NEndpoint p s (Fix dn e)) (NEndpoint p s (dsubst e dn (Fix dn e))))
+
+  (* Par *)
+∧ (∀n1 n2 n3 n4.
+     unfold_rel n1 n2
+     ∧ unfold_rel n3 n4
+     ⇒ unfold_rel (NPar n1 n3) (NPar n2 n4))
+End
+
+val [unfold_rel_refl,unfold_rel_sym,unfold_rel_trans,unfold_rel_unfold,unfold_rel_par]
+  = zip ["unfold_rel_refl","unfold_rel_sym","unfold_rel_trans","unfold_rel_unfold","unfold_rel_par"]
+        (CONJUNCTS unfold_rel_rules) |> map save_thm;
+
 Theorem trans_same_receiver_determ:
   trans p1 (LReceive s d r) p2
   /\ trans p1 (LReceive s d r) p3
   /\ ALL_DISTINCT(MAP FST(endpoints p1))
-  ==> p2 = p3
+  ==> unfold_rel p2 p3
 Proof
   qmatch_goalsub_abbrev_tac `trans _ alpha`
   >> rpt(disch_then strip_assume_tac)
@@ -1619,12 +1648,30 @@ Proof
   >> ho_match_mp_tac trans_strongind
   >> rpt conj_tac >> rpt(gen_tac ORELSE disch_then strip_assume_tac)
   >> fs[] >> rveq
+  >> TRY(rename1 ‘dsubst’ >>
+         qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+         >> fs[] >> rveq >> fs[] >> rveq >> fs[endpoints_def,ALL_DISTINCT_APPEND,unfold_rel_refl]
+         >> match_mp_tac unfold_rel_trans
+         >> qexists_tac ‘NEndpoint p (s with queue := SNOC (s',d) s.queue) (dsubst e dn (Fix dn e))’
+         >> conj_tac
+         >- (metis_tac[trans_enqueue])
+         >> metis_tac[unfold_rel_rules])
+  >> TRY(rename1 ‘NEndpoint’
+         >> ‘∃pp. pp = NEndpoint p2 s e’ by simp[]
+         >> ‘∃alpha. alpha = LReceive p1 d p2’ by simp[]
+         >> pop_assum(fn thm => SUBST_ALL_TAC(GSYM thm) >> mp_tac thm)
+         >> pop_assum(fn thm => SUBST_ALL_TAC(GSYM thm) >> mp_tac thm)
+         >> qhdtm_x_assum ‘trans’ (fn thm => rpt(pop_assum mp_tac) >> assume_tac thm)
+         >> qid_spec_tac ‘e’
+         >> pop_assum mp_tac
+         >> MAP_EVERY qid_spec_tac [‘p3’,‘alpha’,‘pp’]
+         >> ho_match_mp_tac trans_ind
+         >> fs[] >> rveq >> fs[endpoints_def,ALL_DISTINCT_APPEND,unfold_rel_refl]
+         >> rw[]
+         >> metis_tac[unfold_rel_rules])
   >> qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
-  >> fs[] >> rveq >> fs[] >> rveq >> fs[endpoints_def,ALL_DISTINCT_APPEND]
-
-  
-                                        
-  >> metis_tac[receiver_is_endpoint]
+  >> fs[] >> rveq >> fs[] >> rveq >> fs[endpoints_def,ALL_DISTINCT_APPEND,unfold_rel_refl]
+  >> TRY(rename1 ‘NPar’ >> metis_tac[unfold_rel_rules,receiver_is_endpoint])
 QED
 
 Theorem trans_same_receiver_choice_determ:
