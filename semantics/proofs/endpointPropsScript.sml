@@ -281,6 +281,23 @@ val junkcong_remove_junk = Q.store_thm("junkcong_remove_junk",
 val junkcong_sym_eq = Q.store_thm("junkcong_sym_eq",
 `∀fvs p q. junkcong fvs p q = junkcong fvs q p`,metis_tac[junkcong_sym]);
 
+Theorem MEM_free_var_names_endpoint_dsubst:
+  MEM x (free_var_names_endpoint(dsubst e dn e')) ⇒
+  MEM x (free_var_names_endpoint e') ∨ MEM x (free_var_names_endpoint e)
+Proof
+  Induct_on ‘e’ >> rw[free_var_names_endpoint_def,dsubst_def] >>
+  res_tac >> fs[] >>
+  fs[MEM_FILTER]
+QED
+
+Theorem MEM_var_names_endpoint_dsubst:
+  MEM x (var_names_endpoint(dsubst e dn e')) ⇒
+  MEM x (var_names_endpoint e') ∨ MEM x (var_names_endpoint e)
+Proof
+  Induct_on ‘e’ >> rw[var_names_endpoint_def,dsubst_def] >>
+  res_tac >> fs[]
+QED
+      
 val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
   `∀fvs p1 q1.
      junkcong fvs p1 q1
@@ -296,9 +313,14 @@ val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
   >- metis_tac[junkcong_rules]
   >- metis_tac[junkcong_rules]
   >- (* junkcong_add_junk *)
-     (qpat_x_assum `trans _ _ _` (assume_tac
-                                    o REWRITE_RULE [Once endpointSemTheory.trans_cases])
-      >> fs[] >> rveq
+     (‘∃p1. p1 = NEndpoint p s e’ by simp[]
+      >> pop_assum(fn thm => SUBST_ALL_TAC(GSYM thm) >> mp_tac thm)
+      >> qhdtm_x_assum ‘trans’ (fn thm => rpt(pop_assum mp_tac) >> assume_tac thm)
+      >> MAP_EVERY qid_spec_tac [‘fvs’,‘e’,‘p’,‘s’]
+      >> pop_assum mp_tac
+      >> MAP_EVERY qid_spec_tac [‘p2’,‘alpha’,‘p1’]
+      >> ho_match_mp_tac trans_ind
+      >> rw[] >> fs[] >> rveq
       >> TRY(qmatch_goalsub_abbrev_tac `junkcong fvs (NEndpoint a1 a2 a3)`
              >> qexists_tac `NEndpoint a1 (a2 with bindings := a2.bindings |+ (v,d)) a3`
              >> conj_tac
@@ -380,12 +402,24 @@ val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
              >- (IF_CASES_TAC
                  >- metis_tac[junkcong_rules]
                  >- (match_mp_tac junkcong_add_junk' >> fs[free_var_names_endpoint_def,MEM_FILTER])))
+      >> TRY(rename1 ‘dsubst e dn (Fix dn e)’
+             >> first_x_assum drule
+             >> impl_tac
+             >- (spose_not_then strip_assume_tac >> imp_res_tac MEM_free_var_names_endpoint_dsubst
+                 >> fs[free_var_names_endpoint_def])
+             >> metis_tac[trans_fix])
      )
   >- (* junkcong_add_junk, symmetric case *)
      (PURE_ONCE_REWRITE_TAC [junkcong_sym_eq]
-      >> qpat_x_assum `trans _ _ _` (assume_tac
-                                       o REWRITE_RULE [Once endpointSemTheory.trans_cases])
-      >> fs[] >> rveq
+      >> ‘∃q1. q1 = NEndpoint p (s with bindings := s.bindings |+ (v,d)) e’ by simp[]
+      >> pop_assum(fn thm => SUBST_ALL_TAC(GSYM thm) >> mp_tac thm)
+      >> qhdtm_x_assum ‘trans’ (fn thm => rpt(pop_assum mp_tac) >> assume_tac thm)
+      >> MAP_EVERY qid_spec_tac [‘fvs’,‘e’,‘p’,‘s’]
+      >> pop_assum mp_tac
+      >> MAP_EVERY qid_spec_tac [‘q2’,‘alpha’,‘q1’]
+      >> ho_match_mp_tac trans_ind
+      >> rw[] >> fs[] >> rveq
+      >> rename1 ‘NEndpoint _ s’
       >> TRY(qmatch_goalsub_abbrev_tac `junkcong fvs (NEndpoint a1 (a2 with bindings := _) a3)`
              >> qexists_tac `NEndpoint a1 a2 a3`
              >> conj_tac
@@ -436,7 +470,14 @@ val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
                  >> every_case_tac >> fs[])
              >- (Cases_on `a3 = v` >> fs[Once FUPDATE_COMMUTES]
                  >> fs[free_var_names_endpoint_def,MEM_FILTER]
-                 >> metis_tac[junkcong_rules,junkcong_add_junk'])))
+                 >> metis_tac[junkcong_rules,junkcong_add_junk']))
+      >> TRY(rename1 ‘dsubst e dn (Fix dn e)’
+             >> first_x_assum drule
+             >> disch_then(qspec_then ‘s’ mp_tac)
+             >> impl_tac
+             >- (spose_not_then strip_assume_tac >> imp_res_tac MEM_free_var_names_endpoint_dsubst
+                 >> fs[free_var_names_endpoint_def])
+             >> metis_tac[trans_fix]))
   >- (* par-l *)
      (qpat_x_assum `trans (NPar _ _) _ _` (assume_tac
                                     o REWRITE_RULE [Once endpointSemTheory.trans_cases])
@@ -983,9 +1024,14 @@ val qcong_trans_eq = Q.store_thm("qcong_trans_eq",
   >- metis_tac[qcong_rules]
   >- metis_tac[qcong_rules]
   >- (* qcong_queue_reorder *)
-     (qpat_x_assum `trans _ _ _` (assume_tac
-                                  o REWRITE_RULE [Once trans_cases])
-      >> fs[] >> rveq
+     (‘∃pp. pp = NEndpoint p s e’ by simp[]
+      >> pop_assum(fn thm => SUBST_ALL_TAC(GSYM thm) >> mp_tac thm)
+      >> qhdtm_x_assum ‘trans’ (fn thm => rpt(pop_assum mp_tac) >> assume_tac thm)
+      >> MAP_EVERY qid_spec_tac [‘e’,‘p’,‘s’]
+      >> pop_assum mp_tac
+      >> MAP_EVERY qid_spec_tac [‘p2'’,‘alpha’,‘pp’]
+      >> ho_match_mp_tac trans_ind
+      >> rw[] >> fs[] >> rveq
       >> TRY(qmatch_goalsub_abbrev_tac `qcong (NEndpoint a1 a2 a3)`
              >> qexists_tac `NEndpoint a1 (a2 with queue := q1 ⧺ [(p2,d2); (p1,d1)] ⧺ q2) a3`
              >> conj_tac
@@ -1049,7 +1095,9 @@ val qcong_trans_eq = Q.store_thm("qcong_trans_eq",
                    )
              >> HINT_EXISTS_TAC
              >> rw[]
-             >> metis_tac[qcong_queue_reorder',qcong_refl,APPEND_ASSOC,APPEND]))
+             >> metis_tac[qcong_queue_reorder',qcong_refl,APPEND_ASSOC,APPEND])
+      >> TRY(rename1 ‘dsubst’ >> metis_tac[trans_fix])
+     )
   >- (* qcong_queue_reorder, symmetric case *)
      (qmatch_asmsub_abbrev_tac `NEndpoint _ s' _`
       >> `s'.queue = q1 ⧺ [(p2,d2); (p1,d1)] ⧺ q2` by(unabbrev_all_tac >> simp[])
@@ -1060,9 +1108,14 @@ val qcong_trans_eq = Q.store_thm("qcong_trans_eq",
       >> rename1 `s with queue := _ ++ [(p3,d3); (p4,d4)] ++ _`
       >> rename1 `_ with queue := _ ++ [(p2,d2); (p1,d1)] ++ _`
       >> PURE_ONCE_REWRITE_TAC [qcong_sym_eq]
-      >> qpat_x_assum `trans _ _ _` (assume_tac
-                                  o REWRITE_RULE [Once trans_cases])
-      >> fs[] >> rveq
+      >> ‘∃pp. pp = NEndpoint p s e’ by simp[]
+      >> pop_assum(fn thm => SUBST_ALL_TAC(GSYM thm) >> mp_tac thm)
+      >> qhdtm_x_assum ‘trans’ (fn thm => rpt(pop_assum mp_tac) >> assume_tac thm)
+      >> MAP_EVERY qid_spec_tac [‘e’,‘p’,‘s’]
+      >> pop_assum mp_tac
+      >> MAP_EVERY qid_spec_tac [‘q2'’,‘alpha’,‘pp’]
+      >> ho_match_mp_tac trans_ind
+      >> rw[] >> fs[] >> rveq
       >> TRY(qmatch_goalsub_abbrev_tac `qcong (NEndpoint a1 a2 a3)`
              >> qexists_tac `NEndpoint a1 (a2 with queue := q1 ⧺ [(p2,d2); (p1,d1)] ⧺ q2) a3`
              >> conj_tac
@@ -1126,7 +1179,8 @@ val qcong_trans_eq = Q.store_thm("qcong_trans_eq",
                    )
              >> HINT_EXISTS_TAC
              >> rw[]
-             >> metis_tac[qcong_queue_reorder',qcong_refl,APPEND_ASSOC,APPEND]))
+             >> metis_tac[qcong_queue_reorder',qcong_refl,APPEND_ASSOC,APPEND])
+      >> TRY(rename1 ‘dsubst’ >> metis_tac[trans_fix]))
   >- (qpat_x_assum `trans (NPar _ _) _ _` (assume_tac
                                            o REWRITE_RULE [Once trans_cases])
       >> fs[] >> rveq
@@ -1262,7 +1316,10 @@ val trans_var_names_mono = Q.store_thm("trans_var_names_mono",
   >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`n2`,`alpha`,`n1`]
   >> ho_match_mp_tac trans_strongind
   >> rpt strip_tac
-  >> fs[var_names_network_def,var_names_endpoint_def]);
+  >> fs[var_names_network_def,var_names_endpoint_def]
+  >> res_tac
+  >> imp_res_tac MEM_var_names_endpoint_dsubst
+  >> fs[var_names_endpoint_def]);
 
 val reduction_var_names_mono = Q.store_thm("reduction_var_names_mono",
   `!n1 n2 fv.
@@ -1287,13 +1344,24 @@ val partners_endpoint_def = Define `
 ∧ (partners_endpoint (ExtChoice p e1 e2) =
     p::((partners_endpoint e1) ++ (partners_endpoint e2)))
 ∧ (partners_endpoint (IfThen v e1 e2) = (partners_endpoint e1) ++ (partners_endpoint e2))
-∧ (partners_endpoint (Let v f vl e) = partners_endpoint e)`
+∧ (partners_endpoint (Let v f vl e) = partners_endpoint e)
+∧ (partners_endpoint (Fix dn e) = partners_endpoint e)
+∧ (partners_endpoint (Call dn) = [])`
 
 val partners_network_def = Define `
    (partners_network NNil = [])
 ∧ (partners_network (NPar n1 n2) = (partners_network n1 ++ partners_network n2))
 ∧ (partners_network (NEndpoint p s e) = (partners_endpoint e))`
 
+Theorem partners_endpoint_dsubst:
+  MEM x (partners_endpoint(dsubst e dn e')) ⇒
+  MEM x (partners_endpoint e') ∨ MEM x (partners_endpoint e)
+Proof
+  Induct_on ‘e’ >> rw[partners_endpoint_def,dsubst_def] >>
+  res_tac >> fs[]
+QED
+
+  
 val closed_under_def = Define `
   closed_under s n = (set(partners_network n) ⊆ s)`
 
@@ -1340,7 +1408,11 @@ val closed_under_receiver_mem = Q.store_thm("closed_under_receiver_mem",
   >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`n2`,`a1`,`n1`]
   >> ho_match_mp_tac trans_strongind
   >> rpt strip_tac >> fs[] >> rveq
-  >> fs[endpoints_def,closed_under_def,partners_endpoint_def,partners_network_def]);
+  >> fs[endpoints_def,closed_under_def,partners_endpoint_def,partners_network_def]
+  >> first_x_assum(drule_at_then (Pos last) match_mp_tac)
+  >> fs[SUBSET_DEF] >> rw[]
+  >> imp_res_tac partners_endpoint_dsubst
+  >> fs[partners_endpoint_def]);
 
 val closed_network_receiver_mem = Q.store_thm("closed_network_receiver_mem",
   `!n1 p1 d p2 n2 e.
@@ -1387,7 +1459,11 @@ val trans_endpoints_ok = Q.store_thm("trans_endpoints_ok",
                  ==> EVERY endpoint_ok (endpoints n2)`,
   ho_match_mp_tac trans_ind
   >> rpt strip_tac
-  >> fs[endpoints_def,endpoint_ok_def,partners_endpoint_def]);
+  >> fs[endpoints_def,endpoint_ok_def,partners_endpoint_def]
+  >> first_x_assum match_mp_tac
+  >> spose_not_then strip_assume_tac
+  >> imp_res_tac partners_endpoint_dsubst
+  >> fs[partners_endpoint_def]);
 
 val reduction_endpoints_ok = Q.store_thm("reduction_endpoints_ok",
   `!n1 n2. reduction^* n1 n2 /\ EVERY endpoint_ok (endpoints n1)
@@ -1400,7 +1476,13 @@ val closed_under_trans = Q.store_thm("closed_under_trans",
   `!n1 alpha n2 e. trans n1 alpha n2 /\ closed_under e n1 ==> closed_under e n2`,
   simp[GSYM AND_IMP_INTRO,RIGHT_FORALL_IMP_THM]
   >> ho_match_mp_tac trans_ind
-  >> rpt strip_tac >> fs[closed_under_def,partners_network_def,partners_endpoint_def]);
+  >> rpt strip_tac >> fs[closed_under_def,partners_network_def,partners_endpoint_def]
+  >> fs[SUBSET_DEF] >> rw[] >> imp_res_tac partners_endpoint_dsubst
+  >> last_x_assum(match_mp_tac o MP_CANON)
+  >> simp[]
+  >> rw[]
+  >> imp_res_tac partners_endpoint_dsubst
+  >> fs[partners_endpoint_def]);
 
 val closed_network_trans = Q.store_thm("closed_network_trans",
   `!n1 alpha n2. trans n1 alpha n2 /\ closed_network n1 ==> closed_network n2`,
@@ -1417,6 +1499,20 @@ val closed_network_reduction = Q.store_thm("closed_network_reduction",
   >> simp[Once CONJ_SYM, reduction_def]
   >> MATCH_ACCEPT_TAC closed_network_trans);
 
+Theorem choice_free_endpoint_dsubst_IMP:
+  choice_free_endpoint (dsubst e dn e') ⇒
+  choice_free_endpoint e
+Proof
+  Induct_on ‘e’ >> rw[choice_free_endpoint_def,dsubst_def]
+QED
+
+Theorem choice_free_endpoint_dsubstI:
+  choice_free_endpoint e ∧ choice_free_endpoint e' ⇒
+  choice_free_endpoint (dsubst e dn e')
+Proof
+  Induct_on ‘e’ >> rw[choice_free_endpoint_def,dsubst_def]
+QED
+  
 val choice_free_network_no_choice = Q.store_thm("choice_free_network_no_choice",
   `!n1 n2 p1 b p2. trans n1 (LIntChoice p1 b p2) n2 /\ choice_free_network n1 ==> F`,
   rpt GEN_TAC
@@ -1427,12 +1523,14 @@ val choice_free_network_no_choice = Q.store_thm("choice_free_network_no_choice",
   >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`p2`,`b`,`p1`]
   >> pop_assum mp_tac
   >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`n2`,`a1`,`n1`]
-  >> ho_match_mp_tac trans_ind >> rw[choice_free_network_def,choice_free_endpoint_def]);
+  >> ho_match_mp_tac trans_ind >> rw[choice_free_network_def,choice_free_endpoint_def]
+  >> metis_tac[choice_free_endpoint_dsubstI,choice_free_endpoint_def]);
 
 val choice_free_trans_pres = Q.store_thm("choice_free_trans_pres",
   `!n1 alpha n2. trans n1 alpha n2 /\ choice_free_network n1 ==> choice_free_network n2`,
   simp[GSYM AND_IMP_INTRO,RIGHT_FORALL_IMP_THM]
-   >> ho_match_mp_tac trans_ind >> rw[choice_free_network_def,choice_free_endpoint_def]);
+   >> ho_match_mp_tac trans_ind >> rw[choice_free_network_def,choice_free_endpoint_def]
+  >> metis_tac[choice_free_endpoint_dsubstI,choice_free_endpoint_def]);
 
 val choice_free_reduction = Q.store_thm("choice_free_reduction",
   `!n1 n2. reduction^* n1 n2 /\ choice_free_network n1 ==> choice_free_network n2`,
@@ -1523,6 +1621,9 @@ Proof
   >> fs[] >> rveq
   >> qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
   >> fs[] >> rveq >> fs[] >> rveq >> fs[endpoints_def,ALL_DISTINCT_APPEND]
+
+  
+                                        
   >> metis_tac[receiver_is_endpoint]
 QED
 
