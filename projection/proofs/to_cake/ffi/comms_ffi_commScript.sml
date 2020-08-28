@@ -4,7 +4,6 @@ open optionTheory
 open ffiTheory;
 open confluenceTheory
      payloadPropsTheory
-     payloadConfluenceTheory
      payloadSemTheory
      payloadLangTheory
      comms_ffi_modelTheory

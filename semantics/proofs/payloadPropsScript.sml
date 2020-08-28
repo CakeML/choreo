@@ -177,6 +177,7 @@ QED
 Theorem trans_dequeue_last_payload':
   ∀conf s1 s2 v p1 p2 e d tl ds q.
      p1 ≠ p2 ∧ qlk s1.queues p1 = d::tl ∧ final d ∧
+     s2.funs = s1.funs ∧
      s2.bindings = s1.bindings |+ (v,FLAT (SNOC (unpad d) ds)) ∧
      s2.queues = normalise_queues(s1.queues |+ (p1,tl))
      ⇒
@@ -196,6 +197,7 @@ QED
 Theorem trans_dequeue_intermediate_payload':
   ∀conf s1 s2 v p1 p2 e d ds tl.
      p1 ≠ p2 ∧ qlk s1.queues p1 = d::tl ∧ intermediate d ∧
+     s2.funs = s1.funs ∧
      s2.bindings = s1.bindings ∧
      s2.queues = normalise_queues(s1.queues |+ (p1,tl))
       ⇒
@@ -218,13 +220,14 @@ val trans_let' = Q.store_thm("trans_let'",
          EVERY IS_SOME (MAP (FLOOKUP s.bindings) vl) ⇒
          trans conf (NEndpoint p (s with queues:= q) (Let v f vl e)) LTau
            (NEndpoint p
-              (<|bindings := s.bindings |+ (v,f (MAP (THE ∘ FLOOKUP s.bindings) vl));
+              (<|funs := s.funs;
+                 bindings := s.bindings |+ (v,f (MAP (THE ∘ FLOOKUP s.bindings) vl));
                  queues:= q
                  |>) e)`,
   rpt strip_tac
   >> qmatch_goalsub_abbrev_tac `trans _ (NEndpoint _ s1 _) _ (NEndpoint _ s2 _)`
   >> `s2 = s1 with bindings := s1.bindings |+ (v,f (MAP (THE ∘ FLOOKUP s1.bindings) vl))`
-     by(unabbrev_all_tac >> simp[])
+     by(unabbrev_all_tac >> simp[state_component_equality])
   >> pop_assum (fn thm => PURE_ONCE_REWRITE_TAC [thm])
   >> unabbrev_all_tac
   >> match_mp_tac trans_let
@@ -437,10 +440,10 @@ Proof
   FULL_CASE_TAC >> fs[]
 QED
 
-Theorem trans_no_selfloop:
-  !conf p1 alpha p2.
-  trans conf p1 alpha p2 /\ conf.payload_size > 0
-  ==> p1 <> p2
+Theorem trans_no_self_non_tau_loop:
+  ∀conf p1 alpha p2.
+  trans conf p1 alpha p2 /\ alpha ≠ LTau ∧ conf.payload_size > 0
+  ⇒ p1 ≠ p2
 Proof
   PURE_REWRITE_TAC[GSYM AND_IMP_INTRO] >>
   ho_match_mp_tac trans_ind >> rw[] >> fs[payloadLangTheory.state_component_equality] >>
@@ -470,7 +473,7 @@ Proof
   >> fs[] >> rveq
   >> qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
   >> fs[] >> rveq >> fs[] >> rveq >> fs[endpoints_def,ALL_DISTINCT_APPEND]
-  >> metis_tac[sender_is_endpoint,trans_no_selfloop]
+  >> metis_tac[sender_is_endpoint,trans_no_self_non_tau_loop]
 QED
 
 (* TODO: remove? strictly weaker than trans_distinct_residual *)
@@ -493,9 +496,11 @@ Proof
   >> qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
   >> fs[] >> rveq >> fs[] >> rveq >> fs[endpoints_def,ALL_DISTINCT_APPEND]
   >> fs[payloadLangTheory.state_component_equality]
-  >> metis_tac[sender_is_endpoint,trans_no_selfloop]
+  >> metis_tac[sender_is_endpoint,trans_no_self_non_tau_loop]
 QED
 
+(* This needs some love *)
+(*
 Theorem trans_distinct_residual:
   !conf p1 alpha p2 beta p3.
   trans conf p1 alpha p2
@@ -558,6 +563,7 @@ Proof
      (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
       fs[] >> rveq >> fs[] >> rveq >> fs[] >> metis_tac[trans_no_selfloop])
 QED
+*)
 
 Theorem intermediate_final_IMP:
   !d. intermediate d /\ final d ==> F
@@ -705,9 +711,14 @@ Proof
                         rfs[]) >>
           metis_tac[trans_send_cond,IN_APP])
       >- rpt (first_x_assum (dxrule_then strip_assume_tac)))
-  >- (rw[] >>
-      ntac 2 (fs[Once trans_cases]) >>
-      rfs[])
+  >- (Induct_on ‘trans’ >> rw[]
+      >- (rpt (last_x_assum mp_tac) >> Induct_on ‘trans’ >>
+          rw[])
+      >- (rpt (last_x_assum mp_tac) >> Induct_on ‘trans’ >>
+          rw[]) >>
+      pop_assum irule >> fs[net_wf_def] >> rw[] >>
+      qexists_tac ‘bN2’ >> pop_assum mp_tac >>
+      pop_assum kall_tac >> fs[Once trans_cases])
 QED
 
 (* CONFLUENCE *)
@@ -754,12 +765,12 @@ Proof
                               DISJOINT_ALT,
                               IN_APP] >>
       metis_tac[trans_send_cond])
-  >- (rw[Once trans_cases] >>
-      fs[Once trans_cases] >>
-      fs[])
+  >- metis_tac[trans_send_unique]
 QED
 
 (*  Confluence Result for different Labels *)
+(* This needs some love *)
+
 Theorem trans_diff_diamond:
   ∀N1 LA N2A LB N2B.
     net_wf N1 ∧
@@ -785,8 +796,7 @@ Proof
       >- (irule (hd (CONJUNCTS trans_rules)) >>
           simp[]))
   (* LSend Intermediate/LRecieve *)
-  >- (rename [‘Send rp sv n e’,‘Send rp sv (n + _) e’,
-             ‘LReceive sp rd c’] >>
+  >- (rename [‘Send rp sv n e’,‘Send rp sv (n + _) e’,‘LReceive sp rd c’] >>
       qmatch_goalsub_abbrev_tac ‘s with queues := nqs’ >>
       qexists_tac ‘NEndpoint c (s with queues := nqs) (Send rp sv (n + conf.payload_size) e)’ >>
       rw[]
@@ -802,8 +812,7 @@ Proof
           simp[])
       >- metis_tac[trans_rules])
   (* LRecieve/LSend Intermediate *)
-  >- (rename [‘Send rp sv n e’,‘Send rp sv (n + _) e’,
-             ‘LReceive sp rd c’] >>
+  >- (rename [‘Send rp sv n e’,‘Send rp sv (n + _) e’, ‘LReceive sp rd c’] >>
       qmatch_goalsub_abbrev_tac ‘s with queues := nqs’ >>
       qexists_tac ‘NEndpoint c (s with queues := nqs) (Send rp sv (n + conf.payload_size) e)’ >>
       rw[]
@@ -861,10 +870,9 @@ Proof
                 by rw[Abbr ‘ns’,Abbr ‘os’] >>
               metis_tac[trans_rules])))
   (* LReceive/LTau (Receive Final) *)
-  >- (rename [‘NEndpoint c (s with queues := _) (Receive sp2 sv2 ds2 e)’,
-              ‘LReceive sp d c’] >>
-      qmatch_goalsub_abbrev_tac ‘<|bindings := fb; queues := bfq |>’ >>
-      qexists_tac ‘NEndpoint c <|bindings := fb; queues := qpush bfq sp d|> e’ >>
+  >- (rename [‘NEndpoint c (s with queues := _) (Receive sp2 sv2 ds2 e)’,‘LReceive sp d c’] >>
+      qmatch_goalsub_abbrev_tac ‘s with <|bindings := fb; queues := bfq |>’ >>
+      qexists_tac ‘NEndpoint c (s with <|bindings := fb; queues := qpush bfq sp d|>) e’ >>
       rw[]
       >- (qunabbrev_tac ‘bfq’ >> qunabbrev_tac ‘fb’ >>
           qmatch_goalsub_abbrev_tac ‘trans _ (NEndpoint _ sq (Receive _ _ _ _)) _
@@ -895,8 +903,7 @@ Proof
             by (qunabbrev_tac ‘s0’ >> qunabbrev_tac ‘s1’ >> rw[]) >>
           rw[] >> metis_tac[trans_rules]))
   (* LReceive/LTau (Receive intermediate)  *)
-  >- (rename [‘NEndpoint c (s with queues := _) (Receive sp2 sv2 ds2 e)’,
-              ‘LReceive sp d c’,‘qlk s.queues sp2 = dr::tl’] >>
+  >- (rename [‘NEndpoint c (s with queues := _) (Receive sp2 sv2 ds2 e)’,‘LReceive sp d c’,‘qlk s.queues sp2 = dr::tl’] >>
       qexists_tac ‘NEndpoint c (s with queues := normalise_queues(qpush (s.queues |+ (sp2,tl)) sp d))
                                (Receive sp2 sv2 (SNOC (unpad dr) ds2) e)’ >>
       rw[]
@@ -947,8 +954,8 @@ Proof
       qexists_tac ‘NEndpoint c (s with <|bindings := nb; queues := nq|>) e’ >>
       rw[]
       >- (qabbrev_tac ‘IS = s with queues := nq’ >>
-          ‘<|bindings := nb; queues := nq|> = IS with bindings := nb’
-            by simp[Abbr ‘IS’] >>
+          ‘<|funs := s.funs; bindings := nb; queues := nq|> = IS with bindings := nb’
+            by simp[Abbr ‘IS’,state_component_equality] >>
           first_x_assum SUBST1_TAC >>
           qunabbrev_tac ‘nb’ >>
           ‘s.bindings = IS.bindings’
@@ -957,18 +964,24 @@ Proof
           irule (el 10 (CONJUNCTS trans_rules)) >>
           simp[Abbr ‘IS’])
       >- (qabbrev_tac ‘IS = s with bindings := nb’ >>
-          ‘<|bindings := nb; queues := nq|> = IS with queues := nq’
-            by simp[Abbr ‘IS’] >>
+          ‘s with <|bindings := nb; queues := nq|> = IS with queues := nq’
+            by simp[Abbr ‘IS’,state_component_equality] >>
           first_x_assum SUBST1_TAC >>
           qunabbrev_tac ‘nq’ >>
           ‘s.queues = IS.queues’
             by simp[Abbr ‘IS’] >>
           first_x_assum SUBST1_TAC >>
           metis_tac[trans_rules]))
+  (* LReceive/LTau (Fixed point) *)
+  >- (rename [‘NEndpoint c (s with queues := qpush s.queues sp d) (Fix _ _)’, ‘NEndpoint c s (dsubst e dn (Fix dn e))’] >>
+      qexists_tac ‘NEndpoint c (s with queues := qpush s.queues sp d) (dsubst e dn (Fix dn e))’ >>
+      metis_tac[trans_cases])
+  (* LReceive/LTau (Letrec) *)
+  >- cheat
+  (* LReceive/LTau (FCall) *)
+  >- cheat
   (* LTau (Internal Comms TO RIGHT) / Parallel Embedded Behaviour (ON LEFT) *)
-  >- (rename [‘net_wf (NPar N1a N1b)’,
-              ‘trans conf (NPar N2Aa N2Ab) _ _ ∧
-               trans conf (NPar N2Ba N1b) _ _’] >>
+  >- (rename [‘net_wf (NPar N1a N1b)’,‘trans conf (NPar N2Aa N2Ab) _ _ ∧ trans conf (NPar N2Ba N1b) _ _’] >>
       last_x_assum (qspecl_then [‘LB’,‘N2Ba’] assume_tac) >>
       ‘net_wf N1a’
         by fs[net_wf_def] >>
@@ -1004,9 +1017,7 @@ Proof
       qexists_tac ‘NPar N3 N2Ab’ >>
       metis_tac[trans_rules])
   (* LTau (Internal Comms TO RIGHT) / Parallel Embedded Behaviour (ON RIGHT) *)
-  >- (rename [‘net_wf (NPar N1a N1b)’,
-              ‘trans conf (NPar N2Aa N2Ab) _ _ ∧
-               trans conf (NPar N1a N2Bb) _ _’] >>
+  >- (rename [‘net_wf (NPar N1a N1b)’, ‘trans conf (NPar N2Aa N2Ab) _ _ ∧ trans conf (NPar N1a N2Bb) _ _’] >>
       first_x_assum (qspecl_then [‘LB’,‘N2Bb’] assume_tac) >>
       ‘net_wf N1b’
         by fs[net_wf_def] >>
@@ -1043,9 +1054,7 @@ Proof
       qexists_tac ‘NPar N2Aa N3’ >>
       metis_tac[trans_rules])
   (* LTau (Internal Comms TO LEFT) / Parallel Embedded Behaviour (ON LEFT) *)
-  >- (rename [‘net_wf (NPar N1a N1b)’,
-              ‘trans conf (NPar N2Aa N2Ab) _ _ ∧
-               trans conf (NPar N2Ba N1b) _ _’] >>
+  >- (rename [‘net_wf (NPar N1a N1b)’,‘trans conf (NPar N2Aa N2Ab) _ _ ∧ trans conf (NPar N2Ba N1b) _ _’] >>
       last_x_assum (qspecl_then [‘LB’,‘N2Ba’] assume_tac) >>
       ‘net_wf N1a’
         by fs[net_wf_def] >>
@@ -1082,9 +1091,7 @@ Proof
       qexists_tac ‘NPar N3 N2Ab’ >>
       metis_tac[trans_rules])
   (* LTau (Internal Comms TO LEFT) / Other Behaviour (ON RIGHT) *)
-  >- (rename [‘net_wf (NPar N1a N1b)’,
-              ‘trans conf (NPar N2Aa N2Ab) _ _ ∧
-               trans conf (NPar N1a N2Bb) _ _’] >>
+  >- (rename [‘net_wf (NPar N1a N1b)’, ‘trans conf (NPar N2Aa N2Ab) _ _ ∧ trans conf (NPar N1a N2Bb) _ _’] >>
       first_x_assum (qspecl_then [‘LB’,‘N2Bb’] assume_tac) >>
       ‘net_wf N1b’
         by fs[net_wf_def] >>
@@ -1121,14 +1128,13 @@ Proof
       qexists_tac ‘NPar N2Aa N3’ >>
       metis_tac[trans_rules])
   (* LReceive/LTau (Receive Final) *)
-  >- (rename [‘NEndpoint c (s with queues := _) (Receive sp2 sv2 ds2 e)’,
-              ‘LReceive sp d c’] >>
-      qmatch_goalsub_abbrev_tac ‘<|bindings := fb; queues := bfq |>’ >>
-      qexists_tac ‘NEndpoint c <|bindings := fb; queues := normalise_queues(qpush bfq sp d)|> e’ >>
+  >- (rename [‘NEndpoint c (s with queues := _) (Receive sp2 sv2 ds2 e)’,‘LReceive sp d c’] >>
+      qmatch_goalsub_abbrev_tac ‘s with <|bindings := fb; queues := bfq |>’ >>
+      qexists_tac ‘NEndpoint c <|funs := s.funs; bindings := fb; queues := normalise_queues(qpush bfq sp d)|> e’ >>
       rw[]
       >- (qmatch_goalsub_abbrev_tac ‘trans _ (NEndpoint c s0 e) _ (NEndpoint c s1 e)’ >>
           ‘s1 = s0 with queues := qpush s0.queues sp d’
-            by (qunabbrev_tac ‘s0’ >> qunabbrev_tac ‘s1’ >> rw[Abbr ‘bfq’]) >>
+            by (qunabbrev_tac ‘s0’ >> qunabbrev_tac ‘s1’ >> rw[Abbr ‘bfq’,state_component_equality]) >>
           rw[] >> metis_tac[trans_rules])
       >- (qunabbrev_tac ‘bfq’ >> qunabbrev_tac ‘fb’ >>
           qmatch_goalsub_abbrev_tac ‘trans _ (NEndpoint _ sq (Receive _ _ _ _)) _
@@ -1145,13 +1151,12 @@ Proof
             by (qunabbrev_tac ‘sq’ >> qunabbrev_tac ‘ns’ >>
                 fs[qpush_def,qlk_def,fget_def,finite_mapTheory.FLOOKUP_UPDATE] >>
                 Cases_on ‘sp = sp2’ >> fs[]
-                >- (rfs[] >> rw[listTheory.SNOC_APPEND] >> rw[normalise_queues_FUPDATE_NONEMPTY])
-                >- (rw[finite_mapTheory.FUPDATE_COMMUTES,normalise_queues_FUPDATE_NONEMPTY])) >>
+                >- (rfs[state_component_equality] >> rw[listTheory.SNOC_APPEND] >> rw[normalise_queues_FUPDATE_NONEMPTY])
+                >- (rw[finite_mapTheory.FUPDATE_COMMUTES,normalise_queues_FUPDATE_NONEMPTY,state_component_equality])) >>
           first_x_assum SUBST1_TAC >>
           metis_tac[trans_rules]))
   (* LTau (Receive intermediate)/LReceive  *)
-  >- (rename [‘NEndpoint c (s with queues := _) (Receive sp2 sv2 (SNOC (unpad dr) ds2) e)’,
-              ‘LReceive sp d c’,‘qlk s.queues sp2 = dr::tl’] >>
+  >- (rename [‘NEndpoint c (s with queues := _) (Receive sp2 sv2 (SNOC (unpad dr) ds2) e)’, ‘LReceive sp d c’,‘qlk s.queues sp2 = dr::tl’] >>
       qexists_tac ‘NEndpoint c (s with queues := normalise_queues(qpush (s.queues |+ (sp2,tl)) sp d))
                                (Receive sp2 sv2 (SNOC (unpad dr) ds2) e)’ >>
       rw[]
@@ -1202,7 +1207,7 @@ Proof
       qexists_tac ‘NEndpoint c (s with <|bindings := nb; queues := nq|>) e’ >>
       rw[]
       >- (qabbrev_tac ‘IS = s with bindings := nb’ >>
-          ‘<|bindings := nb; queues := nq|> = IS with queues := nq’
+          ‘s with <|bindings := nb; queues := nq|> = IS with queues := nq’
             by simp[Abbr ‘IS’] >>
           first_x_assum SUBST1_TAC >>
           qunabbrev_tac ‘nq’ >>
@@ -1211,7 +1216,7 @@ Proof
           first_x_assum SUBST1_TAC >>
           metis_tac[trans_rules])
       >- (qabbrev_tac ‘IS = s with queues := nq’ >>
-          ‘<|bindings := nb; queues := nq|> = IS with bindings := nb’
+          ‘s with <|bindings := nb; queues := nq|> = IS with bindings := nb’
             by simp[Abbr ‘IS’] >>
           first_x_assum SUBST1_TAC >>
           qunabbrev_tac ‘nb’ >>
@@ -1221,9 +1226,7 @@ Proof
           irule (el 10 (CONJUNCTS trans_rules)) >>
           simp[Abbr ‘IS’]))
   (* Parallel Embedded Behaviour (ON LEFT)/LTau (Internal Comms TO RIGHT) /  *)
-  >- (rename [‘net_wf (NPar N1a N1b)’,
-              ‘trans conf (NPar N2Aa N1b)  _ _ ∧
-               trans conf (NPar N2Ba N2Bb) _ _’] >>
+  >- (rename [‘net_wf (NPar N1a N1b)’, ‘trans conf (NPar N2Aa N1b)  _ _ ∧ trans conf (NPar N2Ba N2Bb) _ _’] >>
       last_x_assum (qspecl_then [‘LSend p1 d p2’,‘N2Ba’] assume_tac) >>
       ‘net_wf N1a’
         by fs[net_wf_def] >>
@@ -1259,10 +1262,7 @@ Proof
       qexists_tac ‘NPar N3 N2Bb’ >>
       metis_tac[trans_rules])
   (*  Parallel Embedded Behaviour (ON LEFT) / LTau (Internal Comms TO RIGHT) *)
-  >- (rename [‘net_wf (NPar N1a N1b)’,
-              ‘LReceive sp d rp’,
-              ‘trans conf (NPar N2Aa N1b) _ _ ∧
-               trans conf (NPar N2Ba N2Bb) _ _’] >>
+  >- (rename [‘net_wf (NPar N1a N1b)’,‘LReceive sp d rp’,‘trans conf (NPar N2Aa N1b) _ _ ∧ trans conf (NPar N2Ba N2Bb) _ _’] >>
       first_x_assum (qspecl_then [‘LReceive sp d rp’,‘N2Ba’] assume_tac) >>
       ‘net_wf N1a’
         by fs[net_wf_def] >>
@@ -1296,9 +1296,7 @@ Proof
       qexists_tac ‘NPar N3 N2Bb’ >>
       metis_tac[trans_rules])
   (* Parallel Embeded Behaviour (ON LEFT) / Parallel Embedded Behaviour (ON LEFT) *)
-  >- (rename [‘net_wf (NPar N1a N1b)’,
-              ‘trans conf (NPar N2Aa N1b) _ _ ∧
-               trans conf (NPar N2Ba N1b) _ _’] >>
+  >- (rename [‘net_wf (NPar N1a N1b)’,‘trans conf (NPar N2Aa N1b) _ _ ∧ trans conf (NPar N2Ba N1b) _ _’] >>
       last_x_assum (qspecl_then [‘LB’,‘N2Ba’] assume_tac) >>
       ‘net_wf N1a’
         by fs[net_wf_def] >>
@@ -1319,16 +1317,11 @@ Proof
       qexists_tac ‘NPar N3 N1b’ >>
       metis_tac[trans_rules])
   (* Parallel Embeded Behaviour (ON LEFT) / Parallel Embedded Behaviour (ON RIGHT) *)
-  >- (rename [‘net_wf (NPar N1a N1b)’,
-              ‘trans conf (NPar N2Aa N1b) _ _ ∧
-               trans conf (NPar N1a N2Bb) _ _’] >>
+  >- (rename [‘net_wf (NPar N1a N1b)’,‘trans conf (NPar N2Aa N1b) _ _ ∧ trans conf (NPar N1a N2Bb) _ _’] >>
       qexists_tac ‘NPar N2Aa N2Bb’ >>
       metis_tac[trans_rules])
   (* Parallel Embedded Behaviour (ON RIGHT) / LTau (Internal Comms TO RIGHT) *)
-  >- (rename [‘net_wf (NPar N1a N1b)’,
-              ‘LReceive sp d rp’,
-              ‘trans conf (NPar N1a N2Ab) _ _ ∧
-               trans conf (NPar N2Ba N2Bb) _ _’] >>
+  >- (rename [‘net_wf (NPar N1a N1b)’,‘LReceive sp d rp’,‘trans conf (NPar N1a N2Ab) _ _ ∧ trans conf (NPar N2Ba N2Bb) _ _’] >>
       last_x_assum (qspecl_then [‘LReceive sp d rp’,‘N2Bb’] assume_tac) >>
       ‘net_wf N1b’
         by fs[net_wf_def] >>
@@ -1362,10 +1355,7 @@ Proof
       qexists_tac ‘NPar N2Ba N3’ >>
       metis_tac[trans_rules])
   (* Parallel Embedded Behaviour (ON RIGHT) / LTau (Internal Comms TO LEFT) *)
-  >- (rename [‘net_wf (NPar N1a N1b)’,
-          ‘LReceive sp d rp’,
-              ‘trans conf (NPar N1a N2Ab) _ _ ∧
-               trans conf (NPar N2Ba N2Bb) _ _’] >>
+  >- (rename [‘net_wf (NPar N1a N1b)’,‘LReceive sp d rp’,‘trans conf (NPar N1a N2Ab) _ _ ∧ trans conf (NPar N2Ba N2Bb) _ _’] >>
       first_x_assum (qspecl_then [‘LSend sp d rp’,‘N2Bb’] assume_tac) >>
       ‘net_wf N1b’
         by fs[net_wf_def] >>
@@ -1399,15 +1389,11 @@ Proof
       qexists_tac ‘NPar N2Ba N3’ >>
       metis_tac[trans_rules])
   (* Parallel Embedded Behaviour (ON RIGHT) / Parallel Embedded Behaviour (ON LEFT) *)
-  >- (rename [‘net_wf (NPar N1a N1b)’,
-              ‘trans conf (NPar N1a N2Ab) _ _ ∧
-               trans conf (NPar N2Ba N1b) _ _’] >>
+  >- (rename [‘net_wf (NPar N1a N1b)’,‘trans conf (NPar N1a N2Ab) _ _ ∧ trans conf (NPar N2Ba N1b) _ _’] >>
       qexists_tac ‘NPar N2Ba N2Ab’ >>
       metis_tac[trans_rules])
   (* Parallel Embedded Behaviour (ON RIGHT) / Parallel Embedded Behaviour (ON RIGHT) *)
-  >- (rename [‘net_wf (NPar N1a N1b)’,
-              ‘trans conf (NPar N1a N2Ab) _ _ ∧
-               trans conf (NPar N1a N2Bb) _ _’] >>
+  >- (rename [‘net_wf (NPar N1a N1b)’,‘trans conf (NPar N1a N2Ab) _ _ ∧ trans conf (NPar N1a N2Bb) _ _’] >>
       last_x_assum (qspecl_then [‘LB’,‘N2Bb’] assume_tac) >>
       ‘net_wf N1b’
         by fs[net_wf_def] >>
@@ -1427,6 +1413,12 @@ Proof
       fs[] >> ntac 6 (pop_assum (K ALL_TAC)) >>
       qexists_tac ‘NPar N1a N3’ >>
       metis_tac[trans_rules])
+  (* LTau (Fixed point)/LReceive *)
+  >- cheat
+  (* LTau (Letrec)/LReceive *)
+  >- cheat
+  (* LTau (Letrec)/LReceive *)
+  >- cheat
 QED
 
 (* Confluence Results for identical Labels *)
@@ -1501,7 +1493,7 @@ Theorem trans_samelab_tau_difout_diamond[local]:
       trans conf N2A LTau N3 ∧
       trans conf N2B LTau N3
 Proof
-        Induct_on ‘N1’
+  Induct_on ‘N1’
   (* NNil Case *)
   >- (rw[] >> fs[Once trans_cases])
   (* NPar Case *)
@@ -2179,14 +2171,15 @@ Proof
   >- (rw[] >>
       qpat_x_assum ‘trans _ _ _ N2A’
                   (fn x => strip_assume_tac(REWRITE_RULE [Once trans_cases] x)) >>
-      fs[] >> rw[] >> fs[] >>
       qpat_x_assum ‘trans _ _ _ N2B’
                   (fn x => strip_assume_tac(REWRITE_RULE [Once trans_cases] x)) >>
-      fs[] >> rw[] >> fs[] >>
+      fs[] >> rw[] >> fs[] >> 
       metis_tac[final_inter_mutexc])
 QED
 
+
 (*  General Reflexive Confluence Result*)
+(* This needs some love *)
 Theorem trans_diamond:
   ∀conf N1 LA N2A LB N2B.
     net_wf N1 ∧
@@ -2225,6 +2218,8 @@ Proof
 QED
 
 (* trans preserves the structure of the network *)
+(* This needs some love *)
+(*
 Theorem trans_struct_pres_NPar_NEndpoint:
   ∀conf p s c n L n'.
    trans conf (NPar (NEndpoint p s c) n) L n'
@@ -2237,8 +2232,11 @@ Proof
                   (ASSUME_TAC o ONCE_REWRITE_RULE [trans_cases])
   \\ fs []
 QED
+*)
 
 (* trans preserves the structure of the network *)
+(* This needs some love *)
+(*
 Theorem trans_struct_pres_NEnpoint:
   ∀conf p s c n L n'.
    trans conf (NEndpoint p s c) L n'
@@ -2249,6 +2247,7 @@ Proof
   \\ fs []
 QED
 
+*)
 val (junkcong_rules, junkcong_ind, junkcong_cases) = Hol_reln `
   (* Reflexive *)
   (∀fvs n:payloadLang$network. junkcong fvs n n)
@@ -2337,6 +2336,8 @@ val junkcong_remove_junk = Q.store_thm("junkcong_remove_junk",
 val junkcong_sym_eq = Q.store_thm("junkcong_sym_eq",
 `∀fvs p q. junkcong fvs p q = junkcong fvs q p`,metis_tac[junkcong_sym]);
 
+(* This needs some love *)
+(*
 val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
   `∀fvs p1 q1.
      junkcong fvs p1 q1
@@ -2514,7 +2515,6 @@ val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
       >> imp_res_tac trans_par_l
       >> imp_res_tac trans_par_r
       >> metis_tac[junkcong_rules]));
-
 val junkcong_reduction_eq = Q.store_thm("junkcong_reduction_eq",
   `∀conf fvs p1 q1.
      junkcong fvs p1 q1
@@ -2545,7 +2545,7 @@ val junkcong_reduction_eq = Q.store_thm("junkcong_reduction_eq",
   \\ rw [reduction_def] \\ irule RTC_TRANS \\ qexists_tac ‘p2’ \\ rw []
   \\ rw [reduction_def]
 );
-
+*)
 val junkcong_has_fv_eq = Q.store_thm("junkcong_has_fv_eq",
   `!fv e l s e2. junkcong {fv} (NEndpoint l s e) e2
    /\ MEM fv (free_var_names_endpoint e)
@@ -2610,17 +2610,22 @@ val junkcong_endpoints = Q.store_thm("junkcong_endpoints",
   ho_match_mp_tac junkcong_ind
   >> rpt strip_tac >> fs[endpoints_def]);
 
+(* This needs some love *)
+(*
 val junkcong_trans_pres = Q.store_thm("junkcong_trans_pres",
   `∀conf p1 q1 fv alpha p2.
      junkcong fv p1 q1 ∧ trans conf p1 alpha p2
      ⇒ ∃q2. trans conf q1 alpha q2 ∧ junkcong fv p2 q2`,
   metis_tac[junkcong_trans_eq])
-
+*)
+(* This needs some love *)
+(*
 val junkcong_reduction_pres = Q.store_thm("junkcong_reduction_pres",
   `∀conf p1 q1 fv alpha p2.
      junkcong fv p1 q1 ∧ (reduction conf)^* p1 p2
      ⇒ ∃q2. (reduction conf)^* q1 q2 ∧ junkcong fv p2 q2`,
   metis_tac[junkcong_reduction_eq])
+*)
 
 Theorem junkcong_net_end:
   ∀fv n1 n2. junkcong fv n1 n2 ⇒ (net_end n1 ⇔ net_end n2)
@@ -2650,6 +2655,8 @@ Proof
   rw [qlk_def,qpush_def,fget_def,FLOOKUP_UPDATE]
 QED
 
+(* This needs some love *)
+(*
 Theorem trans_LSend_padded:
   ∀n conf n' p d q.
    trans conf n (LSend p d q) n'
@@ -2664,7 +2671,10 @@ Proof
   \\ metis_tac []
   \\ metis_tac []
 QED
+*)
 
+(* This needs some love *)
+(*
 Theorem trans_padded_pres:
   ∀n conf n'.
    trans conf n LTau n' ∧ padded_network conf n
@@ -2708,6 +2718,7 @@ Proof
   \\ first_x_assum irule \\ fs []
   \\ qexists_tac ‘k’ \\ fs []
 QED
+*)
 
 Theorem empty_q_padded:
   ∀n conf. empty_q n ⇒ padded_network conf n

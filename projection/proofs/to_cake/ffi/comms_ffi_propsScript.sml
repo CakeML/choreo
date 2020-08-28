@@ -7,7 +7,6 @@ open ffiTheory;
 open payloadSemTheory
      payloadLangTheory
      payloadPropsTheory
-     payloadConfluenceTheory
      comms_ffi_modelTheory
      comms_ffi_consTheory;
 

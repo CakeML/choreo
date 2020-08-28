@@ -113,9 +113,8 @@ Inductive trans:
              (NPar n1 n2'))
 
   (* Recursion, fixpoint style *)
-∧ (∀conf p s dn e alpha n.
-    trans conf (NEndpoint p s (dsubst e dn (Fix dn e))) alpha n
-    ⇒ trans conf (NEndpoint p s (Fix dn e)) alpha n)
+∧ (∀conf p s dn e.
+    trans conf (NEndpoint p s (Fix dn e)) LTau (NEndpoint p s (dsubst e dn (Fix dn e))))
 
   (* Recursion, letrec style *)
 ∧ (∀conf p s dn vars e1 e2.
@@ -133,7 +132,7 @@ Inductive trans:
           (NEndpoint p s (FCall dn args))
           LTau
           (NEndpoint p (s with <|bindings := bindings |++ ZIP(args,MAP (THE o FLOOKUP s.bindings) args);
-                                 funs := (dn,Closure params (fun,bindings) e)::funs|>) e))
+                                 funs := (dn,Closure params (funs,bindings) e)::funs|>) e))
 End
 
 val _ = zip ["trans_send_last_payload","trans_send_intermediate_payload",
