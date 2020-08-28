@@ -82,7 +82,7 @@ Definition letfunsOf_def:
 ∧ letfunsOf pn (Sel p _ q c)      = letfunsOf pn c
 ∧ letfunsOf pn (Let _ p f _ c)    = (if p = pn then f::letfunsOf pn c else  letfunsOf pn c)
 End
-        
+
 Inductive lcong:
 (* Congruence rules for lists of asyncronous operations *)
 
@@ -112,7 +112,7 @@ val [lcong_sym,lcong_refl,lcong_trans,lcong_reord] =
     zip ["lcong_sym","lcong_refl","lcong_trans","lcong_reord"]
         (CONJUNCTS lcong_rules) |> map save_thm;
 
-Definition dsubst:
+Definition dsubst_def:
   dsubst Nil dn c'               = Nil
 ∧ dsubst (IfThen v p l r) dn c' = IfThen v p (dsubst l dn c') (dsubst r dn c')
 ∧ dsubst (Com p v1 q v2 c) dn c'  = Com p v1 q v2 (dsubst c dn c')
