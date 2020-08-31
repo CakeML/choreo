@@ -339,6 +339,14 @@ val compile_network_support = Q.store_thm("compile_network_support",
   >> fs[compile_network_fv_def,free_var_names_network_def,
         compile_endpoint_support]);
 
+Theorem compile_network_fv_dsubst:
+  compile_endpoint fv (dsubst e dn e') =
+  dsubst (compile_endpoint fv e) dn (compile_endpoint fv e')
+Proof
+  Induct_on ‘e’ >>
+  rw[compile_endpoint_def,dsubst_def]
+QED
+
 val compile_network_preservation_trans = Q.store_thm("compile_network_preservation_trans",
   `∀n1 n2 q1 d q2 fv.
     ALL_DISTINCT (MAP FST (endpoints n1)) ∧
@@ -538,6 +546,13 @@ val compile_network_preservation_trans = Q.store_thm("compile_network_preservati
       >> drule reduction_par_r >> disch_then(qspec_then `compile_network_fv fv n1` assume_tac)
       >> asm_exists_tac >> simp[] >> match_mp_tac junkcong_par
       >> fs[junkcong_refl])
+  >- (* trans_fix *)
+     (fs[compile_network_fv_def,compile_network_fv_dsubst,compile_endpoint_def]
+      >> qmatch_goalsub_abbrev_tac `junkcong _ a1 _`
+      >> qexists_tac `a1` >> unabbrev_all_tac
+      >> simp[junkcong_refl]
+      >> match_mp_tac RTC_SUBSET
+      >> metis_tac[reduction_def,trans_fix])
   );
 
 val compile_network_preservation = Q.store_thm("compile_network_preservation",
@@ -1453,7 +1468,21 @@ val choice_rel_trans_pres = Q.prove(
               >> simp[weak_trans_refl]
               >> match_mp_tac trans_IMP_weak_trans
               >> MAP_FIRST match_mp_tac (CONJUNCTS trans_rules)
-              >> fs[])))
+              >> fs[])
+          >- ((* trans_fix *)
+              Cases_on `e` >> fs[compile_endpoint_def] >> rveq >> fs[var_names_endpoint_def]
+              >> fs[decompile_label_def,endpoint_ok_def,endpoints_def,EVERY_APPEND,
+                    partners_endpoint_def,CaseEq "bool"]
+              >> rename1 ‘NEndpoint p s (Fix dn e)’
+              >> qexists_tac ‘NEndpoint p s (dsubst e dn (Fix dn e))’
+              >> conj_tac
+              >- (match_mp_tac trans_IMP_weak_trans >> metis_tac[trans_fix])
+              >> match_mp_tac choice_rel_endpoint_eq_junk
+              >> simp[compile_network_fv_dsubst]
+              >> reverse conj_tac >- metis_tac[junkcong_sym,compile_endpoint_def]
+              >> spose_not_then strip_assume_tac
+              >> imp_res_tac MEM_var_names_endpoint_dsubst
+              >> fs[var_names_endpoint_def])))
   >> rpt strip_tac
   >- ((* choice_rel_par *)
       fs[endpoint_ok_def,endpoints_def,EVERY_APPEND,ALL_DISTINCT_APPEND]
