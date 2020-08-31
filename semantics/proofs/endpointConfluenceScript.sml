@@ -229,6 +229,9 @@ Proof
       >- metis_tac[trans_par_l,trans_par_r] >>
       fs[endpoints_def,ALL_DISTINCT_APPEND] >>
       metis_tac[trans_par_r,trans_par_l])
+  >- (* Fix *)
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >> fs[])
 QED
 
 Theorem endpoint_local_confluence_send_rotated:
@@ -491,6 +494,9 @@ Proof
       >- metis_tac[trans_par_l,trans_par_r] >>
       fs[endpoints_def,ALL_DISTINCT_APPEND] >>
       metis_tac[trans_par_r,trans_par_l])
+  >- (* Fix *)
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >> fs[])
 QED
 
 Theorem endpoint_local_confluence_int_choice_rotated:
@@ -943,6 +949,10 @@ Proof
       >- metis_tac[trans_par_l,trans_par_r,qcong_par,qcong_refl] >>
       fs[endpoints_def,ALL_DISTINCT_APPEND] >>
       metis_tac[qcong_refl,qcong_par,trans_par_r,trans_par_l])
+  >- (* Fix *)
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >> fs[] >>
+      metis_tac[qcong_refl,trans_enqueue,trans_fix])
 QED
 
 Theorem endpoint_local_confluence_tau_choice:
@@ -1973,6 +1983,10 @@ Proof
           rpt(first_x_assum(qspec_then `n1` assume_tac)) >>
           ntac 2 (asm_exists_tac >> simp[]) >>
           metis_tac[qcong_rules]))
+  >- (* Fix *)
+   (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+    fs[] >> rveq >> fs[] >> rveq >> fs[] >>
+    metis_tac[qcong_refl,trans_enqueue,trans_fix])
 QED
 
 (* TODO: move? *)
