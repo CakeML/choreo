@@ -233,6 +233,26 @@ val trans_let' = Q.store_thm("trans_let'",
   >> match_mp_tac trans_let
   >> simp[]);
 
+Theorem trans_let'':
+  ∀conf s v p f vl e q.
+         EVERY IS_SOME (MAP (FLOOKUP s.bindings) vl) ⇒
+         trans conf (NEndpoint p (s with queues:= q) (Let v f vl e)) LTau
+           (NEndpoint p
+              (s with<|
+                 bindings := s.bindings |+ (v,f (MAP (THE ∘ FLOOKUP s.bindings) vl));
+                 queues:= q
+                 |>) e)
+Proof
+  rpt strip_tac
+  >> qmatch_goalsub_abbrev_tac `trans _ (NEndpoint _ s1 _) _ (NEndpoint _ s2 _)`
+  >> `s2 = s1 with bindings := s1.bindings |+ (v,f (MAP (THE ∘ FLOOKUP s1.bindings) vl))`
+     by(unabbrev_all_tac >> simp[state_component_equality])
+  >> pop_assum (fn thm => PURE_ONCE_REWRITE_TAC [thm])
+  >> unabbrev_all_tac
+  >> match_mp_tac trans_let
+  >> simp[]
+QED
+
 val trans_IMP_weak_trans = Q.store_thm("trans_IMP_weak_trans",
   `∀conf p alpha q. trans conf p alpha q ==> weak_trans conf p alpha q`,
   rw[weak_trans_def,weak_tau_trans_def]
