@@ -403,11 +403,12 @@ val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
                  >- metis_tac[junkcong_rules]
                  >- (match_mp_tac junkcong_add_junk' >> fs[free_var_names_endpoint_def,MEM_FILTER])))
       >> TRY(rename1 ‘dsubst e dn (Fix dn e)’
-             >> first_x_assum drule
-             >> impl_tac
-             >- (spose_not_then strip_assume_tac >> imp_res_tac MEM_free_var_names_endpoint_dsubst
-                 >> fs[free_var_names_endpoint_def])
-             >> metis_tac[trans_fix])
+             >> qexists_tac ‘NEndpoint p (s with bindings := s.bindings |+ (v,d)) (dsubst e dn (Fix dn e))’
+             >> conj_tac >- metis_tac[trans_fix]
+             >> match_mp_tac junkcong_add_junk
+             >> simp[]
+             >> spose_not_then strip_assume_tac >> imp_res_tac MEM_free_var_names_endpoint_dsubst
+             >> fs[free_var_names_endpoint_def])
      )
   >- (* junkcong_add_junk, symmetric case *)
      (PURE_ONCE_REWRITE_TAC [junkcong_sym_eq]
@@ -472,12 +473,13 @@ val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
                  >> fs[free_var_names_endpoint_def,MEM_FILTER]
                  >> metis_tac[junkcong_rules,junkcong_add_junk']))
       >> TRY(rename1 ‘dsubst e dn (Fix dn e)’
-             >> first_x_assum drule
-             >> disch_then(qspec_then ‘s’ mp_tac)
-             >> impl_tac
-             >- (spose_not_then strip_assume_tac >> imp_res_tac MEM_free_var_names_endpoint_dsubst
-                 >> fs[free_var_names_endpoint_def])
-             >> metis_tac[trans_fix]))
+             >> qexists_tac ‘NEndpoint p s (dsubst e dn (Fix dn e))’
+             >> conj_tac >- metis_tac[trans_fix]
+             >> match_mp_tac junkcong_sym
+             >> match_mp_tac junkcong_add_junk
+             >> simp[]
+             >> spose_not_then strip_assume_tac >> imp_res_tac MEM_free_var_names_endpoint_dsubst
+             >> fs[free_var_names_endpoint_def]))
   >- (* par-l *)
      (qpat_x_assum `trans (NPar _ _) _ _` (assume_tac
                                     o REWRITE_RULE [Once endpointSemTheory.trans_cases])
@@ -1096,7 +1098,7 @@ val qcong_trans_eq = Q.store_thm("qcong_trans_eq",
              >> HINT_EXISTS_TAC
              >> rw[]
              >> metis_tac[qcong_queue_reorder',qcong_refl,APPEND_ASSOC,APPEND])
-      >> TRY(rename1 ‘dsubst’ >> metis_tac[trans_fix])
+      >> TRY(rename1 ‘dsubst’ >> metis_tac[trans_fix,qcong_rules])
      )
   >- (* qcong_queue_reorder, symmetric case *)
      (qmatch_asmsub_abbrev_tac `NEndpoint _ s' _`
@@ -1180,7 +1182,7 @@ val qcong_trans_eq = Q.store_thm("qcong_trans_eq",
              >> HINT_EXISTS_TAC
              >> rw[]
              >> metis_tac[qcong_queue_reorder',qcong_refl,APPEND_ASSOC,APPEND])
-      >> TRY(rename1 ‘dsubst’ >> metis_tac[trans_fix]))
+      >> TRY(rename1 ‘dsubst’ >> metis_tac[trans_fix,qcong_rules]))
   >- (qpat_x_assum `trans (NPar _ _) _ _` (assume_tac
                                            o REWRITE_RULE [Once trans_cases])
       >> fs[] >> rveq
@@ -1460,7 +1462,6 @@ val trans_endpoints_ok = Q.store_thm("trans_endpoints_ok",
   ho_match_mp_tac trans_ind
   >> rpt strip_tac
   >> fs[endpoints_def,endpoint_ok_def,partners_endpoint_def]
-  >> first_x_assum match_mp_tac
   >> spose_not_then strip_assume_tac
   >> imp_res_tac partners_endpoint_dsubst
   >> fs[partners_endpoint_def]);
@@ -1603,40 +1604,11 @@ Proof
   >> metis_tac[choice_sender_is_endpoint]
 QED
 
-Inductive unfold_rel:
-  (* Reflexive *)
-  (∀n:endpointLang$network. unfold_rel n n)
-
-  (* Symmetric *)
-∧ (∀n1 n2.
-    unfold_rel n1 n2
-    ⇒ unfold_rel n2 n1)
-  (* Transitive *)
-∧ (∀n1 n2 n3.
-     unfold_rel n1 n2
-     ∧ unfold_rel n2 n3
-     ⇒ unfold_rel n1 n3)
-
-  (* Unfold *)
-∧ (∀p s e dn.
-    unfold_rel (NEndpoint p s (Fix dn e)) (NEndpoint p s (dsubst e dn (Fix dn e))))
-
-  (* Par *)
-∧ (∀n1 n2 n3 n4.
-     unfold_rel n1 n2
-     ∧ unfold_rel n3 n4
-     ⇒ unfold_rel (NPar n1 n3) (NPar n2 n4))
-End
-
-val [unfold_rel_refl,unfold_rel_sym,unfold_rel_trans,unfold_rel_unfold,unfold_rel_par]
-  = zip ["unfold_rel_refl","unfold_rel_sym","unfold_rel_trans","unfold_rel_unfold","unfold_rel_par"]
-        (CONJUNCTS unfold_rel_rules) |> map save_thm;
-
 Theorem trans_same_receiver_determ:
   trans p1 (LReceive s d r) p2
   /\ trans p1 (LReceive s d r) p3
   /\ ALL_DISTINCT(MAP FST(endpoints p1))
-  ==> unfold_rel p2 p3
+  ==> p2 = p3
 Proof
   qmatch_goalsub_abbrev_tac `trans _ alpha`
   >> rpt(disch_then strip_assume_tac)
@@ -1648,14 +1620,6 @@ Proof
   >> ho_match_mp_tac trans_strongind
   >> rpt conj_tac >> rpt(gen_tac ORELSE disch_then strip_assume_tac)
   >> fs[] >> rveq
-  >> TRY(rename1 ‘dsubst’ >>
-         qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
-         >> fs[] >> rveq >> fs[] >> rveq >> fs[endpoints_def,ALL_DISTINCT_APPEND,unfold_rel_refl]
-         >> match_mp_tac unfold_rel_trans
-         >> qexists_tac ‘NEndpoint p (s with queue := SNOC (s',d) s.queue) (dsubst e dn (Fix dn e))’
-         >> conj_tac
-         >- (metis_tac[trans_enqueue])
-         >> metis_tac[unfold_rel_rules])
   >> TRY(rename1 ‘NEndpoint’
          >> ‘∃pp. pp = NEndpoint p2 s e’ by simp[]
          >> ‘∃alpha. alpha = LReceive p1 d p2’ by simp[]
@@ -1666,12 +1630,12 @@ Proof
          >> pop_assum mp_tac
          >> MAP_EVERY qid_spec_tac [‘p3’,‘alpha’,‘pp’]
          >> ho_match_mp_tac trans_ind
-         >> fs[] >> rveq >> fs[endpoints_def,ALL_DISTINCT_APPEND,unfold_rel_refl]
+         >> fs[] >> rveq >> fs[endpoints_def,ALL_DISTINCT_APPEND]
          >> rw[]
-         >> metis_tac[unfold_rel_rules])
+         >> metis_tac[])
   >> qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
-  >> fs[] >> rveq >> fs[] >> rveq >> fs[endpoints_def,ALL_DISTINCT_APPEND,unfold_rel_refl]
-  >> TRY(rename1 ‘NPar’ >> metis_tac[unfold_rel_rules,receiver_is_endpoint])
+  >> fs[] >> rveq >> fs[] >> rveq >> fs[endpoints_def,ALL_DISTINCT_APPEND]
+  >> metis_tac[receiver_is_endpoint]
 QED
 
 Theorem trans_same_receiver_choice_determ:
@@ -1718,7 +1682,7 @@ QED
 
 Theorem trans_no_selfloop:
   !p1 alpha p2.
-  trans p1 alpha p2
+  trans p1 alpha p2 ∧ alpha ≠ LTau
   ==> p1 <> p2
 Proof
   PURE_REWRITE_TAC[GSYM AND_IMP_INTRO] >>
@@ -1805,9 +1769,18 @@ Proof
 QED
 
 Theorem trans_no_selfloop'[simp]:
-  trans p1 alpha p1 <=> F
+  (trans p1 (LReceive p2 d p3) p1 <=> F) ∧
+  (trans p1 (LSend p2 d p3) p1 <=> F) ∧
+  (trans p1 (LIntChoice p2 b p3) p1 <=> F) ∧
+  (trans p1 (LExtChoice p2 b p3) p1 <=> F)
 Proof
-  metis_tac[trans_no_selfloop]
+  metis_tac[trans_no_selfloop,label_distinct]
+QED
+
+Theorem trans_selfloop_LTau:
+  trans p1 alpha p1 ⇒ alpha = LTau
+Proof
+  metis_tac[trans_no_selfloop,label_distinct]
 QED
 
 Theorem trans_distinct_residual:
@@ -1829,7 +1802,7 @@ Proof
       fs[Abbr `a1`, Abbr `a2`,endpoint_size_def] >>
       NO_TAC
       ) >>
-  metis_tac[]
+  metis_tac[trans_selfloop_LTau]
 QED
 
 val join_endpoint_def = Define `
@@ -1881,6 +1854,14 @@ val join_endpoint_def = Define `
         else NONE
       | _ => NONE)
    else NONE) /\
+  (join_endpoint (Call dn) (Call dn') =
+   (if dn = dn' then SOME(Call dn') else NONE)) /\
+  (join_endpoint (Fix dn e1) (Fix dn' e2) =
+   (if dn = dn' then
+     case join_endpoint e1 e2 of
+       SOME e3 => SOME(Fix dn' e3)
+     | _ => NONE
+    else NONE)) /\
   (join_endpoint _ _ = NONE)
 `
 
@@ -1930,6 +1911,10 @@ Proof
       rpt(PURE_FULL_CASE_TAC >> fs[] >> rveq) \\
       imp_res_tac join_endpoint_nil_not_nil \\
       fs[] \\ rfs[])
+  >- (reverse IF_CASES_TAC >- metis_tac[] \\
+      rw[])
+  >- (reverse IF_CASES_TAC >- metis_tac[] \\
+      rw[] \\ metis_tac[])
 QED
 
 Theorem join_endpoint_nil_sym:
