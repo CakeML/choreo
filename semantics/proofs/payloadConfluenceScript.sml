@@ -140,6 +140,15 @@ Proof
       >- metis_tac[trans_par_l,trans_par_r] >>
       fs[endpoints_def,ALL_DISTINCT_APPEND] >>
       metis_tac[trans_par_r,trans_par_l])
+  >- (* trans_fix *)
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >> fs[])
+  >- (* trans_letrec *)
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >> fs[])
+  >- (* trans_call *)
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >> fs[])
 QED
 
 Theorem qpush_commute:
@@ -344,8 +353,7 @@ Proof
       disch_then(qspecl_then [`conf`,`s1`,`data`,`ee`] assume_tac) >>
       asm_exists_tac >> simp[] >> unabbrev_all_tac >>
       simp[] >>
-      match_mp_tac trans_let' >>
-      simp[]
+      match_mp_tac trans_let'' >> simp[]
      )
   >- (* Par-L *)
      (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
@@ -360,6 +368,20 @@ Proof
       >- metis_tac[trans_par_l,trans_par_r] >>
       fs[endpoints_def,ALL_DISTINCT_APPEND] >>
       metis_tac[trans_par_r,trans_par_l])
+  >- (* Fix *)
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >>
+      metis_tac[trans_fix,trans_enqueue])
+  >- (* Letrec *)
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >>
+      PURE_ONCE_REWRITE_TAC[trans_cases] >>
+      fs[PULL_EXISTS])
+  >- (* Call *)
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >>
+      PURE_ONCE_REWRITE_TAC[trans_cases] >>
+      fs[PULL_EXISTS])
 QED
 
 Theorem payload_local_confluence_tau:
@@ -728,6 +750,21 @@ Proof
           rpt(first_x_assum(qspec_then `n1` assume_tac)) >>
           ntac 2 (asm_exists_tac >> simp[]) >>
           metis_tac[]))
+  >- (* Fix *)
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >>
+      PURE_ONCE_REWRITE_TAC[trans_cases] >>
+      fs[PULL_EXISTS])
+  >- (* Letrec *)
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >>
+      PURE_ONCE_REWRITE_TAC[trans_cases] >>
+      fs[PULL_EXISTS])
+  >- (* Call *)
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >>
+      PURE_ONCE_REWRITE_TAC[trans_cases] >>
+      fs[PULL_EXISTS])
 QED
 
 (* TODO: move? *)
