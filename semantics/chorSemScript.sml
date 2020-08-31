@@ -6,13 +6,15 @@ val _ = new_theory "chorSem";
 
 Datatype:
   label = LTau proc varN
+        | LFix
         | LCom proc varN proc varN
         | LSel proc bool proc
         | LLet varN proc (datum list -> datum) (varN list)
 End
 
 Definition freeprocs_def:
-  freeprocs (LTau p n)         = {p}
+  freeprocs LFix               = {}
+∧ freeprocs (LTau p n)         = {p}
 ∧ freeprocs (LCom p1 v1 p2 v2) = {p1;p2}
 ∧ freeprocs (LSel p1 b p2)     = {p1;p2}
 ∧ freeprocs (LSel p1 b p2)     = {p1;p2}
@@ -20,28 +22,32 @@ Definition freeprocs_def:
 End
 
 Definition sender_def:
-  sender (LTau p n)          = NONE
+  sender LFix                = NONE
+∧ sender (LTau p n)          = NONE
 ∧ sender (LCom p1 v1 p2 v2)  = SOME p1
 ∧ sender (LSel p1 b p2)      = SOME p1
 ∧ sender (LLet v p f vl)     = NONE
 End
 
 Definition receiver_def:
-  receiver (LTau p n)          = NONE
+  receiver LFix                = NONE
+∧ receiver (LTau p n)          = NONE
 ∧ receiver (LCom p1 v1 p2 v2)  = SOME p2
 ∧ receiver (LSel p1 b p2)      = SOME p2
 ∧ receiver (LLet v p f vl)     = NONE
 End
 
 Definition written_def:
-  written (LTau p n)          = NONE
+  written LFix                = NONE
+∧ written (LTau p n)          = NONE
 ∧ written (LCom p1 v1 p2 v2)  = SOME(v2,p2)
 ∧ written (LSel p1 b p2)      = NONE
 ∧ written (LLet v p f vl)     = SOME(v,p)
 End
 
 Definition read_def:
-  read (LTau p n)          = {(n,p)}
+  read LFix               = {}
+∧ read (LTau p n)         = {(n,p)}
 ∧ read (LCom p1 v1 p2 v2) = {(v1,p1)}
 ∧ read (LSel p1 b p2)     = {}
 ∧ read (LLet v p f vl)     = set(MAP (λv. (v,p)) vl)
@@ -196,9 +202,8 @@ Inductive trans:
     ⇒ trans (s,Sel p1 b p2 c) (alpha,LSel p1 b p2::l) (s',Sel p1 b p2 c'))
 
    (* Recursion *)
-∧ (∀s c s' c' dn l alpha.
-    trans (s,dsubst c dn (Fix dn c)) (alpha,l) (s',c')
-    ⇒ trans (s,Fix dn c) (alpha,l) (s',c'))
+∧ (∀s c dn.
+    trans (s,Fix dn c) (LFix,[]) (s,dsubst c dn (Fix dn c)))
 End
 
 
