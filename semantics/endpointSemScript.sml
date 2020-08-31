@@ -137,9 +137,8 @@ Inductive trans:
              (NPar n1 n2'))
 
   (* Recursion *)
-∧ (∀p s dn e alpha n.
-    trans (NEndpoint p s (dsubst e dn (Fix dn e))) alpha n
-    ⇒ trans (NEndpoint p s (Fix dn e)) alpha n)
+∧ (∀p s dn e.
+    trans (NEndpoint p s (Fix dn e)) LTau (NEndpoint p s (dsubst e dn (Fix dn e))))
 End
 
 val _ = zip [ "trans_send","trans_enqueue"
