@@ -499,8 +499,20 @@ Proof
   >> metis_tac[sender_is_endpoint,trans_no_self_non_tau_loop]
 QED
 
-(* This needs some love *)
-(*
+Theorem trans_no_selfloop:
+  !conf p1 alpha p2.
+  trans conf p1 alpha p2 ∧ conf.payload_size > 0 ∧ alpha ≠ LTau
+  ==> p1 <> p2
+Proof
+  PURE_REWRITE_TAC[GSYM AND_IMP_INTRO] >>
+  ho_match_mp_tac trans_ind >> rw[] >> fs[state_component_equality] >>
+  TRY(disj2_tac) >> spose_not_then strip_assume_tac >>
+  qmatch_asmsub_abbrev_tac `a1 = a2` >>
+  `endpoint_size a1 = endpoint_size a2` by simp[] >>
+  pop_assum mp_tac >> unabbrev_all_tac >> rpt(pop_assum kall_tac) >>
+  simp[endpoint_size_def]
+QED
+
 Theorem trans_distinct_residual:
   !conf p1 alpha p2 beta p3.
   trans conf p1 alpha p2
@@ -528,11 +540,11 @@ Proof
   >- (* Com-L *)
      (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
       fs[] >> rveq >> fs[] >> rveq >> fs[] >>
-      Cases_on `beta` >> fs[] >> metis_tac[trans_no_selfloop])
+      Cases_on `beta` >> fs[] >> metis_tac[trans_no_selfloop,label_distinct])
   >- (* Com-R *)
      (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
       fs[] >> rveq >> fs[] >> rveq >> fs[] >>
-      Cases_on `beta` >> fs[] >> metis_tac[trans_no_selfloop])
+      Cases_on `beta` >> fs[] >> metis_tac[trans_no_selfloop,label_distinct])
   >- (* Dequeue-last-payload *)
      (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
       fs[] >> rveq >> fs[] >> rveq >> fs[payloadLangTheory.state_component_equality] >>
@@ -558,12 +570,20 @@ Proof
       fs[] >> rveq >> fs[] >> rveq >> fs[payloadLangTheory.state_component_equality])
   >- (* Par-L *)
      (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
-      fs[] >> rveq >> fs[] >> rveq >> fs[] >> metis_tac[trans_no_selfloop])
+      fs[] >> rveq >> fs[] >> rveq >> fs[] >> metis_tac[trans_no_selfloop,label_distinct])
   >- (* Par-R *)
      (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
-      fs[] >> rveq >> fs[] >> rveq >> fs[] >> metis_tac[trans_no_selfloop])
+      fs[] >> rveq >> fs[] >> rveq >> fs[] >> metis_tac[trans_no_selfloop,label_distinct])
+  >- (* Fix *)
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >> fs[state_component_equality])
+  >- (* Letrec *)
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >> fs[state_component_equality])
+  >- (* Call *)
+     (qhdtm_x_assum `trans` (assume_tac o SIMP_RULE std_ss [Once trans_cases]) >>
+      fs[] >> rveq >> fs[] >> rveq >> fs[state_component_equality])
 QED
-*)
 
 Theorem intermediate_final_IMP:
   !d. intermediate d /\ final d ==> F
@@ -2173,7 +2193,7 @@ Proof
                   (fn x => strip_assume_tac(REWRITE_RULE [Once trans_cases] x)) >>
       qpat_x_assum ‘trans _ _ _ N2B’
                   (fn x => strip_assume_tac(REWRITE_RULE [Once trans_cases] x)) >>
-      fs[] >> rw[] >> fs[] >> 
+      fs[] >> rw[] >> fs[] >>
       metis_tac[final_inter_mutexc])
 QED
 
