@@ -466,12 +466,12 @@ Proof
   \\ qmatch_goalsub_rename_tac ‘REPN (NPar nn _) = _’
   \\ EQ_TAC \\ rw []
   >- (Cases_on ‘nn’ \\ fs [REPN_def]
-      \\ drule trans_struct_pres_NEnpoint
+      \\ drule trans_struct_pres_NEndpoint
       \\ rw [REPN_def] \\ fs [REPN_def])
   \\ Cases_on ‘nn’ \\ fs [REPN_def]
   \\ TRY (fs [Once trans_cases] \\ NO_TAC)
   \\ TRY (drule trans_struct_pres_NPar \\ strip_tac \\ fs [REPN_def] \\ NO_TAC)
-  \\ drule trans_struct_pres_NEnpoint
+  \\ drule trans_struct_pres_NEndpoint
   \\ rw [REPN_def] \\ fs [REPN_def]
 QED
 
@@ -503,7 +503,7 @@ Proof
       \\ Cases_on ‘n’ \\ fs [net_find_def,REPN_def]
       \\ Cases_on ‘p = s'’ \\ fs [OPTION_CHOICE_def]
       \\ rveq \\ fs[]
-      \\ drule_then assume_tac trans_struct_pres_NEnpoint
+      \\ drule_then assume_tac trans_struct_pres_NEndpoint
       \\ fs [] \\ rveq \\ fs []
       >- (‘p = s’ by fs [Once trans_cases] \\
           disj1_tac \\ asm_exists_tac \\ fs [net_find_def,net_filter_def])
@@ -544,7 +544,7 @@ Proof
   >- (first_x_assum (drule_then assume_tac)
       \\ Cases_on ‘n’ \\ fs [net_find_def,REPN_def]
       \\ Cases_on ‘p = s'’ \\ fs [OPTION_CHOICE_def]
-      \\ drule_then assume_tac trans_struct_pres_NEnpoint
+      \\ drule_then assume_tac trans_struct_pres_NEndpoint
       \\ fs [] \\ rveq \\ fs []
       >- (‘p = s’ by fs [Once trans_cases] \\
           disj1_tac \\ asm_exists_tac \\ fs [net_find_def,net_filter_def])
@@ -596,7 +596,7 @@ Proof
           \\ metis_tac [trans_rules])
       \\ Cases_on ‘n1’ \\ fs [REPN_def,net_find_def]
       \\ rveq \\ fs []
-      \\ drule trans_struct_pres_NEnpoint \\ rw []
+      \\ drule trans_struct_pres_NEndpoint \\ rw []
       \\ rw [net_find_def,net_filter_def]
       \\ metis_tac [trans_rules])
   >- (‘REPN n2’ by (Cases_on ‘n1’ \\ fs [REPN_def])
@@ -610,7 +610,7 @@ Proof
           \\ metis_tac [trans_rules])
       \\ Cases_on ‘n1’ \\ fs [REPN_def,net_find_def]
       \\ rveq \\ fs []
-      \\ drule trans_struct_pres_NEnpoint \\ rw []
+      \\ drule trans_struct_pres_NEndpoint \\ rw []
       \\ rw [net_find_def,net_filter_def]
       \\ metis_tac [trans_rules])
   >- (‘REPN n2’ by (Cases_on ‘n1’ \\ fs [REPN_def])
@@ -622,7 +622,7 @@ Proof
           \\ metis_tac [trans_rules])
       \\ Cases_on ‘n1’ \\ fs [REPN_def,net_find_def]
       \\ rveq \\ fs []
-      \\ drule trans_struct_pres_NEnpoint \\ rw []
+      \\ drule trans_struct_pres_NEndpoint \\ rw []
       \\ rw [net_find_def,net_filter_def]
       \\ metis_tac [trans_rules])
   \\ ‘REPN n2’ by (Cases_on ‘n1’ \\ fs [REPN_def])
@@ -658,7 +658,7 @@ Proof
    \\ rw [REPN_def]
    (* Receive *)
    >- (Cases_on ‘n’ \\ fs [REPN_def,net_find_def]
-       \\ drule_then assume_tac trans_struct_pres_NEnpoint
+       \\ drule_then assume_tac trans_struct_pres_NEndpoint
        \\ fs [] \\ rveq \\ fs []
        \\ Cases_on ‘p = s’ \\ fs [OPTION_CHOICE_def]
        \\ rveq \\ fs [net_find_def,net_filter_def]
@@ -668,7 +668,7 @@ Proof
        \\ metis_tac [trans_rules])
    (* Send *)
    >- (Cases_on ‘n’ \\ fs [REPN_def,net_find_def]
-       \\ drule_then assume_tac trans_struct_pres_NEnpoint
+       \\ drule_then assume_tac trans_struct_pres_NEndpoint
        \\ fs [] \\ rveq \\ fs []
        \\ Cases_on ‘p = s’ \\ fs [OPTION_CHOICE_def]
        \\ rveq \\ fs [net_find_def,net_filter_def]
@@ -679,7 +679,7 @@ Proof
    >- (Cases_on ‘net_find p n’
        \\ Cases_on ‘n’ \\ fs [REPN_def,net_find_def]
        \\ rveq \\ fs []
-       \\ drule trans_struct_pres_NEnpoint
+       \\ drule trans_struct_pres_NEndpoint
        \\ rw [] \\ fs [net_filter_def]
        \\ fs [net_find_def,OPTION_CHOICE_def]
        \\ rveq \\ fs []
