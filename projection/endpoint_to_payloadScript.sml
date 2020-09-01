@@ -11,6 +11,7 @@ Definition compile_endpoint_def:
 ∧ (compile_endpoint (IfThen v e1 e2) = IfThen v (compile_endpoint e1) (compile_endpoint e2))
 ∧ (compile_endpoint (Let v f vl e) = Let v f vl (compile_endpoint e))
 ∧ (compile_endpoint (Fix dn e) = Fix dn (compile_endpoint e))
+∧ (compile_endpoint (Call dn) = Call dn)
 End
 
 Definition compile_message_def:
@@ -36,6 +37,7 @@ End
 Definition compile_state_def:
    compile_state conf s =
    <| bindings := s.bindings;
+      funs := [];
       queues := compile_queue conf s.queue |>
 End
         

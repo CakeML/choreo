@@ -170,14 +170,14 @@ Theorem compile_message_preservation_enqueue':
     conf.payload_size > 0
     ∧ p1 ≠ p2
     ==> list_trans conf
-  (NEndpoint p2 <|bindings := b; queues := q|> e)
+  (NEndpoint p2 <|bindings := b; funs := []; queues := q|> e)
   (MAP (λm. LReceive p1 m p2) (compile_message conf d))
   (NEndpoint p2
-     <|bindings := b; queues := q |+ (p1, qlk q p1 ++ compile_message conf d)|> e)
+     <|bindings := b; funs := []; queues := q |+ (p1, qlk q p1 ++ compile_message conf d)|> e)
 Proof
   rpt strip_tac >>
   drule_then drule compile_message_preservation_enqueue >>
-  disch_then(qspecl_then [‘d’,‘q’,‘e’,‘<|bindings := b|>’] mp_tac) >>
+  disch_then(qspecl_then [‘d’,‘q’,‘e’,‘<|bindings := b; funs := []|>’] mp_tac) >>
   simp[]
 QED
 
@@ -264,8 +264,8 @@ Theorem compile_message_preservation_dequeue:
                s
                (Receive p1 v ds e))
     (NEndpoint p2
-               <|bindings := s.bindings |+ (v,FLAT(ds) ++ d);
-                 queues := normalise_queues(s.queues |+ (p1,q1))|>
+               (s with <|bindings := s.bindings |+ (v,FLAT(ds) ++ d);
+                         queues := normalise_queues(s.queues |+ (p1,q1))|>)
                e)
 Proof
   recInduct compile_message_ind
@@ -356,6 +356,14 @@ Proof
   simp[qlk_compile_queue_MAP_FILTER,FILTER_APPEND]
 QED
 
+Theorem compile_endpoint_dsubst:
+  compile_endpoint (dsubst e dn e') =
+  dsubst (compile_endpoint e) dn (compile_endpoint e')
+Proof
+  Induct_on ‘e’ >>
+  rw[compile_endpoint_def,endpointLangTheory.dsubst_def,payloadLangTheory.dsubst_def]
+QED
+        
 val compile_network_preservation_trans = Q.store_thm("compile_network_preservation_trans",
   `∀p1 p2 conf.
     conf.payload_size > 0
@@ -425,7 +433,7 @@ val compile_network_preservation_trans = Q.store_thm("compile_network_preservati
       fs[compile_network_def,compile_queue_def,compile_endpoint_def,compile_state_def]
       >> match_mp_tac RTC_SUBSET
       >> simp[payloadSemTheory.reduction_def]
-      >> `EVERY IS_SOME (MAP (FLOOKUP ((<|bindings := s.bindings; queues:=compile_queue conf s.queue|>).bindings)) vl)`
+      >> `EVERY IS_SOME (MAP (FLOOKUP ((<|bindings := s.bindings; funs := []; queues:=compile_queue conf s.queue|> : closure state).bindings)) vl)`
           by(fs[EVERY_MAP])
       >> drule payloadSemTheory.trans_let >> simp[])
   >- ((* trans_par_l *)
@@ -433,7 +441,13 @@ val compile_network_preservation_trans = Q.store_thm("compile_network_preservati
       >> MATCH_ACCEPT_TAC payloadPropsTheory.reduction_par_l)
   >- ((* trans_par_r *)
       fs[compile_network_def,choice_free_network_def] >> first_x_assum drule
-      >> MATCH_ACCEPT_TAC payloadPropsTheory.reduction_par_r));
+      >> MATCH_ACCEPT_TAC payloadPropsTheory.reduction_par_r)
+  >- ((* trans_fix *)
+      fs[compile_network_def,choice_free_network_def,compile_endpoint_dsubst,
+         compile_endpoint_def] >>
+      match_mp_tac RTC_SUBSET >>
+      simp[payloadSemTheory.reduction_def] >>
+      rw[Once payloadSemTheory.trans_cases]));
 
 val compile_network_preservation = Q.store_thm("compile_network_preservation",
   `∀conf p1 p2.
@@ -597,7 +611,7 @@ Proof
       simp[compile_queue_SNOC] >>
       qmatch_goalsub_abbrev_tac `_ with queues := qa` >>
       disch_then(qspecl_then [`DROP conf.payload_size d`,
-                              `qa`,`compile_endpoint e`,`<|bindings := st.bindings|>`] mp_tac) >>
+                              `qa`,`compile_endpoint e`,`<|bindings := st.bindings; funs := []|>`] mp_tac) >>
       fs[] >>
       match_mp_tac(DECIDE “∀x y. x = y ⇒ (x ⇒ y)”) >>
       rpt(AP_TERM_TAC ORELSE AP_THM_TAC) >>
@@ -720,11 +734,11 @@ Proof
           rveq >>
           simp[normalise_queues_FUPDATE_NONEMPTY,compile_message_nonempty,compile_queue_normalise] >>
           drule_then drule compile_message_preservation_dequeue >>
-          qmatch_goalsub_abbrev_tac ‘<|bindings := ba; queues := qa|>’ >>
+          qmatch_goalsub_abbrev_tac ‘<|bindings := ba; funs := _; queues := qa|>’ >>
           disch_then(qspecl_then [`DROP conf.payload_size ds`,
                                   `[unpad d]`,`qlk(compile_queue conf q22) p`,
                                   `compile_endpoint exp`,
-                                  `<|bindings := ba; queues := qa|>`,`v`] mp_tac) >>
+                                  `<|bindings := ba; funs := []; queues := qa|>`,`v`] mp_tac) >>
           simp[Abbr ‘qa’,Abbr‘ba’] >>
           match_mp_tac(DECIDE “x = y ⇒ (x ⇒ y)”) >>
           rpt(AP_TERM_TAC ORELSE AP_THM_TAC) >>
@@ -760,7 +774,19 @@ Proof
           qexists_tac `NEndpoint p (s with bindings := s.bindings |+ (v,f (MAP (THE ∘ FLOOKUP s.bindings) l))) e1` >>
           simp[compile_network_def] >>
           simp[reduction_def,compile_state_def] >>
-          metis_tac[trans_let]))
+          metis_tac[trans_let])
+      >- (* Fix *)
+         (Cases_on `e` >> fs[compile_endpoint_def,compile_state_def] >> rveq >>
+          rename1 `compile_endpoint e1` >>
+          rename1 ‘NEndpoint p’ >>
+          rename1 ‘NEndpoint _ s (Fix dn _)’ >>
+          simp[endpointSemTheory.reduction_def,Once endpointSemTheory.trans_cases] >>
+          simp[compile_network_def,compile_endpoint_def,compile_endpoint_dsubst,compile_state_def])
+      >- (* Letrec *)
+         (Cases_on `e` >> fs[compile_endpoint_def,compile_state_def])
+      >- (* FCall *)
+         (Cases_on `e` >> fs[compile_endpoint_def,compile_state_def])
+     )
 QED
 
 Theorem reduction_list_trans:
