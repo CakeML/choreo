@@ -2258,8 +2258,6 @@ Proof
 QED
 
 (* trans preserves the structure of the network *)
-(* This needs some love *)
-(*
 Theorem trans_struct_pres_NPar_NEndpoint:
   ∀conf p s c n L n'.
    trans conf (NPar (NEndpoint p s c) n) L n'
@@ -2272,12 +2270,10 @@ Proof
                   (ASSUME_TAC o ONCE_REWRITE_RULE [trans_cases])
   \\ fs []
 QED
-*)
+
 
 (* trans preserves the structure of the network *)
-(* This needs some love *)
-(*
-Theorem trans_struct_pres_NEnpoint:
+Theorem trans_struct_pres_NEndpoint:
   ∀conf p s c n L n'.
    trans conf (NEndpoint p s c) L n'
    ⇒ ∃ s' c'. n' = NEndpoint p s' c'
@@ -2287,7 +2283,6 @@ Proof
   \\ fs []
 QED
 
-*)
 val (junkcong_rules, junkcong_ind, junkcong_cases) = Hol_reln `
   (* Reflexive *)
   (∀fvs n:payloadLang$network. junkcong fvs n n)
