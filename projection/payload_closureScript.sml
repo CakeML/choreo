@@ -46,7 +46,7 @@ Definition compile_network_def:
 ∧ compile_network (NPar n1 n2) = NPar (compile_network n1) (compile_network n2)
 ∧ compile_network (NEndpoint p s e) =
   let
-    (* In order to avoid having to deal with closures under potentiall undefined variables,
+    (* In order to avoid having to deal with closures under potentially undefined variables,
        make sure all variables that will be written to are initialised. *)
     undefined_writes = FILTER (λx. x ∉ (FDOM s.bindings)) (nub'(written_var_names_endpoint e))
   in
