@@ -299,10 +299,12 @@ QED
 
 Definition free_variables_def:
   (free_variables (Nil) = {}) /\
+  (free_variables (Call _) = {}) /\
   (free_variables (IfThen v p c1 c2) = {(v,p)} ∪ (free_variables c1 ∪ free_variables c2)) /\
   (free_variables (Com p1 v1 p2 v2 c) = {(v1,p1)} ∪ (free_variables c DELETE (v2,p2))) /\
   (free_variables (Let v p f vl c) = set(MAP (λv. (v,p)) vl) ∪ (free_variables c DELETE (v,p))) /\
-  (free_variables (Sel p b q c) = free_variables c)
+  (free_variables (Sel p b q c) = free_variables c) /\
+  (free_variables (Fix x c) = free_variables c)
 End
 
 Definition defined_vars_def:
@@ -321,6 +323,53 @@ Proof
   >> fs[defined_vars_def,SUBSET_OF_INSERT]
 QED
 
+
+(* dsubst resulting free variables are bounded by the original free variables of c and c' *)
+Theorem dsubst_subset_free_variables:
+  ∀c c' dn.
+    free_variables (dsubst c dn c') ⊆ free_variables c ∪ free_variables c'
+Proof
+  rw []
+  \\ Induct_on ‘c’ \\ rw [free_variables_def,dsubst_def]
+  \\ fs [free_variables_def,dsubst_def]
+  >- (irule SUBSET_TRANS \\ asm_exists_tac \\ fs []
+      \\ fs [SUBSET_DEF])
+  >- (irule SUBSET_TRANS \\ asm_exists_tac \\ fs []
+      \\ fs [SUBSET_DEF] \\ rw [] \\ metis_tac [])
+  \\ fs [SUBSET_DEF] \\ rw [] \\ metis_tac []
+QED
+
+(* dsubst can only add more free variables *)
+Theorem free_variables_subset_dsubst:
+  ∀c c' dn.
+    free_variables c ⊆ free_variables (dsubst c dn c')
+Proof
+  rw []
+  \\ Induct_on ‘c’ \\ rw [free_variables_def,dsubst_def]
+  \\ fs [SUBSET_DEF]
+QED
+
+(* free_variables are the same if we are trying to substitute the same program *)
+Theorem free_variables_dsubst_eq:
+  ∀c dn. free_variables (dsubst c dn c) = free_variables c
+Proof
+  rw [] \\ irule SUBSET_ANTISYM
+  \\ metis_tac [free_variables_subset_dsubst,
+                dsubst_subset_free_variables,
+                UNION_IDEMPOT]
+QED
+
+(* free_variables are the same if we are trying to substitute the same program *)
+Theorem free_variables_dsubst_eq_Fix:
+  ∀c x y. free_variables (dsubst c x (Fix y c)) = free_variables c
+Proof
+  rw [] \\ irule SUBSET_ANTISYM
+  \\ metis_tac [free_variables_subset_dsubst,
+                dsubst_subset_free_variables,
+                free_variables_def,
+                UNION_IDEMPOT]
+QED
+
 Theorem free_vars_mono:
   ∀sc alpha sc'. trans sc alpha sc'
     ⇒ (free_variables(SND sc') DIFF defined_vars sc' ⊆ free_variables(SND sc) DIFF defined_vars sc)
@@ -328,7 +377,8 @@ Proof
   ho_match_mp_tac trans_strongind
   >> rpt strip_tac
   >> imp_res_tac defined_vars_mono
-  >> fs[free_variables_def,defined_vars_def,DIFF_INSERT] >> rw[]
+  >> fs[free_variables_def,defined_vars_def,DIFF_INSERT,
+        free_variables_dsubst_eq_Fix] >> rw[]
   >> fs[DELETE_DEF,DIFF_DEF,SUBSET_DEF] >> rpt strip_tac
   >> fs[] >> metis_tac[]
 QED
@@ -347,7 +397,8 @@ Proof
   >> rpt strip_tac
   >> imp_res_tac defined_vars_mono
   >> imp_res_tac free_vars_mono
-  >> fs[no_undefined_vars_def,free_variables_def,DELETE_SUBSET_INSERT,defined_vars_def,SUBSET_OF_INSERT]
+  >> fs[no_undefined_vars_def,free_variables_def,DELETE_SUBSET_INSERT,defined_vars_def,SUBSET_OF_INSERT,
+        free_variables_dsubst_eq_Fix]
   >> fs[SUBSET_DEF,INSERT_DEF,DIFF_DEF] >> metis_tac[]
 QED
 
@@ -393,8 +444,19 @@ Definition no_self_comunication_def:
 ∧ no_self_comunication (IfThen _ _ c c') = (no_self_comunication c ∧
                                             no_self_comunication c')
 ∧ no_self_comunication (Let _ _ _ _ c)   = no_self_comunication c
+∧ no_self_comunication (Fix _ c)         = no_self_comunication c
 ∧ no_self_comunication _                 = T
 End
+
+Theorem no_self_comunication_dsubst:
+  ∀c c' dn.
+    no_self_comunication c ∧ no_self_comunication c'
+    ⇒ no_self_comunication (dsubst c dn c')
+Proof
+  rw [] \\ Induct_on ‘c’
+  \\ rw [no_self_comunication_def,dsubst_def]
+  \\ fs [no_self_comunication_def,dsubst_def]
+QED
 
 (* Transitions preserve ‘no_self_comunication’ since they change
    the shape of the choreography aside from consuming its operations
@@ -409,7 +471,8 @@ Proof
   \\ qpat_x_assum `trans _ _ _` mp_tac
   \\ MAP_EVERY (W(curry Q.SPEC_TAC)) (rev [‘s’,‘c’,‘τ’,‘l’,‘s'’,‘c'’])
   \\ ho_match_mp_tac trans_pairind
-  \\ rw [no_self_comunication_def]
+  \\ rw [no_self_comunication_def,
+         no_self_comunication_dsubst]
 QED
 
 (* Check if a tag matches the head of a choreography *)
@@ -418,6 +481,7 @@ Definition chor_match_def:
 ∧ chor_match (LSel p b q)    (Sel p' b' q' c)     = ((p,b,q)  = (p',b',q'))
 ∧ chor_match (LLet v p f l)  (Let v' p' f' l' c)  = ((v,p,f,l) = (v',p',f',l'))
 ∧ chor_match (LTau p v)      (IfThen v' p' c1 c2) = ((p,v)     = (p',v'))
+∧ chor_match  LFix           (Fix _ _)            = T
 ∧ chor_match  _              _                    = F
 End
 
@@ -429,6 +493,7 @@ Definition chor_tag_def:
 ∧ chor_tag (Sel p b q _)    = LSel p b q
 ∧ chor_tag (Let v p f l _)  = LLet v p f l
 ∧ chor_tag (IfThen v p _ _) = LTau p v
+∧ chor_tag (Fix _ _)        = LFix
 End
 
 
@@ -437,6 +502,8 @@ End
 *)
 Definition chor_tl_def:
   chor_tl s Nil             = (s,Nil)
+∧ chor_tl s (Call v)        = (s,Call v)
+∧ chor_tl s (Fix dn c)      = (s,dsubst c dn (Fix dn c))
 ∧ chor_tl s (Com p v q x c) = (s |+ ((x,q),(THE o FLOOKUP s) (v,p)),c)
 ∧ chor_tl s (Sel p b q c)   = (s,c)
 ∧ chor_tl s (Let v p f l c) =
@@ -445,10 +512,6 @@ Definition chor_tl_def:
     (if FLOOKUP s (v,p) = SOME [1w] then (s,c1)
      else if ∃w. FLOOKUP s (v,p) = SOME w ∧ w ≠ [1w] then (s,c2)
      else (s,IfThen v p c1 c2))
-(* TODO: these are not actually useful clauses of the definition;
-   it's just here as a stopgap measure to make things build. *)
-∧ chor_tl s (Fix vn c2) = (s,Nil)
-∧ chor_tl s (Call v) = (s,Nil)
 End
 
 (* Advances the choreography until the given tag
@@ -456,49 +519,45 @@ End
    (state is still updated)
 *)
 Definition syncTrm_def:
-  syncTrm (s,Nil) τ            = (s,Nil)
-∧ syncTrm (s,IfThen v p c1 c2) τ =
-   (if chor_match τ (IfThen v p c1 c2)
-    then chor_tl s (IfThen v p c1 c2)
-    else if FLOOKUP s (v,p) = SOME [1w]
-         then syncTrm (s,c1) τ
-         else if ∃w. FLOOKUP s (v,p) = SOME w ∧ w ≠ [1w]
-              then syncTrm (s,c2) τ
-              else (s,IfThen v p c1 c2))
-∧ syncTrm (s,c) τ =
-          (if chor_match τ c
-           then chor_tl s c
-           else syncTrm (chor_tl s c) τ)
-(* TODO: this is not a useful clause of the definition; it's just here as a stopgap measure
-         to make things build *)
-∧ syncTrm (s,Fix vn c2) τ = (s,Nil)
-∧ syncTrm (s,Call v) τ = (s,Nil)
-Termination
-  WF_REL_TAC ‘measure (chor_size o SND o FST)’
-  \\ rw [] \\ Cases_on ‘τ’ \\ fs [chor_match_def,chor_tl_def]
-  \\ EVERY_CASE_TAC  \\ fs []
-  \\ fs[chor_size_def]
+  syncTrm (k:num) (s,Nil) τ              = NONE
+∧ syncTrm  k      (s,Call v) τ           = NONE
+∧ syncTrm  k      (s,IfThen v p c1 c2) τ =
+   (if (k = 0) then NONE
+    else if chor_match τ (IfThen v p c1 c2)
+         then SOME (chor_tl s (IfThen v p c1 c2))
+         else if FLOOKUP s (v,p) = SOME [1w]
+              then syncTrm (k-1) (s,c1) τ
+              else if ∃w. FLOOKUP s (v,p) = SOME w ∧ w ≠ [1w]
+                   then syncTrm (k-1)(s,c2) τ
+                   else NONE)
+∧ syncTrm k (s,c) τ =
+   (if (k = 0) then NONE
+    else if chor_match τ c
+         then SOME (chor_tl s c)
+         else syncTrm (k-1) (chor_tl s c) τ)
 End
 
 (* Alternative induction principle *)
 Theorem syncTrm_pairind =
   syncTrm_ind
-  |> Q.SPEC ‘λ(s,c) τ. P s c τ’
-  |> SIMP_RULE std_ss []
+  |> Q.SPEC ‘λk (s,c) τ. P k s c τ’
+  |> SIMP_RULE std_ss [FORALL_PROD]
   |> Q.GEN ‘P’
 
 (* A choreography can always advance synchronously consuming
    the operation at the front
 *)
 Theorem chor_tag_trans:
-  ∀s c.
-   no_undefined_vars (s,c) ∧ c ≠ Nil
+  ∀s c k p.
+   no_undefined_vars (s,c) ∧ c ≠ Nil ∧ (∀x. c ≠ Call x)
    ∧ no_self_comunication c
-   ⇒ trans (s,c) (chor_tag c,[]) (syncTrm (s,c) (chor_tag c))
+   ∧ syncTrm k (s,c) (chor_tag c) = SOME p
+   ⇒ trans (s,c) (chor_tag c,[]) p
 Proof
   rw [] \\ Cases_on ‘c’
   \\ fs [ chor_tag_def,syncTrm_def,chor_match_def
         , chor_tl_def,no_self_comunication_def]
+  \\ rveq
   >- (IF_CASES_TAC
       >- fs [trans_if_true]
       \\ drule no_undefined_FLOOKUP_if \\ rw [] \\ fs []
@@ -507,26 +566,31 @@ Proof
      \\  fs [trans_com])
   >- (drule no_undefined_FLOOKUP_let \\ rw []
      \\  fs [trans_let])
-  \\ fs [trans_sel]
+  \\ fs [trans_sel,trans_fix]
 QED
 
 (* ‘syncTrm’ preserves does not remove any variable from the state *)
 Theorem no_undefined_syncTrm:
-  ∀s c τ. no_undefined_vars (s,c) ⇒ no_undefined_vars (syncTrm (s,c) τ)
+  ∀k s c τ p.
+    no_undefined_vars (s,c) ∧ syncTrm k (s,c) τ = SOME p
+    ⇒ no_undefined_vars p
 Proof
   ho_match_mp_tac syncTrm_pairind
   \\ rw [syncTrm_def,chor_tl_def,
          no_undefined_vars_def,
          free_variables_def,
+         free_variables_dsubst_eq_Fix,
          DELETE_SUBSET_INSERT]
 QED
 
 (* ‘syncTrm’ does not add self communicating operation into the choreography *)
 Theorem no_self_comunication_syncTrm:
-  ∀s c τ q r. no_self_comunication c ∧ syncTrm (s,c) τ = (q,r) ⇒ no_self_comunication r
+  ∀k s c τ q r. no_self_comunication c ∧ syncTrm k (s,c) τ = SOME (q,r) ⇒ no_self_comunication r
 Proof
   ho_match_mp_tac syncTrm_pairind
   \\ rw [syncTrm_def,chor_tl_def,
+         free_variables_dsubst_eq_Fix,
+         no_self_comunication_dsubst,
          no_self_comunication_def]
   \\ rw [no_self_comunication_def]
 QED
@@ -568,15 +632,20 @@ QED
    consume the whole thing.
 *)
 Theorem Trm_trans:
-  ∀s c τ. no_undefined_vars (s,c) ∧ no_self_comunication c
-   ⇒ trans_sync (s,c) (syncTrm (s,c) τ)
+  ∀s c τ k p.
+   no_undefined_vars (s,c) ∧
+   no_self_comunication c ∧
+   syncTrm k (s,c) τ = SOME p
+   ⇒ trans_sync (s,c) p
 Proof
   rw []
   \\ drule chor_tag_trans \\ rw []
   \\ rpt (first_x_assum mp_tac)
-  \\ MAP_EVERY Q.SPEC_TAC [(‘τ’,‘τ’),(‘c’,‘c’),(‘s’,‘s’)]
+  \\ MAP_EVERY Q.SPEC_TAC [(‘p’,‘p’),(‘τ’,‘τ’),(‘c’,‘c’),(‘s’,‘s’),(‘k’,‘k’)]
   \\ ho_match_mp_tac syncTrm_pairind
   \\ rw [ no_self_comunication_def
+        , no_self_comunication_dsubst
+        , free_variables_dsubst_eq_Fix
         , no_undefined_vars_def
         , syncTrm_def
         , chor_match_def
@@ -585,11 +654,16 @@ Proof
         , trans_sync_one
         , trans_sync_refl
         , chor_tag_def]
+  \\ first_x_assum (qspec_then ‘k’ assume_tac) \\ rfs []
   \\ TRY (ho_match_mp_tac trans_sync_one \\ asm_exists_tac \\ fs [])
   \\ ho_match_mp_tac trans_sync_step \\ asm_exists_tac \\ fs []
   \\ first_x_assum irule \\ rw []
   \\ TRY (irule chor_tag_trans)
   \\ fs [no_undefined_vars_def,DELETE_SUBSET_INSERT]
+  \\ rw [no_self_comunication_dsubst
+         , no_self_comunication_def
+         , free_variables_dsubst_eq_Fix]
+  \\ asm_exists_tac \\ fs []
 QED
 
 (* nub' preserves membership *)
