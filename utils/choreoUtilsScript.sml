@@ -98,4 +98,13 @@ Proof
   \\ rw [ALL_DISTINCT,nub'_def,FILTER_ALL_DISTINCT,MEM_FILTER]
 QED
 
+(* nub' preserves membership *)
+Theorem MEM_nub':
+  ∀l x. MEM x (nub' l) = MEM x l
+Proof
+  Induct
+  \\ rw [nub'_def]
+  \\ Cases_on ‘x=h’ \\ fs [MEM_FILTER]
+QED
+
 val _ = export_theory ()

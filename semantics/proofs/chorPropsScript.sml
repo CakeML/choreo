@@ -666,13 +666,4 @@ Proof
   \\ asm_exists_tac \\ fs []
 QED
 
-(* nub' preserves membership *)
-Theorem MEM_nub':
-  ∀l x. MEM x (nub' l) = MEM x l
-Proof
-  Induct
-  \\ rw [nub'_def]
-  \\ Cases_on ‘x=h’ \\ fs [MEM_FILTER]
-QED
-
 val _ = export_theory ()
