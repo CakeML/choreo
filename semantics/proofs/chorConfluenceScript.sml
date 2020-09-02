@@ -59,12 +59,18 @@ val semantics_deterministic = Q.store_thm("semantics_deterministic",
       >> first_x_assum drule
       >> rpt strip_tac
       >> fs[])
-  >> (* Asynch *)
-     qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+  >- (* Asynch *)
+     (qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
       >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
       >> first_x_assum drule
       >> rpt strip_tac
-      >> fs[]);
+      >> fs[])
+  >> (* LFix *)
+     qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+  >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
+  >> first_x_assum drule
+  >> rpt strip_tac
+  >> fs[]);
 
 val map_the_flookup_update_lemma = Q.prove(
   `!vl s p p' v' d. p' ≠ p ==>
@@ -132,10 +138,15 @@ val semantics_add_irrelevant_state = Q.store_thm("semantics_add_irrelevant_state
   >- (* Let-swap *)
     (fs[freeprocs_def] >> fs[FUPDATE_COMMUTES]
      >> metis_tac[trans_let_swap])
-  >> (* Asynch *)
-    fs[freeprocs_def] >> fs[FUPDATE_COMMUTES]
+  >- (* Com-async *)
+    (fs[freeprocs_def] >> fs[FUPDATE_COMMUTES]
     >> (match_mp_tac trans_com_async ORELSE match_mp_tac trans_sel_async)
-    >> fs[]);
+    >> fs[])
+  >- (* sel-async *)
+    (fs[freeprocs_def] >> fs[FUPDATE_COMMUTES]
+    >> (match_mp_tac trans_com_async ORELSE match_mp_tac trans_sel_async)
+    >> fs[])
+  >> irule trans_fix);
 
 val semantics_add_irrelevant_state_tup = Q.store_thm("semantics_add_irrelevant_state_tup",
   `!s c alpha l s' c' p v d. trans (s,c) (alpha,l) (s',c') /\ p ∉ freeprocs alpha ==>
@@ -191,10 +202,15 @@ val semantics_add_irrelevant_state2 = Q.store_thm("semantics_add_irrelevant_stat
   >- (* Let-swap *)
     (fs[written_def,read_def] >> fs[FUPDATE_COMMUTES]
      >> metis_tac[trans_let_swap])
-  >> (* Asynch *)
-    fs[written_def,read_def] >> fs[FUPDATE_COMMUTES]
-    >> (match_mp_tac trans_com_async ORELSE match_mp_tac trans_sel_async)
-    >> fs[]);
+  >- (* Com-async *)
+    (fs[written_def,read_def] >> fs[FUPDATE_COMMUTES]
+     >> (match_mp_tac trans_com_async ORELSE match_mp_tac trans_sel_async)
+     >> fs[])
+  >- (* Sel-async *)
+    (fs[written_def,read_def] >> fs[FUPDATE_COMMUTES]
+     >> (match_mp_tac trans_com_async ORELSE match_mp_tac trans_sel_async)
+     >> fs[])
+  >> irule trans_fix);
 
 val semantics_add_irrelevant_state3 = Q.store_thm("semantics_add_irrelevant_state3",
   `!s c alpha s' c' p v d. trans (s,c) alpha (s',c') /\ (v,p) ∉ read(FST alpha)
@@ -695,6 +711,8 @@ val semantics_locally_confluent = Q.store_thm("semantics_locally_confluent",
         >> qexists_tac `[]`
         >> match_mp_tac trans_sel >> fs[])
     >> first_x_assum drule >> disch_then drule >> strip_tac
-    >> Cases_on `sc'''` >> metis_tac[trans_sel_swap,trans_sel_async]));
+    >> Cases_on `sc'''` >> metis_tac[trans_sel_swap,trans_sel_async])
+  >> qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+  >> fs[]);
 
 val _ = export_theory ()
