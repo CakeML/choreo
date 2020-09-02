@@ -2761,4 +2761,63 @@ Proof
   Induct \\ rw [] \\ fs [empty_q_def,padded_network_def,padded_queues_def]
 QED
 
+Definition fix_endpoint_def:
+    (fix_endpoint payloadLang$Nil = T) ∧
+    (fix_endpoint (Send p v n e) = fix_endpoint e) ∧
+    (fix_endpoint (Receive p v l e) = fix_endpoint e) ∧
+    (fix_endpoint (IfThen v e1 e2) =
+     (fix_endpoint e1 ∧ fix_endpoint e2)) ∧
+    (fix_endpoint (Let v f vl e) =
+     fix_endpoint e) ∧
+    (fix_endpoint (Letrec dn vars e1 e2) = F) ∧
+    (fix_endpoint (FCall dn vars) = F) ∧
+    (fix_endpoint (Fix dn e) =
+     fix_endpoint e) ∧
+    (fix_endpoint (Call dn) = T)
+End
+
+Definition fix_network_def:
+  fix_network n =
+  EVERY (λ(p,s,e). fix_endpoint e) (endpoints n)
+End
+
+Definition letrec_endpoint_def:
+    (letrec_endpoint payloadLang$Nil = T) ∧
+    (letrec_endpoint (Send p v n e) = letrec_endpoint e) ∧
+    (letrec_endpoint (Receive p v l e) = letrec_endpoint e) ∧
+    (letrec_endpoint (IfThen v e1 e2) =
+     (letrec_endpoint e1 ∧ letrec_endpoint e2)) ∧
+    (letrec_endpoint (Let v f vl e) =
+     letrec_endpoint e) ∧
+    (letrec_endpoint (Letrec dn vars e1 e2) = (letrec_endpoint e1 ∧ letrec_endpoint e2)) ∧
+    (letrec_endpoint (FCall dn vars) = T) ∧
+    (letrec_endpoint (Fix dn e) = F) ∧
+    (letrec_endpoint (Call dn) = F)
+End
+
+Theorem closure_size_MEM:
+  MEM (s,cl) cls ⇒
+  closure_size cl < closure2_size cls
+Proof
+  Induct_on ‘cls’ >> rw[closure_size_def] >> rw[closure_size_def] >>
+  res_tac >> DECIDE_TAC
+QED
+
+Definition letrec_closure_def:
+  letrec_closure (Closure args env e) =
+  (letrec_endpoint e ∧
+   EVERY (λ(s,cl). letrec_closure cl) (FST env))
+Termination
+  WF_REL_TAC ‘inv_image $< closure_size’ >>
+  rw[closure_size_def] >> imp_res_tac closure_size_MEM >>
+  DECIDE_TAC
+End
+
+Definition letrec_network_def:
+  letrec_network n =
+  EVERY (λ(p,s,e). letrec_endpoint e ∧
+                    EVERY (λ(s,cl). letrec_closure cl) s.funs)
+        (endpoints n)
+End
+
 val _ = export_theory ();
