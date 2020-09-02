@@ -544,12 +544,17 @@ Theorem syncTrm_pairind =
   |> SIMP_RULE std_ss [FORALL_PROD]
   |> Q.GEN ‘P’
 
+Definition not_finish_def[simp]:
+  not_finish c = (c ≠ Nil ∧ ∀x. c ≠ Call x)
+End
+
 (* A choreography can always advance synchronously consuming
    the operation at the front
 *)
 Theorem chor_tag_trans:
   ∀s c k p.
-   no_undefined_vars (s,c) ∧ c ≠ Nil ∧ (∀x. c ≠ Call x)
+   no_undefined_vars (s,c)
+   ∧ not_finish c
    ∧ no_self_comunication c
    ∧ syncTrm k (s,c) (chor_tag c) = SOME p
    ⇒ trans (s,c) (chor_tag c,[]) p
