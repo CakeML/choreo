@@ -54,4 +54,17 @@ Definition compile_network_def:
       (FOLDL (λe v. Let v K0 [] e) (compile_endpoint [] e) undefined_writes)
 End
 
+Definition compile_network_alt_def:
+  compile_network_alt NNil = NNil
+∧ compile_network_alt (NPar n1 n2) = NPar (compile_network_alt n1) (compile_network_alt n2)
+∧ compile_network_alt (NEndpoint p s e) =
+  let
+    (* In order to avoid having to deal with closures under potentially undefined variables,
+       make sure all variables that will be written to are initialised. *)
+    undefined_writes = FILTER (λx. x ∉ (FDOM s.bindings)) (nub'(written_var_names_endpoint e))
+  in
+    NEndpoint p (s with bindings := s.bindings |++ MAP (λx. (x,[0w])) undefined_writes)
+                (compile_endpoint [] e)
+End
+        
 val _ = export_theory ();
