@@ -296,9 +296,9 @@ Proof
 QED
 
 Theorem WF_ARecv_total_state:
-  ∀conf.
+  ∀conf sp.
     conf.payload_size > 0 ⇒
-    WF (λs1 s2. ∃sp d. strans conf s2 (ARecv sp d) s1)
+    WF (λs1 s2. ∃d. ¬(final d) ∧ strans conf s2 (ARecv sp d) s1)
 Proof
   rw[] >>
   qmatch_goalsub_abbrev_tac ‘WF R’ >>

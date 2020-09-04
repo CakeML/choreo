@@ -193,15 +193,65 @@ Proof
 QED
 
 (* -- Wellformedness *)
-Definition ffi_wf_def:
-  ffi_wf (c,q,n) ⇔ net_wf n ∧ ¬net_has_node n c
+Definition qwf_def:
+  qwf conf (c,q,n) ⇔ ∀sp. ∀d. (MEM d (qlk q sp) ⇒ (∃m. d = pad conf m))
+End 
+
+Definition qim_def:
+  qim q sp ⇔ (qlk q sp ≠ []) ∧ (intermediate (LAST (qlk q sp)))
 End
+
+Definition net_rts_def:
+  net_rts conf sp rp n ⇔ (∃N2 d. trans conf n (LSend sp d rp) n2)
+End
+
+Definition qnwf_def:
+  qnwf conf (c,q,n) ⇔ (∀sp. qim q sp ⇒ net_rts conf sp c n)
+End
+
+Definition ffi_wf_def:
+  ffi_wf conf (c,q,n) ⇔ net_wf n ∧ ¬net_has_node n c ∧ qwf conf (c,q,n) ∧ qnwf conf (c,q,n)
+End
+
+Theorem strans_pres_net_props:
+  ∀c q1 q2 N1 N2 L.
+    strans conf (c,q1,N1) L (c,q2,N2) ⇒
+      (net_wf N1 ∧ ¬net_has_node N1 c) ⇒
+      (net_wf N2 ∧ ¬net_has_node N2 c)
+Proof
+  Induct_on ‘strans’ >> rw[] >>
+  metis_tac[trans_pres_nodes,trans_pres_wf]
+QED
+
+Theorem strans_pres_qwf:
+  ∀conf s1 L s2.
+    strans conf s1 L s2 ⇒
+    qwf conf s1 ⇒
+    qwf conf s2
+Proof
+  Induct_on ‘strans’ >> rw[qwf_def]
+  >- (first_x_assum irule >> rename1 ‘MEM d (qlk (q |+ (ms,tl)) sp)’ >>
+      qexists_tac ‘sp’ >> reverse (Cases_on ‘sp = ms’) >> fs[]) >>
+  rename1 ‘trans conf N _ N2’ >>
+  last_x_assum irule >> reverse (rw[])
+  >- metis_tac[] >>
+  rename1 ‘MEM d2 (qlk (qpush q sp d) sp2)’ >>
+  reverse (Cases_on ‘sp = sp2’) >> fs[]
+  >- metis_tac[] >- metis_tac[] >>
+  last_x_assum mp_tac >>
+  rpt (pop_assum kall_tac) >>
+  qid_spec_tac ‘N2’ >> qid_spec_tac ‘N’ >>
+  Induct_on ‘trans’ >> rw[] >> metis_tac[]
+QED
+
 
 Theorem strans_pres_wf:
   ∀conf s1 L s2.
     strans conf s1 L s2 ⇒
-      (ffi_wf s1 ⇔ ffi_wf s2)
+      (ffi_wf conf s1 ⇔ ffi_wf conf s2)
 Proof
+  rw[ffi_wf_def] >>
+  
   Induct_on ‘strans’ >> rw[ffi_wf_def] >>
   metis_tac[trans_pres_nodes,trans_pres_wf]
 QED

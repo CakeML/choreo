@@ -168,6 +168,12 @@ Proof
   rw[qlk_def,qpush_def,fget_def,FLOOKUP_UPDATE]
 QED
 
+Theorem qlk_qpush2[simp]:
+  p1 ≠ p2 ⇒ qlk (qpush q p1 d) p2 = qlk q p2
+Proof
+  rw[qlk_def,qpush_def,fget_def,FLOOKUP_UPDATE]
+QED
+
 Theorem normalise_queues_FUPDATE_FUPDATE[simp]:
   normalise_queues(q |+ (p,d)) |+ (p,d') = normalise_queues q |+ (p,d')
 Proof
