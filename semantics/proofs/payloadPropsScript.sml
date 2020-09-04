@@ -809,8 +809,6 @@ Proof
 QED
 
 (*  Confluence Result for different Labels *)
-(* This needs some love *)
-
 Theorem trans_diff_diamond:
   ∀N1 LA N2A LB N2B.
     net_wf N1 ∧
@@ -1017,9 +1015,21 @@ Proof
       qexists_tac ‘NEndpoint c (s with queues := qpush s.queues sp d) (dsubst e dn (Fix dn e))’ >>
       metis_tac[trans_cases])
   (* LReceive/LTau (Letrec) *)
-  >- cheat
+  >- (qmatch_goalsub_abbrev_tac ‘s with queues := QN’ >>
+      qmatch_goalsub_abbrev_tac ‘s with funs := FN’ >>
+      rename1 ‘NEndpoint c (s with funs := FN) e’ >>
+      qexists_tac ‘NEndpoint c (s with <|queues := QN; funs := FN|>) e’ >>
+      rw[]
+      >- (qunabbrev_tac ‘FN’ >> rw[Once trans_cases])
+      >- (qunabbrev_tac ‘QN’ >> rw[Once trans_cases]))
   (* LReceive/LTau (FCall) *)
-  >- cheat
+  >- (qmatch_goalsub_abbrev_tac ‘s with queues := QN’ >>
+      qmatch_goalsub_abbrev_tac ‘s with <|bindings := NB; funs := FN|>’ >>
+      rename1 ‘NEndpoint c (s with <|bindings := NB; funs := FN|>) e’ >>
+      qexists_tac ‘NEndpoint c (s with <|bindings := NB; queues := QN; funs := FN|>) e’ >>
+      rw[]
+      >- (MAP_EVERY qunabbrev_tac [‘NB’,‘FN’] >> rw[Once trans_cases])
+      >- (qunabbrev_tac ‘QN’ >> rw[Once trans_cases]))
   (* LTau (Internal Comms TO RIGHT) / Parallel Embedded Behaviour (ON LEFT) *)
   >- (rename [‘net_wf (NPar N1a N1b)’,‘trans conf (NPar N2Aa N2Ab) _ _ ∧ trans conf (NPar N2Ba N1b) _ _’] >>
       last_x_assum (qspecl_then [‘LB’,‘N2Ba’] assume_tac) >>
@@ -1454,11 +1464,25 @@ Proof
       qexists_tac ‘NPar N1a N3’ >>
       metis_tac[trans_rules])
   (* LTau (Fixed point)/LReceive *)
-  >- cheat
+  >- (rename [‘NEndpoint c (s with queues := qpush s.queues sp d) (Fix _ _)’, ‘NEndpoint c s (dsubst e dn (Fix dn e))’] >>
+      qexists_tac ‘NEndpoint c (s with queues := qpush s.queues sp d) (dsubst e dn (Fix dn e))’ >>
+      metis_tac[trans_cases])
   (* LTau (Letrec)/LReceive *)
-  >- cheat
+  >- (qmatch_goalsub_abbrev_tac ‘s with queues := QN’ >>
+      qmatch_goalsub_abbrev_tac ‘s with funs := FN’ >>
+      rename1 ‘NEndpoint c (s with funs := FN) e’ >>
+      qexists_tac ‘NEndpoint c (s with <|queues := QN; funs := FN|>) e’ >>
+      rw[]
+      >- (qunabbrev_tac ‘FN’ >> rw[Once trans_cases])
+      >- (qunabbrev_tac ‘QN’ >> rw[Once trans_cases]))
   (* LTau (Letrec)/LReceive *)
-  >- cheat
+  >- (qmatch_goalsub_abbrev_tac ‘s with queues := QN’ >>
+      qmatch_goalsub_abbrev_tac ‘s with <|bindings := NB; funs := FN|>’ >>
+      rename1 ‘NEndpoint c (s with <|bindings := NB; funs := FN|>) e’ >>
+      qexists_tac ‘NEndpoint c (s with <|bindings := NB; queues := QN; funs := FN|>) e’ >>
+      rw[]
+      >- (MAP_EVERY qunabbrev_tac [‘NB’,‘FN’] >> rw[Once trans_cases])
+      >- (qunabbrev_tac ‘QN’ >> rw[Once trans_cases]))
 QED
 
 (* Confluence Results for identical Labels *)
@@ -2219,7 +2243,6 @@ QED
 
 
 (*  General Reflexive Confluence Result*)
-(* This needs some love *)
 Theorem trans_diamond:
   ∀conf N1 LA N2A LB N2B.
     net_wf N1 ∧
@@ -2690,8 +2713,6 @@ Proof
   rw [qlk_def,qpush_def,fget_def,FLOOKUP_UPDATE]
 QED
 
-(* This needs some love *)
-(*
 Theorem trans_LSend_padded:
   ∀n conf n' p d q.
    trans conf n (LSend p d q) n'
@@ -2700,16 +2721,13 @@ Proof
   Induct
   \\ rw []
   \\ TRY (drule trans_struct_pres_NPar)
-  \\ TRY (drule trans_struct_pres_NEnpoint)
+  \\ TRY (drule trans_struct_pres_NEndpoint)
   \\ rw [] \\ fs []
   \\ pop_assum (ASSUME_TAC o ONCE_REWRITE_RULE [trans_cases]) \\ fs []
   \\ metis_tac []
   \\ metis_tac []
 QED
-*)
 
-(* This needs some love *)
-(*
 Theorem trans_padded_pres:
   ∀n conf n'.
    trans conf n LTau n' ∧ padded_network conf n
@@ -2718,7 +2736,7 @@ Proof
   let val trans_tac =
       rw [] \\ rfs [padded_network_def,padded_queues_def]
       \\ TRY (drule trans_struct_pres_NPar)
-      \\ TRY (drule trans_struct_pres_NEnpoint)
+      \\ TRY (drule trans_struct_pres_NEndpoint)
       \\ rw [] \\ fs []
       \\ pop_assum (ASSUME_TAC o ONCE_REWRITE_RULE [trans_cases]) \\ fs []
       \\ rveq \\ rfs [padded_network_def,padded_queues_def] \\ fs []
@@ -2753,7 +2771,6 @@ Proof
   \\ first_x_assum irule \\ fs []
   \\ qexists_tac ‘k’ \\ fs []
 QED
-*)
 
 Theorem empty_q_padded:
   ∀n conf. empty_q n ⇒ padded_network conf n
