@@ -2194,11 +2194,8 @@ QED
 Definition result_eq_def:
   result_eq crA crB ⇔
     case (crA,crB) of
-    (* Can't compare timeouts *)
-      (Rerr (Rabort Rtimeout_error),_) => F
-    | (_,Rerr (Rabort Rtimeout_error)) => F
     (* An ffi error can be equivalent even with different mutable inputs *)
-    | (Rerr (Rabort (Rffi_error (Final_event f1 i1 m1 o1))),
+      (Rerr (Rabort (Rffi_error (Final_event f1 i1 m1 o1))),
        Rerr (Rabort (Rffi_error (Final_event f2 i2 m2 o2))))
         => (f1 = f2) ∧ (i1 = i2) ∧ (o1 = o2)
     (* Everything else must be identical *)
@@ -3191,12 +3188,16 @@ Theorem ffi_irrel:
     cpEval_valid conf cpNum cEnv1 pSt pCd vs1 cSt1 ∧
     cpEval_valid conf cpNum cEnv2 pSt pCd vs2 cSt2 ∧
     ffi_eq conf cSt1.ffi.ffi_state cSt2.ffi.ffi_state
-    ⇒ ∃mc. cEval_equiv conf
-            (evaluate (cSt1  with clock := mc) cEnv1
+    ⇒ ∀mc1.
+        ∃mc2.
+          cEval_equiv conf
+            (evaluate (cSt1  with clock := mc1) cEnv1
                       [compile_endpoint conf vs1  pCd])
-            (evaluate (cSt2  with clock := mc) cEnv2
+            (evaluate (cSt2  with clock := mc2) cEnv2
                       [compile_endpoint conf vs2  pCd])
 Proof
+  cheat
+  (*
   Induct_on ‘pCd’ >> rw[compile_endpoint_def]
   >- ((* Nil Case *)
       rw (result_eq_def::cEval_equiv_def::eval_sl_nf))
@@ -4122,6 +4123,7 @@ Proof
       qexists_tac ‘mc’ >>
       irule clock_irrel >>
       simp[])
+  *)
 QED
 
 Theorem ffi_irrel_weak:
@@ -4129,10 +4131,12 @@ Theorem ffi_irrel_weak:
     cpEval_valid conf cpNum cEnv pSt pCd vs cSt1 ∧
     cpEval_valid conf cpNum cEnv pSt pCd vs cSt2 ∧
     ffi_eq conf cSt1.ffi.ffi_state cSt2.ffi.ffi_state
-    ⇒ ∃mc. cEval_equiv conf
-            (evaluate (cSt1  with clock := mc) cEnv
+    ⇒ ∀mc1.
+        ∃mc2.
+          cEval_equiv conf
+            (evaluate (cSt1  with clock := mc1) cEnv
                       [compile_endpoint conf vs  pCd])
-            (evaluate (cSt2  with clock := mc) cEnv
+            (evaluate (cSt2  with clock := mc2) cEnv
                       [compile_endpoint conf vs  pCd])
 Proof
   metis_tac[ffi_irrel]
@@ -4768,13 +4772,16 @@ Theorem endpoint_forward_correctness:
     ffi_wf cSt2.ffi.ffi_state ∧
     FST cSt2.ffi.ffi_state = FST cSt1.ffi.ffi_state ∧
     cpFFI_valid conf pSt1 pSt2 cSt1.ffi.ffi_state cSt2.ffi.ffi_state L ⇒
-    ∃mc.
+    ∀mc2.
+      ∃mc1.
        cEval_equiv conf
-          (evaluate (cSt1 with clock := mc) cEnv1
+          (evaluate (cSt1 with clock := mc1) cEnv1
                     [compile_endpoint conf vs1 pCd1])
-          (evaluate (cSt2 with clock := mc) cEnv2
+          (evaluate (cSt2 with clock := mc2) cEnv2
                     [compile_endpoint conf vs2 pCd2])
 Proof
+  cheat
+  (*
   simp[Once trans_cases] >> rw[] >> simp[compile_endpoint_def]
   >- ((* sendloop; d ≤ n + payload_size *)
       fs[cpFFI_valid_def] >>
@@ -5768,6 +5775,7 @@ Proof
              FAPPLY_FUPDATE_THM] >> metis_tac[FLOOKUP_DEF]) >>
    disch_then $ qx_choose_then ‘MC’ assume_tac >>
    qexists_tac ‘MC’ >> dxrule cEval_equiv_bump_clocks >> simp[])
+  *)
 QED
 
 Theorem NPar_trans_l_cases_full:
