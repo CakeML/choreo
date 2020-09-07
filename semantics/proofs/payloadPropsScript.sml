@@ -628,6 +628,13 @@ Proof
   Cases >> rpt strip_tac >> fs[intermediate_def,final_def] >> rveq >> fs[]
 QED
 
+Theorem intermediate_final_simps:
+  (intermediate d ⇒ (final d = F)) ∧
+  (final d ⇒ (intermediate d = F))
+Proof
+  metis_tac[intermediate_final_IMP]
+QED
+
 Theorem qpush_prefix:
   ∀qs spL spA dA.
     isPREFIX (qlk qs spL) (qlk (qpush qs spA dA) spL)
@@ -2451,6 +2458,32 @@ Proof
   metis_tac[APPEND]
 QED
 
+Theorem junkcong_closure''':
+  ∀p s e fvs dn vars fs bds fs' bds' e1 funs1 funs2 b.
+    junkcong fvs
+             (NEndpoint p (s with <|bindings := bds; funs := fs|>) e1)
+             (NEndpoint p (s with <|bindings := bds'; funs := fs'|>) e1)
+    ⇒ junkcong fvs (NEndpoint p (s with <|bindings := b; funs := funs1 ++ [(dn,Closure vars (fs,bds) e1)] ++ funs2|>) e) (NEndpoint p (s with <|bindings :=b; funs := funs1 ++ [(dn,Closure vars (fs',bds') e1)] ++ funs2|>) e)
+Proof
+  rw[] >>
+  simp[Once junkcong_cases] >>
+  rw[state_component_equality] >>
+  metis_tac[APPEND]
+QED
+
+Theorem junkcong_closure'''':
+  ∀funs1 funs2 p s e fvs dn vars fs bds fs' bds' e1.
+    junkcong fvs
+             (NEndpoint p (s with <|bindings := bds; funs := fs|>) e1)
+             (NEndpoint p (s with <|bindings := bds'; funs := fs'|>) e1)
+    ⇒ junkcong fvs (NEndpoint p (s with <|funs := funs1 ++ [(dn,Closure vars (fs,bds) e1)] ++ funs2|>) e) (NEndpoint p (s with <|funs := funs1 ++ [(dn,Closure vars (fs',bds') e1)] ++ funs2|>) e)
+Proof
+  rw[] >>
+  simp[Once junkcong_cases] >>
+  rw[state_component_equality] >>
+  metis_tac[APPEND]
+QED
+
 Theorem junkcong_closure_add_junk_hd:
   ∀p s e fvs dn vars fs bds v d e1 funs2.
     MEM v vars
@@ -2471,6 +2504,130 @@ Proof
   simp[Once junkcong_cases] >>
   rw[state_component_equality] >>
   metis_tac[APPEND]
+QED
+
+Theorem junkcong_endpoint_rel_endpoint:
+  !fvs p1 s1 e1 n2.
+   junkcong fvs (NEndpoint p1 s1 e1) n2 ==> ?s2. n2 = NEndpoint p1 s2 e1
+Proof
+  `!fvs n1 n2.
+    junkcong fvs n1 n2
+    ==> (!p1 s1 e1. n1 = NEndpoint p1 s1 e1 ==> ?s2. n2 = NEndpoint p1 s2 e1)
+        /\ !p2 s2 e2. n2 = NEndpoint p2 s2 e2 ==> ?s1. n1 = NEndpoint p2 s1 e2`
+    suffices_by metis_tac[]
+  >> ho_match_mp_tac junkcong_strongind
+  >> rpt strip_tac >> fs[]
+QED
+
+Theorem junkcong_queue_irrel:
+  ∀fvs p s e p' s' e' q.
+    junkcong fvs (NEndpoint p s e) (NEndpoint p' s' e') ⇒
+    junkcong fvs (NEndpoint p (s with queues := q) e) (NEndpoint p' (s' with queues := q) e')
+Proof
+  ‘∀fvs n1 n2.
+    junkcong fvs n1 n2 ⇒
+    ∀p s e p' s' e' q.
+    n1 = NEndpoint p s e ∧ n2 = NEndpoint p' s' e' ⇒
+    junkcong fvs (NEndpoint p (s with queues := q) e) (NEndpoint p' (s' with queues := q) e')’
+    suffices_by metis_tac[] >>
+  ho_match_mp_tac junkcong_strongind >> rw[] >>
+  fs[junkcong_refl] >>
+  rw[Once junkcong_cases,PULL_EXISTS] >>
+  metis_tac[junkcong_endpoint_rel_endpoint]
+QED
+
+Theorem junkcong_bind:
+  ∀fvs p s e p' s' e' v d.
+    junkcong fvs (NEndpoint p s e) (NEndpoint p' s' e') ⇒
+    junkcong fvs (NEndpoint p (s with<|bindings := s.bindings |+ (v,d)|>) e) (NEndpoint p' (s' with bindings := s'.bindings |+ (v,d)) e')
+Proof
+  ‘∀fvs n1 n2.
+    junkcong fvs n1 n2 ⇒
+    ∀p s e p' s' e' v d.
+    n1 = NEndpoint p s e ∧ n2 = NEndpoint p' s' e' ⇒
+    junkcong fvs (NEndpoint p (s with<|bindings := s.bindings |+ (v,d)|>) e) (NEndpoint p' (s' with bindings := s'.bindings |+ (v,d)) e')’
+    suffices_by metis_tac[] >>
+  ho_match_mp_tac junkcong_strongind >> rw[] >>
+  fs[junkcong_refl] >>
+  TRY(rename1 ‘_ |+ (v,_) |+ (v',_)’ >>
+      Cases_on ‘v = v'’ >- simp[junkcong_refl] >>
+      dep_rewrite.DEP_ONCE_REWRITE_TAC[FUPDATE_COMMUTES] >> simp[] >>
+      simp[Once junkcong_cases,PULL_EXISTS] >> metis_tac[]) >>
+  rw[Once junkcong_cases,PULL_EXISTS] >> metis_tac[junkcong_endpoint_rel_endpoint]
+QED
+
+Theorem junkcong_fun_cons:
+  ∀fvs p s e p' s' e' dnf.
+    junkcong fvs (NEndpoint p s e) (NEndpoint p' s' e') ⇒
+    junkcong fvs (NEndpoint p (s with<|funs := dnf::s.funs|>) e) (NEndpoint p' (s' with funs := dnf::s'.funs) e')
+Proof
+  ‘∀fvs n1 n2.
+    junkcong fvs n1 n2 ⇒
+    ∀p s e p' s' e' dnf.
+    n1 = NEndpoint p s e ∧ n2 = NEndpoint p' s' e' ⇒
+    junkcong fvs (NEndpoint p (s with<|funs := dnf::s.funs|>) e) (NEndpoint p' (s' with funs := dnf::s'.funs) e')’
+    suffices_by metis_tac[] >>
+  ho_match_mp_tac junkcong_strongind >> rw[] >>
+  rw[Once junkcong_cases,PULL_EXISTS] >> metis_tac[APPEND,junkcong_endpoint_rel_endpoint]
+QED
+
+Theorem junkcong_bind_list:
+  ∀fvs p s e p' s' e' bds.
+    junkcong fvs (NEndpoint p s e) (NEndpoint p' s' e') ⇒
+    junkcong fvs (NEndpoint p (s with<|bindings := s.bindings |++ bds|>) e) (NEndpoint p' (s' with bindings := s'.bindings |++ bds) e')
+Proof
+  CONV_TAC(RESORT_FORALL_CONV rev) >>
+  ho_match_mp_tac SNOC_INDUCT >>
+  rw[FUPDATE_LIST_THM,FUPDATE_LIST_APPEND,SNOC_APPEND] >>
+  ‘∀s:closure state. s with bindings := s.bindings = s’ by simp[state_component_equality] >>
+  pop_assum(fs o single) >>
+  fs[SNOC_APPEND] >>
+  res_tac >>
+  rename1 ‘_ |+ vd’ >>
+  Cases_on ‘vd’ >>
+  drule junkcong_bind >>
+  simp[]
+QED
+
+Theorem junkcong_bind_list':
+  ∀fvs p s e p' s' e' bds bds' bds''.
+    junkcong fvs (NEndpoint p (s with bindings := bds') e) (NEndpoint p' (s' with bindings := bds'') e') ⇒
+    junkcong fvs (NEndpoint p (s with<|bindings := bds' |++ bds|>) e) (NEndpoint p' (s' with bindings := bds'' |++ bds) e')
+Proof
+  rw[] >> drule junkcong_bind_list >> simp[]
+QED
+
+Theorem junkcong_closure':
+  ∀p s e fvs funs1 dn vars fs bds fs' bds' e1 funs2 b q.
+    s.funs = funs1 ++ (dn,Closure vars (fs,bds) e1)::funs2 ∧
+    junkcong fvs
+             (NEndpoint p (s with <|bindings := bds; funs := fs|>) e1)
+             (NEndpoint p (s with <|bindings := bds'; funs := fs'|>) e1)
+    ⇒ junkcong fvs
+               (NEndpoint p (s with <|bindings := b; queues := q|>) e)
+               (NEndpoint p <|bindings := b; funs := funs1 ++ (dn,Closure vars (fs',bds') e1)::funs2;
+                              queues := q|> e)
+Proof
+  rw[] >>
+  drule_then(qspec_then ‘q’ assume_tac) junkcong_queue_irrel >>
+  fs[] >>
+  simp[Once junkcong_cases,PULL_EXISTS] >>
+  metis_tac[]
+QED
+
+Theorem junkcong_closure'':
+  ∀p s e fvs funs1 dn vars fs bds fs' bds' e1 funs2 b.
+    s.funs = funs1 ++ (dn,Closure vars (fs,bds) e1)::funs2 ∧
+    junkcong fvs
+             (NEndpoint p (s with <|bindings := bds; funs := fs|>) e1)
+             (NEndpoint p (s with <|bindings := bds'; funs := fs'|>) e1)
+    ⇒ junkcong fvs
+               (NEndpoint p (s with <|bindings := b|>) e)
+               (NEndpoint p (s with <|bindings := b; funs := funs1 ++ (dn,Closure vars (fs',bds') e1)::funs2|>) e)
+Proof
+  rw[] >>
+  simp[Once junkcong_cases,PULL_EXISTS] >>
+  metis_tac[]
 QED
 
 val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
@@ -2621,8 +2778,8 @@ val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
                  >> fs[free_var_names_endpoint_def] >> metis_tac[junkcong_rules]))
       >> TRY(qmatch_goalsub_abbrev_tac `junkcong fvs
                                                 (NEndpoint a1
-                                                           <|bindings := a2 |+ _ |+ (a3,a4);
-                                                             queues := a5|> a6)`
+                                                           (_ with <|bindings := a2 |+ _ |+ (a3,a4);
+                                                                     queues := a5|>) a6)`
              >> qexists_tac `NEndpoint a1 (s with <|queues := a5; bindings := a2 |+ (a3,a4)|>) a6`
              >> conj_tac
              >- (unabbrev_all_tac >> MAP_FIRST match_mp_tac (CONJUNCTS trans_rules)
@@ -2646,9 +2803,67 @@ val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
              >- (Cases_on `a3 = v` >> fs[Once FUPDATE_COMMUTES]
                  >> fs[free_var_names_endpoint_def,MEM_FILTER]
                  >> metis_tac[junkcong_rules,junkcong_add_junk']))
-      >> cheat)
+      >> TRY(rename1 ‘Fix’ >>
+             simp[Once trans_cases] >> match_mp_tac junkcong_sym >>
+             match_mp_tac junkcong_add_junk >> simp[] >>
+             spose_not_then strip_assume_tac >> imp_res_tac MEM_free_var_names_endpoint_dsubst >>
+             fs[free_var_names_endpoint_def] >> NO_TAC)
+      >> TRY(rename1 ‘Letrec’ >>
+             simp[Once trans_cases] >>
+             match_mp_tac junkcong_sym >>
+             match_mp_tac junkcong_trans >>
+             goal_assum(resolve_then (Pos hd) mp_tac junkcong_add_junk) >>
+             goal_assum drule >> simp[GSYM PULL_EXISTS] >>
+             conj_tac >- fs[free_var_names_endpoint_def] >>
+             fs[free_var_names_endpoint_def,MEM_FILTER] >-
+               (goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_add_junk_hd') >>
+                simp[]) >>
+             goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_hd') >>
+             match_mp_tac junkcong_add_junk' >>
+             fs[] >>
+             NO_TAC)
+      >> TRY(rename1 ‘FCall’ >>
+             simp[Once trans_cases] >>
+             fs[free_var_names_endpoint_def] >>
+             conj_asm1_tac >- (fs[EVERY_MEM,IS_SOME_EXISTS] >> rw[FLOOKUP_UPDATE] >>
+                               first_x_assum drule >> strip_tac >> fs[FLOOKUP_UPDATE,CaseEq "bool"] >>
+                               rveq >> fs[]) >>
+             match_mp_tac junkcong_refl_IMP >>
+             simp[state_component_equality] >>
+             AP_TERM_TAC >> AP_TERM_TAC >>
+             simp[] >>
+             rw[MAP_EQ_f,FLOOKUP_UPDATE] >> rw[] >>
+             fs[] >> NO_TAC))
   >- (* junkcong_closure *)
-     (cheat)
+     (qpat_x_assum `trans _ _ _ _` (assume_tac
+                                    o REWRITE_RULE [Once payloadSemTheory.trans_cases])
+      >> fs[] >> rveq
+      >> TRY(simp[Once trans_cases,intermediate_final_simps] >>
+             MAP_FIRST match_mp_tac [junkcong_closure,junkcong_closure',junkcong_closure''] >>
+             simp[] >>
+             drule junkcong_queue_irrel >>
+             simp[] >> NO_TAC)
+      >> TRY(simp[Once trans_cases,intermediate_final_simps] >>
+             match_mp_tac junkcong_trans >>
+             goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_hd) >>
+             goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure''') >>
+             goal_assum drule >>
+             simp[] >>
+             REWRITE_TAC[GSYM APPEND_ASSOC,APPEND] >>
+             match_mp_tac(junkcong_closure'''' |> Q.SPEC ‘f::funs1’ |>
+                          GEN_ALL |> REWRITE_RULE[GSYM APPEND_ASSOC,APPEND] |> SIMP_RULE (srw_ss()) []) >>
+             simp[] >> NO_TAC)
+      >> TRY(rename1 ‘FCall’ >>
+             simp[Once trans_cases,intermediate_final_simps,PULL_EXISTS] >>
+             rfs[] >>
+             fs[ALOOKUP_APPEND,CaseEq "option",junkcong_refl] >>
+             rveq >> fs[] >>
+             match_mp_tac junkcong_bind_list' >>
+             match_mp_tac junkcong_trans >>
+             goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_hd') >>
+             goal_assum drule >>
+             drule junkcong_fun_cons >>
+             simp[]))
   >- (* junkcong_closure (symmetric case) *)
      (cheat)
   >- (* junkcong_closure_add_junk *)
