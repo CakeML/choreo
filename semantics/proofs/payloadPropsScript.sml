@@ -2498,7 +2498,35 @@ QED
 Theorem junkcong_closure_add_junk_hd':
   ∀p s e fvs dn vars fs bds v d e1 funs2 b.
     MEM v vars
-    ⇒ junkcong fvs (NEndpoint p (s with <|bindings := b; funs := (dn,Closure vars (fs,bds) e1)::funs2|>) e) (NEndpoint p (s with <|bindings := b; funs := (dn,Closure vars (fs,bds |+ (v,d)) e1)::funs2|>) e)
+    ⇒ junkcong fvs
+               (NEndpoint p (s with <|bindings := b; funs := (dn,Closure vars (fs,bds) e1)::funs2|>) e)
+               (NEndpoint p (s with <|bindings := b; funs := (dn,Closure vars (fs,bds |+ (v,d)) e1)::funs2|>) e)
+Proof
+  rw[] >>
+  simp[Once junkcong_cases] >>
+  rw[state_component_equality] >>
+  metis_tac[APPEND]
+QED
+
+Theorem junkcong_closure_add_junk':
+  ∀funs1 p s e fvs dn vars fs bds v d e1 funs2 b.
+    MEM v vars
+    ⇒ junkcong fvs
+               (NEndpoint p (s with <|bindings := b; funs := funs1 ++ (dn,Closure vars (fs,bds) e1)::funs2|>) e)
+               (NEndpoint p (s with <|bindings := b; funs := funs1 ++ (dn,Closure vars (fs,bds |+ (v,d)) e1)::funs2|>) e)
+Proof
+  rw[] >>
+  simp[Once junkcong_cases] >>
+  rw[state_component_equality] >>
+  metis_tac[APPEND]
+QED
+
+Theorem junkcong_closure_add_junk'':
+  ∀funs1 p s e fvs dn vars fs bds v d e1 funs2.
+    MEM v vars
+    ⇒ junkcong fvs
+               (NEndpoint p (s with <|funs := funs1 ++ (dn,Closure vars (fs,bds) e1)::funs2|>) e)
+               (NEndpoint p (s with <|funs := funs1 ++ (dn,Closure vars (fs,bds |+ (v,d)) e1)::funs2|>) e)
 Proof
   rw[] >>
   simp[Once junkcong_cases] >>
@@ -2569,6 +2597,15 @@ Proof
     suffices_by metis_tac[] >>
   ho_match_mp_tac junkcong_strongind >> rw[] >>
   rw[Once junkcong_cases,PULL_EXISTS] >> metis_tac[APPEND,junkcong_endpoint_rel_endpoint]
+QED
+
+Theorem junkcong_fun_cons':
+  ∀fvs p s e p' s' e' dnf funs1 funs2.
+    junkcong fvs (NEndpoint p (s with funs := funs1) e) (NEndpoint p' (s' with funs := funs2) e') ⇒
+    junkcong fvs (NEndpoint p (s with<|funs := dnf::funs1|>) e) (NEndpoint p' (s' with funs := dnf::funs2) e')
+Proof
+  rw[] >>
+  drule junkcong_fun_cons >> simp[]
 QED
 
 Theorem junkcong_bind_list:
@@ -2895,9 +2932,65 @@ val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
              drule junkcong_fun_cons >>
              simp[]))
   >- (* junkcong_closure_add_junk *)
-     (cheat)
+     (qpat_x_assum `trans _ _ _ _` (assume_tac
+                                       o REWRITE_RULE [Once payloadSemTheory.trans_cases])
+      >> fs[] >> rveq
+      >> TRY(simp[Once trans_cases,intermediate_final_simps] >>
+             MAP_FIRST match_mp_tac [junkcong_closure_add_junk] >>
+             simp[] >>
+             drule junkcong_queue_irrel >>
+             simp[] >> NO_TAC)
+      >- (simp[Once trans_cases,intermediate_final_simps] >>
+          simp[Once junkcong_cases,PULL_EXISTS] >> metis_tac[])
+      >- (simp[Once trans_cases,intermediate_final_simps] >>
+          simp[Once junkcong_cases,PULL_EXISTS] >> metis_tac[])
+      >- (simp[Once trans_cases,intermediate_final_simps] >>
+          match_mp_tac junkcong_trans >>
+          goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_hd) >>
+          PURE_REWRITE_TAC[GSYM APPEND_ASSOC,APPEND] >>
+          goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_add_junk') >>
+          goal_assum drule >>
+          goal_assum(resolve_then (Pos hd) mp_tac junkcong_fun_cons') >>
+          match_mp_tac junkcong_closure_add_junk'' >>
+          simp[])
+      >- (simp[Once trans_cases,intermediate_final_simps,PULL_EXISTS] >>
+          rfs[] >>
+          fs[ALOOKUP_APPEND,CaseEq "option",junkcong_refl] >>
+          rveq >> fs[] >>
+          dep_rewrite.DEP_REWRITE_TAC[FUPDATE_FUPDATE_LIST_MEM] >>
+          conj_tac >- (simp[MAP_ZIP]) >>
+          match_mp_tac junkcong_closure_add_junk_hd' >>
+          simp[]))
   >- (* junkcong_closure_add_junk (symmetric case) *)
-     (cheat)
+     (qpat_x_assum `trans _ _ _ _` (assume_tac
+                                       o REWRITE_RULE [Once payloadSemTheory.trans_cases])
+      >> fs[] >> rveq
+      >> TRY(simp[Once trans_cases,intermediate_final_simps] >>
+             MAP_FIRST match_mp_tac [junkcong_closure_add_junk] >>
+             simp[] >>
+             drule junkcong_queue_irrel >>
+             simp[] >> NO_TAC)
+      >- (simp[Once trans_cases,intermediate_final_simps] >>
+          simp[Once junkcong_cases,PULL_EXISTS] >> metis_tac[])
+      >- (simp[Once trans_cases,intermediate_final_simps] >>
+          simp[Once junkcong_cases,PULL_EXISTS] >> metis_tac[])
+      >- (simp[Once trans_cases,intermediate_final_simps] >>
+          match_mp_tac junkcong_trans >>
+          goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_hd) >>
+          PURE_REWRITE_TAC[GSYM APPEND_ASSOC,APPEND] >>
+          goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_add_junk') >>
+          goal_assum drule >>
+          goal_assum(resolve_then (Pos hd) mp_tac junkcong_fun_cons') >>
+          match_mp_tac junkcong_closure_add_junk'' >>
+          simp[])
+      >- (simp[Once trans_cases,intermediate_final_simps,PULL_EXISTS] >>
+          rfs[] >>
+          fs[ALOOKUP_APPEND,CaseEq "option",CaseEq "bool", junkcong_refl] >>
+          rveq >> fs[] >>
+          dep_rewrite.DEP_REWRITE_TAC[FUPDATE_FUPDATE_LIST_MEM] >>
+          conj_tac >- (simp[MAP_ZIP]) >>
+          match_mp_tac junkcong_closure_add_junk_hd' >>
+          simp[]))
   >- (* par-l *)
      (qpat_x_assum `trans _ (NPar _ _) _ _` (assume_tac
                                     o REWRITE_RULE [Once payloadSemTheory.trans_cases])
