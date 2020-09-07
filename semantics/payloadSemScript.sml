@@ -131,7 +131,7 @@ Inductive trans:
     trans conf
           (NEndpoint p s (FCall dn args))
           LTau
-          (NEndpoint p (s with <|bindings := bindings |++ ZIP(args,MAP (THE o FLOOKUP s.bindings) args);
+          (NEndpoint p (s with <|bindings := bindings |++ ZIP(params,MAP (THE o FLOOKUP s.bindings) args);
                                  funs := (dn,Closure params (funs,bindings) e)::funs|>) e))
 End
 
