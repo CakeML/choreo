@@ -2865,7 +2865,35 @@ val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
              drule junkcong_fun_cons >>
              simp[]))
   >- (* junkcong_closure (symmetric case) *)
-     (cheat)
+     (qpat_x_assum `trans _ _ _ _` (assume_tac
+                                    o REWRITE_RULE [Once payloadSemTheory.trans_cases])
+      >> fs[] >> rveq
+      >> TRY(simp[Once trans_cases,intermediate_final_simps] >>
+             MAP_FIRST match_mp_tac [junkcong_closure,junkcong_closure',junkcong_closure''] >>
+             simp[] >>
+             drule junkcong_queue_irrel >>
+             simp[] >> NO_TAC)
+      >> TRY(simp[Once trans_cases,intermediate_final_simps] >>
+             match_mp_tac junkcong_trans >>
+             goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_hd) >>
+             goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure''') >>
+             goal_assum drule >>
+             simp[] >>
+             REWRITE_TAC[GSYM APPEND_ASSOC,APPEND] >>
+             match_mp_tac(junkcong_closure'''' |> Q.SPEC ‘f::funs1’ |>
+                          GEN_ALL |> REWRITE_RULE[GSYM APPEND_ASSOC,APPEND] |> SIMP_RULE (srw_ss()) []) >>
+             simp[] >> NO_TAC)
+      >> TRY(rename1 ‘FCall’ >>
+             simp[Once trans_cases,intermediate_final_simps,PULL_EXISTS] >>
+             rfs[] >>
+             fs[ALOOKUP_APPEND,CaseEq "option",CaseEq "bool",junkcong_refl] >>
+             rveq >> fs[] >>
+             match_mp_tac junkcong_bind_list' >>
+             match_mp_tac junkcong_trans >>
+             goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_hd') >>
+             goal_assum drule >>
+             drule junkcong_fun_cons >>
+             simp[]))
   >- (* junkcong_closure_add_junk *)
      (cheat)
   >- (* junkcong_closure_add_junk (symmetric case) *)
