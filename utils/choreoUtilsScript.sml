@@ -97,7 +97,7 @@ Proof
   \\ Induct_on `l`
   \\ rw [ALL_DISTINCT,nub'_def,FILTER_ALL_DISTINCT,MEM_FILTER]
 QED
-
+        
 (* nub' preserves membership *)
 Theorem MEM_nub':
   ∀l x. MEM x (nub' l) = MEM x l
@@ -105,6 +105,13 @@ Proof
   Induct
   \\ rw [nub'_def]
   \\ Cases_on ‘x=h’ \\ fs [MEM_FILTER]
+QED
+
+Theorem set_nub':
+  ∀e. set(nub' e) = set e
+Proof
+  rw[FUN_EQ_THM] >>
+  simp[MEM_nub' |> SIMP_RULE std_ss [IN_DEF]]
 QED
 
 val _ = export_theory ()
