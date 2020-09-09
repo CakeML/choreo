@@ -14,6 +14,7 @@ open chor_to_endpointProofTheory
      endpoint_to_choiceProofTheory
      endpoint_to_payloadProofTheory
 open bisimulationTheory
+open payload_bisimTheory
 
 val _ = new_theory "projectionProof";
 
@@ -390,27 +391,6 @@ Proof
       match_mp_tac payloadPropsTheory.junkcong_add_junk'' >> rw[] >>
       metis_tac[endpoint_to_payload_free_var_names])
   >- (rw[endpoint_to_payloadTheory.compile_network_def] >> metis_tac[payloadPropsTheory.junkcong_par])
-QED
-
-Triviality BISIM_TRANS:
-  ∀a b c. BISIM_REL R a b ∧ BISIM_REL R b c ⇒ BISIM_REL R a c
-Proof
-  metis_tac[BISIM_REL_IS_EQUIV_REL,equivalence_def,transitive_def]
-QED
-
-Triviality BISIM_SYM:
-  BISIM_REL R a b ⇒ BISIM_REL R b a
-Proof
-  metis_tac[BISIM_REL_IS_EQUIV_REL,equivalence_def,symmetric_def]
-QED
-
-Theorem junkcong_bisim:
-  ∀fv p1 q1 conf. junkcong fv p1 q1 ⇒ BISIM_REL (trans conf) p1 q1
-Proof
-  rw[BISIM_REL_def] >>
-  qexists_tac ‘junkcong fv’ >> simp[] >>
-  rw[BISIM_def] >>
-  metis_tac[payloadPropsTheory.junkcong_trans_pres,payloadPropsTheory.junkcong_sym]
 QED
 
 

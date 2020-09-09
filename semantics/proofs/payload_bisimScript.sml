@@ -50,6 +50,27 @@ Proof
   metis_tac[trans_par_l,trans_par_r,trans_com_l,trans_com_r]
 QED
 
+Theorem BISIM_TRANS:
+  ∀a b c. BISIM_REL R a b ∧ BISIM_REL R b c ⇒ BISIM_REL R a c
+Proof
+  metis_tac[BISIM_REL_IS_EQUIV_REL,equivalence_def,transitive_def]
+QED
+
+Theorem BISIM_SYM:
+  BISIM_REL R a b ⇒ BISIM_REL R b a
+Proof
+  metis_tac[BISIM_REL_IS_EQUIV_REL,equivalence_def,symmetric_def]
+QED
+
+Theorem junkcong_bisim:
+  ∀fv p1 q1 conf. junkcong fv p1 q1 ⇒ BISIM_REL (trans conf) p1 q1
+Proof
+  rw[BISIM_REL_def] >>
+  qexists_tac ‘junkcong fv’ >> simp[] >>
+  rw[BISIM_def] >>
+  metis_tac[payloadPropsTheory.junkcong_trans_pres,payloadPropsTheory.junkcong_sym]
+QED
+        
 (* An ungodly simulation preorder where
    visible actions are mimicked by single actions,
    and tau actions are mimicked by sequences of
