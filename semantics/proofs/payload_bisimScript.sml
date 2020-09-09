@@ -109,4 +109,55 @@ Proof
       metis_tac[])
 QED
 
+Theorem tausim_par_left:
+  ∀conf p q r s. tausim conf p r ⇒ tausim conf (NPar p q) (NPar r q)
+Proof
+  strip_tac >>
+  ‘∀pq rs p q r. pq = NPar p q ∧ rs = NPar r q ∧ tausim conf p r ⇒ tausim conf pq rs’
+    suffices_by simp[] >>
+  Ho_Rewrite.PURE_REWRITE_TAC[GSYM PULL_EXISTS] >>
+  ho_match_mp_tac tausim_coind >> rw[]
+  >- (qhdtm_x_assum ‘trans’ (strip_assume_tac o ONCE_REWRITE_RULE[trans_cases]) >> fs[] >>
+      rveq
+      >- ((* par_l *)
+          metis_tac[tausim_cases,trans_par_l])
+      >- ((* par_r *)
+          metis_tac[trans_par_r]))
+  >- (qhdtm_x_assum ‘trans’ (strip_assume_tac o ONCE_REWRITE_RULE[trans_cases]) >> fs[] >>
+      rveq
+      >- ((* par_l *)
+          metis_tac[tausim_cases,trans_par_l])
+      >- ((* par_r *)
+          metis_tac[trans_par_r]))
+  >- (qhdtm_x_assum ‘trans’ (strip_assume_tac o ONCE_REWRITE_RULE[trans_cases]) >> fs[] >>
+      rveq
+      >- ((* com_l *)
+          goal_assum(resolve_then (Pos hd) mp_tac TC_SUBSET) >>
+          simp[reduction_def] >>
+          metis_tac[tausim_cases,label_distinct,trans_com_l])
+      >- ((* com_r *)
+          goal_assum(resolve_then (Pos hd) mp_tac TC_SUBSET) >>
+          simp[reduction_def] >>
+          metis_tac[tausim_cases,label_distinct,trans_com_r])
+      >- ((* par_l *)
+          metis_tac[reduction_TC_par_l,tausim_cases])
+      >- ((* par_l *)
+          goal_assum(resolve_then (Pos hd) mp_tac TC_SUBSET) >>
+          metis_tac[trans_par_r,reduction_def]))
+  >- (qhdtm_x_assum ‘trans’ (strip_assume_tac o ONCE_REWRITE_RULE[trans_cases]) >> fs[] >>
+      rveq
+      >- ((* com_l *)
+          goal_assum(resolve_then (Pos hd) mp_tac RC_SUBSET) >>
+          simp[reduction_def] >>
+          metis_tac[tausim_cases,label_distinct,trans_com_l])
+      >- ((* com_r *)
+          goal_assum(resolve_then (Pos hd) mp_tac RC_SUBSET) >>
+          simp[reduction_def] >>
+          metis_tac[tausim_cases,label_distinct,trans_com_r])
+      >- ((* par_l *)
+          metis_tac[RC_DEF,tausim_cases,trans_par_l,reduction_def])
+      >- ((* par_l *)
+          metis_tac[RC_DEF,trans_par_r,reduction_def]))
+QED
+        
 val _ = export_theory ();
