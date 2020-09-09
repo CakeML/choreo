@@ -149,4 +149,12 @@ Proof
   rw[SET_EQ_SUBSET,SUBSET_DEF]
 QED
 
+Theorem nub'_APPEND:
+  nub'(xs ++ ys) = nub' xs ++ FILTER (λy. ~MEM y xs) (nub' ys)
+Proof
+  Induct_on ‘xs’ >> fs[nub'_def,FILTER_APPEND,FILTER_FILTER] >>
+  strip_tac >>
+  AP_THM_TAC >> AP_TERM_TAC >> rw[FUN_EQ_THM,EQ_IMP_THM]
+QED
+        
 val _ = export_theory ()
