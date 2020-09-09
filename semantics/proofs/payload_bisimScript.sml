@@ -70,7 +70,7 @@ Proof
   rw[BISIM_def] >>
   metis_tac[payloadPropsTheory.junkcong_trans_pres,payloadPropsTheory.junkcong_sym]
 QED
-        
+
 (* An ungodly simulation preorder where
    visible actions are mimicked by single actions,
    and tau actions are mimicked by sequences of

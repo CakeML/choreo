@@ -1,5 +1,5 @@
-open preamble payloadSemTheory payloadLangTheory choreoUtilsTheory payload_closureTheory payloadPropsTheory;
-open ConseqConv;
+open preamble payloadSemTheory payloadLangTheory choreoUtilsTheory payload_closureTheory payloadPropsTheory
+     payload_bisimTheory payloadConfluenceTheory ConseqConv;
 
 val _ = new_theory "payload_closureProof";
 
@@ -41,6 +41,43 @@ Theorem fix_network_NPar:
   fix_network (NPar n1 n2) = (fix_network n1 ∧ fix_network n2)
 Proof
   rw[fix_network_def,endpoints_def]
+QED
+
+Theorem letrec_network_NPar:
+  letrec_network (NPar n1 n2) = (letrec_network n1 ∧ letrec_network n2)
+Proof
+  rw[letrec_network_def,endpoints_def]
+QED
+
+Theorem free_var_names_endpoint_compile_endpoint:
+  ∀x ar e.
+  set(free_fix_names_endpoint e) ⊆ set(MAP FST ar) ∧
+  MEM x (free_var_names_endpoint(compile_endpoint ar e)) ⇒
+  MEM x (FLAT(MAP SND ar)) ∨ MEM x (free_var_names_endpoint e) ∨ MEM x (written_var_names_endpoint e)
+Proof
+  strip_tac >> Induct_on ‘e’ >>
+  fs[free_var_names_endpoint_def,compile_endpoint_def,MEM_FILTER,MEM_nub',
+     free_fix_names_endpoint_def,LIST_TO_SET_FILTER,SUBSET_DEF,
+     DISJ_IMP_THM,FORALL_AND_THM,written_var_names_endpoint_def] >>
+  rw[] >>
+  res_tac >> fs[MEM_nub'] >> fs[] >>
+  rfs[]
+  >- metis_tac[]
+  >- (imp_res_tac MEM_written_var_names_endpoint_until_IMP >> simp[])
+  >- (PURE_FULL_CASE_TAC >> fs[free_var_names_endpoint_def] >>
+      fs[MEM_FLAT,MEM_MAP] >>
+      metis_tac[ALOOKUP_MEM,SND])
+QED
+
+Theorem free_var_names_endpoint_compile_endpoint_NIL:
+  ∀x e.
+  free_fix_names_endpoint e = [] ∧
+  MEM x (free_var_names_endpoint(compile_endpoint [] e)) ⇒
+  MEM x (free_var_names_endpoint e) ∨ MEM x (written_var_names_endpoint e)
+Proof
+  rw[] >>
+  drule_at (Pos last) free_var_names_endpoint_compile_endpoint >>
+  rw[]
 QED
 
 Theorem compile_network_preservation_send:
@@ -391,19 +428,21 @@ Proof
   >- (fs[fix_endpoint_def])
 QED
 
-(* TODO: Figure out a useful relation to put here *)
-Inductive compile_rel:
-  ∀x. compile_rel x (x:network)
+Definition compile_rel_def:
+  compile_rel conf n1 n2 =
+  (letrec_network n1 ∧ letrec_network n2 ∧
+   tausim conf n1 n2
+  )
 End
 
 Theorem compile_rel_refl:
-  compile_rel x x
+  letrec_network x ⇒ compile_rel conf x x
 Proof
-  cheat
+  rw[compile_rel_def,tausim_refl]
 QED
 
 Theorem compile_rel_reflI:
-  ∀x y. x = y ⇒ compile_rel x y
+  ∀conf x y. letrec_network x ∧ x = y ⇒ compile_rel conf x y
 Proof
   simp[compile_rel_refl]
 QED
@@ -415,14 +454,39 @@ Proof
   Induct_on ‘l’ >> rw[] >> fs[]
 QED
 
+Theorem letrec_endpoint_compile_endpoint:
+  ∀ar e. letrec_endpoint (compile_endpoint ar e)
+Proof
+  Induct_on ‘e’ >> rw[letrec_endpoint_def,compile_endpoint_def] >>
+  TOP_CASE_TAC >> rw[letrec_endpoint_def]
+QED
+
+Theorem letrec_network_compile_network_alt:
+  ∀n. fix_network n ⇒ letrec_network(compile_network_alt n)
+Proof
+  Induct >> rw[compile_network_alt_def,letrec_network_def,endpoints_def,fix_network_def] >>
+  fs[letrec_network_def,letrec_endpoint_compile_endpoint,fix_network_def]
+QED
+
+Theorem letrec_network_compile_network:
+  ∀n. fix_network n ⇒ letrec_network(compile_network n)
+Proof
+  Induct >> rw[compile_network_def,letrec_network_def,endpoints_def,fix_network_def] >>
+  fs[letrec_network_def,letrec_endpoint_compile_endpoint,fix_network_def] >>
+  rename1 ‘FOLDL _ _ l’ >>
+  qid_spec_tac ‘l’ >> ho_match_mp_tac SNOC_INDUCT >>
+  rw[letrec_endpoint_def,letrec_endpoint_compile_endpoint,FOLDL_SNOC]
+QED
+
 Theorem compile_network_preservation_trans:
   ∀p1 p2 conf.
     conf.payload_size > 0
     ∧ fix_network p1
     ∧ free_fix_names_network p1 = []
+    ∧ no_undefined_vars_network p1
     ∧ reduction conf p1 p2
     ⇒ ∃p3. (reduction conf)^* (compile_network_alt p1) p3 ∧
-             compile_rel p3 (compile_network_alt p2)
+             compile_rel conf p3 (compile_network_alt p2)
 Proof
   rpt strip_tac
   >> qhdtm_x_assum ‘reduction’ (fn thm => rpt(pop_assum mp_tac) >> assume_tac  thm)
@@ -443,7 +507,8 @@ Proof
       >> fs[GSYM reduction_def]
       >> drule_then strip_assume_tac RTC_SUBSET
       >> goal_assum drule
-      >> simp[compile_rel_refl])
+      >> metis_tac[compile_rel_refl,fix_network_NPar,letrec_network_compile_network_alt,
+                   letrec_network_trans_pres,letrec_network_NPar])
   >- ((* trans_com_r *)
       fs[no_undefined_writes_NPar]
       >> MAP_EVERY (drule_all_then strip_assume_tac)
@@ -454,7 +519,8 @@ Proof
       >> fs[GSYM reduction_def]
       >> drule_then strip_assume_tac RTC_SUBSET
       >> goal_assum drule
-      >> simp[compile_rel_refl])
+      >> metis_tac[compile_rel_refl,fix_network_NPar,letrec_network_compile_network_alt,
+                   letrec_network_trans_pres,letrec_network_NPar])
   >- ((* trans_dequeue_last_payload *)
       goal_assum (resolve_then (Pos hd) mp_tac RTC_SUBSET) >>
       simp[reduction_def] >>
@@ -464,10 +530,13 @@ Proof
         DEPTH_CONSEQ_CONV(
           CONSEQ_REWRITE_CONV
           ([],[compile_rel_reflI],[]))) >>
+      fs[letrec_network_def,letrec_endpoint_def,fix_network_def,fix_endpoint_def,endpoints_def,
+         letrec_endpoint_compile_endpoint] >>
       fs[state_component_equality,fmap_eq_flookup,FLOOKUP_UPDATE,alookup_distinct_reverse,
          flookup_fupdate_list,MAP_MAP_o,o_DEF,all_distinct_nub',ALL_DISTINCT_MAP,
          FILTER_ALL_DISTINCT,ALOOKUP_MAP_CONST_EQ,MEM_FILTER,MEM_nub'] >>
-      csimp[CaseEq "bool",written_var_names_endpoint_def])
+      csimp[CaseEq "bool",written_var_names_endpoint_def]
+      )
   >- ((* trans_dequeue_intermediate_payload *)
       goal_assum (resolve_then (Pos hd) mp_tac RTC_SUBSET) >>
       simp[reduction_def] >>
@@ -477,6 +546,8 @@ Proof
         DEPTH_CONSEQ_CONV(
           CONSEQ_REWRITE_CONV
           ([],[compile_rel_reflI],[]))) >>
+      fs[letrec_network_def,letrec_endpoint_def,fix_network_def,fix_endpoint_def,endpoints_def,
+         letrec_endpoint_compile_endpoint] >>
       fs[state_component_equality,fmap_eq_flookup,FLOOKUP_UPDATE,alookup_distinct_reverse,
          flookup_fupdate_list,MAP_MAP_o,o_DEF,all_distinct_nub',ALL_DISTINCT_MAP,
          FILTER_ALL_DISTINCT,ALOOKUP_MAP_CONST_EQ,MEM_FILTER,MEM_nub'] >>
@@ -487,22 +558,72 @@ Proof
       simp[reduction_def] >>
       simp[compile_network_alt_def,compile_endpoint_def] >>
       simp[Once trans_cases,RIGHT_AND_OVER_OR,PULL_EXISTS,EXISTS_OR_THM] >>
-      cheat (* different variables initialised *)
-      (*CONSEQ_CONV_TAC(
-        DEPTH_CONSEQ_CONV(
-          CONSEQ_REWRITE_CONV
-          ([],[compile_rel_reflI],[]))) >>
-      fs[state_component_equality,fmap_eq_flookup,FLOOKUP_UPDATE,alookup_distinct_reverse,
-         flookup_fupdate_list,MAP_MAP_o,o_DEF,all_distinct_nub',ALL_DISTINCT_MAP,
-         FILTER_ALL_DISTINCT,ALOOKUP_MAP_CONST_EQ,MEM_FILTER,MEM_nub'] >>
-      csimp[CaseEq "bool",written_var_names_endpoint_def]*))
+      disj1_tac >>
+      simp[flookup_fupdate_list] >>
+      reverse TOP_CASE_TAC
+      >- (imp_res_tac ALOOKUP_MEM >>
+          fs[MEM_MAP,MEM_FILTER,MEM_nub',written_var_names_endpoint_def,PULL_EXISTS]) >>
+      pop_assum kall_tac >>
+      fs[written_var_names_endpoint_def] >>
+      fs[compile_rel_def,letrec_network_def,endpoints_def,fix_network_def,letrec_endpoint_compile_endpoint] >>
+      simp[nub'_APPEND,FILTER_APPEND,FUPDATE_LIST_APPEND] >>
+      match_mp_tac bisim_IMP_tausim >>
+      match_mp_tac junkcong_bisim >>
+      goal_assum(resolve_then (Pos hd) mp_tac junkcong_sym) >>
+      goal_assum(resolve_then (Pos hd) mp_tac junkcong_add_junk_list') >>
+      rw[MEM_MAP,MEM_FILTER,MEM_nub'] >>
+      qexists_tac ‘𝕌(varN)’ >>
+      rw[] >>
+      fs[free_fix_names_network_def,free_fix_names_endpoint_def] >>
+      spose_not_then strip_assume_tac >>
+      drule_all free_var_names_endpoint_compile_endpoint_NIL >>
+      fs[no_undefined_vars_network_def,endpoints_def,free_var_names_endpoint_def,SUBSET_DEF] >>
+      metis_tac[])
   >- ((* trans_if_false *)
       ‘v ∈ FDOM s.bindings’ by simp[FDOM_FLOOKUP] >>
       goal_assum (resolve_then (Pos hd) mp_tac RTC_SUBSET) >>
       simp[reduction_def] >>
       simp[compile_network_alt_def,compile_endpoint_def] >>
       simp[Once trans_cases,RIGHT_AND_OVER_OR,PULL_EXISTS,EXISTS_OR_THM] >>
-      cheat  (* different variables initialised *))
+      disj2_tac >>
+      simp[flookup_fupdate_list] >>
+      reverse TOP_CASE_TAC
+      >- (imp_res_tac ALOOKUP_MEM >>
+          fs[MEM_MAP,MEM_FILTER,MEM_nub',written_var_names_endpoint_def,PULL_EXISTS]) >>
+      pop_assum kall_tac >>
+      fs[written_var_names_endpoint_def] >>
+      fs[compile_rel_def,letrec_network_def,endpoints_def,fix_network_def,letrec_endpoint_compile_endpoint] >>
+      simp[nub'_APPEND,FILTER_APPEND,FUPDATE_LIST_APPEND] >>
+      match_mp_tac bisim_IMP_tausim >>
+      match_mp_tac junkcong_bisim >>
+      goal_assum(resolve_then (Pos hd) mp_tac junkcong_sym) >>
+      (* TODO: something less atrocious *)
+      ‘s.bindings |++ MAP (λx. (x,[0w]))
+                       (FILTER (λx. x ∉ FDOM s.bindings)
+                        (nub' (written_var_names_endpoint e1)))
+                  |++ MAP (λx. (x,[0w]))
+                       (FILTER (λx. x ∉ FDOM s.bindings)
+                        (FILTER (λy. ~MEM y (written_var_names_endpoint e1)) (nub' (written_var_names_endpoint e2)))) =
+       s.bindings |++ MAP (λx. (x,[0w]))
+                       (FILTER (λx. x ∉ FDOM s.bindings)
+                        (nub' (written_var_names_endpoint e2)))
+                  |++ MAP (λx. (x,[0w]))
+                       (FILTER (λx. x ∉ FDOM s.bindings)
+                        (FILTER (λy. ~MEM y (written_var_names_endpoint e2))  (nub' (written_var_names_endpoint e1))))’
+        by(rw[fmap_eq_flookup,flookup_fupdate_list] >>
+           every_case_tac >>
+           imp_res_tac ALOOKUP_MEM >>
+           fs[ALOOKUP_NONE,MEM_MAP,MEM_FILTER,MEM_nub',PULL_EXISTS]) >>
+      pop_assum SUBST_ALL_TAC >>
+      goal_assum(resolve_then (Pos hd) mp_tac junkcong_add_junk_list') >>
+      rw[MEM_MAP,MEM_FILTER,MEM_nub'] >>
+      qexists_tac ‘𝕌(varN)’ >>
+      rw[] >>
+      fs[free_fix_names_network_def,free_fix_names_endpoint_def] >>
+      spose_not_then strip_assume_tac >>
+      drule_all free_var_names_endpoint_compile_endpoint_NIL >>
+      fs[no_undefined_vars_network_def,endpoints_def,free_var_names_endpoint_def,SUBSET_DEF] >>
+      metis_tac[])
   >- ((* trans_let *)
       goal_assum (resolve_then (Pos hd) mp_tac RTC_SUBSET) >>
       simp[reduction_def] >>
@@ -512,6 +633,8 @@ Proof
         DEPTH_CONSEQ_CONV(
           CONSEQ_REWRITE_CONV
           ([],[compile_rel_reflI],[]))) >>
+      fs[letrec_network_def,endpoints_def,letrec_endpoint_def,letrec_endpoint_compile_endpoint,
+         fix_network_def] >>
       fs[state_component_equality,fmap_eq_flookup,FLOOKUP_UPDATE,alookup_distinct_reverse,
          flookup_fupdate_list,MAP_MAP_o,o_DEF,all_distinct_nub',ALL_DISTINCT_MAP,
          FILTER_ALL_DISTINCT,ALOOKUP_MAP_CONST_EQ,MEM_FILTER,MEM_nub'] >>
@@ -525,14 +648,15 @@ Proof
       res_tac >>
       fs[FDOM_FLOOKUP])
   >- ((* trans_par_l *)
-      fs[compile_network_alt_def,fix_network_NPar,free_fix_names_network_def]
-      >> drule_then (fn thm => goal_assum(resolve_then (Pos hd) mp_tac thm)) payloadPropsTheory.reduction_par_l
-      >> cheat (* preserved by parallel *)
-     )
+      fs[compile_network_alt_def,fix_network_NPar,free_fix_names_network_def,no_undefined_vars_network_NPar] >>
+      drule_then (fn thm => goal_assum(resolve_then (Pos hd) mp_tac thm)) payloadPropsTheory.reduction_par_l >>
+      fs[compile_rel_def,letrec_network_NPar,letrec_network_compile_network_alt] >>
+      drule_then MATCH_ACCEPT_TAC tausim_par_left)
   >- ((* trans_par_r *)
-      fs[compile_network_alt_def,fix_network_NPar,free_fix_names_network_def]
-      >> drule_then (fn thm => goal_assum(resolve_then (Pos hd) mp_tac thm)) payloadPropsTheory.reduction_par_r
-      >> cheat (* preserved by parallel *))
+      fs[compile_network_alt_def,fix_network_NPar,free_fix_names_network_def,no_undefined_vars_network_NPar] >>
+      drule_then (fn thm => goal_assum(resolve_then (Pos hd) mp_tac thm)) payloadPropsTheory.reduction_par_r >>
+      fs[compile_rel_def,letrec_network_NPar,letrec_network_compile_network_alt] >>
+      drule_then MATCH_ACCEPT_TAC tausim_par_right)
   >- ((* trans_fix *)
       goal_assum (resolve_then (Pos hd) mp_tac RTC_TRANS) >>
       simp[reduction_def,compile_network_alt_def,compile_endpoint_def] >>

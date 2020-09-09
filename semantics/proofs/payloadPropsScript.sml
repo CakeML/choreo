@@ -2413,6 +2413,22 @@ val junkcong_add_junk' = Q.store_thm("junkcong_add_junk'",
  >> pop_assum(fn thm => PURE_ONCE_REWRITE_TAC [thm])
  >> match_mp_tac junkcong_add_junk >> simp[]);
 
+Theorem junkcong_add_junk_list':
+  ∀p s b e vds fvs.
+    (∀v d. MEM (v,d) vds ⇒ ¬MEM v (free_var_names_endpoint e) ∧ v ∈ fvs)
+    ⇒ junkcong fvs (NEndpoint p (s with bindings := b) e) (NEndpoint p (s with bindings:= b |++ vds) e)
+Proof
+  rpt GEN_TAC >> qid_spec_tac ‘vds’ >>
+  ho_match_mp_tac SNOC_INDUCT >>
+  rw[FUPDATE_LIST_SNOC,FUPDATE_LIST_THM,junkcong_refl] >>
+  fs[DISJ_IMP_THM,FORALL_AND_THM] >>
+  res_tac >>
+  drule_then match_mp_tac junkcong_trans >>
+  rename1 ‘_ |+ xx’ >> Cases_on ‘xx’ >>
+  match_mp_tac junkcong_add_junk' >>
+  fs[]
+QED
+
 val junkcong_add_junk'' = Q.store_thm("junkcong_add_junk''",
  `∀p b q e v fvs d.
     v ∈ fvs ∧ ¬MEM v (free_var_names_endpoint e)
