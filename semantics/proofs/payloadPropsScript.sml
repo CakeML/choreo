@@ -3273,4 +3273,39 @@ Definition letrec_network_def:
         (endpoints n)
 End
 
+Theorem fix_endpoint_dsubst:
+  ∀e dn e'.
+  fix_endpoint e ∧ fix_endpoint e' ⇒
+  fix_endpoint (dsubst e dn e')
+Proof
+  Induct >>
+  rw[fix_endpoint_def,dsubst_def]
+QED
+
+Theorem fix_network_trans_pres:
+  ∀conf p α q.
+  trans conf p α q ∧
+  fix_network p ⇒
+  fix_network q
+Proof
+  simp[GSYM AND_IMP_INTRO] >>
+  ho_match_mp_tac trans_ind >>
+  rw[fix_network_def,endpoints_def,fix_endpoint_def] >>
+  match_mp_tac fix_endpoint_dsubst >> simp[fix_endpoint_def]
+QED
+
+Theorem letrec_network_trans_pres:
+  ∀conf p α q.
+  trans conf p α q ∧
+  letrec_network p ⇒
+  letrec_network q
+Proof
+  simp[GSYM AND_IMP_INTRO] >>
+  ho_match_mp_tac trans_ind >>
+  rw[letrec_network_def,endpoints_def,letrec_endpoint_def,letrec_closure_def] >>
+  imp_res_tac ALOOKUP_MEM >>
+  fs[EVERY_MEM] >> res_tac >> fs[letrec_closure_def] >>
+  fs[EVERY_MEM] >> res_tac >> fs[letrec_closure_def]
+QED
+
 val _ = export_theory ();
