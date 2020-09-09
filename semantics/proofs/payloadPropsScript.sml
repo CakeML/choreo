@@ -275,25 +275,49 @@ val trans_IMP_weak_trans = Q.store_thm("trans_IMP_weak_trans",
   rw[weak_trans_def,weak_tau_trans_def]
   >> metis_tac[RTC_REFL,RTC_SINGLE,reduction_def]);
 
-val reduction_par_l = Q.store_thm("reduction_par_l",
-  `∀p q r conf. (reduction conf)^* p q ==> (reduction conf)^* (NPar p r) (NPar q r)`,
+Theorem reduction_par_l:
+  ∀p q r conf. (reduction conf)^* p q ==> (reduction conf)^* (NPar p r) (NPar q r)
+Proof
   rpt gen_tac
   >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`q`,`p`]
   >> ho_match_mp_tac RTC_INDUCT
   >> rpt strip_tac
   >- simp[RTC_REFL]
   >> match_mp_tac (RTC_RULES |> SPEC_ALL |> CONJUNCT2)
-  >> metis_tac[reduction_def,trans_par_l]);
+  >> metis_tac[reduction_def,trans_par_l]
+QED
 
-val reduction_par_r = Q.store_thm("reduction_par_r",
-  `∀p q r conf. (reduction conf)^* p q ==> (reduction conf)^* (NPar r p) (NPar r q)`,
+Theorem reduction_par_r:
+  ∀p q r conf. (reduction conf)^* p q ==> (reduction conf)^* (NPar r p) (NPar r q)
+Proof
   rpt gen_tac
   >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`q`,`p`]
   >> ho_match_mp_tac RTC_INDUCT
   >> rpt strip_tac
   >- simp[RTC_REFL]
   >> match_mp_tac (RTC_RULES |> SPEC_ALL |> CONJUNCT2)
-  >> metis_tac[reduction_def,trans_par_r]);
+  >> metis_tac[reduction_def,trans_par_r]
+QED
+
+Theorem reduction_TC_par_l:
+  ∀p q r conf. (reduction conf)⁺ p q ==> (reduction conf)⁺ (NPar p r) (NPar q r)
+Proof
+  rpt gen_tac
+  >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`q`,`p`]
+  >> ho_match_mp_tac TC_INDUCT
+  >> rpt strip_tac
+  >> metis_tac[TC_RULES,reduction_def,trans_par_l]
+QED
+
+Theorem reduction_TC_par_r:
+  ∀p q r conf. (reduction conf)⁺ p q ==> (reduction conf)⁺ (NPar r p) (NPar r q)
+Proof
+  rpt gen_tac
+  >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`q`,`p`]
+  >> ho_match_mp_tac TC_INDUCT
+  >> rpt strip_tac
+  >> metis_tac[TC_RULES,reduction_def,trans_par_r]
+QED
 
 val trans_nil_false = Q.store_thm("trans_nil_false",
   `∀conf alpha n. trans conf NNil alpha n = F`,
