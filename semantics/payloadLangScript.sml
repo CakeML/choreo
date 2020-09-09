@@ -74,6 +74,18 @@ Definition free_var_names_endpoint_def:
 ∧ (free_var_names_endpoint (FCall dv vars) = vars)
 End
 
+Definition free_fix_names_endpoint_def:
+   (free_fix_names_endpoint Nil = [])
+∧ (free_fix_names_endpoint (Send p v n e) = free_fix_names_endpoint e)
+∧ (free_fix_names_endpoint (Receive p v d e) = free_fix_names_endpoint e)
+∧ (free_fix_names_endpoint (IfThen v e1 e2) = free_fix_names_endpoint e1 ++ free_fix_names_endpoint e2)
+∧ (free_fix_names_endpoint (Let v f vl e) = free_fix_names_endpoint e)
+∧ (free_fix_names_endpoint (Fix dv e) = FILTER ($≠ dv) (free_fix_names_endpoint e))
+∧ (free_fix_names_endpoint (Call dv) = [dv])
+∧ (free_fix_names_endpoint (Letrec dv vars e1 e2) = free_fix_names_endpoint e1 ++ free_fix_names_endpoint e2)
+∧ (free_fix_names_endpoint (FCall dv vars) = [])
+End
+
 Definition var_names_network_def:
    (var_names_network NNil = [])
 ∧ (var_names_network (NEndpoint p s e) = var_names_endpoint e)
@@ -84,6 +96,12 @@ Definition free_var_names_network_def:
    (free_var_names_network NNil = [])
 ∧ (free_var_names_network (NEndpoint p s e) = free_var_names_endpoint e)
 ∧ (free_var_names_network (NPar n1 n2) = free_var_names_network n1 ++ free_var_names_network n2)
+End
+
+Definition free_fix_names_network_def:
+   (free_fix_names_network NNil = [])
+∧ (free_fix_names_network (NEndpoint p s e) = free_fix_names_endpoint e)
+∧ (free_fix_names_network (NPar n1 n2) = free_fix_names_network n1 ++ free_fix_names_network n2)
 End
 
 Definition final_def:

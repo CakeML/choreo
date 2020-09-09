@@ -17,6 +17,21 @@ Definition written_var_names_endpoint_def:
 ∧ (written_var_names_endpoint (FCall dv vars) = vars)
 End
 
+Definition written_var_names_endpoint_until_def:
+   (written_var_names_endpoint_until Nil = [])
+∧ (written_var_names_endpoint_until (Send p v n e) = written_var_names_endpoint_until e)
+∧ (written_var_names_endpoint_until (Receive p v d e) = v::written_var_names_endpoint_until e)
+∧ (written_var_names_endpoint_until (IfThen v e1 e2) = written_var_names_endpoint_until e1 ++ written_var_names_endpoint_until e2)
+∧ (written_var_names_endpoint_until (Let v f vl e) = v::written_var_names_endpoint_until e)
+∧ (written_var_names_endpoint_until (Fix dv e) =
+    if free_fix_names_endpoint(Fix dv e) = []
+    then []
+    else written_var_names_endpoint_until e)
+∧ (written_var_names_endpoint_until (Call dv) = [])
+∧ (written_var_names_endpoint_until (Letrec dv vars e1 e2) = written_var_names_endpoint_until e1 ++ written_var_names_endpoint_until e2)
+∧ (written_var_names_endpoint_until (FCall dv vars) = vars)
+End
+
 Definition compile_endpoint_def:
     (compile_endpoint ar payloadLang$Nil = payloadLang$Nil) ∧
     (compile_endpoint ar (Send p v n e) = Send p v n (compile_endpoint ar e)) ∧
@@ -28,7 +43,7 @@ Definition compile_endpoint_def:
     (compile_endpoint ar (Letrec dn vars e1 e2) = Nil (* Source term should use fixpoint style *)) ∧
     (compile_endpoint ar (FCall dn vars) = Nil (* Source term should use fixpoint style *)) ∧
     (compile_endpoint ar (Fix dn e) =
-     let vars = nub'(written_var_names_endpoint e);
+     let vars = nub'(written_var_names_endpoint_until e);
          e' = compile_endpoint ((dn,vars)::ar) e
      in
        Letrec dn vars e' (FCall dn vars)

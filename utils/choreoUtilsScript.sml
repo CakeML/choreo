@@ -114,4 +114,39 @@ Proof
   simp[MEM_nub' |> SIMP_RULE std_ss [IN_DEF]]
 QED
 
+Theorem ALOOKUP_SOME_SPLIT:
+  ∀l x y. ALOOKUP l x = SOME y ⇔ ∃l1 l2. l = l1 ++ (x,y)::l2 ∧ ~MEM x (MAP FST l1)
+Proof
+  ho_match_mp_tac ALOOKUP_ind >>
+  rw[EQ_IMP_THM]
+  >- (qexists_tac ‘[]’ >> simp[])
+  >- (fs[APPEND_EQ_CONS |> CONV_RULE(LHS_CONV SYM_CONV)] >>
+      rveq >> fs[])
+  >- (res_tac >>
+      rveq >>
+      Q.REFINE_EXISTS_TAC ‘(_,_)::_’ >> simp[])
+  >- (fs[APPEND_EQ_CONS |> CONV_RULE(LHS_CONV SYM_CONV)] >>
+      rveq >> fs[] >>
+      fs[ALOOKUP_APPEND,CaseEq "option"] >>
+      fs[ALOOKUP_NONE])
+QED
+
+Theorem LIST_REL_MEM_IMP_SYM:
+  ∀xs ys P y. LIST_REL P xs ys ∧ MEM y ys ⇒ ∃x. MEM x xs ∧ P x y
+Proof
+  rw[] >>
+  drule_at (Pos last) EVERY2_sym >>
+  disch_then(qspec_then ‘λ y x. P x y’ mp_tac) >>
+  impl_tac >- simp[] >>
+  strip_tac >>
+  imp_res_tac LIST_REL_MEM_IMP >>
+  metis_tac[]
+QED
+
+Theorem DIFF_UNION':
+  (x ∪ y) DIFF z = (x DIFF z) ∪ (y DIFF z)
+Proof
+  rw[SET_EQ_SUBSET,SUBSET_DEF]
+QED
+
 val _ = export_theory ()
