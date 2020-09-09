@@ -3255,7 +3255,7 @@ End
 
 Definition fix_network_def:
   fix_network n =
-  EVERY (λ(p,s,e). fix_endpoint e) (endpoints n)
+  EVERY (λ(p,s,e). fix_endpoint e ∧ s.funs = []) (endpoints n)
 End
 
 Definition letrec_endpoint_def:
@@ -3330,6 +3330,52 @@ Proof
   imp_res_tac ALOOKUP_MEM >>
   fs[EVERY_MEM] >> res_tac >> fs[letrec_closure_def] >>
   fs[EVERY_MEM] >> res_tac >> fs[letrec_closure_def]
+QED
+
+Definition no_undefined_vars_closure_def:
+  no_undefined_vars_closure (Closure args env e) =
+  (set(free_var_names_endpoint e) ⊆ set args ∪ FDOM(SND env) ∧
+   EVERY (λ(s,cl). no_undefined_vars_closure cl) (FST env)
+   )
+Termination
+  WF_REL_TAC ‘inv_image $< closure_size’ >>
+  rw[closure_size_def] >> imp_res_tac closure_size_MEM >>
+  DECIDE_TAC
+End
+
+Definition no_undefined_vars_network_def:
+  no_undefined_vars_network n =
+  EVERY (λ(p,s,e). set(free_var_names_endpoint e) ⊆ FDOM s.bindings ∧
+                   EVERY (λ(s,cl). no_undefined_vars_closure cl) s.funs) (endpoints n)
+End
+
+Theorem no_undefined_vars_network_NPar:
+  no_undefined_vars_network(NPar n1 n2) = (no_undefined_vars_network n1 ∧ no_undefined_vars_network n2)
+Proof
+  rw[no_undefined_vars_network_def,endpoints_def]
+QED
+
+Theorem no_undefined_vars_network_trans_pres:
+  ∀conf n1 α n2.
+    trans conf n1 α n2 ∧
+    no_undefined_vars_network n1 ⇒
+    no_undefined_vars_network n2
+Proof
+  simp[GSYM AND_IMP_INTRO] >>
+  ho_match_mp_tac trans_ind >>
+  rw[no_undefined_vars_network_NPar] >>
+  fs[no_undefined_vars_network_def,endpoints_def,free_var_names_endpoint_def,LIST_TO_SET_FILTER]
+  >- (fs[SUBSET_DEF] >> metis_tac[])
+  >- (fs[SUBSET_DEF] >> metis_tac[])
+  >- (rw[SUBSET_DEF] >> imp_res_tac MEM_free_var_names_endpoint_dsubst >>
+      fs[free_var_names_endpoint_def,SUBSET_DEF])
+  >- (fs[no_undefined_vars_closure_def] >>
+      fs[SUBSET_DEF] >> metis_tac[])
+  >- (imp_res_tac ALOOKUP_MEM >> fs[EVERY_MEM] >> res_tac >>
+      fs[] >>
+      fs[no_undefined_vars_closure_def] >>
+      fs[FDOM_FUPDATE_LIST,MAP_ZIP] >>
+      fs[UNION_COMM,EVERY_MEM])
 QED
 
 val _ = export_theory ();
