@@ -207,4 +207,32 @@ Proof
           metis_tac[RC_DEF,trans_par_r,reduction_def]))
 QED
 
+Theorem tausim_par_sym:
+  ∀conf p q. tausim conf (NPar p q) (NPar q p)
+Proof
+  rpt strip_tac >>
+  match_mp_tac bisim_IMP_tausim >>
+  MATCH_ACCEPT_TAC bisim_par_sym
+QED
+
+Theorem tausim_par_assoc:
+  ∀conf p q r. tausim conf (NPar p (NPar q r)) (NPar (NPar p q) r)
+Proof
+  rpt strip_tac >>
+  match_mp_tac bisim_IMP_tausim >>
+  MATCH_ACCEPT_TAC bisim_par_assoc
+QED
+
+Theorem tausim_par_right:
+  ∀conf p q r s. tausim conf q r ⇒ tausim conf (NPar p q) (NPar p r)
+Proof
+  metis_tac[tausim_trans,tausim_par_sym,tausim_par_left]
+QED
+
+Theorem tausim_par:
+  ∀conf p q r s. tausim conf p s ∧ tausim conf q r ⇒ tausim conf (NPar p q) (NPar s r)
+Proof
+  metis_tac[tausim_trans,tausim_par_left,tausim_par_right]
+QED
+
 val _ = export_theory ();
