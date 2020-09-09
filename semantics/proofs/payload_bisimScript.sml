@@ -2,6 +2,53 @@ open preamble payloadSemTheory payloadLangTheory payloadPropsTheory choreoUtilsT
 
 val _ = new_theory "payload_bisim";
 
+(* Strong bisimulation up-to BISIM_REL *)
+(* TODO: upstream to bisimulationTheory? *)
+Theorem BISIM_REL_strong_coind:
+  ∀ts R.
+    (∀p q.
+       R p q ⇒
+       ∀l.
+         (∀p'. ts p l p' ⇒ ∃q'. ts q l q' ∧ (R p' q' ∨ BISIM_REL ts p' q')) ∧
+         ∀q'. ts q l q' ⇒ ∃p'. ts p l p' ∧ (R p' q' ∨ BISIM_REL ts p' q')) ⇒
+    ∀p q. R p q ⇒ BISIM_REL ts p q
+Proof
+  ntac 3 strip_tac >>
+  ‘∀p q. R p q ∨ BISIM_REL ts p q ⇒ BISIM_REL ts p q’ suffices_by simp[] >>
+  ho_match_mp_tac BISIM_REL_coind >>
+  rw[LEFT_AND_OVER_OR,EXISTS_OR_THM] >>
+  metis_tac[BISIM_REL_cases]
+QED
+
+(* Structural congruence rules for strong bisimilarity *)
+
+Theorem bisim_par_sym:
+  ∀conf p q. BISIM_REL (trans conf) (NPar p q) (NPar q p)
+Proof
+  strip_tac >>
+  ‘∀pq qp p q. pq = NPar p q ∧ qp = NPar q p ⇒ BISIM_REL (trans conf) pq qp’ suffices_by fs[] >>
+  Ho_Rewrite.PURE_REWRITE_TAC[GSYM PULL_EXISTS] >>
+  ho_match_mp_tac BISIM_REL_coind >>
+  rw[] >>
+  qhdtm_x_assum ‘trans’ (strip_assume_tac o ONCE_REWRITE_RULE[trans_cases]) >>
+  fs[] >> rveq >>
+  rw[Once trans_cases] >> metis_tac[]
+QED
+
+Theorem bisim_par_assoc:
+  ∀conf p q r. BISIM_REL (trans conf) (NPar p (NPar q r)) (NPar (NPar p q) r)
+Proof
+  strip_tac >>
+  ‘∀pq qp p q r. pq = NPar p (NPar q r) ∧ qp = NPar (NPar p q) r ⇒ BISIM_REL (trans conf) pq qp’ suffices_by fs[] >>
+  Ho_Rewrite.PURE_REWRITE_TAC[GSYM PULL_EXISTS] >>
+  ho_match_mp_tac BISIM_REL_coind >>
+  rw[] >>
+  qhdtm_x_assum ‘trans’ (strip_assume_tac o ONCE_REWRITE_RULE[trans_cases]) >>
+  fs[] >> rveq >>
+  TRY(qpat_x_assum ‘trans conf (NPar _ _) _ _’ (strip_assume_tac o ONCE_REWRITE_RULE[trans_cases])) >>
+  fs[] >> rveq >>
+  metis_tac[trans_par_l,trans_par_r,trans_com_l,trans_com_r]
+QED
 
 (* An ungodly simulation preorder where
    visible actions are mimicked by single actions,
@@ -159,5 +206,5 @@ Proof
       >- ((* par_l *)
           metis_tac[RC_DEF,trans_par_r,reduction_def]))
 QED
-        
+
 val _ = export_theory ();
