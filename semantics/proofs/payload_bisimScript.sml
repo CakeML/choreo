@@ -71,6 +71,123 @@ Proof
   metis_tac[payloadPropsTheory.junkcong_trans_pres,payloadPropsTheory.junkcong_sym]
 QED
 
+(* Nil is always bisimilar to Nil (regardless of state) *)
+Theorem BISIM_REL_Nil:
+  ∀conf p s s'.
+    BISIM_REL (trans conf) (NEndpoint p s Nil) (NEndpoint p s' Nil)
+Proof
+  ntac 2 strip_tac >>
+  ‘∀n1 n2 s s'.
+    n1 = NEndpoint p s Nil ∧ n2 = NEndpoint p s' Nil ⇒
+    BISIM_REL (trans conf) n1 n2’
+    suffices_by simp[] >>
+  Ho_Rewrite.PURE_REWRITE_TAC[GSYM PULL_EXISTS] >>
+  ho_match_mp_tac bisimulationTheory.BISIM_REL_coind >>
+  rw[] >>
+  fs[Once trans_cases]
+QED
+
+(* TODO: move to props *)
+Theorem MEM_free_fun_names_endpoint_dsubst:
+  ∀e dn e'.
+  MEM x (free_fun_names_endpoint (dsubst e dn e')) ⇒
+  MEM x (free_fun_names_endpoint e) ∨
+  MEM x (free_fun_names_endpoint e')
+Proof
+  Induct >> rw[free_fun_names_endpoint_def,dsubst_def] >>
+  fs[MEM_FILTER] >> res_tac >> fs[]
+QED
+
+Definition used_closures_rel_def:
+  used_closures_rel s (Closure vars1 (fs1,bds1) e1) (Closure vars2 (fs2,bds2) e2) ⇔
+  e1 = e2 ∧ bds1 = bds2 ∧ vars1 = vars2 ∧
+  ∀dn. MEM dn (free_fun_names_endpoint e1) ∧ dn ∉ s ⇒
+    ((ALOOKUP fs1 dn = NONE ∧ ALOOKUP fs2 dn = NONE) ∨
+     (∃cl1 cl2.
+        ALOOKUP fs1 dn = SOME cl1 ∧ ALOOKUP fs2 dn = SOME cl2 ∧
+        (ALOOKUP fs1 dn = SOME cl1 ∧ ALOOKUP fs2 dn = SOME cl2 ⇒ used_closures_rel {dn} cl1 cl2)
+     ))
+Termination
+  WF_REL_TAC ‘inv_image $< (closure_size o FST o SND)’ >>
+  rw[closure_size_def] >> imp_res_tac ALOOKUP_MEM >>
+  imp_res_tac closure_size_MEM >>
+  DECIDE_TAC
+End
+
+Definition used_closures_endpoint_rel_def:
+  used_closures_endpoint_rel n1 n2 ⇔
+  ∃p (s:closure state) e fs1 fs2.
+    n1 = NEndpoint p (s with funs := fs1) e ∧
+    n2 = NEndpoint p (s with funs := fs2) e ∧
+    (∀dn. MEM dn (free_fun_names_endpoint e) ⇒
+          ((ALOOKUP fs1 dn = NONE ∧ ALOOKUP fs2 dn = NONE) ∨
+           (∃cl1 cl2.
+             ALOOKUP fs1 dn = SOME cl1 ∧ ALOOKUP fs2 dn = SOME cl2 ∧
+             used_closures_rel {dn} cl1 cl2)))
+End
+
+(* TODO: move? *)
+Triviality final_intermediate_imps:
+  (final d ⇒ ~intermediate d) ∧
+  (intermediate d ⇒ ~final d)
+Proof
+  metis_tac[intermediate_final_IMP]
+QED
+
+Theorem used_closures_rel_refl:
+  ∀s cl1. used_closures_rel s cl1 cl1
+Proof
+  ‘∀s cl1 cl2. cl1 = cl2 ⇒ used_closures_rel s cl1 cl2’ suffices_by simp[] >>
+  ho_match_mp_tac used_closures_rel_ind >>
+  rw[used_closures_rel_def] >>
+  Cases_on ‘ALOOKUP fs1 dn’ >> fs[] >>
+  metis_tac[]
+QED
+
+Theorem bisim_used_closures_rel:
+  ∀conf n1 n2.
+    used_closures_endpoint_rel n1 n2 ⇒
+    BISIM_REL (trans conf) n1 n2
+Proof
+  strip_tac >>
+  ho_match_mp_tac bisimulationTheory.BISIM_REL_coind >>
+  rw[] >>
+  fs[used_closures_endpoint_rel_def] >> rveq
+  >>
+    (qhdtm_x_assum ‘trans’ (strip_assume_tac o ONCE_REWRITE_RULE[trans_cases]) >>
+     fs[free_fun_names_endpoint_def] >> rveq >>
+     rw[Once trans_cases] >> fs[] >>
+     imp_res_tac final_intermediate_imps >> fs[]
+     >- (ntac 2 (goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL)) >> metis_tac[])
+     >- (ntac 2 (goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL)) >> metis_tac[])
+     >- (ntac 2 (goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL)) >> metis_tac[])
+     >- (Q.REFINE_EXISTS_TAC ‘<|bindings := _; funs := _; queues := _|>’ >> simp[])
+     >- (Q.REFINE_EXISTS_TAC ‘_ with queues := _’ >> simp[] >> metis_tac[])
+     >- (ntac 2 (goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL)) >> metis_tac[])
+     >- (ntac 2 (goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL)) >> metis_tac[])
+     >- (Q.REFINE_EXISTS_TAC ‘(_:closure state) with <|bindings := _; funs := _|>’ >> simp[] >>
+         metis_tac[])
+     >- (goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+         goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+         rw[] >>
+         imp_res_tac MEM_free_fun_names_endpoint_dsubst >>
+         fs[free_fun_names_endpoint_def])
+     >- (goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+         goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+         fs[FILTER_APPEND,MEM_FILTER] >> rveq >> fs[LEFT_AND_OVER_OR,DISJ_IMP_THM,FORALL_AND_THM] >>
+         rw[] >>
+         rw[used_closures_rel_def] >>
+         metis_tac[])
+     >- (fs[PULL_EXISTS] >> rveq >>
+         TRY(Cases_on ‘cl2’ ORELSE Cases_on ‘cl1’) >>
+         rename1 ‘Closure _ fb _’ >> Cases_on ‘fb’ >> fs[used_closures_rel_def] >>
+         Q.REFINE_EXISTS_TAC ‘_ with <|bindings := _|>’ >> simp[] >>
+         goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+         goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+         rveq >> rw[] >> fs[used_closures_rel_def] >>
+         metis_tac[]))
+QED
+
 (* An ungodly simulation preorder where
    visible actions are mimicked by single actions,
    and tau actions are mimicked by sequences of
@@ -95,6 +212,30 @@ val (tausim_rules,tausim_coind,tausim_cases) =
           ∃p2. RC(reduction conf) p1 p2 ∧ tausim conf p2 q2)
      ⇒
      tausim conf p1 q1’
+
+Theorem tausim_strong_coind:
+  ∀conf R.
+    (∀p q.
+       R p q ⇒
+       (∀p2 α.
+          trans conf p α p2 ∧ α ≠ LTau ⇒
+          ∃q2. trans conf q α q2 ∧ (R p2 q2 ∨ tausim conf p2 q2)) ∧
+       (∀q2 α.
+          trans conf q α q2 ∧ α ≠ LTau ⇒
+          ∃p2. trans conf p α p2 ∧ (R p2 q2 ∨ tausim conf p2 q2)) ∧
+       (∀p2.
+          trans conf p LTau p2 ⇒
+          ∃q2. (reduction conf)⁺ q q2 ∧ (R p2 q2 ∨ tausim conf p2 q2)) ∧
+       ∀q2.
+         trans conf q LTau q2 ⇒
+         ∃p2. RC (reduction conf) p p2 ∧ (R p2 q2 ∨ tausim conf p2 q2)) ⇒
+    ∀p q. R p q ⇒ tausim conf p q
+Proof
+  rpt gen_tac >> strip_tac >>
+  ‘∀p q. R p q ∨ tausim conf p q ⇒ tausim conf p q’ suffices_by simp[] >>
+  ho_match_mp_tac tausim_coind >>
+  rw[] >> metis_tac[tausim_cases]
+QED
 
 Theorem bisim_IMP_tausim:
   ∀conf p q. BISIM_REL (trans conf) p q ⇒ tausim conf p q
