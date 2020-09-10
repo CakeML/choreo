@@ -32,6 +32,32 @@ Definition written_var_names_endpoint_until_def:
 ∧ (written_var_names_endpoint_until (FCall dv vars) = vars)
 End
 
+Definition written_var_names_endpoint_before_def:
+   (written_var_names_endpoint_before dn Nil = [])
+∧ (written_var_names_endpoint_before dn (Send p v n e) =
+    written_var_names_endpoint_before dn e)
+∧ (written_var_names_endpoint_before dn (Receive p v d e) =
+    if MEM dn (free_fun_names_endpoint e) then
+      v::written_var_names_endpoint_before dn e
+    else [])
+∧ (written_var_names_endpoint_before dn (IfThen v e1 e2) =
+   written_var_names_endpoint_before dn e1 ++ written_var_names_endpoint_before dn e2)
+∧ (written_var_names_endpoint_before dn (Let v f vl e) =
+    if MEM dn (free_fun_names_endpoint e) then
+      v::written_var_names_endpoint_before dn e
+    else
+      [])
+∧ (written_var_names_endpoint_before dn (Fix dv e) =
+    written_var_names_endpoint_before dn e)
+∧ (written_var_names_endpoint_before dn (Call dv) = [])
+∧ (written_var_names_endpoint_before dn (Letrec dv vars e1 e2) =
+   if dn = dv then
+     []
+   else
+     written_var_names_endpoint_before dn e1 ++ written_var_names_endpoint_before dn e2)
+∧ (written_var_names_endpoint_before dn (FCall dv vars) = vars)
+End
+
 Definition compile_endpoint_def:
     (compile_endpoint ar payloadLang$Nil = payloadLang$Nil) ∧
     (compile_endpoint ar (Send p v n e) = Send p v n (compile_endpoint ar e)) ∧
@@ -81,5 +107,5 @@ Definition compile_network_alt_def:
     NEndpoint p (s with bindings := s.bindings |++ MAP (λx. (x,[0w])) undefined_writes)
                 (compile_endpoint [] e)
 End
-        
+
 val _ = export_theory ();

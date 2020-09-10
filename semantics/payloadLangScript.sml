@@ -86,6 +86,18 @@ Definition free_fix_names_endpoint_def:
 ∧ (free_fix_names_endpoint (FCall dv vars) = [])
 End
 
+Definition free_fun_names_endpoint_def:
+   (free_fun_names_endpoint Nil = [])
+∧ (free_fun_names_endpoint (Send p v n e) = free_fun_names_endpoint e)
+∧ (free_fun_names_endpoint (Receive p v d e) = free_fun_names_endpoint e)
+∧ (free_fun_names_endpoint (IfThen v e1 e2) = free_fun_names_endpoint e1 ++ free_fun_names_endpoint e2)
+∧ (free_fun_names_endpoint (Let v f vl e) = free_fun_names_endpoint e)
+∧ (free_fun_names_endpoint (Fix dv e) = free_fun_names_endpoint e)
+∧ (free_fun_names_endpoint (Call dv) = [])
+∧ (free_fun_names_endpoint (Letrec dv vars e1 e2) = FILTER ($≠ dv) (free_fun_names_endpoint e1 ++ free_fun_names_endpoint e2))
+∧ (free_fun_names_endpoint (FCall dv vars) = [dv])
+End
+
 Definition var_names_network_def:
    (var_names_network NNil = [])
 ∧ (var_names_network (NEndpoint p s e) = var_names_endpoint e)
