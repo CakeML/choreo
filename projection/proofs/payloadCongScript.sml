@@ -697,11 +697,11 @@ QED
 (* Arbitrary reordering of network using net_find and net_filter *)
 Theorem net_find_filter_reduction:
   ∀conf n n' p.
-   (reduction conf)⃰ n n' ∧
+   RTC (reduction conf) n n' ∧
    REPN n ∧
    IS_SOME (net_find p n) ∧
    conf.payload_size > 0
-   ⇒ (reduction conf)⃰ (NPar (THE (net_find p n )) (net_filter p n ))
+   ⇒ RTC (reduction conf) (NPar (THE (net_find p n )) (net_filter p n ))
                        (NPar (THE (net_find p n')) (net_filter p n'))
 Proof
   rw []
