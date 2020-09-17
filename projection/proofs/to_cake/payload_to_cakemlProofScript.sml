@@ -1932,52 +1932,96 @@ Definition pFv_def[simp]:
   pFv (Send _ fv _ npCd) = fv INSERT pFv npCd ∧
   pFv (Receive _ fv _ npCd) =  pFv npCd DELETE fv ∧
   pFv (IfThen fv npCd1 npCd2) = fv INSERT pFv npCd1 ∪ pFv npCd2 ∧
-  pFv (Let bv _ fvs npCd) = (pFv npCd DELETE bv) ∪ set fvs
+  pFv (Let bv _ fvs npCd) = (pFv npCd DELETE bv) ∪ set fvs ∧
+  pFv (Letrec dv vars e1 e2) =
+    (pFv e1 DIFF set vars) ∪ pFv e2 ∧
+  pFv (Fix dv e) = pFv e ∧
+  pFv (Call dv) = ∅ ∧
+  pFv (FCall dv vars) = set vars
 End
 
+Theorem FINITE_pFv[simp]:
+  FINITE (pFv e)
+Proof
+  Induct_on ‘e’ >> simp[]
+QED
+
+Theorem pFv_free_var_names_endpoint:
+  pFv e = set (free_var_names_endpoint e)
+Proof
+  Induct_on ‘e’ >> simp[free_var_names_endpoint_def] >>
+  simp[EXTENSION, MEM_FILTER] >> metis_tac[]
+QED
+
+Theorem pFv_dsubst_E:
+  v ∈ pFv (dsubst M dn N) ⇒ v ∈ pFv M ∨ v ∈ pFv N
+Proof
+  Induct_on ‘M’ >> rw[dsubst_def] >> metis_tac[]
+QED
+
+
 Definition pSt_pCd_corr_def:
-  pSt_pCd_corr (pSt :closure payloadLang$state) pCd ⇔ ∀vn. vn ∈ pFv pCd
-                              ⇒ ∃vv. FLOOKUP pSt.bindings vn = SOME vv
+  pSt_pCd_corr (pSt :closure payloadLang$state) pCd ⇔
+  ∀vn. vn ∈ pFv pCd ⇒ ∃vv. FLOOKUP pSt.bindings vn = SOME vv
 End
+
+Theorem pSt_pCd_corr_alt:
+  pSt_pCd_corr pst pcd ⇔ ∀v. v ∈ pFv pcd ⇒ v ∈ FDOM pst.bindings
+Proof
+  simp[pSt_pCd_corr_def, FLOOKUP_DEF]
+QED
 
 Theorem trans_pSt_pCd_corr_pres:
   ∀conf p s c L s' c'.
-   trans conf (NEndpoint p s c) L (NEndpoint p s' c') ∧
-   pSt_pCd_corr s c
-   ⇒ pSt_pCd_corr s' c'
+    trans conf (NEndpoint p s c) L (NEndpoint p s' c') ∧ pSt_pCd_corr s c ⇒
+    pSt_pCd_corr s' c'
 Proof
-  rw []
-  \\ last_assum (mp_tac o PURE_ONCE_REWRITE_RULE [trans_cases])
-  \\ rw [] \\ fs [pSt_pCd_corr_def,pFv_def] \\ rw []
-  \\ TRY (fs [FLOOKUP_UPDATE] \\ EVERY_CASE_TAC \\ fs [] \\ NO_TAC)
-  \\ metis_tac []
+  Induct_on ‘trans’ >> simp[pSt_pCd_corr_alt] >> rw[]
+  >- metis_tac[]
+  >- metis_tac[]
+  >- (drule pFv_dsubst_E >> simp[])
+  >- cheat
 QED
 
 (* Payload State and Semantic Environment *)
 (* -- Check the semantic environment contains all the variable bindings in
       the payload state and also matches all the config assumptions        *)
 Definition sem_env_cor_def:
-    sem_env_cor conf (pSt :closure payloadLang$state) cEnv ⇔
-        env_asm cEnv conf ∧
-        ∀ n v.  FLOOKUP pSt.bindings n = SOME v
-                ⇒ ∃v'.  nsLookup (cEnv.v) (Short (ps2cs n)) = SOME v' ∧
-                        ^(DATUM) v v'
+  sem_env_cor conf (pSt :closure payloadLang$state) cEnv ⇔
+    env_asm cEnv conf ∧
+    ∀ n v. FLOOKUP pSt.bindings n = SOME v ⇒
+           ∃v'. nsLookup cEnv.v (Short (ps2cs n)) = SOME v' ∧
+                DATUM v v'
 End
 
 (* -- Check the semantic environment has all the Let functions
       defined as specified in given list *)
+Definition enc1_ok_def:
+  enc1_ok conf cEnv f n ⇔
+    ∃cl.
+      SOME cl = nsLookup cEnv.v (getLetID conf n) ∧
+      (LIST_TYPE DATUM --> DATUM) f cl
+End
+
 Definition enc_ok_def:
     (enc_ok _ _ [] [] = T) ∧
-    (enc_ok conf cEnv (f::fs) (n::ns) =
-       ((∃cl.
-            (SOME cl = nsLookup (cEnv.v) (getLetID conf n)) ∧
-            (LIST_TYPE ^(DATUM) --> DATUM) f cl
-         ) ∧
-        enc_ok conf cEnv fs ns
-        )
+    (enc_ok conf cEnv (f::fs) (n::ns) ⇔
+       (∃cl.
+          SOME cl = nsLookup cEnv.v (getLetID conf n) ∧
+          (LIST_TYPE DATUM --> DATUM) f cl
+       ) ∧
+       enc_ok conf cEnv fs ns
     ) ∧
     (enc_ok _ _ _ _ = F)
 End
+
+Theorem enc_ok_LIST_REL:
+  enc_ok conf cEnv = LIST_REL (enc1_ok conf cEnv)
+Proof
+  simp[FUN_EQ_THM] >> Induct >> simp[enc_ok_def, LIST_REL_def]
+  >- (Cases >> simp[enc_ok_def]) >>
+  gen_tac >> Cases >> simp[enc_ok_def, enc1_ok_def]
+QED
 
 (* -- Helper Theorems about enc_ok *)
 Theorem enc_ok_take:
@@ -1985,24 +2029,10 @@ Theorem enc_ok_take:
     enc_ok conf cEnv (x ++ y) vs ⇒
     enc_ok conf cEnv x (TAKE (LENGTH x) vs)
 Proof
-  Induct_on ‘x’ >> fs[enc_ok_def,LENGTH,TAKE] >>
-  rw[] >> PURE_ONCE_REWRITE_TAC [enc_ok_def] >>
-  ‘SUC (LENGTH x) ≤ LENGTH vs’
-    by (‘∀a b. enc_ok conf cEnv a b ⇒ (LENGTH a = LENGTH b)’
-          by (Induct_on ‘a’ >> Cases_on ‘b’ >>
-              fs[enc_ok_def]) >>
-        ‘LENGTH (h :: (x ++ y)) = LENGTH vs’
-          by rw[] >>
-        ‘SUC (LENGTH (x ++ y)) = LENGTH vs’
-          by metis_tac[LENGTH] >>
-        ‘LENGTH x ≤ LENGTH (x ++ y)’
-          suffices_by (rw[] >>
-                      ‘SUC (LENGTH x) ≤ SUC (LENGTH (x ++ y))’
-                        by rw[] >>
-                      simp[]) >>
-        rw[]) >>
-  Cases_on ‘vs’ >> fs[enc_ok_def] >>
-  metis_tac[]
+  rw[enc_ok_LIST_REL, LIST_REL_SPLIT1] >>
+  rename [‘LIST_REL _ x (TAKE _ (ys ++ zs))’] >>
+  ‘LENGTH ys = LENGTH x’ by metis_tac[LIST_REL_LENGTH] >>
+  simp[TAKE_APPEND1, TAKE_LENGTH_TOO_LONG]
 QED
 
 Theorem enc_ok_drop:
@@ -2010,23 +2040,10 @@ Theorem enc_ok_drop:
     enc_ok conf cEnv (x ++ y) vs ⇒
     enc_ok conf cEnv y (DROP (LENGTH x) vs)
 Proof
-  Induct_on ‘x’ >> fs[enc_ok_def,LENGTH,TAKE] >>
-  rw[] >> PURE_ONCE_REWRITE_TAC [enc_ok_def] >>
-  ‘SUC (LENGTH x) ≤ LENGTH vs’
-    by (‘∀a b. enc_ok conf cEnv a b ⇒ (LENGTH a = LENGTH b)’
-          by (Induct_on ‘a’ >> Cases_on ‘b’ >>
-              fs[enc_ok_def]) >>
-        ‘LENGTH (h :: (x ++ y)) = LENGTH vs’
-          by rw[] >>
-        ‘SUC (LENGTH (x ++ y)) = LENGTH vs’
-          by metis_tac[LENGTH] >>
-        ‘LENGTH x ≤ LENGTH (x ++ y)’
-          suffices_by (rw[] >>
-                      ‘SUC (LENGTH x) ≤ SUC (LENGTH (x ++ y))’
-                        by rw[] >>
-                      simp[]) >>
-        rw[]) >>
-  Cases_on ‘vs’ >> fs[enc_ok_def]
+  rw[enc_ok_LIST_REL, LIST_REL_SPLIT1] >>
+  rename [‘LIST_REL _ y (DROP (LENGTH x) (ys ++ zs))’] >>
+  ‘LENGTH ys = LENGTH x’ by metis_tac[LIST_REL_LENGTH] >>
+  simp[DROP_APPEND2]
 QED
 
 Theorem enc_ok_bind:
