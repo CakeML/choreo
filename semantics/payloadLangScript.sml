@@ -116,16 +116,6 @@ Definition free_fix_names_network_def:
 ∧ (free_fix_names_network (NPar n1 n2) = free_fix_names_network n1 ++ free_fix_names_network n2)
 End
 
-Definition final_def:
-  final (w::d) = (w = 7w:word8 \/ w = 6w:word8)
-  ∧ final _ = F
-End
-
-Definition intermediate_def:
-  intermediate (w::d) = (w = 2w:word8)
-  ∧ intermediate _ = F
-End
-
 Definition fget_def:
   fget fm dv k =
     case FLOOKUP fm k of
