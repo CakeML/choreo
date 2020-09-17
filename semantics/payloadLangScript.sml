@@ -98,6 +98,18 @@ Definition free_fun_names_endpoint_def:
 ∧ (free_fun_names_endpoint (FCall dv vars) = [dv])
 End
 
+Definition bound_fun_names_endpoint_def:
+   (bound_fun_names_endpoint Nil = [])
+∧ (bound_fun_names_endpoint (Send p v n e) = bound_fun_names_endpoint e)
+∧ (bound_fun_names_endpoint (Receive p v d e) = bound_fun_names_endpoint e)
+∧ (bound_fun_names_endpoint (IfThen v e1 e2) = bound_fun_names_endpoint e1 ++ bound_fun_names_endpoint e2)
+∧ (bound_fun_names_endpoint (Let v f vl e) = bound_fun_names_endpoint e)
+∧ (bound_fun_names_endpoint (Fix dv e) = bound_fun_names_endpoint e)
+∧ (bound_fun_names_endpoint (Call dv) = [])
+∧ (bound_fun_names_endpoint (Letrec dv vars e1 e2) = dv::bound_fun_names_endpoint e1 ++ bound_fun_names_endpoint e2)
+∧ (bound_fun_names_endpoint (FCall dv vars) = [])
+End
+
 Definition var_names_network_def:
    (var_names_network NNil = [])
 ∧ (var_names_network (NEndpoint p s e) = var_names_endpoint e)

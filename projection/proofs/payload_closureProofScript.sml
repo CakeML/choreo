@@ -63,6 +63,19 @@ Proof
   Induct_on ‘e’ >> rw[dsubst_def,written_var_names_endpoint_def] >> fs[]
 QED
 
+(*Theorem written_var_names_endpoint_until_dsubst:
+  MEM x (written_var_names_endpoint_until (dsubst e dn e')) ∧
+  free_fix_names_endpoint e' = [] ⇒
+  MEM x (written_var_names_endpoint_until e) ∨ MEM x (written_var_names_endpoint_until e')
+Proof
+  Induct_on ‘e’ >> rw[dsubst_def,written_var_names_endpoint_until_def] >> fs[] >>
+  PURE_FULL_CASE_TAC >> fs[] >>
+  fs[free_fix_names_endpoint_def,FILTER_EQ_NIL,EVERY_MEM] >>
+  imp_res_tac MEM_free_fix_names_endpoint_dsubst >> fs[] >>
+  res_tac >>
+  rfs[]
+QED*)
+
 Theorem written_var_names_endpoint_dsubst':
   MEM x (written_var_names_endpoint e) ⇒
   MEM x (written_var_names_endpoint (dsubst e dn e'))
@@ -90,7 +103,6 @@ Proof
   res_tac >> fs[MEM_nub'] >> fs[] >>
   rfs[]
   >- metis_tac[]
-  >- (imp_res_tac MEM_written_var_names_endpoint_until_IMP >> simp[])
   >- (PURE_FULL_CASE_TAC >> fs[free_var_names_endpoint_def] >>
       fs[MEM_FLAT,MEM_MAP] >>
       metis_tac[ALOOKUP_MEM,SND])
@@ -253,12 +265,14 @@ Inductive saturates:
      saturates vars e3 e4 ∧
      ALL_DISTINCT vars' ∧
      ALL_DISTINCT vars'' ∧
-     set vars' ⊆ set vars ∪ set vars'' ⇒
+     set vars' ⊆ set vars'' ∧
+     set vars'' ⊆ set vars ∪ set vars' ⇒
      saturates vars (Letrec dn vars' e1 e3) (Letrec dn vars'' e2 e4)) ∧
   (∀vars dn vars' vars''.
      ALL_DISTINCT vars' ∧
      ALL_DISTINCT vars'' ∧
-     set vars' ⊆ set vars ∪ set vars'' ⇒
+     set vars' ⊆ set vars'' ∧
+     set vars'' ⊆ set vars ∪ set vars' ⇒
      saturates vars (FCall dn vars') (FCall dn vars'')
   )
 End
@@ -296,7 +310,7 @@ Theorem saturates_compile_endpoint_ar:
   ∀ar ar' e vars.
   (∀s x. ALOOKUP ar s = SOME x ⇒ ALL_DISTINCT x) ∧
   (∀s x. ALOOKUP ar' s = SOME x ⇒ ALL_DISTINCT x) ∧
-  LIST_REL (λ(s,vs) (s',vs'). s = s' ∧ set vs ⊆ set vs' ∪ set vars) ar ar'
+  LIST_REL (λ(s,vs) (s',vs'). s = s' ∧ set vs ⊆ set vs' ∧ set vs' ⊆ set vs ∪ set vars) ar ar'
   ⇒
   saturates vars (compile_endpoint ar e) (compile_endpoint ar' e)
 Proof
@@ -370,6 +384,8 @@ Definition consistent_arities_def:
    consistent_arities e) ∧
   (consistent_arities (Letrec dn vars e1 e2) =
    (consistent_arities e1 ∧ consistent_arities e2 ∧
+    (∀n. MEM (dn,n) (arities e1) ⇒ n = LENGTH vars) ∧
+    (∀n. MEM (dn,n) (arities e2) ⇒ n = LENGTH vars) ∧
     (∀dn n n'. MEM (dn,n) (arities e1) ∧ MEM (dn,n') (arities e2) ⇒ n = n'))) ∧
   (consistent_arities (FCall dn vars) = T) ∧
   (consistent_arities (Fix dn e) = F) ∧
@@ -410,7 +426,7 @@ Theorem compile_endpoint_dsubst:
     compile_endpoint ar (dsubst e' dn (Fix dn e)) =
     fsubst e'' dn (compile_endpoint [] (Fix dn e)) ∧
     saturates (written_var_names_endpoint e)
-              (compile_endpoint ((dn,nub'(written_var_names_endpoint_until e))::ar) e')
+              (compile_endpoint ((dn,nub'(written_var_names_endpoint e))::ar) e')
               e''
 Proof
   strip_tac >> Induct >> rpt strip_tac
@@ -481,12 +497,18 @@ Proof
         conj_tac >- (rw[] >> fs[all_distinct_nub'] >> res_tac) >>
         simp[set_nub'] >>
         conj_tac >- (fs[written_var_names_endpoint_def] >>
-                     metis_tac[SUBSET_TRANS,set_written_var_names_endpoint_until,SUBSET_UNION]) >>
+                     reverse conj_tac >-
+                       (rw[SUBSET_DEF,written_var_names_endpoint_dsubst] >>
+                        drule_all written_var_names_endpoint_dsubst >>
+                        rw[] >> fs[written_var_names_endpoint_def]) >>
+                     metis_tac[SUBSET_DEF,written_var_names_endpoint_dsubst']) >>
         match_mp_tac EVERY2_refl >>
         rw[] >>
         pairarg_tac >> rveq >> fs[]) >>
      fs[written_var_names_endpoint_def] >>
-     metis_tac[SUBSET_TRANS,set_written_var_names_endpoint_until,SUBSET_UNION]
+     rw[SUBSET_DEF] >>
+     TRY(drule_then MATCH_ACCEPT_TAC written_var_names_endpoint_dsubst') >>
+     imp_res_tac written_var_names_endpoint_dsubst >> fs[written_var_names_endpoint_def]
      )
   >- (fs[dsubst_def,fix_endpoint_def,fsubst_def,compile_endpoint_def] >>
       reverse(rw[] >> fs[compile_endpoint_def,fsubst_def]) >-
@@ -497,7 +519,7 @@ Proof
       simp[Once saturates_cases,PULL_EXISTS,fsubst_def] >>
       goal_assum(resolve_then (Pos hd) mp_tac compile_endpoint_ALOOKUP_eq_strong) >>
       fs[FILTER_EQ_NIL,EVERY_MEM] >>
-      metis_tac[SUBSET_UNION,all_distinct_nub'])
+      metis_tac[SUBSET_UNION,all_distinct_nub',set_nub',SUBSET_REFL])
   >- (fs[fix_endpoint_def])
   >- (fs[fix_endpoint_def])
 QED
@@ -604,6 +626,10 @@ Definition closure_args_def:
   closure_args (Closure vars1 env e) = vars1
 End
 
+Definition closure_var_env_def:
+  closure_var_env (Closure vars1 env e) = SND env
+End
+
 Theorem MEM_arities_saturates:
   ∀dn n vars e1 e2.
     MEM (dn,n) (arities e1) ∧
@@ -626,36 +652,137 @@ Proof
   metis_tac[FST,SND]
 QED
 
+Theorem letrec_endpoint_fsubst:
+  ∀e1 dn e2.
+    letrec_endpoint e1 ∧ letrec_endpoint e2 ⇒
+    letrec_endpoint(fsubst e1 dn e2)
+Proof
+  Induct >> rw[letrec_endpoint_def,fsubst_def]
+QED
+
+Theorem letrec_endpoint_fsubst':
+  ∀e1 dn e2.
+    letrec_endpoint(fsubst e1 dn e2) ⇒
+    letrec_endpoint e1
+Proof
+  Induct >> rw[letrec_endpoint_def,fsubst_def] >> res_tac
+QED
+
+Theorem MEM_arities_fsubst_IMP:
+  ∀e1 dn e2.
+    MEM (s,n) (arities(fsubst e1 dn e2)) ⇒
+    (MEM (s,n) (arities e1) ∧ dn ≠ s) ∨ MEM (s,n) (arities e2)
+Proof
+  Induct >> rw[arities_def,fsubst_def,MEM_FILTER] >>
+  res_tac >>
+  fs[]
+QED
+
+Theorem MEM_arities_imp_free_fun_names:
+  ∀s n e. MEM (s,n) (arities e) ⇒ MEM s (free_fun_names_endpoint e)
+Proof
+  Induct_on ‘e’ >> rw[arities_def,free_fun_names_endpoint_def,MEM_FILTER] >>
+  res_tac >> fs[]
+QED
+
+Theorem consistent_arities_fsubst_nofrees:
+  ∀e1 dn e2.
+    consistent_arities e1 ∧ consistent_arities e2 ∧
+    free_fun_names_endpoint e2 = [] ⇒
+    consistent_arities (fsubst e1 dn e2)
+Proof
+  Induct >> rw[consistent_arities_def,fsubst_def] >>
+   (imp_res_tac MEM_arities_fsubst_IMP >- metis_tac[] >>
+    imp_res_tac MEM_arities_imp_free_fun_names >> rfs[])
+QED
+
+Definition always_same_args_def:
+   (always_same_args funs Nil = T)
+∧ (always_same_args funs (Send p v n e) =
+    always_same_args funs e)
+∧ (always_same_args funs (Receive p v d e) =
+    always_same_args funs e)
+∧ (always_same_args funs (IfThen v e1 e2) =
+    (always_same_args funs e1 ∧ always_same_args funs e2))
+∧ (always_same_args funs (Let v f vl e) =
+    always_same_args funs e)
+∧ (always_same_args funs (Fix dv e) =
+    always_same_args funs e)
+∧ (always_same_args funs (Call dv) = T)
+∧ (always_same_args funs (Letrec dv vars e1 e2) =
+    (always_same_args ((dv,vars)::funs) e1 ∧ always_same_args ((dv,vars)::funs) e2))
+∧ (always_same_args funs (FCall dv vars) =
+    case ALOOKUP funs dv of
+      NONE => T
+    | SOME vars' => vars' = vars)
+End
+
+Definition good_letrecs_def:
+   (good_letrecs known Nil = T)
+∧ (good_letrecs known (Send p v n e) =
+    good_letrecs known e)
+∧ (good_letrecs known (Receive p v d e) =
+    good_letrecs known e)
+∧ (good_letrecs known (IfThen v e1 e2) =
+    (good_letrecs known e1 ∧ good_letrecs known e2))
+∧ (good_letrecs known (Let v f vl e) =
+    good_letrecs known e)
+∧ (good_letrecs known (Fix dv e) =
+    good_letrecs known e)
+∧ (good_letrecs known (Call dv) = T)
+∧ (good_letrecs known (Letrec dv vars e1 e2) =
+    (good_letrecs ((dv,vars)::known) e1 ∧ good_letrecs ((dv,vars)::known) e2 ∧
+     (∀dn vars'. MEM dn (free_fun_names_endpoint e1 ++ free_fun_names_endpoint e2) ∧
+                 ALOOKUP known dn = SOME vars' ⇒
+                 set vars ⊆ set vars') ∧
+     set(written_var_names_endpoint_before dv e1) ⊆ set vars ∧
+     set(written_var_names_endpoint_before dv e2) ⊆ set vars))
+∧ (good_letrecs known (FCall dv vars) =
+    T)
+End
+
 Definition compile_fix_closure_rel_def:
-  compile_fix_closure_rel dn e vars (Closure vars1 (fs1,bds1) e1) (Closure vars2 (fs2,bds2) e2) ⇔
+  compile_fix_closure_rel dn e vars dn' (Closure vars1 (fs1,bds1) e1) (Closure vars2 (fs2,bds2) e2) ⇔
   ∃e'.
     bds1 = bds2 ∧
     letrec_endpoint e ∧ letrec_endpoint e1 ∧ letrec_endpoint e2 ∧
-    consistent_arities e ∧ consistent_arities e1 ∧ consistent_arities e2 ∧
-    set(written_var_names_endpoint e) DIFF set vars ⊆ FDOM bds1 ∧
+    consistent_arities e ∧ consistent_arities e1 ∧ consistent_arities e' ∧
+    arsof dn e = {LENGTH vars} ∧
+    set(written_var_names_endpoint e) (* DIFF set vars *) ⊆ FDOM bds1 ∧
     set(written_var_names_endpoint_before dn e1) ⊆ set vars ∧
-    set(written_var_names_endpoint e1) ⊆ set(written_var_names_endpoint e) ∧
+    set(written_var_names_endpoint_before dn' e1) ⊆ set vars1 ∧
+    set(written_var_names_endpoint e') ⊆ set(written_var_names_endpoint e) ∧
+    good_letrecs ((dn',vars1)::MAP (λ(x,y). (x, closure_args y)) fs1) e1 ∧
     ALL_DISTINCT vars ∧
-    saturates vars e1 e' ∧
+    ¬MEM dn (bound_fun_names_endpoint e1) ∧
+    always_same_args ((dn',vars1)::MAP (λ(x,y). (x, closure_args y)) fs1) e1 ∧
+    always_same_args ((dn',vars2)::MAP (λ(x,y). (x, closure_args y)) fs2) e' ∧
+    saturates (written_var_names_endpoint e) e1 e' ∧
     set(free_fun_names_endpoint e) ⊆ {dn} ∧
     e2 = fsubst e' dn
                 (Letrec dn vars e (FCall dn vars)) ∧
     ALL_DISTINCT vars1 ∧ ALL_DISTINCT vars2 ∧
-    set vars1 ⊆ set(written_var_names_endpoint e) ∪ set vars2 ∧
+    set vars = set(written_var_names_endpoint e) ∧
+    set vars1 ⊆ set vars2 ∧
+    set vars2 ⊆ set(written_var_names_endpoint e) ∪ set vars1 ∧
     (∃fs3 bds3.
         ALOOKUP fs1 dn = SOME(Closure vars (fs3,bds3) e) ∧
         (MEM dn (free_fun_names_endpoint e1) ⇒
          DRESTRICT bds3 (λk. ~MEM k vars) =
          DRESTRICT bds1 (λk. ~MEM k vars))
     ) ∧
-    (∀dn' ar1.
-      dn ≠ dn' ∧ MEM (dn',ar1) (arities e1) ⇒
-      ∃cl1 cl2. ALOOKUP fs1 dn' = SOME cl1 ∧ ALOOKUP fs2 dn' = SOME cl2 ∧
-                arsof dn' e' = {LENGTH(closure_args cl2)} ∧
-                (ALOOKUP fs1 dn' = SOME cl1 ∧ ALOOKUP fs2 dn' = SOME cl2 ⇒
-                 compile_fix_closure_rel dn e vars cl1 cl2))
+    (∀dn'' ar1.
+      dn ≠ dn'' ∧ dn' ≠ dn'' ∧ MEM (dn'',ar1) (arities e1) ∧ MEM dn'' (free_fun_names_endpoint e1) ⇒
+      ∃cl1 cl2. ALOOKUP fs1 dn'' = SOME cl1 ∧ ALOOKUP fs2 dn'' = SOME cl2 ∧
+                arsof dn'' e' = {LENGTH(closure_args cl2)} ∧
+                DRESTRICT (closure_var_env cl1) (λk. MEM k (closure_args cl2) ∧ ¬MEM k (closure_args cl1) (* ∧ ¬MEM k vars1 *) ) =
+                DRESTRICT bds2 (λk. MEM k (closure_args cl2) ∧ ¬MEM k (closure_args cl1) (*∧ ¬MEM k vars1*) ) ∧
+                set(written_var_names_endpoint_before dn'' e1) ⊆ set(closure_args cl1) ∧
+                set vars1 ⊆ set(closure_args cl1) ∧
+                (ALOOKUP fs1 dn'' = SOME cl1 ∧ ALOOKUP fs2 dn'' = SOME cl2 ⇒
+                 compile_fix_closure_rel dn e vars dn'' cl1 cl2))
 Termination
-  WF_REL_TAC ‘inv_image $< (closure_size o FST o SND o SND o SND)’ >>
+  WF_REL_TAC ‘inv_image $< (closure_size o FST o SND o SND o SND o SND)’ >>
   rw[closure_size_def] >> imp_res_tac ALOOKUP_MEM >>
   imp_res_tac closure_size_MEM >>
   DECIDE_TAC
@@ -663,7 +790,7 @@ End
 
 Definition compile_fix_closure_endpoint_rel_def:
   compile_fix_closure_endpoint_rel vars dn e n1 n2 ⇔
-  ∃p s1 s2 e1 e'.
+  ∃p s1 s2 e1 e' fs3 bds3.
     s1.queues = s2.queues ∧
     s1.bindings = s2.bindings ∧
     n1 = NEndpoint p s1 e1 ∧
@@ -671,31 +798,51 @@ Definition compile_fix_closure_endpoint_rel_def:
                          (Letrec dn vars e (FCall dn vars))) ∧
     saturates (written_var_names_endpoint e) e1 e' ∧
     letrec_endpoint e ∧ letrec_endpoint e1 ∧ letrec_endpoint e' ∧
-    consistent_arities e ∧ consistent_arities e1 ∧ consistent_arities e' ∧
-    set vars ⊆ set(written_var_names_endpoint e) ∧
-    set(written_var_names_endpoint e) DIFF set vars ⊆ FDOM s2.bindings ∧
+    consistent_arities e ∧ consistent_arities e1 ∧
+    consistent_arities e' ∧
+    arsof dn e = {LENGTH vars} ∧
+    good_letrecs (MAP (λ(x,y). (x, closure_args y)) s1.funs) e1 ∧
+    set vars = set(written_var_names_endpoint e) ∧
+    set(written_var_names_endpoint e) (* DIFF set vars *) ⊆ FDOM s2.bindings ∧
     set(written_var_names_endpoint_before dn e1) ⊆ set vars ∧
     set(free_fun_names_endpoint e) ⊆ {dn} ∧
-    set(written_var_names_endpoint e1) ⊆ set(written_var_names_endpoint e) ∧
+    set(written_var_names_endpoint e') ⊆ set(written_var_names_endpoint e) ∧
     ALL_DISTINCT vars ∧
-    (∃fs3 bds3.
-        ALOOKUP s1.funs dn = SOME(Closure vars (fs3,bds3) e) ∧
-        (MEM dn (free_fun_names_endpoint e1) ⇒
-         DRESTRICT bds3 (λk. ~MEM k vars) =
-         DRESTRICT s1.bindings (λk. ~MEM k vars))
-    ) ∧
+    ¬MEM dn (bound_fun_names_endpoint e1) ∧
+    always_same_args (MAP (λ(x,y). (x, closure_args y)) s1.funs) e1 ∧
+    always_same_args (MAP (λ(x,y). (x, closure_args y)) s2.funs) e' ∧
+    ALOOKUP s1.funs dn = SOME(Closure vars (fs3,bds3) e) ∧
+    (MEM dn (free_fun_names_endpoint e1) ⇒
+     DRESTRICT s1.bindings (λk. ~MEM k vars) =
+     DRESTRICT bds3 (λk. ~MEM k vars))
+     ∧
     (∀dn' ar1.
-      dn ≠ dn' ∧ MEM (dn',ar1) (arities e1) ⇒
+      dn ≠ dn' ∧ MEM (dn',ar1) (arities e1) ∧ MEM dn' (free_fun_names_endpoint e1) ⇒
       ∃cl1 cl2. ALOOKUP s1.funs dn' = SOME cl1 ∧ ALOOKUP s2.funs dn' = SOME cl2 ∧
+                DRESTRICT (closure_var_env cl1) (λk. MEM k (closure_args cl2) ∧ ¬MEM k (closure_args cl1)) =
+                DRESTRICT s2.bindings (λk. MEM k (closure_args cl2) ∧ ¬MEM k (closure_args cl1)) ∧
+                set(written_var_names_endpoint_before dn' e1) ⊆ set(closure_args cl1) ∧
                 arsof dn' e' = {LENGTH(closure_args cl2)} ∧
-                compile_fix_closure_rel dn e vars cl1 cl2)
+                compile_fix_closure_rel dn e vars dn' cl1 cl2)
 End
+
+Theorem compile_fix_closure_rel_closure_args:
+  compile_fix_closure_rel dn e vars dn' cl1 cl2 ⇒
+  set(closure_args cl1) ⊆ set(closure_args cl2) ∧
+  set(closure_args cl2) ⊆ set(written_var_names_endpoint e) ∪ set(closure_args cl1)
+Proof
+  MAP_EVERY Cases_on [‘cl1’,‘cl2’] >>
+  rename1 ‘compile_fix_closure_rel _ _ _ _ (Closure _ p1 _) (Closure _ p2 _)’ >>
+  MAP_EVERY Cases_on [‘p1’,‘p2’] >>
+  rw[compile_fix_closure_rel_def,closure_args_def] >> fs[]
+QED
 
 Theorem arsof_simps[simp]:
   arsof dn (Send p v n e) = arsof dn e ∧
   arsof dn (Receive p v d e) = arsof dn e ∧
   arsof dn (Let v f vl e) = arsof dn e ∧
-  arsof dn (IfThen v e1 e2) = arsof dn e1 ∪ arsof dn e2
+  arsof dn (IfThen v e1 e2) = arsof dn e1 ∪ arsof dn e2 ∧
+  arsof dn (FCall dn vars) = {LENGTH vars}
 Proof
   rw[arsof_def,arities_def,FILTER_APPEND]
 QED
@@ -708,6 +855,142 @@ Proof
   strip_tac >> Induct >> fs[free_fun_names_endpoint_def,written_var_names_endpoint_before_def] >>
   rw[] >>
   fs[MEM_FILTER] >> rveq >> fs[]
+QED
+
+(* TODO: move to payloadProps *)
+Theorem junkcong_DRESTRICT_closure_hd:
+  ∀s p dn args fs bds e e' funs.
+  junkcong (𝕌(:varN))
+           (NEndpoint p (s with funs := (dn,Closure args (fs,bds) e)::funs) e')
+           (NEndpoint p (s with funs := (dn,Closure args (fs,DRESTRICT bds (λk. ~MEM k args)) e)::funs) e')
+Proof
+  rw[] >>
+  Q.ISPECL_THEN [‘λk. ~MEM k args’,‘bds’] assume_tac (GEN_ALL DRESTRICT_FUNION_DRESTRICT_COMPL) >>
+  pop_assum(fn thm => CONV_TAC(LAND_CONV(PURE_ONCE_REWRITE_CONV[GSYM thm]))) >>
+  qmatch_goalsub_abbrev_tac ‘_ ⊌ bds'’ >>
+  ‘FDOM bds' ⊆ set args’
+    by(rw[Abbr ‘bds'’,FDOM_DRESTRICT,COMPL_DEF,SUBSET_DEF]) >>
+  pop_assum mp_tac >>
+  pop_assum kall_tac >>
+  Induct_on ‘bds'’ >>
+  rw[junkcong_refl] >>
+  res_tac >>
+  first_x_assum(fn thm => resolve_then (Pos last) match_mp_tac thm junkcong_trans) >>
+  simp[FUNION_FUPDATE_2,FDOM_DRESTRICT] >>
+  match_mp_tac junkcong_sym >>
+  match_mp_tac junkcong_closure_add_junk_hd >>
+  simp[]
+QED
+
+(* TODO: move to payloadProps *)
+Theorem junkcong_DRESTRICT_closure_hd':
+  ∀s p dn args fs bds e e' funs bds'.
+  junkcong (𝕌(:varN))
+           (NEndpoint p (s with <|bindings:= bds'; funs := (dn,Closure args (fs,bds) e)::funs|>) e')
+           (NEndpoint p (s with <|bindings:= bds'; funs := (dn,Closure args (fs,DRESTRICT bds (λk. ~MEM k args)) e)::funs|>) e')
+Proof
+  rw[] >>
+  Q.ISPEC_THEN ‘s with bindings := bds'’ assume_tac junkcong_DRESTRICT_closure_hd >>
+  fs[]
+QED
+
+Theorem ALOOKUP_ZIP_SELF:
+  ALOOKUP (ZIP (l,l)) x =
+  if MEM x l then SOME x else NONE
+Proof
+  Induct_on ‘l’ >>
+  rw[] >> fs[]
+QED
+
+Theorem ALOOKUP_REVERSE_ALL_DISTINCT:
+  ALL_DISTINCT (MAP FST l) ⇒
+  ALOOKUP (REVERSE l) = ALOOKUP l
+Proof
+  strip_tac >>
+  match_mp_tac ALOOKUP_ALL_DISTINCT_PERM_same >>
+  fs[MAP_REVERSE]
+QED
+
+Theorem NOT_free_fun_names_endpoint_arsof:
+  ~MEM dn (free_fun_names_endpoint e) ⇒
+  arsof dn e = {}
+Proof
+  Induct_on ‘e’ >> rw[free_fun_names_endpoint_def] >>
+  rw[arsof_def,arities_def,FILTER_EQ_NIL,EVERY_MEM] >>
+  res_tac >> fs[arsof_def,arities_def,FILTER_EQ_NIL,EVERY_MEM,MEM_FILTER] >>
+  rveq >> fs[]
+QED
+
+Theorem saturates_free_fun_names_endpoint:
+  ∀vars e1 e2.
+  saturates vars e1 e2 ⇒
+  free_fun_names_endpoint e1 = free_fun_names_endpoint e2
+Proof
+  ho_match_mp_tac saturates_ind >>
+  rw[free_fun_names_endpoint_def]
+QED
+
+Theorem arsof_lemma:
+  ∀dn l e funs.
+  MEM dn (free_fun_names_endpoint e) ∧
+  always_same_args funs e ∧
+  ALOOKUP funs dn = SOME l ⇒
+  arsof dn e = {LENGTH l}
+Proof
+  ntac 2 GEN_TAC >> Induct >>
+  rw[free_fun_names_endpoint_def,always_same_args_def] >>
+  res_tac >>
+  TRY(Cases_on ‘MEM dn (free_fun_names_endpoint e')’ >> fs[] >>
+      fs[NOT_free_fun_names_endpoint_arsof] >> NO_TAC) >>
+  TRY(Cases_on ‘MEM dn (free_fun_names_endpoint e)’ >> fs[] >>
+      fs[NOT_free_fun_names_endpoint_arsof] >> NO_TAC) >>
+  fs[arsof_def,arities_def] >>
+  fs[MEM_FILTER] >>
+  rfs[] >>
+  fs[o_DEF] >>
+  fs[FILTER_FILTER,FILTER_APPEND] >>
+  ‘(λx:string#num. dn = FST x ∧ s ≠ FST x) = (λx. dn = FST x)’ by(rw[FUN_EQ_THM,EQ_IMP_THM] >> simp[]) >>
+  pop_assum SUBST_ALL_TAC >>
+  fs[] >>
+  fs[IMP_DISJ_THM] >>
+  imp_res_tac NOT_free_fun_names_endpoint_arsof >>
+  fs[arsof_def,FILTER_EQ_NIL,EVERY_MEM] >>
+  rw[SET_EQ_SUBSET,SUBSET_DEF] >>
+  fs[MEM_MAP,MEM_FILTER] >>
+  rveq >>
+  metis_tac[]
+QED
+
+Theorem written_var_names_endpoint_lemma:
+  ∀dn l e funs.
+  MEM dn (free_fun_names_endpoint e) ∧
+  always_same_args funs e ∧
+  ALOOKUP funs dn = SOME l ⇒
+  set l ⊆ set(written_var_names_endpoint e)
+Proof
+  ntac 2 GEN_TAC >> Induct >>
+  rw[free_fun_names_endpoint_def,always_same_args_def,written_var_names_endpoint_def] >>
+  res_tac >>
+  fs[SUBSET_INSERT_RIGHT] >>
+  fs[MEM_FILTER] >>
+  rfs[] >>
+  rw[SUBSET_DEF] >> imp_res_tac SUBSET_THM >> simp[]
+QED
+
+Theorem written_var_names_endpoint_before_lemma:
+  ∀dn l e funs.
+  MEM dn (free_fun_names_endpoint e) ∧
+  always_same_args funs e ∧
+  ALOOKUP funs dn = SOME l ⇒
+  set l ⊆ set(written_var_names_endpoint_before dn e)
+Proof
+  ntac 2 GEN_TAC >> Induct >>
+  rw[free_fun_names_endpoint_def,always_same_args_def,written_var_names_endpoint_before_def] >>
+  res_tac >>
+  fs[SUBSET_INSERT_RIGHT] >>
+  fs[MEM_FILTER] >>
+  rfs[] >>
+  rw[SUBSET_DEF] >> imp_res_tac SUBSET_THM >> simp[]
 QED
 
 Theorem tausim_defer_fundef:
@@ -729,7 +1012,8 @@ Proof
           rw[compile_fix_closure_endpoint_rel_def] >>
           goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL) >>
           fs[letrec_endpoint_def,consistent_arities_def,arities_def,free_fun_names_endpoint_def,
-             written_var_names_endpoint_before_def,written_var_names_endpoint_def] >>
+             written_var_names_endpoint_before_def,written_var_names_endpoint_def,
+             always_same_args_def,bound_fun_names_endpoint_def,good_letrecs_def] >>
           metis_tac[])
       >- ((* trans_send_intermediate_payload *)
           qhdtm_x_assum ‘compile_fix_closure_endpoint_rel’ (strip_assume_tac o REWRITE_RULE[compile_fix_closure_endpoint_rel_def]) >> fs[] >> rveq >> fs[] >>
@@ -742,7 +1026,8 @@ Proof
           rw[fsubst_def] >>
           goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL) >>
           fs[letrec_endpoint_def,consistent_arities_def,arities_def,free_fun_names_endpoint_def,
-             written_var_names_endpoint_before_def,written_var_names_endpoint_def] >>
+             written_var_names_endpoint_before_def,written_var_names_endpoint_def,
+             always_same_args_def,bound_fun_names_endpoint_def,good_letrecs_def] >>
           metis_tac[])
       >- ((* trans_enqueue *)
           qhdtm_x_assum ‘compile_fix_closure_endpoint_rel’ (strip_assume_tac o REWRITE_RULE[compile_fix_closure_endpoint_rel_def]) >> fs[] >> rveq >> fs[] >>
@@ -767,7 +1052,8 @@ Proof
           rw[compile_fix_closure_endpoint_rel_def] >>
           goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL) >>
           fs[letrec_endpoint_def,consistent_arities_def,arities_def,written_var_names_endpoint_before_def,
-              written_var_names_endpoint_def,free_fun_names_endpoint_def] >>
+              written_var_names_endpoint_def,free_fun_names_endpoint_def,
+              always_same_args_def,bound_fun_names_endpoint_def,good_letrecs_def] >>
           metis_tac[])
       >- ((* trans_send_intermediate_payload *)
           qhdtm_x_assum ‘compile_fix_closure_endpoint_rel’ (strip_assume_tac o REWRITE_RULE[compile_fix_closure_endpoint_rel_def]) >> fs[CaseEq "bool"] >> rveq >> fs[] >>
@@ -781,13 +1067,14 @@ Proof
           rw[fsubst_def] >>
           goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL) >>
           fs[letrec_endpoint_def,consistent_arities_def,arities_def,written_var_names_endpoint_before_def,
-             written_var_names_endpoint_def,free_fun_names_endpoint_def] >>
+             written_var_names_endpoint_def,free_fun_names_endpoint_def,
+             always_same_args_def,bound_fun_names_endpoint_def,good_letrecs_def] >>
           metis_tac[])
       >- ((* trans_enqueue *)
           qhdtm_x_assum ‘compile_fix_closure_endpoint_rel’ (strip_assume_tac o REWRITE_RULE[compile_fix_closure_endpoint_rel_def]) >> fs[] >> rveq >> fs[] >>
           goal_assum(resolve_then (Pos hd) mp_tac trans_enqueue) >>
           simp[] >>
-          disj1_tac >> fs[compile_fix_closure_endpoint_rel_def] >>
+          disj1_tac >> fs[compile_fix_closure_endpoint_rel_def,always_same_args_def,bound_fun_names_endpoint_def] >>
           metis_tac[])
       >- ((* trans_par_l (impossible) *)
           fs[compile_fix_closure_endpoint_rel_def])
@@ -810,16 +1097,17 @@ Proof
           disj1_tac >>
           rw[compile_fix_closure_endpoint_rel_def] >>
           goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL) >>
-          fs[letrec_endpoint_def,consistent_arities_def,arities_def]
-          >- (fs[written_var_names_endpoint_def,free_fun_names_endpoint_def,
-                 written_var_names_endpoint_before_def] >>
-              PURE_FULL_CASE_TAC >> fs[] >>
-              conj_tac >- (fs[SUBSET_DEF]) >>
-              conj_tac >- (fs[written_var_names_endpoint_before_fresh_eq_NIL]) >>
-              metis_tac[]) >>
+          fs[letrec_endpoint_def,consistent_arities_def,arities_def] >>
           fs[written_var_names_endpoint_def,free_fun_names_endpoint_def,
-                 written_var_names_endpoint_before_def] >>
-          PURE_FULL_CASE_TAC >> fs[written_var_names_endpoint_before_fresh_eq_NIL] >> metis_tac[])
+             written_var_names_endpoint_before_def,always_same_args_def,bound_fun_names_endpoint_def,
+             good_letrecs_def] >>
+          conj_tac >- (fs[SUBSET_DEF]) >>
+          conj_tac >-
+           (PURE_FULL_CASE_TAC >> fs[written_var_names_endpoint_before_fresh_eq_NIL] >> rfs[]) >>
+          conj_tac >- (fs[] >> rfs[]) >>
+          rpt strip_tac >>
+          first_x_assum(drule_all_then strip_assume_tac) >>
+          rpt(goal_assum drule) >> rw[])
       >- ((* trans_dequeue_intermediate_payload *)
           qhdtm_x_assum ‘compile_fix_closure_endpoint_rel’ (strip_assume_tac o REWRITE_RULE[compile_fix_closure_endpoint_rel_def]) >> fs[] >> rveq >> fs[] >>
           fs[Once saturates_cases] >> rveq >> fs[fsubst_def] >>
@@ -834,7 +1122,7 @@ Proof
           simp[PULL_EXISTS,fsubst_def] >>
           goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL) >>
           fs[letrec_endpoint_def,consistent_arities_def] >>
-          fs[free_fun_names_endpoint_def,written_var_names_endpoint_before_def] >>
+          fs[free_fun_names_endpoint_def,written_var_names_endpoint_before_def,always_same_args_def,bound_fun_names_endpoint_def,written_var_names_endpoint_def,good_letrecs_def] >>
           metis_tac[])
       >- ((* trans_if_true *)
           qhdtm_x_assum ‘compile_fix_closure_endpoint_rel’ (strip_assume_tac o REWRITE_RULE[compile_fix_closure_endpoint_rel_def]) >> fs[] >> rveq >> fs[] >>
@@ -845,11 +1133,14 @@ Proof
           fs[] >>
           disj1_tac >>
           rw[compile_fix_closure_endpoint_rel_def] >>
-          fs[letrec_endpoint_def,consistent_arities_def,arities_def,written_var_names_endpoint_def] >>
+          fs[letrec_endpoint_def,consistent_arities_def,arities_def,written_var_names_endpoint_def,
+             always_same_args_def,bound_fun_names_endpoint_def,good_letrecs_def] >>
           goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL) >>
           fs[letrec_endpoint_def,consistent_arities_def] >>
           fs[free_fun_names_endpoint_def,written_var_names_endpoint_before_def] >>
           fs[LEFT_AND_OVER_OR,DISJ_IMP_THM,FORALL_AND_THM] >>
+          conj_tac >- (rfs[]) >>
+          conj_tac >- (metis_tac[]) >>
           rw[] >>
           res_tac >>
           drule_all_then strip_assume_tac MEM_arities_saturates >>
@@ -857,7 +1148,7 @@ Proof
           fs[] >>
           fs[SET_EQ_SUBSET,SUBSET_DEF] >>
           metis_tac[])
-      >- ((* trans_if_true *)
+      >- ((* trans_if_false *)
           qhdtm_x_assum ‘compile_fix_closure_endpoint_rel’ (strip_assume_tac o REWRITE_RULE[compile_fix_closure_endpoint_rel_def]) >> fs[] >> rveq >> fs[] >>
           fs[Once saturates_cases] >> rveq >> fs[fsubst_def] >>
           goal_assum(resolve_then (Pos hd) mp_tac TC_SUBSET) >>
@@ -866,11 +1157,14 @@ Proof
           fs[] >>
           disj1_tac >>
           rw[compile_fix_closure_endpoint_rel_def] >>
-          fs[letrec_endpoint_def,consistent_arities_def,arities_def,written_var_names_endpoint_def] >>
+          fs[letrec_endpoint_def,consistent_arities_def,arities_def,written_var_names_endpoint_def,
+             always_same_args_def,bound_fun_names_endpoint_def,good_letrecs_def] >>
           goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL) >>
           fs[letrec_endpoint_def,consistent_arities_def] >>
           fs[free_fun_names_endpoint_def,written_var_names_endpoint_before_def] >>
           fs[LEFT_AND_OVER_OR,DISJ_IMP_THM,FORALL_AND_THM] >>
+          conj_tac >- (rfs[]) >>
+          conj_tac >- (metis_tac[]) >>
           rw[] >>
           res_tac >>
           drule_all_then strip_assume_tac MEM_arities_saturates >>
@@ -888,16 +1182,16 @@ Proof
           disj1_tac >>
           rw[compile_fix_closure_endpoint_rel_def] >>
           goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL) >>
-          fs[letrec_endpoint_def,consistent_arities_def,arities_def]
-          >- (fs[written_var_names_endpoint_def,free_fun_names_endpoint_def,
-                 written_var_names_endpoint_before_def] >>
-              PURE_FULL_CASE_TAC >> fs[] >>
-              conj_tac >- (fs[SUBSET_DEF]) >>
-              conj_tac >- (fs[written_var_names_endpoint_before_fresh_eq_NIL]) >>
-              metis_tac[]) >>
+          fs[letrec_endpoint_def,consistent_arities_def,arities_def] >>
           fs[written_var_names_endpoint_def,free_fun_names_endpoint_def,
-                 written_var_names_endpoint_before_def] >>
-          PURE_FULL_CASE_TAC >> fs[written_var_names_endpoint_before_fresh_eq_NIL] >> metis_tac[])
+             written_var_names_endpoint_before_def,always_same_args_def,bound_fun_names_endpoint_def,
+             good_letrecs_def] >>
+          conj_tac >- (fs[SUBSET_DEF]) >>
+          conj_tac >-
+           (PURE_FULL_CASE_TAC >> fs[written_var_names_endpoint_before_fresh_eq_NIL] >> rfs[]) >>
+          rpt strip_tac >>
+          first_x_assum(drule_all_then strip_assume_tac) >>
+          rpt(goal_assum drule) >> rw[] >> rfs[])
       >- ((* trans_par_l (impossible) *)
           fs[compile_fix_closure_endpoint_rel_def])
       >- ((* trans_par_r (impossible) *)
@@ -908,16 +1202,234 @@ Proof
           qhdtm_x_assum ‘compile_fix_closure_endpoint_rel’ (strip_assume_tac o REWRITE_RULE[compile_fix_closure_endpoint_rel_def]) >> fs[] >> rveq >> fs[] >>
           fs[Once saturates_cases] >> rveq >> fs[fsubst_def] >>
           IF_CASES_TAC >-
-            (rveq >>
-             fs[free_fun_names_endpoint_def,MEM_FILTER] >>
-             goal_assum(resolve_then (Pos hd) mp_tac TC_SUBSET) >>
-             simp[reduction_def] >>
-             goal_assum(resolve_then (Pos hd) mp_tac trans_letrec) >>
-             cheat (* not at all obvious. change candidate relation? alpha-convert? *)
-            ) >>
-          cheat
-         )
-      >> cheat
+            (rveq >> fs[free_fun_names_endpoint_def,MEM_FILTER,bound_fun_names_endpoint_def]) >>
+          rveq >>
+          fs[free_fun_names_endpoint_def,MEM_FILTER] >>
+          goal_assum(resolve_then (Pos hd) mp_tac TC_SUBSET) >>
+          simp[reduction_def] >>
+          goal_assum(resolve_then (Pos hd) mp_tac trans_letrec) >>
+          disj1_tac >>
+          simp[compile_fix_closure_endpoint_rel_def] >>
+          goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+          fs[letrec_endpoint_def] >>
+          fs[consistent_arities_def] >>
+          fs[written_var_names_endpoint_before_def,written_var_names_endpoint_def,
+             always_same_args_def,bound_fun_names_endpoint_def,good_letrecs_def] >>
+          fs[arities_def,MEM_FILTER,PULL_EXISTS,LEFT_AND_OVER_OR,RIGHT_AND_OVER_OR,DISJ_IMP_THM,FORALL_AND_THM] >>
+          conj_tac >- (fs[closure_args_def]) >>
+          conj_tac >- (rfs[]) >>
+          conj_tac >- (rw[closure_args_def]) >>
+          conj_tac >- (rw[closure_args_def]) >>
+          conj_tac >- metis_tac[] >>
+          rw[closure_var_env_def,closure_args_def]
+          >- (fs[] >> rfs[])
+          >- (fs[arsof_def,closure_args_def,MEM_FILTER] >>
+              imp_res_tac MEM_arities_saturates >>
+              rw[SET_EQ_SUBSET,SUBSET_DEF,MEM_MAP,MEM_FILTER] >>
+              metis_tac[PAIR,FST,SND])
+          >- (simp[compile_fix_closure_rel_def] >>
+              goal_assum(resolve_then (Pos hd) mp_tac letrec_endpoint_fsubst) >>
+              simp[letrec_endpoint_def] >>
+              goal_assum(resolve_then (Pat ‘fsubst _ _ _ = fsubst _ _ _’) mp_tac EQ_REFL) >>
+              simp[GSYM PULL_EXISTS] >>
+              conj_tac >- rfs[] >>
+              rw[] >>
+              first_x_assum (drule_all_then strip_assume_tac) >>
+              simp[] >>
+              conj_tac >-
+               (fs[arsof_def,arities_def] >> rveq >> fs[] >>
+                rw[SET_EQ_SUBSET,SUBSET_DEF,MEM_MAP,MEM_FILTER] >>
+                qpat_x_assum ‘_ = {_}’ mp_tac >>
+                rw[SET_EQ_SUBSET,SUBSET_DEF,MEM_MAP,MEM_FILTER,PULL_EXISTS] >>
+                metis_tac[FST,SND,PAIR,MEM_arities_saturates]) >>
+              last_x_assum(drule_then match_mp_tac) >>
+              simp[ALOOKUP_MAP,PULL_EXISTS]) >>
+          first_x_assum(drule_all_then strip_assume_tac) >>
+          rpt(goal_assum drule) >>
+          simp[] >>
+          fs[arsof_def,arities_def] >>
+          rw[SET_EQ_SUBSET,SUBSET_DEF,MEM_MAP,MEM_FILTER] >>
+          qpat_x_assum ‘_ = {_}’ mp_tac >>
+          rw[SET_EQ_SUBSET,SUBSET_DEF,MEM_MAP,MEM_FILTER,PULL_EXISTS] >>
+          metis_tac[FST,SND,PAIR,MEM_arities_saturates])
+      >- ((* trans_call *)
+          qhdtm_x_assum ‘compile_fix_closure_endpoint_rel’ (strip_assume_tac o REWRITE_RULE[compile_fix_closure_endpoint_rel_def]) >> fs[] >> rveq >> fs[] >>
+          fs[Once saturates_cases] >> rveq >> fs[fsubst_def] >>
+          IF_CASES_TAC
+          >- ((* Actual call to dn *)
+              rveq >>
+              fs[] >> rveq >> fs[] >>
+              goal_assum(resolve_then (Pos hd) mp_tac EXTEND_RTC_TC) >>
+              simp[reduction_def] >>
+              simp[Once trans_cases] >>
+              goal_assum(resolve_then (Pos hd) mp_tac RTC_SUBSET) >>
+              simp[reduction_def] >>
+              simp[Once trans_cases] >>
+              fs[written_var_names_endpoint_before_def] >>
+              fs[always_same_args_def,bound_fun_names_endpoint_def,ALOOKUP_MAP,closure_args_def] >>
+              rveq >> fs[] >>
+              disj2_tac >>
+              ‘bds3 |++ ZIP (args,MAP (THE ∘ FLOOKUP s2.bindings) args) =
+               s2.bindings |++ ZIP (args,MAP (THE ∘ FLOOKUP s2.bindings) args)’
+                by(fs[free_fun_names_endpoint_def,fmap_eq_flookup,FLOOKUP_DRESTRICT,
+                      flookup_fupdate_list] >>
+                   rw[] >> TOP_CASE_TAC >>
+                   fs[ALOOKUP_NONE,MAP_REVERSE,MAP_ZIP] >>
+                   metis_tac[]) >>
+              pop_assum SUBST_ALL_TAC >>
+              ‘tausim conf
+                 (NEndpoint p
+                            (s with <|bindings := s2.bindings |++ ZIP (args,MAP (THE ∘ FLOOKUP s2.bindings) args);
+                                      funs := (dn,Closure args (fs3,bds3) e)::fs3|>)
+                            e)
+                 (NEndpoint p
+                            (s with <|bindings := s2.bindings |++ ZIP (args,MAP (THE ∘ FLOOKUP s2.bindings) args);
+                                      funs := [(dn,Closure args ([],bds3) e)]|>)
+                            e)
+                      ’
+                by(match_mp_tac bisim_IMP_tausim >>
+                   match_mp_tac bisim_used_closures_rel >>
+                   simp[used_closures_rel_def,used_closures_endpoint_rel_def] >>
+                   Q.REFINE_EXISTS_TAC ‘(s:closure state) with bindings := _’ >>
+                   simp[state_component_equality] >>
+                   rpt strip_tac >>
+                   drule_all SUBSET_THM >> rw[] >>
+                   rw[used_closures_rel_def] >>
+                   drule_all SUBSET_THM >> rw[]) >>
+              dxrule_then match_mp_tac tausim_trans >>
+              ‘tausim conf
+                 (NEndpoint p
+                            (s2 with <|bindings := s2.bindings |++ ZIP (args,MAP (THE ∘ FLOOKUP s2.bindings) args);
+                                      funs := [(dn,Closure args ([],s2.bindings) e)]|>)
+                            e)
+                 (NEndpoint p
+                            (s2 with <|bindings := s2.bindings |++ ZIP (args,MAP (THE ∘ FLOOKUP s2.bindings) args);
+                                      funs := (dn,Closure args (s2.funs,s2.bindings) e)::s2.funs|>)
+                            e)
+                      ’
+                by(match_mp_tac bisim_IMP_tausim >>
+                   match_mp_tac bisim_used_closures_rel >>
+                   simp[used_closures_rel_def,used_closures_endpoint_rel_def] >>
+                   Q.REFINE_EXISTS_TAC ‘(s:closure state) with bindings := _’ >>
+                   simp[state_component_equality] >>
+                   rpt strip_tac >>
+                   drule_all SUBSET_THM >> rw[] >>
+                   rw[used_closures_rel_def] >>
+                   drule_all SUBSET_THM >> rw[]) >>
+              first_x_assum(fn thm => resolve_then (Pos last) match_mp_tac thm tausim_trans) >>
+              match_mp_tac bisim_IMP_tausim >>
+              match_mp_tac junkcong_bisim >>
+              goal_assum(resolve_then (Pos hd) mp_tac junkcong_trans) >>
+              goal_assum(resolve_then (Pos hd) mp_tac junkcong_DRESTRICT_closure_hd') >>
+              rfs[free_fun_names_endpoint_def] >>
+              match_mp_tac junkcong_sym >>
+              goal_assum(resolve_then (Pos hd) mp_tac junkcong_trans) >>
+              goal_assum(resolve_then (Pos hd) mp_tac junkcong_DRESTRICT_closure_hd') >>
+              match_mp_tac junkcong_refl_IMP >>
+              AP_THM_TAC >> AP_TERM_TAC >>
+              rw[state_component_equality]) >>
+          (* Call to something else *)
+          goal_assum(resolve_then (Pos hd) mp_tac TC_SUBSET) >>
+          simp[reduction_def] >>
+          goal_assum(resolve_then (Pos hd) mp_tac trans_call) >>
+          fs[arities_def,free_fun_names_endpoint_def] >>
+          Cases_on ‘cl2’ >> rveq >> fs[closure_args_def] >>
+          fs[written_var_names_endpoint_before_def] >>
+          rename1 ‘pair = (_,_)’ >> Cases_on ‘pair’ >> fs[] >>
+          conj_tac
+          >- (rw[EVERY_MEM,IS_SOME_EXISTS] >>
+              fs[written_var_names_endpoint_def] >>
+              imp_res_tac SUBSET_THM >>
+              fs[FDOM_FLOOKUP]) >>
+          rveq >> fs[written_var_names_endpoint_def,bound_fun_names_endpoint_def,free_fun_names_endpoint_def,
+                     closure_args_def,closure_var_env_def,always_same_args_def,ALOOKUP_MAP] >>
+          rveq >> fs[] >>
+          disj1_tac >>
+          qhdtm_x_assum ‘compile_fix_closure_rel’ (strip_assume_tac o REWRITE_RULE[compile_fix_closure_rel_def]) >>
+          rveq >> fs[] >>
+          simp[compile_fix_closure_endpoint_rel_def] >>
+          simp[GSYM PULL_EXISTS] >>
+          conj_asm1_tac >-
+            (simp[fmap_eq_flookup] >>
+             rw[flookup_fupdate_list] >>
+             TOP_CASE_TAC >-
+              (fs[ALOOKUP_NONE,MAP_REVERSE,MAP_ZIP] >>
+               rfs[ALOOKUP_REVERSE_ALL_DISTINCT,MAP_ZIP] >>
+               fs[ALOOKUP_ZIP_MAP_SND] >>
+               rveq >>
+               fs[ALOOKUP_ZIP_SELF] >> rveq >>
+               rw[] >>
+               qpat_x_assum ‘DRESTRICT bindings _ = DRESTRICT s2.bindings _’ mp_tac >>
+               rw[fmap_eq_flookup,FLOOKUP_DRESTRICT] >>
+               pop_assum(qspec_then ‘x’ mp_tac) >>
+               rw[] >>
+               drule_all_then strip_assume_tac SUBSET_THM >>
+               drule_all_then strip_assume_tac SUBSET_THM >>
+               rfs[FDOM_FLOOKUP]) >>
+             rfs[ALOOKUP_REVERSE_ALL_DISTINCT,MAP_ZIP] >>
+             fs[ALOOKUP_ZIP_MAP_SND] >>
+             rveq >>
+             fs[ALOOKUP_ZIP_SELF] >> rveq >>
+             drule_all_then strip_assume_tac SUBSET_THM >>
+             simp[]) >>
+          goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+          imp_res_tac letrec_endpoint_fsubst' >>
+          simp[closure_args_def] >>
+          simp[FDOM_FUPDATE_LIST,MAP_ZIP] >>
+          conj_tac >- fs[SUBSET_DEF] >>
+          conj_tac >- rfs[] >>
+          conj_tac >-
+           (rw[] >> fs[] >> rfs[] >>
+            rw[fmap_eq_flookup,FLOOKUP_DRESTRICT] >>
+            rw[] >>
+            rw[flookup_fupdate_list] >>
+            TOP_CASE_TAC >>
+            rfs[ALOOKUP_REVERSE_ALL_DISTINCT,MAP_ZIP] >>
+            fs[ALOOKUP_ZIP_MAP_SND] >>
+            rveq >> fs[ALOOKUP_ZIP_SELF] >> rveq >>
+            metis_tac[SUBSET_DEF]) >>
+          simp[PULL_EXISTS] >>
+          rw[closure_var_env_def,closure_args_def] >> rfs[]
+          >- (rw[fmap_eq_flookup,FLOOKUP_DRESTRICT] >>
+              rw[] >>
+              rw[flookup_fupdate_list] >>
+              TOP_CASE_TAC >>
+              rfs[ALOOKUP_REVERSE_ALL_DISTINCT,MAP_ZIP] >>
+              fs[ALOOKUP_ZIP_MAP_SND] >>
+              rveq >> fs[ALOOKUP_ZIP_SELF] >> rveq >>
+              drule_all_then strip_assume_tac SUBSET_THM >>
+              drule_all_then strip_assume_tac SUBSET_THM >>
+              fs[FDOM_FLOOKUP] >>
+              qpat_x_assum ‘DRESTRICT _ _ = DRESTRICT _ _’ mp_tac >>
+              rw[fmap_eq_flookup] >>
+              pop_assum(qspec_then ‘x’ mp_tac) >>
+              rw[FLOOKUP_DRESTRICT] >>
+              metis_tac[THE_DEF])
+          >- (match_mp_tac arsof_lemma >>
+              goal_assum(drule_at (Pat ‘always_same_args _ _’)) >>
+              simp[] >>
+              metis_tac[saturates_free_fun_names_endpoint])
+          >- (rw[compile_fix_closure_rel_def] >>
+              goal_assum(drule_at (Pat ‘always_same_args _ _’)) >>
+              simp[] >>
+              rpt strip_tac >>
+              metis_tac[])
+          >- (first_x_assum(drule_all_then strip_assume_tac) >>
+              rpt(goal_assum drule) >>
+              simp[] >>
+              rfs[] >>
+              qpat_x_assum ‘bindings |++ _ = bindings |++ _’ (fn thm => SUBST_ALL_TAC(GSYM thm) >> assume_tac(GSYM thm)) >>
+              rw[fmap_eq_flookup,FLOOKUP_DRESTRICT] >>
+              rw[] >>
+              rw[flookup_fupdate_list] >>
+              TOP_CASE_TAC >>
+              rfs[ALOOKUP_REVERSE_ALL_DISTINCT,MAP_ZIP] >>
+              fs[ALOOKUP_ZIP_MAP_SND] >>
+              rveq >> fs[ALOOKUP_ZIP_SELF] >> rveq >>
+              drule_then drule written_var_names_endpoint_lemma >>
+              simp[ALOOKUP_MAP] >>
+              strip_tac >>
+              metis_tac[SUBSET_THM]))
      )
   >- ((* Tau, RHS leads *)
       cheat
