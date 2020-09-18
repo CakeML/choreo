@@ -1552,6 +1552,272 @@ Proof
      )
 QED
 
+(* TODO: reconciliate this and renaming gunk in projectionProofTheory to separate file *)
+Definition perm1_def:
+  perm1 v1 v2 v = if v = v1 then v2 else if v = v2 then v1 else v
+End
+
+Definition perm_dname_endpoint_def:
+   (perm_dname_endpoint n1 n2 Nil = Nil)
+∧ (perm_dname_endpoint n1 n2 (Send p v n e) = Send p v n(perm_dname_endpoint n1 n2 e))
+∧ (perm_dname_endpoint n1 n2 (Receive p v d e) = Receive p v d (perm_dname_endpoint n1 n2 e))
+∧ (perm_dname_endpoint n1 n2 (IfThen v e1 e2) =
+    IfThen v (perm_dname_endpoint n1 n2 e1) (perm_dname_endpoint n1 n2 e2))
+∧ (perm_dname_endpoint n1 n2 (Let v f vl e) =
+    Let v f vl (perm_dname_endpoint n1 n2 e))
+∧ (perm_dname_endpoint n1 n2 (Fix dv e) =
+    Fix (perm1 n1 n2 dv) (perm_dname_endpoint n1 n2 e))
+∧ (perm_dname_endpoint n1 n2 (Call dv) =
+    Call (perm1 n1 n2 dv))
+∧ (perm_dname_endpoint n1 n2 (Letrec dv vars e1 e2) =
+    Letrec (perm1 n1 n2 dv) vars (perm_dname_endpoint n1 n2 e1) (perm_dname_endpoint n1 n2 e2))
+∧ (perm_dname_endpoint n1 n2 (FCall dv vars) =
+    FCall (perm1 n1 n2 dv) vars)
+End
+
+Theorem perm_dname_endpoint_cancel:
+  ∀dv dv' e.
+  perm_dname_endpoint dv dv' (perm_dname_endpoint dv dv' e) =
+  e
+Proof
+  ntac 2 strip_tac >> Induct >> rw[perm_dname_endpoint_def] >>
+  rw[perm1_def] >> fs[CaseEq "bool"] >> rveq >> fs[]
+QED
+
+Theorem perm_dname_endpoint_sym:
+  ∀dv dv' e.
+  perm_dname_endpoint dv dv' e =
+  perm_dname_endpoint dv' dv e
+Proof
+  ntac 2 strip_tac >> Induct >> rw[perm_dname_endpoint_def] >>
+  rw[perm1_def] >> fs[CaseEq "bool"] >> rveq >> fs[]
+QED
+
+Inductive ACONV:
+  ACONV Nil Nil ∧
+  (∀p v n e e'.
+   ACONV e e' ⇒ ACONV (Send p v n e) (Send p v n e')) ∧
+  (∀p v d e e'.
+   ACONV e e' ⇒ ACONV (Receive p v d e) (Receive p v d e')) ∧
+  (∀v e e' e'' e'''.
+   ACONV e e' ∧ ACONV e'' e''' ⇒ ACONV (IfThen v e e'') (IfThen v e' e''')) ∧
+  (∀v f vl e e'.
+   ACONV e e' ⇒ ACONV (Let v f vl e) (Let v f vl e')) ∧
+  (∀dv e e'.
+   ACONV e e' ⇒
+   ACONV (Fix dv e) (Fix dv e')) ∧
+  (∀dv e dv'.
+   ¬(dv' ∈ set(free_fix_names_endpoint e) ∪ set(free_fun_names_endpoint e)) ⇒
+   ACONV (Fix dv e) (Fix dv' (perm_dname_endpoint dv dv' e))) ∧
+  (∀dv. ACONV (Call dv) (Call dv)) ∧
+  (∀dv vars e e' e'' e'''.
+   ACONV e e' ∧ ACONV e'' e''' ⇒
+   ACONV (Letrec dv vars e e'') (Letrec dv vars e' e''')) ∧
+  (∀dv vars e e' dv'.
+   ¬(dv' ∈ (set(free_fix_names_endpoint e) ∪ set(free_fun_names_endpoint e) ∪
+           set(free_fix_names_endpoint e') ∪ set(free_fun_names_endpoint e'))) ⇒
+   ACONV (Letrec dv vars e e')
+         (Letrec dv' vars (perm_dname_endpoint dv dv' e) (perm_dname_endpoint dv dv' e'))) ∧
+  (∀dv vars. ACONV (FCall dv vars) (FCall dv vars))
+End
+
+Theorem ACONV_refl:
+  ∀e. ACONV e e
+Proof
+  Induct_on ‘e’ >> rw[Once ACONV_cases] >> goal_assum drule
+QED
+
+Theorem perm1_eq_cong:
+  perm1 dv dv' e = perm1 dv dv' e' ⇔ e = e'
+Proof
+  rw[perm1_def] >> metis_tac[]
+QED
+
+Theorem perm1_eq_right:
+  perm1 dv dv' e = x ⇔ e = perm1 dv dv' x
+Proof
+  rw[perm1_def] >> metis_tac[]
+QED
+
+Theorem perm1_simps[simp]:
+  perm1 dv dv' dv = dv' ∧
+  perm1 dv dv' dv' = dv
+Proof
+  rw[perm1_def]
+QED
+
+Theorem free_fun_names_endpoint_perm:
+  ∀dv dv' e.
+  free_fun_names_endpoint (perm_dname_endpoint dv dv' e) =
+  MAP (perm1 dv dv') (free_fun_names_endpoint e)
+Proof
+  ntac 2 strip_tac >>
+  Induct_on ‘e’ >> rw[free_fun_names_endpoint_def,perm_dname_endpoint_def] >>
+  rw[FILTER_APPEND,FILTER_MAP,o_DEF,perm1_eq_cong,perm1_eq_right]
+QED
+
+Theorem free_fix_names_endpoint_perm:
+  ∀dv dv' e.
+  free_fix_names_endpoint (perm_dname_endpoint dv dv' e) =
+  MAP (perm1 dv dv') (free_fix_names_endpoint e)
+Proof
+  ntac 2 strip_tac >>
+  Induct_on ‘e’ >> rw[free_fix_names_endpoint_def,perm_dname_endpoint_def] >>
+  rw[FILTER_APPEND,FILTER_MAP,o_DEF,perm1_eq_cong,perm1_eq_right]
+QED
+
+Theorem ACONV_sym:
+  ∀e1 e2. ACONV e1 e2 ⇒ ACONV e2 e1
+Proof
+  ho_match_mp_tac ACONV_strongind >>
+  rw[] >>
+  TRY(rename1 ‘Fix _ (perm_dname_endpoint _ _ _)’ >>
+      qspecl_then [‘dv’,‘dv'’,‘e’] mp_tac perm_dname_endpoint_cancel >>
+      disch_then(fn thm => CONV_TAC(RAND_CONV(PURE_ONCE_REWRITE_CONV[GSYM thm]))) >>
+      qspecl_then [‘dv’,‘dv'’] (PURE_ONCE_REWRITE_TAC o single) perm_dname_endpoint_sym >>
+      qspecl_then [‘dv’,‘dv'’,‘e’] (SUBST_ALL_TAC) perm_dname_endpoint_sym >>
+      rw[Once ACONV_cases] >>
+      simp[free_fun_names_endpoint_perm,free_fix_names_endpoint_perm,MEM_MAP,GSYM perm1_eq_right]) >>
+  TRY(rename1 ‘Letrec _  _(perm_dname_endpoint _ _ _)’ >>
+      qspecl_then [‘dv’,‘dv'’,‘e’] mp_tac perm_dname_endpoint_cancel >>
+      disch_then(fn thm => CONV_TAC(RAND_CONV(PURE_ONCE_REWRITE_CONV[GSYM thm]))) >>
+      qspecl_then [‘dv’,‘dv'’,‘e'’] mp_tac perm_dname_endpoint_cancel >>
+      disch_then(fn thm => CONV_TAC(RAND_CONV(PURE_ONCE_REWRITE_CONV[GSYM thm]))) >>
+      qspecl_then [‘dv’,‘dv'’] (PURE_ONCE_REWRITE_TAC o single) perm_dname_endpoint_sym >>
+      qspecl_then [‘dv’,‘dv'’,‘e’] (SUBST_ALL_TAC) perm_dname_endpoint_sym >>
+      qspecl_then [‘dv’,‘dv'’,‘e'’] (SUBST_ALL_TAC) perm_dname_endpoint_sym >>
+      rw[Once ACONV_cases] >>
+      simp[free_fun_names_endpoint_perm,free_fix_names_endpoint_perm,MEM_MAP,GSYM perm1_eq_right]) >>
+  metis_tac[ACONV_rules]
+QED
+
+Theorem perm_dname_endpoint_sym:
+  ∀dv1 dv2 dv3 dv4 e.
+  perm_dname_endpoint dv1 dv2 (perm_dname_endpoint dv3 dv4 e) =
+  perm_dname_endpoint dv3 dv4 (perm_dname_endpoint (perm1 dv3 dv4 dv1) (perm1 dv3 dv4 dv2) e)
+Proof
+  ntac 4 strip_tac >> Induct >>
+  rw[perm_dname_endpoint_def] >>
+  fs[] >>
+  rw[perm1_def] >>
+  rpt(PURE_FULL_CASE_TAC >> fs[] >> rveq)
+QED
+
+Theorem perm_dname_endpoint_sym':
+  ∀dv1 dv2 dv3 dv4 e.
+  perm_dname_endpoint dv1 dv2 (perm_dname_endpoint dv3 dv4 e) =
+  perm_dname_endpoint (perm1 dv1 dv2 dv3) (perm1 dv1 dv2 dv4) (perm_dname_endpoint dv1 dv2 e)
+Proof
+  ntac 4 strip_tac >> Induct >>
+  rw[perm_dname_endpoint_def] >>
+  fs[] >>
+  rw[perm1_def] >>
+  rpt(PURE_FULL_CASE_TAC >> fs[] >> rveq)
+QED
+
+Theorem ACONV_perm:
+  ∀dv dv' e1 e2.
+    ACONV e1 e2 ⇒
+    ACONV (perm_dname_endpoint dv dv' e1) (perm_dname_endpoint dv dv' e2)
+Proof
+  ntac 2 strip_tac >>
+  ho_match_mp_tac ACONV_strongind >>
+  rw[perm_dname_endpoint_def]
+  >- metis_tac[ACONV_rules]
+  >- metis_tac[ACONV_rules]
+  >- metis_tac[ACONV_rules]
+  >- metis_tac[ACONV_rules]
+  >- metis_tac[ACONV_rules]
+  >- metis_tac[ACONV_rules]
+  >- (simp[Once perm_dname_endpoint_sym'] >>
+      simp[Once ACONV_cases] >>
+      simp[free_fix_names_endpoint_perm,free_fun_names_endpoint_perm,MEM_MAP,perm1_eq_cong])
+  >- metis_tac[ACONV_rules]
+  >- metis_tac[ACONV_rules]
+  >- (PURE_ONCE_REWRITE_TAC[perm_dname_endpoint_sym'] >>
+      simp[Once ACONV_cases] >>
+      simp[free_fix_names_endpoint_perm,free_fun_names_endpoint_perm,MEM_MAP,perm1_eq_cong])
+  >- metis_tac[ACONV_rules]
+QED
+
+Theorem ACONV_avoids:
+ ∀dn e1.
+   ∃e2. ACONV^* e1 e2 ∧ ~MEM dn (bound_fun_names_endpoint e2) ∧ ~MEM dn (bound_fix_names_endpoint e2)
+Proof
+  strip_tac >> Induct >> rw[]
+  >- (goal_assum (resolve_then (Pos hd) mp_tac RTC_SUBSET) >>
+      rw[Once ACONV_cases,bound_fun_names_endpoint_def,bound_fix_names_endpoint_def])
+  >- (rename1 ‘Send p d n’ >>
+      Q.REFINE_EXISTS_TAC ‘Send p d n _’ >>
+      simp[bound_fun_names_endpoint_def,bound_fix_names_endpoint_def] >>
+      rpt(goal_assum(drule_at (Pos last))) >>
+      qpat_x_assum ‘ACONV^* _ _’ mp_tac >>
+      rpt(pop_assum kall_tac) >>
+      MAP_EVERY qid_spec_tac [‘e2’,‘e1’] >>
+      ho_match_mp_tac RTC_INDUCT >>
+      rw[] >>
+      metis_tac[ACONV_rules,RTC_RULES])
+  >- (rename1 ‘Receive p d n’ >>
+      Q.REFINE_EXISTS_TAC ‘Receive p d n _’ >>
+      simp[bound_fun_names_endpoint_def,bound_fix_names_endpoint_def] >>
+      rpt(goal_assum(drule_at (Pos last))) >>
+      qpat_x_assum ‘ACONV^* _ _’ mp_tac >>
+      rpt(pop_assum kall_tac) >>
+      MAP_EVERY qid_spec_tac [‘e2’,‘e1’] >>
+      ho_match_mp_tac RTC_INDUCT >>
+      rw[] >>
+      metis_tac[ACONV_rules,RTC_RULES])
+  >- (rename1 ‘IfThen v e1 e1'’ >>
+      Q.REFINE_EXISTS_TAC ‘IfThen v _ _’ >>
+      simp[bound_fun_names_endpoint_def,bound_fix_names_endpoint_def] >>
+      qexists_tac ‘e2'’ >> qexists_tac ‘e2’ >>
+      simp[] >>
+      ‘ACONV^* (IfThen v e1 e1') (IfThen v e2' e1')’
+        by(qpat_x_assum ‘ACONV^* e1 e2'’ mp_tac >>
+           rpt(pop_assum kall_tac) >>
+           MAP_EVERY qid_spec_tac [‘e2'’,‘e1’] >>
+           ho_match_mp_tac RTC_INDUCT >>
+           rw[] >>
+           metis_tac[ACONV_rules,RTC_RULES,ACONV_refl]) >>
+      drule_then match_mp_tac RTC_RTC >>
+      qpat_x_assum ‘ACONV^* e1' e2’ mp_tac >>
+      rpt(pop_assum kall_tac) >>
+      MAP_EVERY qid_spec_tac [‘e2’,‘e1'’] >>
+      ho_match_mp_tac RTC_INDUCT >>
+      rw[] >>
+      metis_tac[ACONV_rules,RTC_RULES,ACONV_refl])
+  >- (rename1 ‘Let v f vl’ >>
+      Q.REFINE_EXISTS_TAC ‘Let v f vl _’ >>
+      simp[bound_fun_names_endpoint_def,bound_fix_names_endpoint_def] >>
+      rpt(goal_assum(drule_at (Pos last))) >>
+      qpat_x_assum ‘ACONV^* _ _’ mp_tac >>
+      rpt(pop_assum kall_tac) >>
+      MAP_EVERY qid_spec_tac [‘e2’,‘e1’] >>
+      ho_match_mp_tac RTC_INDUCT >>
+      rw[] >>
+      metis_tac[ACONV_rules,RTC_RULES])
+  >- (rename1 ‘Fix dn'’ >>
+      Cases_on ‘dn ≠ dn'’ >-
+       (Q.REFINE_EXISTS_TAC ‘Fix dn' _’ >>
+        simp[bound_fun_names_endpoint_def,bound_fix_names_endpoint_def] >>
+        rpt(goal_assum(drule_at (Pos last))) >>
+        qpat_x_assum ‘ACONV^* _ _’ mp_tac >>
+        rpt(pop_assum kall_tac) >>
+        MAP_EVERY qid_spec_tac [‘e2’,‘e1’] >>
+        ho_match_mp_tac RTC_INDUCT >>
+        rw[] >>
+        metis_tac[ACONV_rules,RTC_RULES]) >>
+      fs[] >> rveq >>
+      ‘∃dn'. dn' ∉ set(bound_fun_names_endpoint e1) ∪ set(bound_fun_names_endpoint e2) ∪
+                    set(bound_fix_names_endpoint e1) ∪ set(bound_fix_names_endpoint e2)’
+        by cheat >>
+      rpt(goal_assum(drule_at (Pos last))) >>
+      cheat)
+  >- cheat
+  >- cheat
+  >- cheat
+QED
+
 Theorem compile_network_preservation_trans:
   ∀p1 p2 conf.
     conf.payload_size > 0
