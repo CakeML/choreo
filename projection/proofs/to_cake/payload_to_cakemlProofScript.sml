@@ -1959,14 +1959,26 @@ Proof
   Induct_on ‘M’ >> rw[dsubst_def] >> metis_tac[]
 QED
 
+Definition wfclosure_def[simp]:
+  wfclosure (Closure pms (fs,binds) body :payloadLang$closure) ⇔
+    (∀v. v ∈ pFv body ⇒ v ∈ set pms ∪ FDOM binds) ∧
+    ∀nm c. MEM (nm,c) fs ⇒ wfclosure c
+Termination
+  WF_REL_TAC ‘measure closure_size’ >> rpt gen_tac >> Induct_on ‘fs’ >>
+  simp[FORALL_PROD, closure_size_def] >> rw[] >> simp[] >>
+  first_x_assum (drule_then assume_tac) >> simp[] >>
+  irule LESS_LESS_EQ_TRANS >> first_x_assum (irule_at Any) >> simp[]
+End
 
 Definition pSt_pCd_corr_def:
-  pSt_pCd_corr (pSt :closure payloadLang$state) pCd ⇔
-  ∀vn. vn ∈ pFv pCd ⇒ ∃vv. FLOOKUP pSt.bindings vn = SOME vv
+  pSt_pCd_corr (pSt :payloadLang$closure payloadLang$state) pCd ⇔
+    (∀vn. vn ∈ pFv pCd ⇒ ∃vv. FLOOKUP pSt.bindings vn = SOME vv) ∧
+    ∀nm c. MEM (nm,c) pSt.funs ⇒ wfclosure c
 End
 
 Theorem pSt_pCd_corr_alt:
-  pSt_pCd_corr pst pcd ⇔ ∀v. v ∈ pFv pcd ⇒ v ∈ FDOM pst.bindings
+  pSt_pCd_corr pst pcd ⇔ (∀v. v ∈ pFv pcd ⇒ v ∈ FDOM pst.bindings) ∧
+                         ∀nm c. MEM (nm,c) pst.funs ⇒ wfclosure c
 Proof
   simp[pSt_pCd_corr_def, FLOOKUP_DEF]
 QED
@@ -1976,11 +1988,19 @@ Theorem trans_pSt_pCd_corr_pres:
     trans conf (NEndpoint p s c) L (NEndpoint p s' c') ∧ pSt_pCd_corr s c ⇒
     pSt_pCd_corr s' c'
 Proof
-  Induct_on ‘trans’ >> simp[pSt_pCd_corr_alt] >> rw[]
+  Induct_on ‘trans’ >> simp[pSt_pCd_corr_alt] >> rw[] >>
+  TRY (first_x_assum $ drule_all_then ACCEPT_TAC) >> simp[]
   >- metis_tac[]
   >- metis_tac[]
   >- (drule pFv_dsubst_E >> simp[])
-  >- cheat
+  >- metis_tac[]
+  >- (drule_then assume_tac ALOOKUP_MEM >> first_x_assum drule >>
+      simp[FDOM_FUPDATE_LIST, MEM_MAP, MEM_ZIP, EXISTS_PROD, MEM_EL] >>
+      metis_tac[])
+  >- (drule_then assume_tac ALOOKUP_MEM >> first_x_assum drule >> simp[] >>
+      metis_tac[])
+  >- (drule_then assume_tac ALOOKUP_MEM >> first_x_assum drule >> simp[] >>
+      metis_tac[])
 QED
 
 (* Payload State and Semantic Environment *)
@@ -2090,15 +2110,17 @@ End
    two corresponding FFI states are all valid to produce
    coherent corresponding transitions *)
 Definition cpFFI_valid_def:
-  (cpFFI_valid conf pSt1 pSt2 ffi1 ffi2 (LSend _ d rp)
-    ⇔ strans conf ffi1 (ASend rp d) ffi2) ∧
-  (cpFFI_valid conf pSt1 pSt2 ffi1 ffi2 (LReceive _ _ _)
-    ⇔ ffi_eq conf ffi1 ffi2) ∧
-  (cpFFI_valid conf pSt1 pSt2 ffi1 ffi2 LTau
-    ⇔ case (some (sp,d).
-              pSt1.queues = normalise_queues (pSt2.queues |+ (sp,d::qlk pSt2.queues sp))) of
-        SOME (sp,d) => strans conf ffi1 (ARecv sp d) ffi2
-      | NONE        => ffi_eq conf ffi1 ffi2)
+  (cpFFI_valid conf pSt1 pSt2 ffi1 ffi2 (LSend _ d rp) ⇔
+     strans conf ffi1 (ASend rp d) ffi2) ∧
+  (cpFFI_valid conf pSt1 pSt2 ffi1 ffi2 (LReceive _ _ _) ⇔
+     ffi_eq conf ffi1 ffi2) ∧
+  (cpFFI_valid conf pSt1 pSt2 ffi1 ffi2 LTau ⇔
+     case (some (sp,d).
+             pSt1.queues = normalise_queues
+                           (pSt2.queues |+ (sp,d::qlk pSt2.queues sp)))
+     of
+       SOME (sp,d) => strans conf ffi1 (ARecv sp d) ffi2
+     | NONE        => ffi_eq conf ffi1 ffi2)
 End
 
 Theorem FDOM_normalise_queues:
@@ -2188,11 +2210,12 @@ Theorem clock_irrel:
   ∀ conf cSt1 cSt2 cEnv1 cExps1 cEnv2 cExps2.
     ∀mc eck1 eck2.
       cEval_equiv conf
-        (evaluate (cSt1 with clock := mc) cEnv1 cExps1)
-        (evaluate (cSt2 with clock := mc) cEnv2 cExps2)
-    ⇒ cEval_equiv conf
-        (evaluate (cSt1 with clock := eck1 + mc) cEnv1 cExps1)
-        (evaluate (cSt2 with clock := eck2 + mc) cEnv2 cExps2)
+                  (evaluate (cSt1 with clock := mc) cEnv1 cExps1)
+                  (evaluate (cSt2 with clock := mc) cEnv2 cExps2)
+      ⇒
+      cEval_equiv conf
+                  (evaluate (cSt1 with clock := eck1 + mc) cEnv1 cExps1)
+                  (evaluate (cSt2 with clock := eck2 + mc) cEnv2 cExps2)
 Proof
   rpt strip_tac >>
   Cases_on ‘evaluate (cSt1 with clock := mc) cEnv1 cExps1’ >>
