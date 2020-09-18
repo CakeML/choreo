@@ -2183,28 +2183,24 @@ Definition cEval_equiv_def:
     ffi_eq conf csA.ffi.ffi_state csB.ffi.ffi_state ∧
     result_eq crA crB
 End
+
 (* Transitive *)
 Theorem result_eq_trans:
-  ∀p1 p2 p3.
-    result_eq p1 p2 ∧
-    result_eq p2 p3
-    ⇒ result_eq p1 p3
+  ∀p1 p2 p3. result_eq p1 p2 ∧ result_eq p2 p3 ⇒ result_eq p1 p3
 Proof
-  rw[result_eq_def] >>
-  EVERY_CASE_TAC >> rw[]
+  rw[result_eq_def] >> EVERY_CASE_TAC >> rw[]
 QED
 
 Theorem cEval_equiv_trans:
   ∀conf p1 p2 p3.
-   cEval_equiv conf p1 p2 ∧
-   cEval_equiv conf p2 p3
-   ⇒ cEval_equiv conf p1 p3
+    cEval_equiv conf p1 p2 ∧ cEval_equiv conf p2 p3 ⇒ cEval_equiv conf p1 p3
 Proof
   rw [] \\ Cases_on ‘p1’ \\ Cases_on ‘p2’ \\ Cases_on ‘p3’
   \\ fs [cEval_equiv_def] \\ qspec_then ‘conf’ assume_tac ffi_eq_equivRel
   \\ fs [equivalence_def,transitive_def]
   \\ metis_tac [result_eq_trans]
 QED
+
 (* Irrelevance of extra time/fuel to equivalence *)
 Theorem clock_irrel:
   ∀ conf cSt1 cSt2 cEnv1 cExps1 cEnv2 cExps2.
@@ -2221,12 +2217,14 @@ Proof
   Cases_on ‘evaluate (cSt1 with clock := mc) cEnv1 cExps1’ >>
   Cases_on ‘evaluate (cSt2 with clock := mc) cEnv2 cExps2’ >>
   fs[cEval_equiv_def] >>
-  ‘evaluate (cSt1 with clock := eck1 + mc) cEnv1 cExps1
-    = (q with clock := eck1 + q.clock,r)’
-    by (Q.ISPECL_THEN [‘(cSt1 with clock := mc)’,‘cEnv1’, ‘cExps1’,‘q’,‘r’,‘eck1’]
-                      assume_tac evaluate_add_to_clock >>
-        rfs[] >> pop_assum mp_tac >> impl_tac
-        >- (fs[result_eq_def] >> EVERY_CASE_TAC >> rw[]) >>
+  rename [‘ffi_eq conf q.ffi.ffi_state q'.ffi.ffi_state’,
+          ‘evaluate _ _ _ = (q,r)’, ‘evaluate _ _ _ = (q',r')’]
+  ‘evaluate (cSt1 with clock := eck1 + mc) cEnv1 cExps1 =
+   (q with clock := eck1 + q.clock,r)’
+    by (qspecl_then [‘(cSt1 with clock := mc)’,‘cEnv1’, ‘cExps1’,‘q’,‘r’,‘eck1’]
+        assume_tac evaluate_add_to_clock >> gs[] >>
+        pop_assum mp_tac >> impl_tac
+        >- (gvs[result_eq_def] >> EVERY_CASE_TAC >> rw[]) >>
         rw[]) >>
   ‘evaluate (cSt2 with clock := eck2 + mc) cEnv2 cExps2
     = (q' with clock := eck2 + q'.clock,r')’
