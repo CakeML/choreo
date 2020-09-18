@@ -747,7 +747,7 @@ Definition compile_fix_closure_rel_def:
     bds1 = bds2 ∧
     letrec_endpoint e ∧ letrec_endpoint e1 ∧ letrec_endpoint e2 ∧
     consistent_arities e ∧ consistent_arities e1 ∧ consistent_arities e' ∧
-    arsof dn e = {LENGTH vars} ∧
+    arsof dn e ⊆ {LENGTH vars} ∧
     set(written_var_names_endpoint e) (* DIFF set vars *) ⊆ FDOM bds1 ∧
     set(written_var_names_endpoint_before dn e1) ⊆ set vars ∧
     set(written_var_names_endpoint_before dn' e1) ⊆ set vars1 ∧
@@ -800,7 +800,7 @@ Definition compile_fix_closure_endpoint_rel_def:
     letrec_endpoint e ∧ letrec_endpoint e1 ∧ letrec_endpoint e' ∧
     consistent_arities e ∧ consistent_arities e1 ∧
     consistent_arities e' ∧
-    arsof dn e = {LENGTH vars} ∧
+    arsof dn e ⊆ {LENGTH vars} ∧
     good_letrecs (MAP (λ(x,y). (x, closure_args y)) s1.funs) e1 ∧
     set vars = set(written_var_names_endpoint e) ∧
     set(written_var_names_endpoint e) (* DIFF set vars *) ⊆ FDOM s2.bindings ∧
@@ -991,6 +991,122 @@ Proof
   fs[MEM_FILTER] >>
   rfs[] >>
   rw[SUBSET_DEF] >> imp_res_tac SUBSET_THM >> simp[]
+QED
+
+Theorem free_fun_names_endpoint_compile_endpoint:
+  ∀dn funs e. MEM dn (free_fun_names_endpoint (compile_endpoint funs e)) ⇒
+           MEM dn (free_fix_names_endpoint e) ∧ MEM dn (MAP FST funs)
+Proof
+  strip_tac >> Induct_on ‘e’ >>
+  rw[good_letrecs_def,compile_endpoint_def,free_fix_names_endpoint_def,free_fun_names_endpoint_def] >>
+  TRY(res_tac >> fs[] >> NO_TAC) >>
+  TRY(rename1 ‘FILTER’ >>
+      fs[MEM_FILTER,EVERY_MEM] >>
+      res_tac >> rveq >> fs[] >> rveq >> fs[] >> NO_TAC) >>
+  FULL_CASE_TAC >> fs[free_fun_names_endpoint_def] >>
+  imp_res_tac ALOOKUP_MEM >>
+  rw[MEM_MAP] >>
+  metis_tac[FST]
+QED
+
+Theorem written_var_names_endpoint_before_compile_endpoint:
+  ∀x dn funs e vars.
+    MEM x (written_var_names_endpoint_before dn (compile_endpoint funs e)) ∧
+    ALOOKUP funs dn = SOME vars ∧
+    set(written_var_names_endpoint e) ⊆ set vars ⇒
+    MEM x vars
+Proof
+  ntac 2 strip_tac >> Induct_on ‘e’ >>
+  rw[written_var_names_endpoint_before_def,compile_endpoint_def,written_var_names_endpoint_def] >>
+  TRY(res_tac >> fs[] >> NO_TAC) >>
+  FULL_CASE_TAC >> fs[written_var_names_endpoint_before_def] >>
+  FULL_CASE_TAC >> fs[] >> rveq >> simp[]
+QED
+
+Theorem good_letrecs_compile_endpoint:
+  ∀funs e.
+        (∀dn vars. ALOOKUP funs dn = SOME vars ⇒ set(written_var_names_endpoint e) ⊆ set vars) ⇒
+        good_letrecs funs (compile_endpoint funs e)
+Proof
+  Induct_on ‘e’ >>
+  rw[good_letrecs_def,compile_endpoint_def,free_fun_names_endpoint_def,
+     written_var_names_endpoint_before_def,
+     written_var_names_endpoint_def,IMP_CONJ_THM,FORALL_AND_THM] >>
+  TRY(first_x_assum match_mp_tac >>
+      rw[] >> rw[set_nub'] >> res_tac >> NO_TAC) >>
+  TRY(imp_res_tac free_fun_names_endpoint_compile_endpoint >>
+      fs[] >> rveq >>
+      res_tac >> fs[set_nub'] >> NO_TAC) >>
+  TRY(rw[SUBSET_DEF,set_nub'] >>
+      drule written_var_names_endpoint_before_compile_endpoint >>
+      simp[set_nub'] >> NO_TAC) >>
+  TOP_CASE_TAC >> simp[good_letrecs_def]
+QED
+
+Theorem arities_compile_endpoint_IMP:
+  ∀dn l funs e.
+  MEM (dn,l) (arities (compile_endpoint funs e)) ⇒
+  (∃vars. ALOOKUP funs dn = SOME vars ∧ l = LENGTH vars ∧ MEM dn (free_fix_names_endpoint e))
+Proof
+  ntac 2 strip_tac >> Induct_on ‘e’ >>
+  rw[arities_def,free_fix_names_endpoint_def,compile_endpoint_def,MEM_FILTER]
+  >- metis_tac[]
+  >- metis_tac[]
+  >- (res_tac >> fs[CaseEq "bool"] >> rveq >> fs[])
+  >- (FULL_CASE_TAC >> fs[arities_def])
+QED
+
+Theorem IMP_arities_compile_endpoint:
+  ∀dn vars funs e.
+  ALOOKUP funs dn = SOME vars ∧ MEM dn (free_fix_names_endpoint e) ∧ fix_endpoint e ⇒
+  MEM (dn,LENGTH vars) (arities (compile_endpoint funs e))
+Proof
+  ntac 2 strip_tac >> Induct_on ‘e’ >>
+  rw[arities_def,free_fix_names_endpoint_def,compile_endpoint_def,MEM_FILTER,fix_endpoint_def]
+  >- metis_tac[]
+  >- metis_tac[]
+  >- simp[arities_def]
+QED
+
+Theorem arities_compile_endpoint_eq:
+  ∀dn l funs e.
+  fix_endpoint e ⇒
+  (MEM (dn,l) (arities (compile_endpoint funs e)) ⇔
+   (∃vars. ALOOKUP funs dn = SOME vars ∧ l = LENGTH vars ∧ MEM dn (free_fix_names_endpoint e)))
+Proof
+  metis_tac[IMP_arities_compile_endpoint,arities_compile_endpoint_IMP]
+QED
+
+Theorem compile_endpoint_always_same_args:
+  ∀funs e. always_same_args funs (compile_endpoint funs e)
+Proof
+  Induct_on ‘e’ >> rw[compile_endpoint_def,always_same_args_def] >>
+  TOP_CASE_TAC >> rw[always_same_args_def]
+QED
+
+Theorem arsof_compile_endpoint_SUBSET:
+  ∀dn vars funs e.
+    ALOOKUP funs dn = SOME vars ⇒
+    arsof dn (compile_endpoint funs e) ⊆ {LENGTH vars}
+Proof
+  rpt strip_tac >>
+  rw[arsof_def,SUBSET_DEF,MEM_FILTER,MEM_MAP] >>
+  rename1 ‘MEM pair (arities _)’ >>
+  Cases_on ‘pair’ >>
+  imp_res_tac arities_compile_endpoint_IMP >>
+  fs[]
+QED
+
+Theorem always_same_args_fsubst_lemma:
+  ∀dn e' funs e.
+    always_same_args funs (fsubst e dn e') ∧
+    ~MEM dn (MAP FST funs) ⇒
+    always_same_args funs e
+Proof
+  ntac 2 strip_tac >>
+  Induct_on ‘e’ >> rw[always_same_args_def,fsubst_def] >>
+  TOP_CASE_TAC >> imp_res_tac ALOOKUP_MEM >>
+  metis_tac[MEM_MAP,FST]
 QED
 
 Theorem tausim_defer_fundef:
@@ -1693,7 +1809,45 @@ Proof
       simp[saturates_nub'] >>
       goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL) >>
       simp[FDOM_FUPDATE_LIST,MAP_MAP_o,LIST_TO_SET_MAP] >>
-      cheat)
+      simp[good_letrecs_def,closure_args_def,good_letrecs_compile_endpoint,set_nub',
+           arities_compile_endpoint_eq,compile_endpoint_consistent_arities,
+           compile_endpoint_always_same_args,arsof_compile_endpoint_SUBSET,
+           SUBSET_REFL] >>
+      conj_tac >-
+        (drule_then match_mp_tac saturates_mono >>
+         match_mp_tac SUBSET_TRANS >>
+         goal_assum(resolve_then (Pos hd) mp_tac written_var_names_endpoint_compile_endpoint_SUBSET) >>
+         simp[] >>
+         goal_assum(resolve_then (Pos hd) mp_tac SUBSET_REFL)) >>
+      conj_tac >-
+       (metis_tac[letrec_endpoint_fsubst',letrec_endpoint_compile_endpoint]) >>
+      conj_tac >-
+       (cheat (* consistent_arities e'' *)) >>
+      conj_tac >-
+       (rw[SET_EQ_SUBSET]
+        >- metis_tac[written_var_names_endpoint_compile_endpoint_SUBSET]
+        >- (match_mp_tac SUBSET_TRANS >>
+            goal_assum(resolve_then (Pos hd) mp_tac written_var_names_endpoint_compile_endpoint_SUBSET') >>
+            simp[set_nub'])) >>
+      conj_tac >-
+       (match_mp_tac SUBSET_TRANS >>
+        goal_assum(resolve_then (Pos hd) mp_tac written_var_names_endpoint_compile_endpoint_SUBSET') >>
+        simp[set_nub'] >>
+        simp[IMAGE_IMAGE,o_DEF,LIST_TO_SET_FILTER,set_nub'] >>
+        rw[SUBSET_DEF,UNION_DEF,INTER_DEF]) >>
+      conj_tac >-
+       (rw[SUBSET_DEF] >>
+        drule written_var_names_endpoint_before_compile_endpoint >>
+        rw[set_nub']) >>
+      conj_tac >-
+       (rw[SUBSET_DEF] >> drule free_fun_names_endpoint_compile_endpoint >> rw[]) >>
+      conj_tac >-
+       (cheat (* written_var_names_endpoint + fsubst *)) >>
+      conj_tac >-
+       (cheat (* dn is fresh amongs the bound names of e *)) >>
+      match_mp_tac always_same_args_fsubst_lemma >>
+      simp[] >>
+      metis_tac[compile_endpoint_always_same_args])
   >- ((* trans_Letrec *)
       fs[fix_network_def,endpoints_def,fix_endpoint_def])
   >- ((* trans_call *)
