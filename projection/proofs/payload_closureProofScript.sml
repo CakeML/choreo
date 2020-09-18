@@ -1666,6 +1666,26 @@ Proof
   rw[FILTER_APPEND,FILTER_MAP,o_DEF,perm1_eq_cong,perm1_eq_right]
 QED
 
+Theorem bound_fun_names_endpoint_perm:
+  ∀dv dv' e.
+  bound_fun_names_endpoint (perm_dname_endpoint dv dv' e) =
+  MAP (perm1 dv dv') (bound_fun_names_endpoint e)
+Proof
+  ntac 2 strip_tac >>
+  Induct_on ‘e’ >> rw[bound_fun_names_endpoint_def,perm_dname_endpoint_def] >>
+  rw[FILTER_APPEND,FILTER_MAP,o_DEF,perm1_eq_cong,perm1_eq_right]
+QED
+
+Theorem bound_fix_names_endpoint_perm:
+  ∀dv dv' e.
+  bound_fix_names_endpoint (perm_dname_endpoint dv dv' e) =
+  MAP (perm1 dv dv') (bound_fix_names_endpoint e)
+Proof
+  ntac 2 strip_tac >>
+  Induct_on ‘e’ >> rw[bound_fix_names_endpoint_def,perm_dname_endpoint_def] >>
+  rw[FILTER_APPEND,FILTER_MAP,o_DEF,perm1_eq_cong,perm1_eq_right]
+QED
+
 Theorem ACONV_sym:
   ∀e1 e2. ACONV e1 e2 ⇒ ACONV e2 e1
 Proof
@@ -1740,6 +1760,35 @@ Proof
   >- metis_tac[ACONV_rules]
 QED
 
+Theorem RTC_ACONV_perm:
+  ∀dv dv' e1 e2.
+    ACONV^* e1 e2 ⇒
+    ACONV^* (perm_dname_endpoint dv dv' e1) (perm_dname_endpoint dv dv' e2)
+Proof
+  ntac 2 strip_tac >>
+  ho_match_mp_tac RTC_INDUCT >>
+  rw[] >>
+  metis_tac[ACONV_perm,RTC_RULES]
+QED
+
+Theorem get_fresh_thing:
+  INFINITE(𝕌(:'a)) ∧
+  FINITE(s:'a set) ⇒
+  ∃x. ¬(x ∈ s)
+Proof
+  spose_not_then STRIP_ASSUME_TAC >>
+  ‘𝕌(:α) ⊆ s’ by metis_tac[SUBSET_DEF] >>
+  imp_res_tac INFINITE_SUBSET
+QED
+
+Theorem get_fresh_string:
+  FINITE(s:string set) ⇒
+  ∃x. ¬(x ∈ s)
+Proof
+  strip_tac >> match_mp_tac get_fresh_thing >>
+  simp[]
+QED
+
 Theorem ACONV_avoids:
  ∀dn e1.
    ∃e2. ACONV^* e1 e2 ∧ ~MEM dn (bound_fun_names_endpoint e2) ∧ ~MEM dn (bound_fix_names_endpoint e2)
@@ -1808,14 +1857,96 @@ Proof
         rw[] >>
         metis_tac[ACONV_rules,RTC_RULES]) >>
       fs[] >> rveq >>
-      ‘∃dn'. dn' ∉ set(bound_fun_names_endpoint e1) ∪ set(bound_fun_names_endpoint e2) ∪
-                    set(bound_fix_names_endpoint e1) ∪ set(bound_fix_names_endpoint e2)’
-        by cheat >>
-      rpt(goal_assum(drule_at (Pos last))) >>
-      cheat)
-  >- cheat
-  >- cheat
-  >- cheat
+      ‘∃dn'. ¬(dn' ∈ {dn} ∪
+                      set(bound_fun_names_endpoint e1) ∪ set(bound_fun_names_endpoint e2) ∪
+                      set(bound_fix_names_endpoint e1) ∪ set(bound_fix_names_endpoint e2) ∪
+                      set(free_fun_names_endpoint e1) ∪ set(free_fun_names_endpoint e2) ∪
+                      set(free_fix_names_endpoint e1) ∪ set(free_fix_names_endpoint e2))’
+        by(match_mp_tac get_fresh_string >> simp[]) >>
+      goal_assum(resolve_then (Pos hd) mp_tac RTC_TRANS) >>
+      CONV_TAC(SWAP_EXISTS_CONV) >>
+      qexists_tac ‘Fix dn' (perm_dname_endpoint dn dn' e1)’ >>
+      simp[GSYM PULL_EXISTS] >>
+      conj_tac >- (rw[Once ACONV_cases] >> fs[]) >>
+      qexists_tac ‘(Fix dn' (perm_dname_endpoint dn dn' e2))’ >>
+      conj_tac >-
+       (drule_then (qspecl_then [‘dn’,‘dn'’] mp_tac) RTC_ACONV_perm >>
+        rpt(pop_assum kall_tac) >>
+        rename [‘ACONV^* e1 e2’] >>
+        MAP_EVERY qid_spec_tac [‘e2’,‘e1’] >>
+        ho_match_mp_tac RTC_INDUCT >>
+        rw[] >>
+        metis_tac[ACONV_rules,RTC_RULES]) >>
+      fs[bound_fun_names_endpoint_def,bound_fix_names_endpoint_def,
+         bound_fun_names_endpoint_perm,bound_fix_names_endpoint_perm,
+         MEM_MAP,GSYM perm1_eq_right])
+  >- (goal_assum(resolve_then (Pos hd) mp_tac RTC_SUBSET) >>
+      rw[Once ACONV_cases,bound_fix_names_endpoint_def,bound_fun_names_endpoint_def])
+  >- (rename1 ‘Letrec dn' vars’ >>
+      Cases_on ‘dn ≠ dn'’ >-
+       (Q.REFINE_EXISTS_TAC ‘Letrec dn' vars _ _’ >>
+        simp[bound_fun_names_endpoint_def,bound_fix_names_endpoint_def] >>
+        ‘ACONV^* (Letrec dn' vars e1 e1') (Letrec dn' vars e2' e1')’
+          by(qpat_x_assum ‘ACONV^* e1 _’ mp_tac >>
+             rpt(pop_assum kall_tac) >>
+             MAP_EVERY qid_spec_tac [‘e2'’,‘e1’] >>
+             ho_match_mp_tac RTC_INDUCT >>
+             rw[] >>
+             metis_tac[ACONV_rules,RTC_RULES,ACONV_refl]) >>
+        goal_assum(resolve_then (Pos hd) mp_tac RTC_RTC) >>
+        goal_assum drule >>
+        ‘ACONV^* (Letrec dn' vars e2' e1') (Letrec dn' vars e2' e2)’
+          by(qpat_x_assum ‘ACONV^* e1' _’ mp_tac >>
+             rpt(pop_assum kall_tac) >>
+             MAP_EVERY qid_spec_tac [‘e2’,‘e1'’] >>
+             ho_match_mp_tac RTC_INDUCT >>
+             rw[] >>
+             metis_tac[ACONV_rules,RTC_RULES,ACONV_refl]) >>
+        goal_assum drule >>
+        simp[]) >>
+      fs[] >> rveq >>
+      ‘∃dn'. ¬(dn' ∈ {dn} ∪
+                      set(bound_fun_names_endpoint e1) ∪ set(bound_fun_names_endpoint e2) ∪
+                      set(bound_fix_names_endpoint e1) ∪ set(bound_fix_names_endpoint e2) ∪
+                      set(free_fun_names_endpoint e1) ∪ set(free_fun_names_endpoint e2) ∪
+                      set(free_fix_names_endpoint e1) ∪ set(free_fix_names_endpoint e2) ∪
+                      set(bound_fun_names_endpoint e1') ∪ set(bound_fun_names_endpoint e2') ∪
+                      set(bound_fix_names_endpoint e1') ∪ set(bound_fix_names_endpoint e2') ∪
+                      set(free_fun_names_endpoint e1') ∪ set(free_fun_names_endpoint e2') ∪
+                      set(free_fix_names_endpoint e1') ∪ set(free_fix_names_endpoint e2'))’
+        by(match_mp_tac get_fresh_string >> simp[]) >>
+      goal_assum(resolve_then (Pos hd) mp_tac RTC_TRANS) >>
+      CONV_TAC(SWAP_EXISTS_CONV) >>
+      qexists_tac ‘Letrec dn' vars (perm_dname_endpoint dn dn' e1) (perm_dname_endpoint dn dn' e1')’ >>
+      simp[GSYM PULL_EXISTS] >>
+      conj_tac >- (rw[Once ACONV_cases] >> fs[]) >>
+      qexists_tac ‘Letrec dn' vars (perm_dname_endpoint dn dn' e2') (perm_dname_endpoint dn dn' e2)’ >>
+      conj_tac >-
+       (dxrule_then (qspecl_then [‘dn’,‘dn'’] mp_tac) RTC_ACONV_perm >>
+        dxrule_then (qspecl_then [‘dn’,‘dn'’] mp_tac) RTC_ACONV_perm >>
+        rpt(pop_assum kall_tac) >>
+        rename [‘ACONV^* e1 e2 ⇒ ACONV^* e3 e4 ⇒ _’] >>
+        rpt strip_tac >>
+        ‘ACONV^* (Letrec dn' vars e3 e1) (Letrec dn' vars e4 e1)’
+          by(qpat_x_assum ‘ACONV^* e3 _’ mp_tac >>
+             rpt(pop_assum kall_tac) >>
+             MAP_EVERY qid_spec_tac [‘e4’,‘e3’] >>
+             ho_match_mp_tac RTC_INDUCT >>
+             rw[] >>
+             metis_tac[ACONV_rules,RTC_RULES,ACONV_refl]) >>
+        goal_assum(resolve_then (Pos hd) mp_tac RTC_RTC) >>
+        goal_assum drule >>
+        qpat_x_assum ‘ACONV^* e1 _’ mp_tac >>
+        rpt(pop_assum kall_tac) >>
+        MAP_EVERY qid_spec_tac [‘e2’,‘e1’] >>
+        ho_match_mp_tac RTC_INDUCT >>
+        rw[] >>
+        metis_tac[ACONV_rules,RTC_RULES,ACONV_refl]) >>
+      fs[bound_fun_names_endpoint_def,bound_fix_names_endpoint_def,
+         bound_fun_names_endpoint_perm,bound_fix_names_endpoint_perm,
+         MEM_MAP,GSYM perm1_eq_right])
+  >- (goal_assum(resolve_then (Pos hd) mp_tac RTC_SUBSET) >>
+      rw[Once ACONV_cases,bound_fix_names_endpoint_def,bound_fun_names_endpoint_def])
 QED
 
 Theorem compile_network_preservation_trans:
