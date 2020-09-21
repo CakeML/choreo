@@ -117,6 +117,9 @@ val (scong_rules, scong_ind, scong_cases) = Hol_reln `
 ∧ (∀p1 b p2 c c'.
     scong c c'
     ⇒ scong (Sel p1 b p2 c) (Sel p1 b p2 c'))
+
+  (* Recursion *)
+∧ (∀x c. scong (Fix x c) (dsubst c x (Fix x c)))
 `;
 
 val _ = Parse.add_infix("≅",425,Parse.NONASSOC);
@@ -129,7 +132,7 @@ val _ = zip ["scong_sym", "scong_refl", "scong_trans"
             , "scong_if_swap", "scong_com_if_swap"
             , "scong_sel_if_swap", "scong_let_if_swap"
             , "scong_if", "scong_let", "scong_com"
-            , "scong_sel"]
+            , "scong_sel", "scong_fix"]
             (CONJUNCTS scong_rules) |> map save_thm;
 
 val (transCong_rules,transCong_ind,transCong_cases) = Hol_reln `

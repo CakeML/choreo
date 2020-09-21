@@ -118,24 +118,6 @@ val [lcong_sym,lcong_refl,lcong_trans,lcong_reord] =
     zip ["lcong_sym","lcong_refl","lcong_trans","lcong_reord"]
         (CONJUNCTS lcong_rules) |> map save_thm;
 
-Definition dsubst_def:
-  dsubst Nil dn c'               = Nil
-∧ dsubst (IfThen v p l r) dn c' = IfThen v p (dsubst l dn c') (dsubst r dn c')
-∧ dsubst (Com p v1 q v2 c) dn c'  = Com p v1 q v2 (dsubst c dn c')
-∧ dsubst (Sel p v q c) dn c'    = Sel p v q (dsubst c dn c')
-∧ dsubst (Let v p f l c) dn c'  = Let v p f l (dsubst c dn c')
-∧ dsubst (Fix dn' c) dn c' =
-   (if dn = dn' then
-      Fix dn' c
-    else
-      Fix dn' (dsubst c dn c'))
-∧ dsubst (Call dn') dn c'          =
-   (if dn = dn' then
-      c'
-    else
-      Call dn')
-End
-
 Inductive trans:
   (* Communication *)
   (∀s v1 p1 v2 p2 d c.

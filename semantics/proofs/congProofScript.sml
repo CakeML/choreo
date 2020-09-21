@@ -16,27 +16,110 @@ End
    under state `s` (the state is only used for If expressions)
 *)
 Definition chorTrm_def:
-  chorTrm s (LCom p v q x) (Com p' v' q' x' c) =
-    (if (p,v,q,x) = (p',v',q',x') then c
-     else Com p' v' q' x' (chorTrm s (LCom p v q x) c))
-∧ chorTrm s (LSel p b q) (Sel p' b' q' c) =
-    (if (p,b,q) = (p',b',q') then c
-     else Sel p' b' q' (chorTrm s (LSel p b q) c))
-∧ chorTrm s (LLet v p f vl) (Let v' p' f' vl' c) =
-    (if (v,p,f,vl) = (v',p',f',vl') then c
-     else Let v' p' f' vl' (chorTrm s (LLet v p f vl) c))
-∧ chorTrm s (LTau p v) (IfThen v' p' c1 c2) =
+  chorTrm (k:num) s (LCom p v q x) (Com p' v' q' x' c) =
+    (if (p,v,q,x) = (p',v',q',x') then SOME c
+     else OPTION_MAP (Com p' v' q' x') (chorTrm k s (LCom p v q x) c))
+∧ chorTrm k s (LSel p b q) (Sel p' b' q' c) =
+    (if (p,b,q) = (p',b',q') then SOME c
+     else OPTION_MAP (Sel p' b' q') (chorTrm k s (LSel p b q) c))
+∧ chorTrm k s (LLet v p f vl) (Let v' p' f' vl' c) =
+    (if (v,p,f,vl) = (v',p',f',vl') then SOME c
+     else OPTION_MAP (Let v' p' f' vl') (chorTrm k s (LLet v p f vl) c))
+∧ chorTrm k s (LTau p v) (IfThen v' p' c1 c2) =
     (if (p,v) = (p',v')
-     then if FLOOKUP s (v,p) = SOME [1w] then c1
-          else if ∃w. FLOOKUP s (v,p) = SOME w ∧ w ≠ [1w] then c2
-          else IfThen v' p' c1 c2 (* Imposible? *)
-     else IfThen v' p' (chorTrm s (LTau p v) c1) (chorTrm s (LTau p v) c2))
-∧ chorTrm s τ (Com p' v' q' x' c)  = Com p' v' q' x' (chorTrm s τ c)
-∧ chorTrm s τ (Sel p' b' q' c)     = Sel p' b' q' (chorTrm s τ c)
-∧ chorTrm s τ (Let v' p' f' vl' c) = Let v' p' f' vl' (chorTrm s τ c)
-∧ chorTrm s τ (IfThen v' p' c1 c2) = IfThen v' p' (chorTrm s τ c1) (chorTrm s τ c2)
-∧ chorTrm s τ Nil                  = Nil
+     then if FLOOKUP s (v,p) = SOME [1w] then SOME c1
+          else if ∃w. FLOOKUP s (v,p) = SOME w ∧ w ≠ [1w] then SOME c2
+          else SOME (IfThen v' p' c1 c2) (* Imposible? *)
+     else  OPTION_MAP2 (IfThen v' p') (chorTrm k s (LTau p v) c1) (chorTrm k s (LTau p v) c2))
+∧ chorTrm k s LFix (Fix x c)         = SOME c
+∧ chorTrm k s τ (Fix x c)            = (if k = 0 then NONE
+                                        else chorTrm (k-1) s τ (dsubst c x (Fix x c)))
+∧ chorTrm k s τ (Com p' v' q' x' c)  = OPTION_MAP  (Com p' v' q' x')  (chorTrm k s τ c)
+∧ chorTrm k s τ (Sel p' b' q' c)     = OPTION_MAP  (Sel p' b' q')     (chorTrm k s τ c)
+∧ chorTrm k s τ (Let v' p' f' vl' c) = OPTION_MAP  (Let v' p' f' vl') (chorTrm k s τ c)
+∧ chorTrm k s τ (IfThen v' p' c1 c2) = OPTION_MAP2 (IfThen v' p')     (chorTrm k s τ c1)
+                                                                      (chorTrm k s τ c2)
+∧ chorTrm k s τ (Call x)             = NONE
+∧ chorTrm k s τ Nil                  = NONE
+Termination
+  WF_REL_TAC ‘inv_image (measure I LEX
+                         measure chor_size)
+                        (λ(k,s,τ,c). (k,c))’
+  \\ rpt strip_tac
 End
+
+Theorem chorTrm_k_scong:
+  ∀k s τ c0 c c' k'.
+    chorTrm k s τ c0 = SOME c  ∧
+    chorTrm k' s τ c0 = SOME c'
+    ⇒ c ≅ c'
+Proof
+  ho_match_mp_tac chorTrm_ind
+  \\ rw [chorTrm_def]
+  \\ metis_tac [scong_rules]
+QED
+
+Theorem chorTrm_IS_SOME:
+  ∀k s τ c k'.
+    k < k' ∧ IS_SOME (chorTrm k s τ c)
+    ⇒ IS_SOME (chorTrm k' s τ c)
+Proof
+  ho_match_mp_tac chorTrm_ind
+  \\ rw [chorTrm_def]
+  \\ TRY (qpat_x_assum ‘_ ⇒ _ ’ mp_tac
+         \\ impl_tac >- fs []
+         \\ disch_then drule
+         \\ strip_tac
+         \\ qmatch_goalsub_abbrev_tac ‘IS_SOME (_ _ t0)’
+         \\ Cases_on ‘t0’ \\ fs [] \\ simp [] \\ NO_TAC)
+  \\ TRY (qpat_x_assum ‘_ ⇒ _ ’ mp_tac
+          \\ impl_tac >- fs []
+          \\ disch_then drule
+          \\ strip_tac
+          \\ qpat_x_assum ‘_ ⇒ ∀k''. _ ’ mp_tac
+          \\ impl_tac >- fs []
+          \\ disch_then drule
+          \\ strip_tac
+          \\ qmatch_asmsub_abbrev_tac ‘IS_SOME (OPTION_MAP2 _ t0 t1)’
+          \\ MAP_EVERY Cases_on [‘t0’,‘t1’] \\ fs [] \\ simp []
+          \\ qmatch_goalsub_abbrev_tac ‘IS_SOME (OPTION_MAP2 _ t2 t3)’
+          \\ MAP_EVERY Cases_on [‘t2’,‘t3’] \\ fs [] \\ simp []
+          \\ NO_TAC)
+  \\ TRY (first_x_assum drule \\ strip_tac
+          \\ qmatch_asmsub_abbrev_tac ‘IS_SOME (OPTION_MAP _ t0)’
+          \\ Cases_on ‘t0’ \\ fs [] \\ simp []
+          \\ qmatch_goalsub_abbrev_tac ‘IS_SOME (OPTION_MAP _ t1)’
+          \\ Cases_on ‘t1’ \\ fs [] \\ simp []
+          \\ NO_TAC)
+  \\ first_x_assum drule
+  \\ first_x_assum drule
+  \\ strip_tac \\ strip_tac
+  \\ qmatch_asmsub_abbrev_tac ‘IS_SOME (OPTION_MAP2 _ t0 t1)’
+  \\ MAP_EVERY Cases_on [‘t0’,‘t1’] \\ fs [] \\ simp []
+  \\ qmatch_goalsub_abbrev_tac ‘IS_SOME (OPTION_MAP2 _ t2 t3)’
+  \\ MAP_EVERY Cases_on [‘t2’,‘t3’] \\ fs [] \\ simp []
+QED
+
+Theorem chorTrm_IS_NONE:
+  ∀k s τ c k'.
+    k' < k ∧ IS_NONE (chorTrm k s τ c)
+    ⇒ IS_NONE (chorTrm k' s τ c)
+Proof
+  ho_match_mp_tac chorTrm_ind
+  \\ rw [chorTrm_def]
+  \\ TRY (qpat_x_assum ‘_ ⇒ _ ’ mp_tac
+         \\ impl_tac >- fs []
+         \\ disch_then drule
+         \\ strip_tac
+         \\ fs [] \\ simp [] \\ NO_TAC)
+  \\ TRY (Cases_on ‘k = 0’ \\ fs []
+          \\ CCONTR_TAC
+          \\ ‘k' - 1 < k - 1’ by fs []
+          \\ first_x_assum drule
+          \\ fs []
+          \\ CCONTR_TAC \\ fs []
+          \\ NO_TAC)
+QED
 
 (* The application of `chorTrm` preserves `scong` *)
 Theorem chorTrm_scong:
