@@ -374,6 +374,51 @@ Definition arities_def:
   (arities (Call dn) = [])
 End
 
+Definition arsof_def:
+  arsof dn e = set(MAP SND (FILTER ($= dn o FST) (arities e)))
+End
+
+Theorem MEM_arities_arsof:
+  ∀dn n vars e.
+    MEM (dn,n) (arities e) ⇒
+    n ∈ arsof dn e
+Proof
+  rw[arsof_def,MEM_MAP,MEM_FILTER] >>
+  metis_tac[FST,SND]
+QED
+
+Theorem arsof_simps[simp]:
+  arsof dn (Send p v n e) = arsof dn e ∧
+  arsof dn (Receive p v d e) = arsof dn e ∧
+  arsof dn (Let v f vl e) = arsof dn e ∧
+  arsof dn (IfThen v e1 e2) = arsof dn e1 ∪ arsof dn e2 ∧
+  arsof dn (FCall dn vars) = {LENGTH vars}
+Proof
+  rw[arsof_def,arities_def,FILTER_APPEND]
+QED
+
+Theorem arsof_Nil:
+  arsof dn Nil = {}
+Proof
+  rw[arsof_def,arities_def]
+QED
+
+Theorem arsof_letrec_lemma:
+  dn ≠ s ⇒
+  arsof dn (Letrec s l e1 e2) =
+  arsof dn e1 ∪ arsof dn e2
+Proof
+  rw[arsof_def,arities_def,SET_EQ_SUBSET,SUBSET_DEF,MEM_MAP,MEM_FILTER] >>
+  metis_tac[FST,SND]
+QED
+
+Theorem arsof_FCall_lemma:
+  dn ≠ s ⇒
+  arsof dn (FCall s vars) = {}
+Proof
+  rw[arsof_def,arities_def]
+QED
+
 Definition consistent_arities_def:
   (consistent_arities payloadLang$Nil = T) ∧
   (consistent_arities (Send p v n e) = consistent_arities e) ∧
@@ -427,11 +472,12 @@ Theorem compile_endpoint_dsubst:
     fsubst e'' dn (compile_endpoint [] (Fix dn e)) ∧
     saturates (written_var_names_endpoint e)
               (compile_endpoint ((dn,nub'(written_var_names_endpoint e))::ar) e')
-              e''
+              e'' ∧
+    arsof dn e'' ⊆ {LENGTH(nub'(written_var_names_endpoint e))}
 Proof
   strip_tac >> Induct >> rpt strip_tac
   >- ((* Nil *)
-      fs[dsubst_def,fix_endpoint_def,fsubst_def,compile_endpoint_def,Once saturates_cases])
+      fs[dsubst_def,fix_endpoint_def,fsubst_def,compile_endpoint_def,Once saturates_cases,arsof_Nil])
   >- ((* Send *)
       fs[dsubst_def,fix_endpoint_def,fsubst_def,compile_endpoint_def] >>
       simp[Once saturates_cases,PULL_EXISTS,fsubst_def] >>
@@ -457,7 +503,8 @@ Proof
        (simp[Once saturates_cases,PULL_EXISTS] >>
         simp[fsubst_def] >>
         simp[all_distinct_nub'] >>
-        reverse conj_tac
+        reverse(rpt conj_tac)
+        >- (simp[arsof_def,arities_def,FILTER_FILTER])
         >- (simp[Once saturates_cases,all_distinct_nub']) >>
         qmatch_goalsub_abbrev_tac ‘saturates _ a1 a2’ >>
         ‘a1 = a2’
@@ -508,13 +555,15 @@ Proof
      fs[written_var_names_endpoint_def] >>
      rw[SUBSET_DEF] >>
      TRY(drule_then MATCH_ACCEPT_TAC written_var_names_endpoint_dsubst') >>
-     imp_res_tac written_var_names_endpoint_dsubst >> fs[written_var_names_endpoint_def]
-     )
+     imp_res_tac written_var_names_endpoint_dsubst >> fs[written_var_names_endpoint_def] >>
+     rfs[arsof_letrec_lemma,arsof_FCall_lemma] >>
+     imp_res_tac SUBSET_THM >> fs[])
   >- (fs[dsubst_def,fix_endpoint_def,fsubst_def,compile_endpoint_def] >>
       reverse(rw[] >> fs[compile_endpoint_def,fsubst_def]) >-
        (TOP_CASE_TAC >> rw[] >>
         simp[Once saturates_cases,PULL_EXISTS,fsubst_def] >>
-        res_tac) >>
+        res_tac >>
+        fs[arsof_FCall_lemma,arsof_Nil]) >>
       fs[free_fix_names_endpoint_def] >>
       simp[Once saturates_cases,PULL_EXISTS,fsubst_def] >>
       goal_assum(resolve_then (Pos hd) mp_tac compile_endpoint_ALOOKUP_eq_strong) >>
@@ -618,10 +667,6 @@ Proof
   metis_tac[MEM_written_var_names_endpoint_until_IMP,SND]
 QED
 
-Definition arsof_def:
-  arsof dn e = set(MAP SND (FILTER ($= dn o FST) (arities e)))
-End
-
 Definition closure_args_def:
   closure_args (Closure vars1 env e) = vars1
 End
@@ -641,15 +686,6 @@ Proof
   fs[arities_def] >> rw[Once saturates_cases] >> rw[arities_def] >>
   fs[MEM_FILTER] >>
   metis_tac[]
-QED
-
-Theorem MEM_arities_arsof:
-  ∀dn n vars e.
-    MEM (dn,n) (arities e) ⇒
-    n ∈ arsof dn e
-Proof
-  rw[arsof_def,MEM_MAP,MEM_FILTER] >>
-  metis_tac[FST,SND]
 QED
 
 Theorem letrec_endpoint_fsubst:
@@ -678,6 +714,16 @@ Proof
   fs[]
 QED
 
+Theorem MEM_arities_IMP_fsubst:
+  ∀e1 dn e2.
+    MEM (s,n) (arities e1) ∧ s ≠ dn ⇒
+    MEM (s,n) (arities(fsubst e1 dn e2))
+Proof
+  Induct >> rw[arities_def,fsubst_def,MEM_FILTER] >>
+  res_tac >>
+  fs[]
+QED
+
 Theorem MEM_arities_imp_free_fun_names:
   ∀s n e. MEM (s,n) (arities e) ⇒ MEM s (free_fun_names_endpoint e)
 Proof
@@ -694,6 +740,20 @@ Proof
   Induct >> rw[consistent_arities_def,fsubst_def] >>
    (imp_res_tac MEM_arities_fsubst_IMP >- metis_tac[] >>
     imp_res_tac MEM_arities_imp_free_fun_names >> rfs[])
+QED
+
+Theorem fsubst_consistent_arities_nofrees:
+  ∀e1 dn e2 n.
+    consistent_arities (fsubst e1 dn e2) ∧
+    arsof dn e1 ⊆ {n} ⇒
+    consistent_arities e1
+Proof
+  Induct >> rw[consistent_arities_def,fsubst_def,arsof_letrec_lemma] >>
+  res_tac
+  >- metis_tac[MEM_arities_IMP_fsubst]
+  >- metis_tac[MEM_arities_IMP_fsubst]
+  >- (fs[arsof_def,SUBSET_DEF,MEM_MAP,MEM_FILTER,PULL_EXISTS] >>
+      metis_tac[FST,SND,MEM_arities_IMP_fsubst])
 QED
 
 Definition always_same_args_def:
@@ -849,16 +909,6 @@ Proof
   rw[compile_fix_closure_rel_def,closure_args_def] >> fs[]
 QED
 
-Theorem arsof_simps[simp]:
-  arsof dn (Send p v n e) = arsof dn e ∧
-  arsof dn (Receive p v d e) = arsof dn e ∧
-  arsof dn (Let v f vl e) = arsof dn e ∧
-  arsof dn (IfThen v e1 e2) = arsof dn e1 ∪ arsof dn e2 ∧
-  arsof dn (FCall dn vars) = {LENGTH vars}
-Proof
-  rw[arsof_def,arities_def,FILTER_APPEND]
-QED
-
 Theorem written_var_names_endpoint_before_fresh_eq_NIL:
   ∀dn e.
   ~MEM dn (free_fun_names_endpoint e) ⇒
@@ -945,7 +995,17 @@ QED
 Theorem saturates_written_var_names_endpoint:
   ∀vars e1 e2.
   saturates vars e1 e2 ⇒
-  set(written_var_names_endpoint e1) ⊆ set(written_var_names_endpoint e2) ∪ set vars
+  set(written_var_names_endpoint e1) ⊆ set(written_var_names_endpoint e2)
+Proof
+  ho_match_mp_tac saturates_ind >>
+  rw[written_var_names_endpoint_def] >>
+  fs[SUBSET_DEF] >> rw[] >> res_tac >> fs[]
+QED
+
+Theorem saturates_written_var_names_endpoint':
+  ∀vars e1 e2.
+  saturates vars e1 e2 ⇒
+  set(written_var_names_endpoint e2) ⊆ set(written_var_names_endpoint e1) ∪ set vars
 Proof
   ho_match_mp_tac saturates_ind >>
   rw[written_var_names_endpoint_def] >>
@@ -2469,7 +2529,11 @@ Proof
       conj_tac >-
        (metis_tac[letrec_endpoint_fsubst',letrec_endpoint_compile_endpoint]) >>
       conj_tac >-
-       (cheat (* consistent_arities e'' *)) >>
+       (‘consistent_arities (fsubst e'' dn (compile_endpoint [] (Fix dn e)))’
+          by(metis_tac[compile_endpoint_consistent_arities]) >>
+        drule_then match_mp_tac fsubst_consistent_arities_nofrees >>
+        simp[] >>
+        goal_assum drule) >>
       conj_tac >-
        (rw[SET_EQ_SUBSET]
         >- metis_tac[written_var_names_endpoint_compile_endpoint_SUBSET]
@@ -2489,7 +2553,11 @@ Proof
       conj_tac >-
        (rw[SUBSET_DEF] >> drule free_fun_names_endpoint_compile_endpoint >> rw[]) >>
       conj_tac >-
-       (cheat (* written_var_names_endpoint + fsubst *)) >>
+       (drule saturates_written_var_names_endpoint' >>
+        strip_tac >>
+        dxrule_then match_mp_tac SUBSET_TRANS >>
+        simp[] >>
+        match_mp_tac written_var_names_endpoint_compile_endpoint_SUBSET >> simp[]) >>
       match_mp_tac always_same_args_fsubst_lemma >>
       simp[] >>
       metis_tac[compile_endpoint_always_same_args])
