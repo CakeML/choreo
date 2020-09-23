@@ -2747,9 +2747,371 @@ Proof
           drule arsof_lemma >>
           disch_then drule >>
           simp[ALOOKUP_MAP])
-      >- ((* trans_letrec *)
-          cheat
-         )
+      >- ((* trans_call *)
+          qhdtm_x_assum ‘compile_fix_closure_endpoint_rel’ (strip_assume_tac o REWRITE_RULE[compile_fix_closure_endpoint_rel_def]) >> fs[] >> rveq >> fs[] >>
+          reverse(Cases_on ‘shadow’) >> fs[] >> rveq >> fs[] >-
+            (Cases_on ‘e''’ >> fs[fsubst_def,CaseEq "bool"] >> rveq >>
+             fs[Once saturates_cases] >> rveq >> fs[fsubst_def] >>
+             goal_assum(resolve_then (Pos hd) mp_tac RC_SUBSET) >>
+             rfs[] >>
+             simp[reduction_def] >>
+             goal_assum(resolve_then (Pos hd) mp_tac trans_call) >>
+             fs[arities_def,free_fun_names_endpoint_def] >> rfs[] >>
+             fs[always_same_args_def,ALOOKUP_MAP] >> rveq >>
+             Cases_on ‘cl1’ >> rveq >> fs[closure_args_def] >>
+             fs[written_var_names_endpoint_before_def] >>
+             rename1 ‘pair = (_,_)’ >> Cases_on ‘pair’ >> fs[] >>
+             conj_tac
+            >- (rw[EVERY_MEM,IS_SOME_EXISTS] >>
+                fs[written_var_names_endpoint_def] >>
+                imp_res_tac SUBSET_THM >>
+                fs[FDOM_FLOOKUP]) >>
+            rveq >> fs[written_var_names_endpoint_def,bound_fun_names_endpoint_def,free_fun_names_endpoint_def,
+                       closure_args_def,closure_var_env_def,always_same_args_def,ALOOKUP_MAP] >>
+            rveq >> fs[] >>
+            disj1_tac >>
+            qhdtm_x_assum ‘compile_fix_closure_rel’ (strip_assume_tac o REWRITE_RULE[compile_fix_closure_rel_def]) >>
+            rveq >> fs[] >>
+            reverse(Cases_on ‘shadow’) >> fs[] >> rveq >> fs[] >-
+              (simp[compile_fix_closure_endpoint_rel_def] >>
+               qexists_tac ‘F’ >>
+               simp[GSYM PULL_EXISTS] >>
+               conj_asm1_tac >-
+                 (simp[fmap_eq_flookup] >>
+                  rw[flookup_fupdate_list] >>
+                  TOP_CASE_TAC >-
+                   (fs[ALOOKUP_NONE,MAP_REVERSE,MAP_ZIP] >>
+                    rfs[ALOOKUP_REVERSE_ALL_DISTINCT,MAP_ZIP] >>
+                    fs[ALOOKUP_ZIP_MAP_SND,closure_args_def] >>
+                    rveq >>
+                    fs[ALOOKUP_ZIP_SELF] >> rveq >>
+                    rw[] >>
+                    qpat_x_assum ‘DRESTRICT bindings _ = DRESTRICT s.bindings _’ mp_tac >>
+                    rw[fmap_eq_flookup,FLOOKUP_DRESTRICT] >>
+                    pop_assum(qspec_then ‘x’ mp_tac) >>
+                    rw[] >>
+                    drule_all_then strip_assume_tac SUBSET_THM >>
+                    drule_all_then strip_assume_tac SUBSET_THM >>
+                    rfs[FDOM_FLOOKUP] >>
+                    metis_tac[THE_DEF,FDOM_FLOOKUP,SUBSET_THM]) >>
+                  rfs[ALOOKUP_REVERSE_ALL_DISTINCT,MAP_ZIP] >>
+                  fs[ALOOKUP_ZIP_MAP_SND,closure_args_def] >>
+                  rveq >>
+                  fs[ALOOKUP_ZIP_SELF] >> rveq >>
+                  drule_all_then strip_assume_tac SUBSET_THM >>
+                  simp[]) >>
+               goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+               imp_res_tac letrec_endpoint_fsubst' >>
+               simp[closure_args_def] >>
+               simp[FDOM_FUPDATE_LIST,MAP_ZIP] >>
+               simp[GSYM PULL_EXISTS] >>
+               conj_tac >- fs[SUBSET_DEF] >>
+               conj_tac >- rfs[] >>
+               conj_tac >-
+                (rw[] >> fs[] >> rfs[] >> fs[closure_args_def] >>
+                 rw[fmap_eq_flookup,FLOOKUP_DRESTRICT] >>
+                 rw[] >>
+                 rw[flookup_fupdate_list] >>
+                 TOP_CASE_TAC >>
+                 rfs[ALOOKUP_REVERSE_ALL_DISTINCT,MAP_ZIP] >>
+                 fs[ALOOKUP_ZIP_MAP_SND] >>
+                 rveq >> fs[ALOOKUP_ZIP_SELF] >> rveq >>
+                 metis_tac[SUBSET_DEF]) >>
+               simp[PULL_EXISTS] >>
+               rw[closure_var_env_def,closure_args_def] >> rfs[]
+               >- (rw[fmap_eq_flookup,FLOOKUP_DRESTRICT] >>
+                   rw[] >>
+                   rw[flookup_fupdate_list] >>
+                   simp[closure_args_def] >>
+                   TOP_CASE_TAC >>
+                   rfs[closure_args_def] >>
+                   rfs[ALOOKUP_REVERSE_ALL_DISTINCT,MAP_ZIP] >>
+                   fs[ALOOKUP_ZIP_MAP_SND] >>
+                   rveq >> fs[ALOOKUP_ZIP_SELF] >> rveq >>
+                   drule_all_then strip_assume_tac SUBSET_THM >>
+                   drule_all_then strip_assume_tac SUBSET_THM >>
+                   fs[FDOM_FLOOKUP] >>
+                   qpat_x_assum ‘DRESTRICT _ _ = DRESTRICT _ _’ mp_tac >>
+                   rw[fmap_eq_flookup] >>
+                   pop_assum(qspec_then ‘x’ mp_tac) >>
+                   rw[FLOOKUP_DRESTRICT] >>
+                   metis_tac[THE_DEF])
+               >- (match_mp_tac arsof_lemma >>
+                   goal_assum(drule_at (Pat ‘always_same_args _ _’)) >>
+                   simp[] >>
+                   metis_tac[saturates_free_fun_names_endpoint])
+               >- (rw[compile_fix_closure_rel_def] >>
+                   qexists_tac ‘F’ >> simp[] >>
+                   goal_assum(drule_at (Pat ‘always_same_args _ _’)) >>
+                   simp[] >>
+                   rpt strip_tac >>
+                   metis_tac[])
+               >- (first_x_assum(drule_all_then strip_assume_tac) >>
+                   rpt(goal_assum drule) >>
+                   simp[] >>
+                   rfs[] >>
+                   qpat_x_assum ‘bindings |++ _ = bindings |++ _’ (fn thm => SUBST_ALL_TAC(GSYM thm) >> assume_tac(GSYM thm)) >>
+                   rw[fmap_eq_flookup,FLOOKUP_DRESTRICT] >>
+                   rw[] >>
+                   rw[flookup_fupdate_list] >>
+                   TOP_CASE_TAC >>
+                   rfs[ALOOKUP_REVERSE_ALL_DISTINCT,MAP_ZIP] >>
+                   fs[ALOOKUP_ZIP_MAP_SND] >>
+                   rveq >> fs[ALOOKUP_ZIP_SELF] >> rveq >>
+                   drule_then drule written_var_names_endpoint_lemma >>
+                   simp[ALOOKUP_MAP] >>
+                   strip_tac >>
+                   metis_tac[SUBSET_THM])) >>
+            rfs[closure_args_def] >> rveq >> fs[] >>
+            simp[compile_fix_closure_endpoint_rel_def] >>
+            qexists_tac ‘T’ >> simp[] >>
+            conj_asm1_tac >-
+             (simp[fmap_eq_flookup] >>
+              rw[flookup_fupdate_list] >>
+              TOP_CASE_TAC >-
+               (fs[ALOOKUP_NONE,MAP_REVERSE,MAP_ZIP] >>
+                rfs[ALOOKUP_REVERSE_ALL_DISTINCT,MAP_ZIP] >>
+                fs[ALOOKUP_ZIP_MAP_SND] >>
+                rveq >>
+                fs[ALOOKUP_ZIP_SELF] >> rveq >>
+                rw[] >>
+                qpat_x_assum ‘DRESTRICT bindings _ = DRESTRICT s2.bindings _’ mp_tac >>
+                rw[fmap_eq_flookup,FLOOKUP_DRESTRICT] >>
+                pop_assum(qspec_then ‘x’ mp_tac) >>
+                rw[] >>
+                drule_all_then strip_assume_tac SUBSET_THM >>
+                drule_all_then strip_assume_tac SUBSET_THM >>
+                rfs[FDOM_FLOOKUP]) >>
+              rfs[ALOOKUP_REVERSE_ALL_DISTINCT,MAP_ZIP] >>
+              fs[ALOOKUP_ZIP_MAP_SND] >>
+              rveq >>
+              fs[ALOOKUP_ZIP_SELF] >> rveq >>
+              drule_all_then strip_assume_tac SUBSET_THM >>
+              simp[]) >>
+            simp[closure_args_def] >>
+            simp[FDOM_FUPDATE_LIST,MAP_ZIP] >>
+            simp[GSYM PULL_EXISTS] >>
+            conj_tac >- fs[SUBSET_DEF] >>
+            rpt strip_tac >>
+            IF_CASES_TAC >-
+              (fs[closure_var_env_def,closure_args_def] >> rveq >>
+               conj_asm1_tac >-
+                 (qpat_x_assum ‘DRESTRICT _ _ = DRESTRICT _ _ ’ (assume_tac o GSYM) >>
+                  simp[] >>
+                  qpat_x_assum ‘_ |++ _ = _ |++ _’ (assume_tac o GSYM) >>
+                  rw[] >> fs[] >> rfs[] >>
+                  rw[fmap_eq_flookup,FLOOKUP_DRESTRICT] >>
+                  rw[] >>
+                  rw[flookup_fupdate_list] >>
+                  TOP_CASE_TAC >>
+                  rfs[ALOOKUP_REVERSE_ALL_DISTINCT,MAP_ZIP] >>
+                  fs[ALOOKUP_ZIP_MAP_SND] >>
+                  rveq >> fs[ALOOKUP_ZIP_SELF] >> rveq) >>
+               conj_asm1_tac >-
+                (drule_then (fs o single) saturates_free_fun_names_endpoint >>
+                 drule_all_then strip_assume_tac MEM_arities_saturates >>
+                 drule arsof_lemma >>
+                 disch_then drule >>
+                 simp[]) >>
+               simp[compile_fix_closure_rel_def] >>
+               qexists_tac ‘T’ >> simp[] >>
+               rpt strip_tac >>
+               first_x_assum drule_all >>
+               strip_tac >>
+               rpt(goal_assum drule) >>
+               simp[]) >>
+            simp[] >>
+            first_x_assum(drule_all_then strip_assume_tac) >>
+            rfs[] >>
+            qpat_x_assum ‘_ |++ _ = _ |++ _’ (assume_tac o GSYM) >>
+            rw[] >> fs[] >> rfs[] >>
+            rw[fmap_eq_flookup,FLOOKUP_DRESTRICT] >>
+            rw[] >>
+            rw[flookup_fupdate_list] >>
+            TOP_CASE_TAC >>
+            rfs[ALOOKUP_REVERSE_ALL_DISTINCT,MAP_ZIP] >>
+            fs[ALOOKUP_ZIP_MAP_SND] >>
+            rveq >> fs[ALOOKUP_ZIP_SELF] >> rveq >>
+            metis_tac[SUBSET_DEF]) >>
+          fs[Once saturates_cases] >> rveq >> fs[fsubst_def] >>
+          goal_assum(resolve_then (Pos hd) mp_tac RC_SUBSET) >>
+          simp[reduction_def] >>
+          fs[always_same_args_def,ALOOKUP_MAP] >>
+          rfs[closure_args_def] >> rveq >> fs[] >>
+          goal_assum(resolve_then (Pos hd) mp_tac trans_call) >>
+          fs[arities_def,free_fun_names_endpoint_def] >>
+          Cases_on ‘cl1’ >> rveq >> fs[closure_args_def] >>
+          fs[written_var_names_endpoint_before_def] >>
+          rename1 ‘pair = (_,_)’ >> Cases_on ‘pair’ >> fs[] >>
+          rveq >> fs[] >>
+          conj_tac
+          >- (rw[EVERY_MEM,IS_SOME_EXISTS] >>
+              fs[written_var_names_endpoint_def] >>
+              imp_res_tac SUBSET_THM >>
+              fs[FDOM_FLOOKUP]) >>
+          rveq >> fs[written_var_names_endpoint_def,bound_fun_names_endpoint_def,free_fun_names_endpoint_def,
+                       closure_args_def,closure_var_env_def,always_same_args_def,ALOOKUP_MAP] >>
+          rveq >> fs[] >>
+          disj1_tac >>
+          qhdtm_x_assum ‘compile_fix_closure_rel’ (strip_assume_tac o REWRITE_RULE[compile_fix_closure_rel_def]) >>
+          rveq >> fs[] >>
+          reverse(Cases_on ‘shadow’) >> fs[] >> rveq >> fs[] >-
+           (simp[compile_fix_closure_endpoint_rel_def] >>
+            qexists_tac ‘F’ >>
+            simp[GSYM PULL_EXISTS] >>
+            conj_asm1_tac >-
+             (simp[fmap_eq_flookup] >>
+              rw[flookup_fupdate_list] >>
+              TOP_CASE_TAC >-
+               (fs[ALOOKUP_NONE,MAP_REVERSE,MAP_ZIP] >>
+                rfs[ALOOKUP_REVERSE_ALL_DISTINCT,MAP_ZIP] >>
+                fs[ALOOKUP_ZIP_MAP_SND] >>
+                rveq >>
+                fs[ALOOKUP_ZIP_SELF] >> rveq >>
+                rw[] >>
+                qpat_x_assum ‘DRESTRICT bindings _ = DRESTRICT s2.bindings _’ mp_tac >>
+                rw[fmap_eq_flookup,FLOOKUP_DRESTRICT] >>
+                pop_assum(qspec_then ‘x’ mp_tac) >>
+                rw[] >>
+                drule_all_then strip_assume_tac SUBSET_THM >>
+                drule_all_then strip_assume_tac SUBSET_THM >>
+                rfs[FDOM_FLOOKUP]) >>
+              rfs[ALOOKUP_REVERSE_ALL_DISTINCT,MAP_ZIP] >>
+              fs[ALOOKUP_ZIP_MAP_SND] >>
+              rveq >>
+              fs[ALOOKUP_ZIP_SELF] >> rveq >>
+              drule_all_then strip_assume_tac SUBSET_THM >>
+              simp[]) >>
+            goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+            imp_res_tac letrec_endpoint_fsubst' >>
+            simp[closure_args_def] >>
+            simp[FDOM_FUPDATE_LIST,MAP_ZIP] >>
+            simp[GSYM PULL_EXISTS] >>
+            conj_tac >- fs[SUBSET_DEF] >>
+            conj_tac >- rfs[] >>
+            conj_tac >-
+             (rw[] >> fs[] >> rfs[] >>
+              rw[fmap_eq_flookup,FLOOKUP_DRESTRICT] >>
+              rw[] >>
+              rw[flookup_fupdate_list] >>
+              TOP_CASE_TAC >>
+              rfs[ALOOKUP_REVERSE_ALL_DISTINCT,MAP_ZIP] >>
+              fs[ALOOKUP_ZIP_MAP_SND] >>
+              rveq >> fs[ALOOKUP_ZIP_SELF] >> rveq >>
+              metis_tac[SUBSET_DEF]) >>
+            simp[PULL_EXISTS] >>
+            rw[closure_var_env_def,closure_args_def] >> rfs[]
+            >- (rw[fmap_eq_flookup,FLOOKUP_DRESTRICT] >>
+                rw[] >>
+                rw[flookup_fupdate_list] >>
+                TOP_CASE_TAC >>
+                rfs[ALOOKUP_REVERSE_ALL_DISTINCT,MAP_ZIP] >>
+                fs[ALOOKUP_ZIP_MAP_SND] >>
+                rveq >> fs[ALOOKUP_ZIP_SELF] >> rveq >>
+                drule_all_then strip_assume_tac SUBSET_THM >>
+                drule_all_then strip_assume_tac SUBSET_THM >>
+                fs[FDOM_FLOOKUP] >>
+                qpat_x_assum ‘DRESTRICT _ _ = DRESTRICT _ _’ mp_tac >>
+                rw[fmap_eq_flookup] >>
+                pop_assum(qspec_then ‘x’ mp_tac) >>
+                rw[FLOOKUP_DRESTRICT] >>
+                metis_tac[THE_DEF])
+            >- (match_mp_tac arsof_lemma >>
+                goal_assum(drule_at (Pat ‘always_same_args _ _’)) >>
+                simp[] >>
+                metis_tac[saturates_free_fun_names_endpoint])
+            >- (rw[compile_fix_closure_rel_def] >>
+                qexists_tac ‘F’ >> simp[] >>
+                goal_assum(drule_at (Pat ‘always_same_args _ _’)) >>
+                simp[] >>
+                rpt strip_tac >>
+                metis_tac[])
+            >- (first_x_assum(drule_all_then strip_assume_tac) >>
+                rpt(goal_assum drule) >>
+                simp[] >>
+                rfs[] >>
+                qpat_x_assum ‘bindings |++ _ = bindings |++ _’ (fn thm => SUBST_ALL_TAC(GSYM thm) >> assume_tac(GSYM thm)) >>
+                rw[fmap_eq_flookup,FLOOKUP_DRESTRICT] >>
+                rw[] >>
+                rw[flookup_fupdate_list] >>
+                TOP_CASE_TAC >>
+                rfs[ALOOKUP_REVERSE_ALL_DISTINCT,MAP_ZIP] >>
+                fs[ALOOKUP_ZIP_MAP_SND] >>
+                rveq >> fs[ALOOKUP_ZIP_SELF] >> rveq >>
+                drule_then drule written_var_names_endpoint_lemma >>
+                simp[ALOOKUP_MAP] >>
+                strip_tac >>
+                metis_tac[SUBSET_THM])) >>
+          simp[compile_fix_closure_endpoint_rel_def] >>
+          qexists_tac ‘T’ >> simp[] >>
+          conj_asm1_tac >-
+           (simp[fmap_eq_flookup] >>
+            rw[flookup_fupdate_list] >>
+            TOP_CASE_TAC >-
+             (fs[ALOOKUP_NONE,MAP_REVERSE,MAP_ZIP] >>
+              rfs[ALOOKUP_REVERSE_ALL_DISTINCT,MAP_ZIP] >>
+              fs[ALOOKUP_ZIP_MAP_SND] >>
+              rveq >>
+              fs[ALOOKUP_ZIP_SELF] >> rveq >>
+              rw[] >>
+              qpat_x_assum ‘DRESTRICT bindings _ = DRESTRICT s2.bindings _’ mp_tac >>
+              rw[fmap_eq_flookup,FLOOKUP_DRESTRICT] >>
+              pop_assum(qspec_then ‘x’ mp_tac) >>
+              rw[] >>
+              drule_all_then strip_assume_tac SUBSET_THM >>
+              drule_all_then strip_assume_tac SUBSET_THM >>
+              rfs[FDOM_FLOOKUP]) >>
+            rfs[ALOOKUP_REVERSE_ALL_DISTINCT,MAP_ZIP] >>
+            fs[ALOOKUP_ZIP_MAP_SND] >>
+            rveq >>
+            fs[ALOOKUP_ZIP_SELF] >> rveq >>
+            drule_all_then strip_assume_tac SUBSET_THM >>
+            simp[]) >>
+          simp[closure_args_def] >>
+          simp[FDOM_FUPDATE_LIST,MAP_ZIP] >>
+          simp[GSYM PULL_EXISTS] >>
+          conj_tac >- fs[SUBSET_DEF] >>
+          rpt strip_tac >>
+          IF_CASES_TAC >-
+           (fs[closure_var_env_def,closure_args_def] >> rveq >>
+            conj_asm1_tac >-
+             (qpat_x_assum ‘DRESTRICT _ _ = DRESTRICT _ _ ’ (assume_tac o GSYM) >>
+              simp[] >>
+              qpat_x_assum ‘_ |++ _ = _ |++ _’ (assume_tac o GSYM) >>
+              rw[] >> fs[] >> rfs[] >>
+              rw[fmap_eq_flookup,FLOOKUP_DRESTRICT] >>
+              rw[] >>
+              rw[flookup_fupdate_list] >>
+              TOP_CASE_TAC >>
+              rfs[ALOOKUP_REVERSE_ALL_DISTINCT,MAP_ZIP] >>
+              fs[ALOOKUP_ZIP_MAP_SND] >>
+              rveq >> fs[ALOOKUP_ZIP_SELF] >> rveq) >>
+            conj_asm1_tac >-
+             (drule_then (fs o single) saturates_free_fun_names_endpoint >>
+              drule_all_then strip_assume_tac MEM_arities_saturates >>
+              drule arsof_lemma >>
+              disch_then drule >>
+              simp[]) >>
+            simp[compile_fix_closure_rel_def] >>
+            qexists_tac ‘T’ >> simp[] >>
+            rpt strip_tac >>
+            first_x_assum drule_all >>
+            strip_tac >>
+            rpt(goal_assum drule) >>
+            simp[]) >>
+          simp[] >>
+          first_x_assum(drule_all_then strip_assume_tac) >>
+          rfs[] >>
+          qpat_x_assum ‘_ |++ _ = _ |++ _’ (assume_tac o GSYM) >>
+          rw[] >> fs[] >> rfs[] >>
+          rw[fmap_eq_flookup,FLOOKUP_DRESTRICT] >>
+          rw[] >>
+          rw[flookup_fupdate_list] >>
+          TOP_CASE_TAC >>
+          rfs[ALOOKUP_REVERSE_ALL_DISTINCT,MAP_ZIP] >>
+          fs[ALOOKUP_ZIP_MAP_SND] >>
+          rveq >> fs[ALOOKUP_ZIP_SELF] >> rveq >>
+          metis_tac[SUBSET_DEF])
   )
 QED
 
