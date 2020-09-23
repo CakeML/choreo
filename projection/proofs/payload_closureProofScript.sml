@@ -1191,6 +1191,65 @@ Proof
   metis_tac[MEM_MAP,FST]
 QED
 
+(* TODO: move to payload_bisim *)
+Theorem tausim_reduction_pres:
+  ∀conf n1 n2 p1 s1 dn1 vars1 params1 funs1 bindings1 e1 s2 dn2 vars2 params2 funs2 bindings2 e2.
+        n1 = NEndpoint p1 s1 (FCall dn1 vars1) ∧
+        n2 = NEndpoint p1 s2 (FCall dn2 vars2) ∧
+        ALOOKUP s1.funs dn1 = SOME (Closure params1 (funs1,bindings1) e1) ∧
+        LENGTH vars1 = LENGTH params1 ∧
+        EVERY (IS_SOME ∘ FLOOKUP s1.bindings) vars1 ∧
+        ALOOKUP s2.funs dn2 = SOME (Closure params2 (funs2,bindings2) e2) ∧
+        LENGTH vars2 = LENGTH params2 ∧
+        EVERY (IS_SOME ∘ FLOOKUP s2.bindings) vars2 ∧
+        tausim conf
+               (NEndpoint p1
+                          (s1 with <|bindings := bindings1 |++ ZIP(params1,MAP (THE o FLOOKUP s1.bindings) vars1);
+                                     funs := (dn1,Closure params1 (funs1,bindings1) e1)::funs1|>)
+                          e1)
+               (NEndpoint p1
+                          (s2 with <|bindings := bindings2 |++ ZIP(params2,MAP (THE o FLOOKUP s2.bindings) vars2);
+                                     funs := (dn2,Closure params2 (funs2,bindings2) e2)::funs2|>)
+                          e2) ⇒
+  tausim conf n1 n2
+Proof
+  strip_tac >> Ho_Rewrite.PURE_REWRITE_TAC[GSYM PULL_EXISTS] >>
+  ho_match_mp_tac tausim_strong_coind >> rpt strip_tac >> rveq
+  >- (qhdtm_assum ‘trans’ (strip_assume_tac o REWRITE_RULE[Once trans_cases]) >>
+      fs[] >> rveq >>
+      simp[Once trans_cases] >>
+      disj1_tac >>
+      rename1 ‘LReceive r d p1’ >>
+      qhdtm_x_assum ‘tausim’ (strip_assume_tac o REWRITE_RULE[Once tausim_cases]) >>
+      last_x_assum(qspec_then ‘LReceive r d p1’ mp_tac o CONV_RULE SWAP_FORALL_CONV) >>
+      simp[Once trans_cases] >>
+      simp[Once trans_cases])
+   >- (qhdtm_assum ‘trans’ (strip_assume_tac o REWRITE_RULE[Once trans_cases]) >>
+       fs[] >> rveq >>
+       simp[Once trans_cases] >>
+       disj1_tac >>
+       rename1 ‘LReceive r d p1’ >>
+       qhdtm_x_assum ‘tausim’ (strip_assume_tac o REWRITE_RULE[Once tausim_cases]) >>
+       last_x_assum(qspec_then ‘LReceive r d p1’ kall_tac o CONV_RULE SWAP_FORALL_CONV) >>
+       last_x_assum(qspec_then ‘LReceive r d p1’ mp_tac o CONV_RULE SWAP_FORALL_CONV) >>
+       simp[Once trans_cases] >>
+       simp[Once trans_cases])
+   >- (qhdtm_assum ‘trans’ (strip_assume_tac o REWRITE_RULE[Once trans_cases]) >>
+       fs[] >> rveq >>
+       goal_assum(resolve_then (Pos hd) mp_tac TC_SUBSET) >>
+       simp[reduction_def,Once trans_cases])
+   >- (qhdtm_assum ‘trans’ (strip_assume_tac o REWRITE_RULE[Once trans_cases]) >>
+       fs[] >> rveq >>
+       goal_assum(resolve_then (Pos hd) mp_tac RC_SUBSET) >>
+       simp[reduction_def,Once trans_cases])
+QED
+
+Triviality RC_REFL:
+  RC R x x
+Proof
+  rw[RC_DEF]
+QED
+
 Theorem tausim_defer_fundef:
   ∀conf dn e vars n1 n2.
     compile_fix_closure_endpoint_rel vars dn e n1 n2 ⇒
@@ -2418,8 +2477,276 @@ Proof
           Cases_on ‘e''’ >> fs[letrec_endpoint_def,fsubst_def] >>
           every_case_tac >> fs[])
       >- ((* trans_letrec *)
-          cheat
-         )
+          qhdtm_x_assum ‘compile_fix_closure_endpoint_rel’ (strip_assume_tac o REWRITE_RULE[compile_fix_closure_endpoint_rel_def]) >> fs[] >> rveq >> fs[] >>
+          reverse(Cases_on ‘shadow’) >> fs[] >> rveq >> fs[] >-
+            (Cases_on ‘e'’ >> fs[fsubst_def,CaseEq "bool"] >> rveq
+             >- ((* letrec but it's dn (shadow case) *)
+                 fs[Once saturates_cases] >> rveq >> fs[fsubst_def] >>
+                 rveq >> fs[free_fun_names_endpoint_def,MEM_FILTER,bound_fun_names_endpoint_def] >>
+                 goal_assum(resolve_then (Pos hd) mp_tac RC_SUBSET) >>
+                 simp[reduction_def] >>
+                 goal_assum(resolve_then (Pos hd) mp_tac trans_letrec) >>
+                 disj1_tac >>
+                 simp[compile_fix_closure_endpoint_rel_def] >>
+                 qexists_tac ‘T’ >>
+                 simp[] >>
+                 fs[letrec_endpoint_def] >>
+                 fs[consistent_arities_def] >>
+                 fs[written_var_names_endpoint_before_def,written_var_names_endpoint_def,
+                    always_same_args_def,bound_fun_names_endpoint_def,good_letrecs_def] >>
+                 fs[arities_def,MEM_FILTER,PULL_EXISTS,LEFT_AND_OVER_OR,RIGHT_AND_OVER_OR,DISJ_IMP_THM,FORALL_AND_THM] >>
+                 fs[closure_args_def] >>
+                 rpt strip_tac >> fs[] >>
+                 IF_CASES_TAC >-
+                  (fs[closure_args_def,closure_var_env_def] >> rveq >>
+                   conj_asm1_tac >-
+                    (drule_then (fs o single) saturates_free_fun_names_endpoint >>
+                     drule_all_then strip_assume_tac MEM_arities_saturates >>
+                     qpat_x_assum ‘∀n. MEM _ (arities _) ⇒ _ = _’ drule >>
+                     strip_tac >> rveq >>
+                     drule arsof_lemma >>
+                     disch_then drule >>
+                     simp[]) >>
+                   simp[compile_fix_closure_rel_def] >>
+                   rpt strip_tac >>
+                   first_x_assum drule_all >>
+                   strip_tac >>
+                   rpt(goal_assum drule) >>
+                   simp[] >>
+                   conj_tac >-
+                    (qpat_x_assum ‘saturates _ e1 _’ assume_tac >>
+                     drule_then (fs o single) saturates_free_fun_names_endpoint >>
+                     drule arsof_lemma >>
+                     disch_then drule >>
+                     simp[ALOOKUP_MAP]) >>
+                   last_x_assum(drule_then match_mp_tac) >>
+                   simp[ALOOKUP_MAP,closure_args_def]) >>
+                 simp[] >>
+                 first_x_assum(drule_all_then strip_assume_tac) >>
+                 rpt(goal_assum drule) >>
+                 simp[] >>
+                 qpat_x_assum ‘saturates _ e2 _’ assume_tac >>
+                 drule_then (fs o single) saturates_free_fun_names_endpoint >>
+                 drule arsof_lemma >>
+                 disch_then drule >>
+                 simp[ALOOKUP_MAP])
+             >- ((* letrec but not dn (non-shadowed case) *)
+                 fs[Once saturates_cases] >> rveq >> fs[fsubst_def] >>
+                 fs[free_fun_names_endpoint_def,MEM_FILTER] >>
+                 goal_assum(resolve_then (Pos hd) mp_tac RC_SUBSET) >>
+                 simp[reduction_def] >>
+                 goal_assum(resolve_then (Pos hd) mp_tac trans_letrec) >>
+                 disj1_tac >>
+                 simp[compile_fix_closure_endpoint_rel_def] >>
+                 qexists_tac ‘F’ >> simp[] >>
+                 goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+                 fs[letrec_endpoint_def] >>
+                 fs[consistent_arities_def] >>
+                 fs[written_var_names_endpoint_before_def,written_var_names_endpoint_def,
+                    always_same_args_def,bound_fun_names_endpoint_def,good_letrecs_def] >>
+                 fs[arities_def,MEM_FILTER,PULL_EXISTS,LEFT_AND_OVER_OR,RIGHT_AND_OVER_OR,DISJ_IMP_THM,FORALL_AND_THM] >>
+                 conj_tac >- (fs[closure_args_def]) >>
+                 conj_tac >- (rfs[]) >>
+                 conj_tac >- (rw[closure_args_def]) >>
+                 conj_tac >- (rw[closure_args_def]) >>
+                 conj_tac >- metis_tac[] >>
+                 rw[closure_var_env_def,closure_args_def]
+                 >- (fs[] >> rfs[])
+                 >- (fs[arsof_def,closure_args_def,MEM_FILTER] >>
+                     imp_res_tac MEM_arities_saturates >>
+                     rw[SET_EQ_SUBSET,SUBSET_DEF,MEM_MAP,MEM_FILTER] >>
+                     metis_tac[PAIR,FST,SND])
+                 >- (simp[compile_fix_closure_rel_def] >>
+                     qexists_tac ‘F’ >> simp[] >>
+                     goal_assum(resolve_then (Pos hd) mp_tac letrec_endpoint_fsubst) >>
+                     simp[letrec_endpoint_def] >>
+                     goal_assum(resolve_then (Pat ‘fsubst _ _ _ = fsubst _ _ _’) mp_tac EQ_REFL) >>
+                     simp[GSYM PULL_EXISTS] >>
+                     rw[] >>
+                     first_x_assum (drule_all_then strip_assume_tac) >>
+                     simp[]
+                     >- rfs[]
+                     >- (fs[] >> rfs[]) >>
+                     conj_tac >-
+                      (fs[arsof_def,arities_def] >> rveq >> fs[] >>
+                       rw[SET_EQ_SUBSET,SUBSET_DEF,MEM_MAP,MEM_FILTER] >>
+                       qpat_x_assum ‘_ = {_}’ mp_tac >>
+                       rw[SET_EQ_SUBSET,SUBSET_DEF,MEM_MAP,MEM_FILTER,PULL_EXISTS] >>
+                       metis_tac[FST,SND,PAIR,MEM_arities_saturates]) >>
+                     last_x_assum(drule_then match_mp_tac) >>
+                     simp[ALOOKUP_MAP,PULL_EXISTS]) >>
+                 first_x_assum(drule_all_then strip_assume_tac) >>
+                 rpt(goal_assum drule) >>
+                 simp[] >>
+                 fs[arsof_def,arities_def] >>
+                 rw[SET_EQ_SUBSET,SUBSET_DEF,MEM_MAP,MEM_FILTER] >>
+                 qpat_x_assum ‘_ = {_}’ mp_tac >>
+                 rw[SET_EQ_SUBSET,SUBSET_DEF,MEM_MAP,MEM_FILTER,PULL_EXISTS] >>
+                 metis_tac[FST,SND,PAIR,MEM_arities_saturates])
+             >- ((* actual call to dn *)
+                 fs[Once saturates_cases] >> rveq >> fs[] >>
+                 goal_assum(resolve_then (Pos hd) mp_tac RC_REFL) >>
+                 fs[always_same_args_def,ALOOKUP_MAP,closure_args_def] >>
+                 rveq >> fs[] >>
+                 disj2_tac >>
+                 match_mp_tac(tausim_reduction_pres |> SIMP_RULE std_ss []) >>
+                 simp[] >>
+                 conj_asm1_tac >-
+                   (rw[EVERY_MEM,IS_SOME_EXISTS] >>
+                    drule_then drule SUBSET_THM >>
+                    rw[FDOM_FLOOKUP]) >>
+                 simp[] >>
+                 ‘bds3 |++ ZIP (vars,MAP (THE ∘ FLOOKUP s.bindings) vars) =
+                 s.bindings |++ ZIP (vars,MAP (THE ∘ FLOOKUP s.bindings) vars)’
+                   by(fs[free_fun_names_endpoint_def,fmap_eq_flookup,FLOOKUP_DRESTRICT,
+                         flookup_fupdate_list] >>
+                      rw[] >> TOP_CASE_TAC >>
+                      fs[ALOOKUP_NONE,MAP_REVERSE,MAP_ZIP] >>
+                      metis_tac[]) >>
+                 pop_assum SUBST_ALL_TAC >>
+                 ‘tausim conf
+                   (NEndpoint p
+                              (s1 with <|bindings := s.bindings |++ ZIP (vars,MAP (THE ∘ FLOOKUP s.bindings) vars);
+                                        funs := (dn,Closure vars (fs3,bds3) e)::fs3|>)
+                              e)
+                   (NEndpoint p
+                              (s with <|bindings := s.bindings |++ ZIP (vars,MAP (THE ∘ FLOOKUP s.bindings) vars);
+                                        funs := [(dn,Closure vars ([],bds3) e)]|>)
+                              e)
+                        ’
+                   by(match_mp_tac bisim_IMP_tausim >>
+                      match_mp_tac bisim_used_closures_rel >>
+                      simp[used_closures_rel_def,used_closures_endpoint_rel_def] >>
+                      Q.REFINE_EXISTS_TAC ‘(s:closure state) with bindings := _’ >>
+                      simp[state_component_equality] >>
+                      rpt strip_tac >>
+                      drule_all SUBSET_THM >> rw[] >>
+                      rw[used_closures_rel_def] >>
+                      drule_all SUBSET_THM >> rw[]) >>
+                 dxrule_then match_mp_tac tausim_trans >>
+                 ‘tausim conf
+                   (NEndpoint p
+                              (s with <|bindings := s.bindings |++ ZIP (vars,MAP (THE ∘ FLOOKUP s.bindings) vars);
+                                        funs := [(dn,Closure vars ([],s.bindings) e)]|>)
+                              e)
+                   (NEndpoint p
+                              (s with <|bindings := s.bindings |++ ZIP (vars,MAP (THE ∘ FLOOKUP s.bindings) vars);
+                                        funs := (dn,Closure vars (s.funs,s.bindings) e)::s.funs|>)
+                              e)
+                        ’
+                  by(match_mp_tac bisim_IMP_tausim >>
+                     match_mp_tac bisim_used_closures_rel >>
+                     simp[used_closures_rel_def,used_closures_endpoint_rel_def] >>
+                     Q.REFINE_EXISTS_TAC ‘(s:closure state) with bindings := _’ >>
+                     simp[state_component_equality] >>
+                     rpt strip_tac >>
+                     drule_all SUBSET_THM >> rw[] >>
+                     rw[used_closures_rel_def] >>
+                     drule_all SUBSET_THM >> rw[]) >>
+                 first_x_assum(fn thm => resolve_then (Pos last) match_mp_tac thm tausim_trans) >>
+                 match_mp_tac bisim_IMP_tausim >>
+                match_mp_tac junkcong_bisim >>
+                goal_assum(resolve_then (Pos hd) mp_tac junkcong_trans) >>
+                goal_assum(resolve_then (Pos hd) mp_tac junkcong_DRESTRICT_closure_hd') >>
+                rfs[free_fun_names_endpoint_def] >>
+                match_mp_tac junkcong_sym >>
+                goal_assum(resolve_then (Pos hd) mp_tac junkcong_trans) >>
+                goal_assum(resolve_then (Pos hd) mp_tac junkcong_DRESTRICT_closure_hd') >>
+                match_mp_tac junkcong_refl_IMP >>
+                AP_THM_TAC >> AP_TERM_TAC >>
+                rw[state_component_equality])) >>
+          fs[Once saturates_cases] >> rveq >> fs[fsubst_def] >>
+          rveq >> fs[free_fun_names_endpoint_def,MEM_FILTER,bound_fun_names_endpoint_def] >>
+          goal_assum(resolve_then (Pos hd) mp_tac RC_SUBSET) >>
+          simp[reduction_def] >>
+          goal_assum(resolve_then (Pos hd) mp_tac trans_letrec) >>
+          disj1_tac >>
+          simp[compile_fix_closure_endpoint_rel_def] >>
+          Cases_on ‘dn = dn'’ >-
+           (rveq >>
+            qexists_tac ‘T’ >> simp[] >>
+            fs[letrec_endpoint_def] >>
+            fs[consistent_arities_def] >>
+            fs[written_var_names_endpoint_before_def,written_var_names_endpoint_def,
+               always_same_args_def,bound_fun_names_endpoint_def,good_letrecs_def] >>
+            fs[arities_def,MEM_FILTER,PULL_EXISTS,LEFT_AND_OVER_OR,RIGHT_AND_OVER_OR,DISJ_IMP_THM,FORALL_AND_THM] >>
+            fs[closure_args_def] >>
+            rpt strip_tac >>
+            IF_CASES_TAC >-
+              (fs[closure_args_def,closure_var_env_def] >> rveq >>
+               conj_asm1_tac >-
+                (drule_then (fs o single) saturates_free_fun_names_endpoint >>
+                 drule_all_then strip_assume_tac MEM_arities_saturates >>
+                 qpat_x_assum ‘∀n. MEM _ (arities _) ⇒ _ = _’ drule >>
+                 strip_tac >> rveq >>
+                 drule arsof_lemma >>
+                 disch_then drule >>
+                 simp[]) >>
+               simp[compile_fix_closure_rel_def] >>
+               rpt strip_tac >>
+               first_x_assum drule_all >>
+               strip_tac >>
+               rpt(goal_assum drule) >>
+               simp[] >>
+               conj_tac >-
+                (qpat_x_assum ‘saturates _ _ e1’ assume_tac >>
+                 drule_then (fs o single) saturates_free_fun_names_endpoint >>
+                 drule arsof_lemma >>
+                 disch_then drule >>
+                 simp[ALOOKUP_MAP]) >>
+               last_x_assum(drule_then match_mp_tac) >>
+               simp[ALOOKUP_MAP,closure_args_def]) >>
+            simp[] >>
+            first_x_assum(drule_all_then strip_assume_tac) >>
+            rpt(goal_assum drule) >>
+            simp[] >>
+            qpat_x_assum ‘saturates _ _ e2’ assume_tac >>
+            drule_then (fs o single) saturates_free_fun_names_endpoint >>
+            drule arsof_lemma >>
+            disch_then drule >>
+            simp[ALOOKUP_MAP]) >>
+          qexists_tac ‘T’ >> simp[] >>
+          fs[letrec_endpoint_def] >>
+          fs[consistent_arities_def] >>
+          fs[written_var_names_endpoint_before_def,written_var_names_endpoint_def,
+             always_same_args_def,bound_fun_names_endpoint_def,good_letrecs_def] >>
+          fs[arities_def,MEM_FILTER,PULL_EXISTS,LEFT_AND_OVER_OR,RIGHT_AND_OVER_OR,DISJ_IMP_THM,FORALL_AND_THM] >>
+          fs[closure_args_def] >>
+          rpt strip_tac >>
+          IF_CASES_TAC >-
+           (fs[closure_args_def,closure_var_env_def] >> rveq >>
+            conj_asm1_tac >-
+             (drule_then (fs o single) saturates_free_fun_names_endpoint >>
+              drule_all_then strip_assume_tac MEM_arities_saturates >>
+              qpat_x_assum ‘∀n. MEM _ (arities _) ⇒ _ = _’ drule >>
+              strip_tac >> rveq >>
+              drule arsof_lemma >>
+              disch_then drule >>
+              simp[]) >>
+            simp[compile_fix_closure_rel_def] >>
+            qexists_tac ‘T’ >> simp[] >>
+            rpt strip_tac >>
+            first_x_assum drule_all >>
+            strip_tac >>
+            rpt(goal_assum drule) >>
+            simp[] >>
+            conj_tac >-
+             (qpat_x_assum ‘saturates _ _ e1’ assume_tac >>
+              drule_then (fs o single) saturates_free_fun_names_endpoint >>
+              drule arsof_lemma >>
+              disch_then drule >>
+              simp[ALOOKUP_MAP]) >>
+            last_x_assum(drule_then match_mp_tac) >>
+            simp[ALOOKUP_MAP,closure_args_def]) >>
+          simp[] >>
+          first_x_assum(drule_all_then strip_assume_tac) >>
+          rpt(goal_assum drule) >>
+          simp[] >>
+          qpat_x_assum ‘saturates _ _ e2’ assume_tac >>
+          drule_then (fs o single) saturates_free_fun_names_endpoint >>
+          drule arsof_lemma >>
+          disch_then drule >>
+          simp[ALOOKUP_MAP])
       >- ((* trans_letrec *)
           cheat
          )
