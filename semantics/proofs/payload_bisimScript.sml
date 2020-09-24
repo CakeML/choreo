@@ -87,6 +87,49 @@ Proof
   fs[Once trans_cases]
 QED
 
+Theorem bisim_par_left:
+  ∀conf p q r s. BISIM_REL (trans conf) p r ⇒ BISIM_REL (trans conf) (NPar p q) (NPar r q)
+Proof
+  strip_tac >>
+  ‘∀pq rs p q r. pq = NPar p q ∧ rs = NPar r q ∧ BISIM_REL (trans conf) p r ⇒ BISIM_REL (trans conf) pq rs’
+    suffices_by simp[] >>
+  Ho_Rewrite.PURE_REWRITE_TAC[GSYM PULL_EXISTS] >>
+  ho_match_mp_tac BISIM_REL_coind >> rw[] >>
+  qhdtm_x_assum ‘trans’ (strip_assume_tac o ONCE_REWRITE_RULE[trans_cases]) >> fs[] >>
+  rveq >>
+  metis_tac[BISIM_REL_cases,trans_com_l,trans_com_r,trans_par_l,trans_par_r]
+QED
+
+Theorem bisim_trans:
+  ∀R p q r. BISIM_REL R p q ∧ BISIM_REL R q r ⇒ BISIM_REL R p r
+Proof
+  metis_tac[bisimulationTheory.BISIM_REL_IS_EQUIV_REL,equivalence_def,transitive_def]
+QED
+
+Theorem bisim_sym:
+  ∀R p q. BISIM_REL R p q ⇒ BISIM_REL R q p
+Proof
+  metis_tac[bisimulationTheory.BISIM_REL_IS_EQUIV_REL,equivalence_def,symmetric_def]
+QED
+
+Theorem bisim_refl:
+  ∀R p. BISIM_REL R p p
+Proof
+  metis_tac[bisimulationTheory.BISIM_REL_IS_EQUIV_REL,equivalence_def,reflexive_def]
+QED
+
+Theorem bisim_par_right:
+  ∀conf p q r s. BISIM_REL (trans conf) q r ⇒ BISIM_REL (trans conf) (NPar p q) (NPar p r)
+Proof
+  metis_tac[bisim_trans,bisim_par_sym,bisim_par_left]
+QED
+
+Theorem bisim_par:
+  ∀conf p q r s. BISIM_REL (trans conf) p s ∧ BISIM_REL (trans conf) q r ⇒ BISIM_REL (trans conf) (NPar p q) (NPar s r)
+Proof
+  metis_tac[bisim_trans,bisim_par_left,bisim_par_right]
+QED
+
 (* TODO: move to props *)
 Theorem MEM_free_fun_names_endpoint_dsubst:
   ∀e dn e'.

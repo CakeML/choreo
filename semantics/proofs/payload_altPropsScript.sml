@@ -23,14 +23,6 @@ Proof
       rw[Once trans_alt_cases])
 QED
 
-Theorem ALOOKUP_ZIP_SELF:
-  ALOOKUP (ZIP (l,l)) x =
-  if MEM x l then SOME x else NONE
-Proof
-  Induct_on ‘l’ >>
-  rw[] >> fs[]
-QED
-
 Theorem reduction_alt_IMP:
   ∀conf n1 n2.
     reduction_alt conf n1 n2 ⇒

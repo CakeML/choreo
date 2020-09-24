@@ -13,7 +13,7 @@ Definition written_var_names_endpoint_def:
 ∧ (written_var_names_endpoint (Let v f vl e) = v::written_var_names_endpoint e)
 ∧ (written_var_names_endpoint (Fix dv e) = written_var_names_endpoint e)
 ∧ (written_var_names_endpoint (Call dv) = [])
-∧ (written_var_names_endpoint (Letrec dv vars e1 e2) = written_var_names_endpoint e1 ++ written_var_names_endpoint e2)
+∧ (written_var_names_endpoint (Letrec dv vars e1) = written_var_names_endpoint e1)
 ∧ (written_var_names_endpoint (FCall dv vars) = vars)
 End
 
@@ -28,7 +28,7 @@ Definition written_var_names_endpoint_until_def:
     then []
     else written_var_names_endpoint_until e)
 ∧ (written_var_names_endpoint_until (Call dv) = [])
-∧ (written_var_names_endpoint_until (Letrec dv vars e1 e2) = written_var_names_endpoint_until e1 ++ written_var_names_endpoint_until e2)
+∧ (written_var_names_endpoint_until (Letrec dv vars e1) = written_var_names_endpoint_until e1)
 ∧ (written_var_names_endpoint_until (FCall dv vars) = vars)
 End
 
@@ -50,11 +50,11 @@ Definition written_var_names_endpoint_before_def:
 ∧ (written_var_names_endpoint_before dn (Fix dv e) =
     written_var_names_endpoint_before dn e)
 ∧ (written_var_names_endpoint_before dn (Call dv) = [])
-∧ (written_var_names_endpoint_before dn (Letrec dv vars e1 e2) =
+∧ (written_var_names_endpoint_before dn (Letrec dv vars e1) =
    if dn = dv then
      []
    else
-     written_var_names_endpoint_before dn e1 ++ written_var_names_endpoint_before dn e2)
+     written_var_names_endpoint_before dn e1)
 ∧ (written_var_names_endpoint_before dn (FCall dv vars) =
     if dn = dv then
        vars
@@ -71,13 +71,13 @@ Definition compile_endpoint_def:
      IfThen v (compile_endpoint ar e1) (compile_endpoint ar e2)) ∧
     (compile_endpoint ar (Let v f vl e) =
      Let v f vl (compile_endpoint ar e)) ∧
-    (compile_endpoint ar (Letrec dn vars e1 e2) = Nil (* Source term should use fixpoint style *)) ∧
+    (compile_endpoint ar (Letrec dn vars e1) = Nil (* Source term should use fixpoint style *)) ∧
     (compile_endpoint ar (FCall dn vars) = Nil (* Source term should use fixpoint style *)) ∧
     (compile_endpoint ar (Fix dn e) =
      let vars = nub'(written_var_names_endpoint e);
          e' = compile_endpoint ((dn,vars)::ar) e
      in
-       Letrec dn vars e' (FCall dn vars)
+       Letrec dn vars e'
     ) ∧
     (compile_endpoint ar (Call dn) =
      case ALOOKUP ar dn of

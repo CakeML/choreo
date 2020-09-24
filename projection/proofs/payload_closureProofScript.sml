@@ -1,5 +1,5 @@
 open preamble payloadSemTheory payloadLangTheory choreoUtilsTheory payload_closureTheory payloadPropsTheory
-     payload_bisimTheory payloadConfluenceTheory ConseqConv payload_altSemTheory payload_altPropsTheory;
+     payload_bisimTheory payloadConfluenceTheory ConseqConv;
 
 val _ = new_theory "payload_closureProof";
 
@@ -602,6 +602,14 @@ Theorem compile_rel_reflI:
   ∀conf x y. letrec_network x ∧ x = y ⇒ compile_rel conf x y
 Proof
   simp[compile_rel_refl]
+QED
+
+Theorem ALOOKUP_ZIP_SELF:
+  ALOOKUP (ZIP (l,l)) x =
+  if MEM x l then SOME x else NONE
+Proof
+  Induct_on ‘l’ >>
+  rw[] >> fs[]
 QED
 
 Theorem ALOOKUP_MAP_CONST_EQ:

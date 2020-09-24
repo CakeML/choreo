@@ -20,7 +20,7 @@ Datatype:
            | Let varN (datum list -> datum) (varN list) endpoint
            | Fix dvarN endpoint
            | Call dvarN
-           | Letrec dvarN (varN list) endpoint endpoint
+           | Letrec dvarN (varN list) endpoint
            | FCall dvarN (varN list)
 End
 
@@ -58,7 +58,7 @@ Definition var_names_endpoint_def:
 ∧ (var_names_endpoint (Let v f vl e) = v::vl ++ var_names_endpoint e)
 ∧ (var_names_endpoint (Fix dv e) = var_names_endpoint e)
 ∧ (var_names_endpoint (Call dv) = [])
-∧ (var_names_endpoint (Letrec dv vars e1 e2) = vars ++ var_names_endpoint e1 ++ var_names_endpoint e2)
+∧ (var_names_endpoint (Letrec dv vars e1) = vars ++ var_names_endpoint e1)
 ∧ (var_names_endpoint (FCall dv vars) = vars)
 End
 
@@ -70,7 +70,7 @@ Definition free_var_names_endpoint_def:
 ∧ (free_var_names_endpoint (Let v f vl e) = vl ++ FILTER ($≠ v) (free_var_names_endpoint e))
 ∧ (free_var_names_endpoint (Fix dv e) = free_var_names_endpoint e)
 ∧ (free_var_names_endpoint (Call dv) = [])
-∧ (free_var_names_endpoint (Letrec dv vars e1 e2) = FILTER (λn. ~MEM n vars) (free_var_names_endpoint e1) ++ free_var_names_endpoint e2)
+∧ (free_var_names_endpoint (Letrec dv vars e1) = vars ++ free_var_names_endpoint e1)
 ∧ (free_var_names_endpoint (FCall dv vars) = vars)
 End
 
@@ -82,7 +82,7 @@ Definition free_fix_names_endpoint_def:
 ∧ (free_fix_names_endpoint (Let v f vl e) = free_fix_names_endpoint e)
 ∧ (free_fix_names_endpoint (Fix dv e) = FILTER ($≠ dv) (free_fix_names_endpoint e))
 ∧ (free_fix_names_endpoint (Call dv) = [dv])
-∧ (free_fix_names_endpoint (Letrec dv vars e1 e2) = free_fix_names_endpoint e1 ++ free_fix_names_endpoint e2)
+∧ (free_fix_names_endpoint (Letrec dv vars e1) = free_fix_names_endpoint e1)
 ∧ (free_fix_names_endpoint (FCall dv vars) = [])
 End
 
@@ -94,7 +94,7 @@ Definition free_fun_names_endpoint_def:
 ∧ (free_fun_names_endpoint (Let v f vl e) = free_fun_names_endpoint e)
 ∧ (free_fun_names_endpoint (Fix dv e) = free_fun_names_endpoint e)
 ∧ (free_fun_names_endpoint (Call dv) = [])
-∧ (free_fun_names_endpoint (Letrec dv vars e1 e2) = FILTER ($≠ dv) (free_fun_names_endpoint e1 ++ free_fun_names_endpoint e2))
+∧ (free_fun_names_endpoint (Letrec dv vars e1) = FILTER ($≠ dv) (free_fun_names_endpoint e1))
 ∧ (free_fun_names_endpoint (FCall dv vars) = [dv])
 End
 
@@ -106,7 +106,7 @@ Definition bound_fun_names_endpoint_def:
 ∧ (bound_fun_names_endpoint (Let v f vl e) = bound_fun_names_endpoint e)
 ∧ (bound_fun_names_endpoint (Fix dv e) = bound_fun_names_endpoint e)
 ∧ (bound_fun_names_endpoint (Call dv) = [])
-∧ (bound_fun_names_endpoint (Letrec dv vars e1 e2) = dv::bound_fun_names_endpoint e1 ++ bound_fun_names_endpoint e2)
+∧ (bound_fun_names_endpoint (Letrec dv vars e1) = dv::bound_fun_names_endpoint e1)
 ∧ (bound_fun_names_endpoint (FCall dv vars) = [])
 End
 
@@ -118,7 +118,7 @@ Definition bound_fix_names_endpoint_def:
 ∧ (bound_fix_names_endpoint (Let v f vl e) = bound_fix_names_endpoint e)
 ∧ (bound_fix_names_endpoint (Fix dv e) = dv::bound_fix_names_endpoint e)
 ∧ (bound_fix_names_endpoint (Call dv) = [])
-∧ (bound_fix_names_endpoint (Letrec dv vars e1 e2) = bound_fix_names_endpoint e1 ++ bound_fix_names_endpoint e2)
+∧ (bound_fix_names_endpoint (Letrec dv vars e1) = bound_fix_names_endpoint e1)
 ∧ (bound_fix_names_endpoint (FCall dv vars) = [])
 End
 
@@ -259,8 +259,8 @@ Definition dsubst_def:
       e'
     else
       Call dn')
-∧ dsubst (Letrec dn' vars e1 e2) dn e' =
-   Letrec dn' vars (dsubst e1 dn e') (dsubst e2 dn e')
+∧ dsubst (Letrec dn' vars e1) dn e' =
+   Letrec dn' vars (dsubst e1 dn e')
 ∧ dsubst (FCall dn' vars) dn e' =
    FCall dn' vars
 End

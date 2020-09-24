@@ -33,7 +33,7 @@ Definition letfuns_def:
   (letfuns (Receive p v l e) = letfuns e) ∧
   (letfuns (IfThen v e1 e2) = letfuns e1 ++ letfuns e2) ∧
   (letfuns (Let v f vl e) = f::letfuns e) ∧
-  (letfuns (Letrec dn args e1 e2) = letfuns e1 ++ letfuns e2) ∧
+  (letfuns (Letrec dn args e1) = letfuns e1) ∧
   (letfuns (Fix s e) = letfuns e) ∧
   (letfuns (FCall s v) = []) ∧
   (letfuns (Call s) = [])
@@ -330,17 +330,15 @@ Definition compile_endpoint_def:
          (App Opapp [((ast$Var o (getLetID conf)) hv);
                      convList conf (MAP (Var o Short o ps2cs) vl)])
          (compile_endpoint conf vs e)) ∧
-    (compile_endpoint conf vs (payloadLang$Letrec dn args e1 e2) =
-     let vn = LENGTH(letfuns e1)
-     in
+    (compile_endpoint conf vs (payloadLang$Letrec dn args e1) =
        ast$Letrec
          [(ps2cs2 dn,"",
            Mat (Var(Short ""))
                [(Pcon NONE (MAP (Pvar o ps2cs) args),
-                 compile_endpoint conf (TAKE vn vs) e1)]
+                 compile_endpoint conf vs e1)]
           )
          ]
-         (compile_endpoint conf (DROP vn vs) e2)
+         (App Opapp [Var(Short(ps2cs2 dn)); Con NONE (MAP (Var o Short o ps2cs) args)])
     ) ∧
     (compile_endpoint conf vs (payloadLang$FCall dn args) =
      App Opapp [Var(Short(ps2cs2 dn)); Con NONE (MAP (Var o Short o ps2cs) args) ]

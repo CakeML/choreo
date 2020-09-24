@@ -1068,8 +1068,8 @@ Proof
       rename1 ‘NEndpoint c (s with funs := FN) e’ >>
       qexists_tac ‘NEndpoint c (s with <|queues := QN; funs := FN|>) e’ >>
       rw[]
-      >- (qunabbrev_tac ‘FN’ >> rw[Once trans_cases])
-      >- (qunabbrev_tac ‘QN’ >> rw[Once trans_cases]))
+      >- (qunabbrev_tac ‘FN’ >> rw[Once trans_cases] >> metis_tac[])
+      >- (qunabbrev_tac ‘QN’ >> rw[Once trans_cases] >> metis_tac[]))
   (* LReceive/LTau (FCall) *)
   >- (qmatch_goalsub_abbrev_tac ‘s with queues := QN’ >>
       qmatch_goalsub_abbrev_tac ‘s with <|bindings := NB; funs := FN|>’ >>
@@ -1521,16 +1521,16 @@ Proof
       rename1 ‘NEndpoint c (s with funs := FN) e’ >>
       qexists_tac ‘NEndpoint c (s with <|queues := QN; funs := FN|>) e’ >>
       rw[]
-      >- (qunabbrev_tac ‘FN’ >> rw[Once trans_cases])
-      >- (qunabbrev_tac ‘QN’ >> rw[Once trans_cases]))
+      >- (qunabbrev_tac ‘FN’ >> rw[Once trans_cases] >> metis_tac[])
+      >- (qunabbrev_tac ‘QN’ >> rw[Once trans_cases] >> metis_tac[]))
   (* LTau (Letrec)/LReceive *)
   >- (qmatch_goalsub_abbrev_tac ‘s with queues := QN’ >>
       qmatch_goalsub_abbrev_tac ‘s with <|bindings := NB; funs := FN|>’ >>
       rename1 ‘NEndpoint c (s with <|bindings := NB; funs := FN|>) e’ >>
       qexists_tac ‘NEndpoint c (s with <|bindings := NB; queues := QN; funs := FN|>) e’ >>
       rw[]
-      >- (MAP_EVERY qunabbrev_tac [‘NB’,‘FN’] >> rw[Once trans_cases])
-      >- (qunabbrev_tac ‘QN’ >> rw[Once trans_cases]))
+      >- (MAP_EVERY qunabbrev_tac [‘NB’,‘FN’] >> rw[Once trans_cases] >> metis_tac[])
+      >- (qunabbrev_tac ‘QN’ >> rw[Once trans_cases] >> metis_tac[]))
 QED
 
 (* Confluence Results for identical Labels *)
@@ -2802,17 +2802,15 @@ val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
              spose_not_then strip_assume_tac >> imp_res_tac MEM_free_var_names_endpoint_dsubst >>
              fs[free_var_names_endpoint_def] >> NO_TAC)
       >> TRY(rename1 ‘Letrec’ >>
-             simp[Once trans_cases] >>
+             simp[Once trans_cases,PULL_EXISTS] >>
+             conj_tac >- (fs[EVERY_MEM,IS_SOME_EXISTS,FLOOKUP_UPDATE] >> rw[]) >>
              match_mp_tac junkcong_trans >>
              goal_assum(resolve_then (Pos hd) mp_tac junkcong_add_junk) >>
              goal_assum drule >> simp[GSYM PULL_EXISTS] >>
              conj_tac >- fs[free_var_names_endpoint_def] >>
-             fs[free_var_names_endpoint_def,MEM_FILTER] >-
-               (goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_add_junk_hd') >>
-                simp[]) >>
              goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_hd') >>
              match_mp_tac junkcong_add_junk' >>
-             fs[] >>
+             fs[free_var_names_endpoint_def] >>
              NO_TAC)
       >> TRY(rename1 ‘FCall’ >>
              simp[Once trans_cases] >>
@@ -2886,18 +2884,17 @@ val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
              spose_not_then strip_assume_tac >> imp_res_tac MEM_free_var_names_endpoint_dsubst >>
              fs[free_var_names_endpoint_def] >> NO_TAC)
       >> TRY(rename1 ‘Letrec’ >>
-             simp[Once trans_cases] >>
+             simp[Once trans_cases,PULL_EXISTS] >>
+             conj_tac >- (fs[EVERY_MEM,IS_SOME_EXISTS,FLOOKUP_UPDATE] >> rfs[free_var_names_endpoint_def] >>
+                          rw[] >> res_tac >> fs[CaseEq "bool"] >> rveq >> fs[]) >>
              match_mp_tac junkcong_sym >>
              match_mp_tac junkcong_trans >>
              goal_assum(resolve_then (Pos hd) mp_tac junkcong_add_junk) >>
              goal_assum drule >> simp[GSYM PULL_EXISTS] >>
              conj_tac >- fs[free_var_names_endpoint_def] >>
-             fs[free_var_names_endpoint_def,MEM_FILTER] >-
-               (goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_add_junk_hd') >>
-                simp[]) >>
              goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_hd') >>
              match_mp_tac junkcong_add_junk' >>
-             fs[] >>
+             fs[free_var_names_endpoint_def] >>
              NO_TAC)
       >> TRY(rename1 ‘FCall’ >>
              simp[Once trans_cases] >>
@@ -3262,7 +3259,7 @@ Definition fix_endpoint_def:
      (fix_endpoint e1 ∧ fix_endpoint e2)) ∧
     (fix_endpoint (Let v f vl e) =
      fix_endpoint e) ∧
-    (fix_endpoint (Letrec dn vars e1 e2) = F) ∧
+    (fix_endpoint (Letrec dn vars e1) = F) ∧
     (fix_endpoint (FCall dn vars) = F) ∧
     (fix_endpoint (Fix dn e) =
      fix_endpoint e) ∧
@@ -3282,7 +3279,7 @@ Definition letrec_endpoint_def:
      (letrec_endpoint e1 ∧ letrec_endpoint e2)) ∧
     (letrec_endpoint (Let v f vl e) =
      letrec_endpoint e) ∧
-    (letrec_endpoint (Letrec dn vars e1 e2) = (letrec_endpoint e1 ∧ letrec_endpoint e2)) ∧
+    (letrec_endpoint (Letrec dn vars e1) = letrec_endpoint e1) ∧
     (letrec_endpoint (FCall dn vars) = T) ∧
     (letrec_endpoint (Fix dn e) = F) ∧
     (letrec_endpoint (Call dn) = F)
@@ -3414,5 +3411,5 @@ Proof
       fs[GSYM payloadSemTheory.reduction_def] >>
       metis_tac[RTC_RULES])
 QED
-        
+
 val _ = export_theory ();
