@@ -1202,4 +1202,25 @@ Proof
   >> metis_tac[]
 QED
 
+Theorem reduction_list_trans_alt:
+  (reduction_alt conf)^* p q = ?n. list_trans_alt conf p (REPLICATE n LTau) q
+Proof
+  simp[EQ_IMP_THM] >>
+  conj_tac
+  >- (MAP_EVERY qid_spec_tac [`q`,`p`] >>
+      ho_match_mp_tac RTC_INDUCT >>
+      rw[]
+      >- (qexists_tac `0` >> simp[list_trans_alt_def])
+      >- (fs[reduction_alt_def] >>
+          qexists_tac `SUC n` >>
+          simp[list_trans_alt_def] >>
+          asm_exists_tac >> simp[]))
+  >- (rpt strip_tac >> pop_assum mp_tac >>
+      MAP_EVERY qid_spec_tac [`q`,`p`,`n`] >>
+      Induct >>
+      rw[list_trans_alt_def] >>
+      fs[GSYM reduction_alt_def] >>
+      metis_tac[RTC_RULES])
+QED
+
 val _ = export_theory();
