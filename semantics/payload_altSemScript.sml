@@ -117,14 +117,14 @@ Inductive trans_alt:
           (NEndpoint p s (Letrec dn vars e (FCall dn vars)))
           LTau
           (NEndpoint p
-            (s with <|funs := (dn,Closure vars (s.funs,s.bindings) e1)::s.funs|>) e))
+            (s with <|funs := (dn,Closure vars (s.funs,s.bindings) e)::s.funs|>) e))
 
 ∧ (∀conf p s dn args params funs bindings e.
     ALOOKUP s.funs dn = SOME(Closure params (funs,bindings) e) ∧
     LENGTH args = LENGTH params ∧
     EVERY (IS_SOME o FLOOKUP s.bindings) args
     ⇒
-    trans conf
+    trans_alt conf
           (NEndpoint p s (FCall dn args))
           LTau
           (NEndpoint p (s with <|bindings := bindings |++ ZIP(params,MAP (THE o FLOOKUP s.bindings) args);

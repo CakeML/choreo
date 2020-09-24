@@ -789,27 +789,6 @@ Proof
      )
 QED
 
-Theorem reduction_list_trans:
-  (reduction conf)^* p q = ?n. list_trans conf p (REPLICATE n LTau) q
-Proof
-  simp[EQ_IMP_THM] >>
-  conj_tac
-  >- (MAP_EVERY qid_spec_tac [`q`,`p`] >>
-      ho_match_mp_tac RTC_INDUCT >>
-      rw[]
-      >- (qexists_tac `0` >> simp[list_trans_def])
-      >- (fs[payloadSemTheory.reduction_def] >>
-          qexists_tac `SUC n` >>
-          simp[list_trans_def] >>
-          asm_exists_tac >> simp[]))
-  >- (rpt strip_tac >> pop_assum mp_tac >>
-      MAP_EVERY qid_spec_tac [`q`,`p`,`n`] >>
-      Induct >>
-      rw[list_trans_def] >>
-      fs[GSYM payloadSemTheory.reduction_def] >>
-      metis_tac[RTC_RULES])
-QED
-
 Theorem compile_network_endpoints:
   MAP FST(endpoints(compile_network conf p1)) = MAP FST (endpoints p1)
 Proof
