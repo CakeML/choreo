@@ -3173,7 +3173,7 @@ Proof
   rveq >> fs[]
 QED
 
-Theorem compile_network_preservation_trans:
+Theorem compile_network_preservation_trans_alt:
   ∀p1 p2 conf.
     conf.payload_size > 0
     ∧ fix_network p1
@@ -3482,6 +3482,75 @@ Proof
       fs[fix_network_def,endpoints_def,fix_endpoint_def])
   >- ((* trans_call *)
       fs[fix_network_def,endpoints_def,fix_endpoint_def])
+QED
+
+Theorem no_undefined_writes_compile_network_alt:
+  ∀n1.
+    no_undefined_writes n1 ⇒
+    compile_network_alt n1 = compile_network n1
+Proof
+  Induct >> rw[compile_network_alt_def,compile_network_def,no_undefined_writes_NPar] >>
+  fs[no_undefined_writes_def,endpoints_def] >>
+  dep_rewrite.DEP_ONCE_REWRITE_TAC[FILTER_EQ_NIL |> SPEC_ALL |> REWRITE_RULE[EQ_IMP_THM] |> CONJUNCT2 |> GEN_ALL] >>
+  simp[state_component_equality,FUPDATE_LIST_THM] >>
+  fs[EVERY_MEM,MEM_nub',SUBSET_DEF]
+QED
+
+Theorem compile_network_reduction_alt:
+  ∀conf n1. (reduction conf)^* (compile_network n1) (compile_network_alt n1)
+Proof
+  strip_tac >> Induct >>
+  rw[compile_network_def,compile_network_alt_def]
+  >- (metis_tac [RTC_RTC,reduction_par_l,reduction_par_r])
+  >- (qmatch_goalsub_abbrev_tac ‘FOLDL _ _ l’ >>
+      Q.SUBGOAL_THEN ‘ALL_DISTINCT l’ mp_tac >- rw[Abbr ‘l’,FILTER_ALL_DISTINCT,all_distinct_nub'] >>
+      pop_assum kall_tac >>
+      rename1 ‘NEndpoint p st’ >>
+      qid_spec_tac ‘st’ >>
+      qid_spec_tac ‘l’ >>
+      ho_match_mp_tac SNOC_INDUCT >>
+      rw[FUPDATE_LIST_THM,ALL_DISTINCT_SNOC]
+      >- (Q.SUBGOAL_THEN ‘st with bindings := st.bindings = st’ (rw o single) >>
+          rw[state_component_equality]) >>
+      simp[FOLDL_SNOC,MAP_SNOC,FUPDATE_LIST_SNOC] >>
+      match_mp_tac RTC_TRANS >>
+      simp[reduction_def,Once trans_cases,endpoint_to_choiceTheory.K0_def] >>
+      match_mp_tac (MP_CANON RTC_RTC) >>
+      first_x_assum(fn thm => goal_assum(resolve_then (Pos hd) mp_tac thm)) >>
+      simp[] >>
+      dep_rewrite.DEP_ONCE_REWRITE_TAC [FUPDATE_FUPDATE_LIST_COMMUTES] >>
+      simp[] >>
+      spose_not_then strip_assume_tac >>
+      fs[MEM_MAP] >> rveq >> fs[])
+QED
+
+Theorem compile_rel_trans:
+  compile_rel conf p1 p2 ∧ compile_rel conf p2 p3 ⇒
+  compile_rel conf p1 p3
+Proof
+  rw[compile_rel_def] >> metis_tac[tausim_trans]
+QED
+
+(* TODO: having compile_network instead of compile_network_alt in the conclusion would be
+         nicer, but that requires using a different notion of bismulation in the theorem statement *)
+Theorem compile_network_preservation_trans:
+  ∀p1 p2 conf.
+    conf.payload_size > 0
+    ∧ fix_network p1
+    ∧ free_fix_names_network p1 = []
+    ∧ no_undefined_vars_network p1
+    ∧ reduction conf p1 p2
+    ⇒ ∃p3. (reduction conf)^* (compile_network p1) p3 ∧
+           compile_rel conf p3 (compile_network_alt p2)
+Proof
+  rpt strip_tac >>
+  drule_all_then strip_assume_tac compile_network_preservation_trans_alt >>
+  goal_assum(resolve_then (Pos hd) mp_tac RTC_RTC) >>
+  goal_assum(resolve_then (Pos hd) mp_tac compile_network_reduction_alt) >>
+  goal_assum drule >>
+  simp[]
+(*  ‘fix_network p2’ by metis_tac[fix_network_trans_pres,reduction_def] >>
+    simp[compile_rel_def,letrec_network_compile_network,letrec_network_compile_network_alt] *)
 QED
 
 (*
