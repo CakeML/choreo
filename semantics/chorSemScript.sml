@@ -186,12 +186,20 @@ Inductive trans:
    (* Recursion *)
 ∧ (∀s c dn.
     trans (s,Fix dn c) (LFix,[]) (s,dsubst c dn (Fix dn c)))
-End
 
+∧ (∀s v p c c0.
+    trans (s,c) (LFix,[]) (s,c')
+    ⇒ trans (s,IfThen v p c c0) (LFix,[]) (s,IfThen v p c' c0))
+
+∧ (∀s v p c c0.
+    trans (s,c) (LFix,[]) (s,c')
+    ⇒ trans (s,IfThen v p c0 c) (LFix,[]) (s,IfThen v p c0 c'))
+End
 
 val _ = zip ["trans_com","trans_sel","trans_let","trans_if_true","trans_if_false",
               "trans_if_swap","trans_com_swap","trans_sel_swap","trans_let_swap",
-              "trans_com_async","trans_sel_async","trans_fix"]
+              "trans_com_async","trans_sel_async",
+              "trans_fix","trans_fix_if_true","trans_fix_if_false"]
             (CONJUNCTS trans_rules) |> map save_thm;
 
 Theorem trans_pairind =

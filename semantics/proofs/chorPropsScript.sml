@@ -261,7 +261,11 @@ Proof
   >- (res_tac
      \\ `z' = z''` by metis_tac [trans_state]
      \\ rveq \\ qexists_tac `z'` \\ local_metis)
-  \\ local_metis
+  >- local_metis >- local_metis >- local_metis
+  >- local_metis >- local_metis >- local_metis
+  \\ res_tac
+  \\ `z = z'` by (drule trans_state \\ rw [state_from_tag_def])
+  \\ rveq \\ qexists_tac `z` \\ local_metis
   end
 QED
 
