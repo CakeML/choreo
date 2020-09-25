@@ -3096,8 +3096,8 @@ Theorem compile_network_preservation_trans_alt:
     ∧ free_fix_names_network p1 = []
     ∧ no_undefined_vars_network p1
     ∧ reduction conf p1 p2
-    ⇒ ∃p3. (reduction conf)^* (compile_network_alt p1) p3 ∧
-             compile_rel conf p3 (compile_network_alt p2)
+    ⇒ ∃p3. reduction conf (compile_network_alt p1) p3 ∧
+           compile_rel conf p3 (compile_network_alt p2)
 Proof
   rpt strip_tac
   >> qhdtm_x_assum ‘reduction’ (fn thm => rpt(pop_assum mp_tac) >> assume_tac  thm)
@@ -3116,7 +3116,6 @@ Proof
       >> simp[compile_network_alt_def]
       >> drule_all_then strip_assume_tac trans_com_l
       >> fs[GSYM reduction_def]
-      >> drule_then strip_assume_tac RTC_SUBSET
       >> goal_assum drule
       >> metis_tac[compile_rel_refl,fix_network_NPar,letrec_network_compile_network_alt,
                    letrec_network_trans_pres,letrec_network_NPar])
@@ -3128,12 +3127,10 @@ Proof
       >> simp[compile_network_alt_def]
       >> drule_all_then strip_assume_tac trans_com_r
       >> fs[GSYM reduction_def]
-      >> drule_then strip_assume_tac RTC_SUBSET
       >> goal_assum drule
       >> metis_tac[compile_rel_refl,fix_network_NPar,letrec_network_compile_network_alt,
                    letrec_network_trans_pres,letrec_network_NPar])
   >- ((* trans_dequeue_last_payload *)
-      goal_assum (resolve_then (Pos hd) mp_tac RTC_SUBSET) >>
       simp[reduction_def] >>
       simp[compile_network_alt_def,compile_endpoint_def] >>
       simp[Once trans_cases,RIGHT_AND_OVER_OR,PULL_EXISTS,EXISTS_OR_THM] >>
@@ -3149,7 +3146,6 @@ Proof
       csimp[CaseEq "bool",written_var_names_endpoint_def]
       )
   >- ((* trans_dequeue_intermediate_payload *)
-      goal_assum (resolve_then (Pos hd) mp_tac RTC_SUBSET) >>
       simp[reduction_def] >>
       simp[compile_network_alt_def,compile_endpoint_def] >>
       simp[Once trans_cases,RIGHT_AND_OVER_OR,PULL_EXISTS,EXISTS_OR_THM] >>
@@ -3165,7 +3161,6 @@ Proof
       csimp[CaseEq "bool",written_var_names_endpoint_def])
   >- ((* trans_if_true *)
       ‘v ∈ FDOM s.bindings’ by simp[FDOM_FLOOKUP] >>
-      goal_assum (resolve_then (Pos hd) mp_tac RTC_SUBSET) >>
       simp[reduction_def] >>
       simp[compile_network_alt_def,compile_endpoint_def] >>
       simp[Once trans_cases,RIGHT_AND_OVER_OR,PULL_EXISTS,EXISTS_OR_THM] >>
@@ -3178,7 +3173,6 @@ Proof
       fs[written_var_names_endpoint_def] >>
       fs[compile_rel_def,letrec_network_def,endpoints_def,fix_network_def,letrec_endpoint_compile_endpoint] >>
       simp[nub'_APPEND,FILTER_APPEND,FUPDATE_LIST_APPEND] >>
-      match_mp_tac bisim_IMP_tausim >>
       match_mp_tac junkcong_bisim >>
       goal_assum(resolve_then (Pos hd) mp_tac junkcong_sym) >>
       goal_assum(resolve_then (Pos hd) mp_tac junkcong_add_junk_list') >>
@@ -3192,7 +3186,6 @@ Proof
       metis_tac[])
   >- ((* trans_if_false *)
       ‘v ∈ FDOM s.bindings’ by simp[FDOM_FLOOKUP] >>
-      goal_assum (resolve_then (Pos hd) mp_tac RTC_SUBSET) >>
       simp[reduction_def] >>
       simp[compile_network_alt_def,compile_endpoint_def] >>
       simp[Once trans_cases,RIGHT_AND_OVER_OR,PULL_EXISTS,EXISTS_OR_THM] >>
@@ -3205,7 +3198,6 @@ Proof
       fs[written_var_names_endpoint_def] >>
       fs[compile_rel_def,letrec_network_def,endpoints_def,fix_network_def,letrec_endpoint_compile_endpoint] >>
       simp[nub'_APPEND,FILTER_APPEND,FUPDATE_LIST_APPEND] >>
-      match_mp_tac bisim_IMP_tausim >>
       match_mp_tac junkcong_bisim >>
       goal_assum(resolve_then (Pos hd) mp_tac junkcong_sym) >>
       (* TODO: something less atrocious *)
@@ -3236,7 +3228,6 @@ Proof
       fs[no_undefined_vars_network_def,endpoints_def,free_var_names_endpoint_def,SUBSET_DEF] >>
       metis_tac[])
   >- ((* trans_let *)
-      goal_assum (resolve_then (Pos hd) mp_tac RTC_SUBSET) >>
       simp[reduction_def] >>
       simp[compile_network_alt_def,compile_endpoint_def] >>
       simp[Once trans_cases,RIGHT_AND_OVER_OR,PULL_EXISTS,EXISTS_OR_THM] >>
@@ -3260,20 +3251,16 @@ Proof
       fs[FDOM_FLOOKUP])
   >- ((* trans_par_l *)
       fs[compile_network_alt_def,fix_network_NPar,free_fix_names_network_def,no_undefined_vars_network_NPar] >>
-      drule_then (fn thm => goal_assum(resolve_then (Pos hd) mp_tac thm)) payloadPropsTheory.reduction_par_l >>
+      drule_then (fn thm => goal_assum(resolve_then (Pos hd) mp_tac thm)) trans_par_l >>
       fs[compile_rel_def,letrec_network_NPar,letrec_network_compile_network_alt] >>
-      drule_then MATCH_ACCEPT_TAC tausim_par_left)
+      drule_then MATCH_ACCEPT_TAC bisim_par_left)
   >- ((* trans_par_r *)
       fs[compile_network_alt_def,fix_network_NPar,free_fix_names_network_def,no_undefined_vars_network_NPar] >>
-      drule_then (fn thm => goal_assum(resolve_then (Pos hd) mp_tac thm)) payloadPropsTheory.reduction_par_r >>
+      drule_then (fn thm => goal_assum(resolve_then (Pos hd) mp_tac thm)) trans_par_r >>
       fs[compile_rel_def,letrec_network_NPar,letrec_network_compile_network_alt] >>
-      drule_then MATCH_ACCEPT_TAC tausim_par_right)
+      drule_then MATCH_ACCEPT_TAC bisim_par_right)
   >- ((* trans_fix *)
       rename1 ‘Fix dn e’ >>
-      goal_assum (resolve_then (Pos hd) mp_tac RTC_TRANS) >>
-      simp[reduction_def,compile_network_alt_def,compile_endpoint_def] >>
-      simp[Once trans_cases] >>
-      goal_assum (resolve_then (Pos hd) mp_tac RTC_SUBSET) >>
       simp[reduction_def,compile_network_alt_def,compile_endpoint_def] >>
       simp[Once trans_cases] >>
       conj_asm1_tac >-
@@ -3297,8 +3284,8 @@ Proof
       conj_tac >- metis_tac[letrec_endpoint_compile_endpoint] >>
       simp[written_var_names_endpoint_def] >>
       simp[compile_endpoint_def] >>
-      qmatch_goalsub_abbrev_tac ‘tausim _ (NEndpoint _ (_ with <|bindings := b1; funs := _|>) _)
-                                          (NEndpoint _ (_ with bindings := b2) _)’ >>
+      qmatch_goalsub_abbrev_tac ‘BISIM_REL _ (NEndpoint _ (_ with <|bindings := b1; funs := _|>) _)
+                                             (NEndpoint _ (_ with bindings := b2) _)’ >>
       ‘b1 = b2’
         by(unabbrev_all_tac >>
            rw[fmap_eq_flookup,flookup_fupdate_list] >>
@@ -3339,9 +3326,9 @@ Proof
            imp_res_tac written_var_names_endpoint_dsubst' >>
            fs[]) >>
       pop_assum SUBST_ALL_TAC >>
-      simp[Abbr ‘a2’] >>
       pop_assum kall_tac >>
-      match_mp_tac tausim_defer_fundef >>
+      simp[Abbr ‘a2’] >>
+      match_mp_tac bisim_defer_fundef >>
       simp[compile_fix_closure_endpoint_rel_def,letrec_endpoint_compile_endpoint,all_distinct_nub',
            set_nub'] >>
       CONV_TAC(RESORT_EXISTS_CONV (fn l => List.nth(l,3)::List.take(l,3) @ [last l])) (* TODO: make less hacky *) >>
@@ -3444,14 +3431,7 @@ Theorem compile_rel_trans:
   compile_rel conf p1 p2 ∧ compile_rel conf p2 p3 ⇒
   compile_rel conf p1 p3
 Proof
-  rw[compile_rel_def] >> metis_tac[tausim_trans]
-QED
-
-Theorem compile_rel_alt_trans:
-  compile_rel_alt conf p1 p2 ∧ compile_rel_alt conf p2 p3 ⇒
-  compile_rel_alt conf p1 p3
-Proof
-  rw[compile_rel_alt_def] >> metis_tac[bisimulationTheory.BISIM_REL_IS_EQUIV_REL,equivalence_def,transitive_def]
+  rw[compile_rel_def] >> metis_tac[bisim_trans]
 QED
 
 (* TODO: having compile_network instead of compile_network_alt in the conclusion would be
@@ -3470,10 +3450,29 @@ Proof
   drule_all_then strip_assume_tac compile_network_preservation_trans_alt >>
   goal_assum(resolve_then (Pos hd) mp_tac RTC_RTC) >>
   goal_assum(resolve_then (Pos hd) mp_tac compile_network_reduction_alt) >>
+  goal_assum(resolve_then (Pos hd) mp_tac RTC_SUBSET) >>
   goal_assum drule >>
   simp[]
 (*  ‘fix_network p2’ by metis_tac[fix_network_trans_pres,reduction_def] >>
     simp[compile_rel_def,letrec_network_compile_network,letrec_network_compile_network_alt] *)
+QED
+
+Theorem bisim_reductionE:
+  ∀conf p2 p3 p1.
+  (reduction conf)^* p2 p3 ∧
+  BISIM_REL (trans conf) p1 p2 ⇒
+  ∃p4. (reduction conf)^* p1 p4 ∧ BISIM_REL (trans conf) p4 p3
+Proof
+  strip_tac >>
+  simp[GSYM PULL_FORALL,GSYM AND_IMP_INTRO] >>
+  ho_match_mp_tac RTC_STRONG_INDUCT >> rw[]
+  >- metis_tac[RTC_REFL,bisim_refl]
+  >- (qhdtm_x_assum ‘BISIM_REL’ (strip_assume_tac o REWRITE_RULE[Once bisimulationTheory.BISIM_REL_cases]) >>
+      fs[reduction_def] >>
+      res_tac >> fs[] >>
+      last_x_assum drule >> rw[] >>
+      goal_assum(drule_at (Pos last)) >>
+      metis_tac[RTC_TRANS,reduction_def])
 QED
 
 Theorem tausim_reductionE:
@@ -3530,14 +3529,14 @@ Proof
   drule_all compile_network_preservation_trans_alt >>
   strip_tac >>
   qhdtm_assum ‘compile_rel’ (strip_assume_tac o REWRITE_RULE[compile_rel_def]) >>
-  drule_all tausim_reductionE >>
+  drule_all bisim_reductionE >>
   strip_tac >>
-  goal_assum(resolve_then (Pos hd) mp_tac RTC_RTC) >>
+  goal_assum(resolve_then (Pos hd) mp_tac RTC_TRANS) >>
   goal_assum drule >>
   goal_assum drule >>
   fs[compile_rel_def] >>
   conj_tac >- cheat >>
-  metis_tac[tausim_trans]
+  metis_tac[bisim_trans]
 QED
 
 Theorem compile_network_reflection_alt_single:
