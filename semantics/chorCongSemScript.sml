@@ -162,7 +162,7 @@ val _ = Parse.add_infix("≲",425,Parse.NONASSOC);
 val _ = Parse.overload_on("≲",``scong``);
 
 val _ = zip ["scong_refl", "scong_trans"
-            , "scong__com_swap", "scong_sel_swap"
+            , "scong_com_swap", "scong_sel_swap"
             , "scong_com_sel_swap","scong_sel_com_swap"
             , "scong_let_swap"
             , "scong_com_let_swap" , "scong_sel_let_swap"
@@ -236,5 +236,146 @@ val transCong_pairind = save_thm("transCong_pairind",
   |> SIMP_RULE std_ss [FORALL_PROD]
   |> Q.GEN `P`
 );
+
+val (lncong_rules, lncong_ind, lncong_cases) = Hol_reln `
+(* Basic congruence rules *)
+
+  (* Symmetric *)
+  (∀c. lncong c c)
+
+  (* Reflexive *)
+∧ (∀c1 c2.
+    lncong c1 c2
+    ⇒ lncong c2 c1)
+
+  (* Transitive *)
+∧ (∀c1 c2 c3.
+     lncong c1 c2
+     ∧ lncong c2 c3
+     ⇒ lncong c1 c3)
+
+(* Swapping rules *)
+
+(* Swapping communications and selections is only posible if the
+   processes involved in each operations are diferent (all of them)
+*)
+∧ (∀p1 p2 p3 p4 v1 v2 v3 v4 c.
+    {p1;p2} ∩ {p3;p4} = {}
+    ⇒ lncong (Com p1 v1 p2 v2 (Com p3 v3 p4 v4 c))
+            (Com p3 v3 p4 v4 (Com p1 v1 p2 v2 c)))
+∧ (∀p1 p2 p3 p4 v1 v2 v3 c.
+    {p1;p2} ∩ {p3;p4} = {}
+    ⇒ lncong (Com p1 v1 p2 v2 (Sel p3 v3 p4 c))
+            (Sel p3 v3 p4 (Com p1 v1 p2 v2 c)))
+∧ (∀p1 p2 p3 p4 v1 v3 c.
+    {p1;p2} ∩ {p3;p4} = {}
+    ⇒ lncong (Sel p1 v1 p2 (Sel p3 v3 p4 c))
+            (Sel p3 v3 p4 (Sel p1 v1 p2 c)))
+
+(* Let swaps need to make sure no pair of process and variable is
+   shared betwen operations (this includes the arguments to the let
+   function)
+*)
+∧ (∀p1 p2 p3 v1 v2 v3 f vl c.
+    p1 ≠ p3 ∧ p2 ≠ p3
+    ⇒ lncong (Com p1 v1 p2 v2 (Let v3 p3 f vl c))
+            (Let v3 p3 f vl (Com p1 v1 p2 v2 c)))
+∧ (∀v v' p p' f f' vl vl' c.
+    p ≠ p'
+    ⇒ lncong (Let v p f vl (Let v' p' f' vl' c))
+           (Let v' p' f' vl' (Let v p f vl c)))
+∧ (∀p1 p2 p3 b v vl f c.
+    p1 ≠ p3 ∧ p2 ≠ p3
+    ⇒ lncong (Sel p1 b p2 (Let v p3 f vl c))
+            (Let v p3 f vl (Sel p1 b p2 c)))
+
+(* If Rules *)
+∧ (∀p q e1 e2 c1 c2 c1' c2'.
+    p ≠ q
+    ⇒ lncong (IfThen e1 p (IfThen e2 q c1 c2)  (IfThen e2 q c1' c2'))
+            (IfThen e2 q (IfThen e1 p c1 c1') (IfThen e1 p c2  c2')))
+∧ (∀p1 p2 p v1 v2 c1 c2 e.
+    p ∉ {p1;p2}
+    ⇒ lncong (Com p1 v1 p2 v2 (IfThen e p c1 c2))
+            (IfThen e p (Com p1 v1 p2 v2 c1) (Com p1 v1 p2 v2 c2)))
+∧ (∀p1 p2 b c1 c2 p e.
+    p ∉ {p1;p2}
+    ⇒ lncong (Sel p1 b p2 (IfThen e p c1 c2))
+            (IfThen e p (Sel p1 b p2 c1) (Sel p1 b p2 c2)))
+∧ (∀p1 p2 v f vl e c1 c2.
+    p1 ≠ p2
+    ⇒ lncong (Let v p1 f vl (IfThen e p2 c1 c2))
+            (IfThen e p2 (Let v p1 f vl c1) (Let v p1 f vl c2)))
+
+  (* Structural rules *)
+∧ (∀p e c1 c1' c2 c2'.
+    lncong c1 c1'
+    ∧ lncong c2 c2'
+    ⇒ lncong (IfThen e p c1 c2) (IfThen e p c1' c2'))
+∧ (∀p v f vl c c'.
+    lncong c c'
+    ⇒ lncong (Let v p f vl c) (Let v p f vl c'))
+∧ (∀p1 v1 p2 v2 c c'.
+    lncong c c'
+    ⇒ lncong (Com p1 v1 p2 v2 c) (Com p1 v1 p2 v2 c'))
+∧ (∀p1 b p2 c c'.
+    lncong c c'
+    ⇒ lncong (Sel p1 b p2 c) (Sel p1 b p2 c'))
+`;
+
+val _ = Parse.add_infix("≅l",425,Parse.NONASSOC);
+val _ = Parse.overload_on("≅l",``lncong``);
+
+val _ = zip ["lncong_refl", "lncong_sym", "lncong_trans"
+            , "lncong_com_swap", "lncong_com_sel_swap"
+            , "lncong_sel_swap", "lncong_com_let_swap"
+            , "lncong_let_swap", "lncong_sel_let_swap"
+            , "lncong_if_swap", "lncong_com_if_swap"
+            , "lncong_sel_if_swap", "lncong_let_if_swap"
+            , "lncong_if", "lncong_let", "lncong_com"
+            , "lncong_sel"]
+            (CONJUNCTS lncong_rules) |> map save_thm;
+
+val (flcong_rules, flcong_ind, flcong_cases) = Hol_reln `
+(* Basic pre-congruence rules *)
+
+  (* Symmetric *)
+  (∀c. flcong c c)
+
+  (* Transitive *)
+∧ (∀c1 c2 c3.
+     flcong c1 c2
+     ∧ flcong c2 c3
+     ⇒ flcong c1 c3)
+
+  (* Structural rules *)
+∧ (∀p e c1 c1' c2 c2'.
+    flcong c1 c1'
+    ∧ flcong c2 c2'
+    ⇒ flcong (IfThen e p c1 c2) (IfThen e p c1' c2'))
+∧ (∀p v f vl c c'.
+    flcong c c'
+    ⇒ flcong (Let v p f vl c) (Let v p f vl c'))
+∧ (∀p1 v1 p2 v2 c c'.
+    flcong c c'
+    ⇒ flcong (Com p1 v1 p2 v2 c) (Com p1 v1 p2 v2 c'))
+∧ (∀p1 b p2 c c'.
+    flcong c c'
+    ⇒ flcong (Sel p1 b p2 c) (Sel p1 b p2 c'))
+
+  (* Recursion *)
+∧ (∀x c. flcong (Fix x c) (dsubst c x (Fix x c)))
+`;
+
+val _ = Parse.add_infix("≅⟩",425,Parse.NONASSOC);
+val _ = Parse.overload_on("≅⟩",``flcong``);
+
+val _ = zip ["flcong_refl" , "flcong_trans"
+            , "flcong_if"  , "flcong_let"
+            , "flcong_com" , "flcong_sel"
+            , "flcong_fix"]
+            (CONJUNCTS flcong_rules) |> map save_thm;
+
+
 
 val _ = export_theory ()
