@@ -3524,7 +3524,10 @@ Proof
   fs[] >>
   ‘fix_network p1'’ by metis_tac[fix_network_trans_pres,reduction_def] >>
   first_x_assum drule >>
-  impl_tac >- cheat >>
+  impl_tac
+  >- (drule_all free_fix_names_network_reduction_pres >>
+      rw[] >>
+      imp_res_tac no_undefined_vars_network_reduction_pres) >>
   strip_tac >>
   drule_all compile_network_preservation_trans_alt >>
   strip_tac >>
@@ -3535,29 +3538,23 @@ Proof
   goal_assum drule >>
   goal_assum drule >>
   fs[compile_rel_def] >>
-  conj_tac >- cheat >>
+  conj_tac
+  >- (drule_then match_mp_tac letrec_network_weak_reduction_pres >>
+      simp[]) >>
   metis_tac[bisim_trans]
 QED
 
-Theorem compile_network_reflection_alt_single:
+Theorem compile_network_reflection_single:
   ∀p1 p2 conf.
     conf.payload_size > 0
     ∧ fix_network p1
     ∧ free_fix_names_network p1 = []
     ∧ no_undefined_vars_network p1
-    ∧ (reduction_alt conf) (compile_network_alt p1) p2
-    ⇒ ∃p3 p4. reduction_alt conf p1 p3 ∧
-              (reduction_alt conf)^* p2 p4 ∧
-              compile_rel_alt conf p4 (compile_network_alt p3)
+    ∧ (reduction conf) (compile_network_alt p1) p2
+    ⇒ ∃p3 p4. reduction conf p1 p3 ∧
+              compile_rel conf p2 (compile_network_alt p3)
 Proof
   cheat
-QED
-
-Theorem compile_network_alt_endpoints:
-  ∀p1.
-    MAP FST(endpoints(compile_network_alt p1)) = MAP FST (endpoints p1)
-Proof
-  Induct >> rw[compile_network_alt_def,endpoints_def]
 QED
 
 Theorem compile_network_endpoints:
@@ -3567,145 +3564,74 @@ Proof
   Induct >> rw[compile_network_def,endpoints_def]
 QED
 
-Theorem letrec_network_trans_alt_pres:
-  letrec_network p1 ∧ trans_alt conf p1 α p2 ⇒ letrec_network p2
-Proof
-  rw[] >> Cases_on ‘α ≠ LTau’ >>
-  fs[trans_alt_nontau_eq,GSYM reduction_alt_def] >>
-  imp_res_tac letrec_network_trans_pres >>
-  drule reduction_alt_IMP >>
-  qhdtm_x_assum ‘letrec_network’ mp_tac >>
-  simp[AND_IMP_INTRO] >>
-  match_mp_tac RTC_lifts_invariants >>
-  metis_tac[letrec_network_trans_pres,reduction_def]
-QED
-
-Theorem fix_network_trans_alt_pres:
-  fix_network p1 ∧ trans_alt conf p1 α p2 ⇒ fix_network p2
-Proof
-  rw[] >> Cases_on ‘α ≠ LTau’ >>
-  fs[trans_alt_nontau_eq,GSYM reduction_alt_def] >>
-  imp_res_tac fix_network_trans_pres >>
-  drule reduction_alt_IMP >>
-  qhdtm_x_assum ‘fix_network’ mp_tac >>
-  simp[AND_IMP_INTRO] >>
-  match_mp_tac RTC_lifts_invariants >>
-  metis_tac[fix_network_trans_pres,reduction_def]
-QED
-
-Theorem compile_rel_alt_trans_alt_pres:
- ∀conf p1 p2 l p3.
- compile_rel_alt conf p1 p2 ∧
- trans_alt conf p1 l p3 ⇒
- ∃p4. trans_alt conf p2 l p4 ∧ compile_rel_alt conf p3 p4
+Theorem compile_rel_trans_pres:
+  ∀conf n1 α n2 n1'.
+    compile_rel conf n1 n2 ∧ trans conf n1 α n1' ⇒
+    ∃n2'. trans conf n2 α n2' ∧ compile_rel conf n1' n2'
 Proof
   rpt strip_tac >>
-  fs[compile_rel_alt_def] >>
+  fs[compile_rel_def] >>
   qhdtm_x_assum ‘BISIM_REL’ (strip_assume_tac o REWRITE_RULE[Once bisimulationTheory.BISIM_REL_cases]) >>
   fs[FORALL_AND_THM] >>
   res_tac >>
-  goal_assum drule >> simp[] >>
-  imp_res_tac letrec_network_trans_alt_pres >> simp[]
+  goal_assum drule >>
+  simp[] >>
+  imp_res_tac letrec_network_trans_pres >> simp[]
 QED
 
-Theorem compile_rel_alt_trans_alt_pres':
- ∀conf p1 p2 l p3.
- compile_rel_alt conf p1 p2 ∧
- trans_alt conf p2 l p3 ⇒
- ∃p4. trans_alt conf p1 l p4 ∧ compile_rel_alt conf p4 p3
+Theorem list_trans_compile_rel:
+  ∀conf p1 l p1' p2.
+  list_trans conf p1 l p1' ∧
+  compile_rel conf p1 p2 ⇒
+  ∃p2'. list_trans conf p2 l p2' ∧ compile_rel conf p1' p2'
 Proof
-  rpt strip_tac >>
-  fs[compile_rel_alt_def] >>
-  qhdtm_x_assum ‘BISIM_REL’ (strip_assume_tac o REWRITE_RULE[Once bisimulationTheory.BISIM_REL_cases]) >>
-  fs[FORALL_AND_THM] >>
-  res_tac >>
-  goal_assum drule >> simp[] >>
-  imp_res_tac letrec_network_trans_alt_pres >> simp[]
-QED
-
-Theorem compile_rel_alt_list_trans:
- ∀conf p1 p2 l p3.
- compile_rel_alt conf p1 p2 ∧
- list_trans_alt conf p1 l p3 ⇒
- ∃p4. list_trans_alt conf p2 l p4 ∧ compile_rel_alt conf p3 p4
-Proof
-  strip_tac >>
-  Induct_on ‘l’ >>
-  rw[list_trans_alt_def] >> rw[] >>
-  imp_res_tac compile_rel_alt_trans_alt_pres >>
-  res_tac >>
+  strip_tac >> Induct_on ‘l’ >>
+  rw[list_trans_def] >- goal_assum drule >>
+  drule_all compile_rel_trans_pres >> strip_tac >>
   metis_tac[]
 QED
 
-Theorem compile_rel_alt_list_trans':
- ∀conf p1 p2 l p3.
- compile_rel_alt conf p1 p2 ∧
- list_trans_alt conf p2 l p3 ⇒
- ∃p4. list_trans_alt conf p1 l p4 ∧ compile_rel_alt conf p4 p3
-Proof
-  strip_tac >>
-  Induct_on ‘l’ >>
-  rw[list_trans_alt_def] >> rw[] >>
-  imp_res_tac compile_rel_alt_trans_alt_pres' >>
-  res_tac >>
-  metis_tac[]
-QED
-
-Theorem compile_network_reflection_al_trans_altt:
+Theorem compile_network_reflection_alt:
   ∀p1 p2 conf.
     conf.payload_size > 0
     ∧ fix_network p1
     ∧ free_fix_names_network p1 = []
     ∧ no_undefined_vars_network p1
     ∧ ALL_DISTINCT (MAP FST (endpoints p1))
-    ∧ (reduction_alt conf)^* (compile_network_alt p1) p2
-    ⇒ ∃p3 p4. (reduction_alt conf)^* p1 p3 ∧
-              (reduction_alt conf)^* p2 p4 ∧
-              compile_rel_alt conf p4 (compile_network_alt p3)
+    ∧ (reduction conf)^* (compile_network_alt p1) p2
+    ⇒ ∃p3. (reduction conf)^* p1 p3 ∧
+           compile_rel conf p2 (compile_network_alt p3)
 Proof
-  simp[reduction_list_trans_alt,PULL_EXISTS] >>
+  simp[reduction_list_trans,PULL_EXISTS] >>
   CONV_TAC(RESORT_FORALL_CONV rev) >>
   ho_match_mp_tac COMPLETE_INDUCTION >>
   Cases
-  >- (rw[list_trans_alt_def] >>
+  >- (rw[list_trans_def] >>
       CONV_TAC(RESORT_EXISTS_CONV rev) >>
-      qexists_tac `0` >> qexists_tac ‘0’ >> rw[list_trans_alt_def] >>
-      metis_tac[RTC_REFL,compile_rel_alt_refl,letrec_network_compile_network_alt])
-  >- (rw[list_trans_alt_def,GSYM reduction_alt_def] >>
-      drule_all(compile_network_reflection_alt_single
+      qexists_tac ‘0’ >> rw[list_trans_def] >>
+      metis_tac[RTC_REFL,compile_rel_refl,letrec_network_compile_network_alt])
+  >- (rw[list_trans_def,GSYM reduction_def] >>
+      CONV_TAC(RESORT_EXISTS_CONV rev) >>
+      Q.REFINE_EXISTS_TAC ‘SUC _’ >>
+      simp[list_trans_def,PULL_EXISTS,GSYM reduction_def] >>
+      drule_all(compile_network_reflection_single
                 |> REWRITE_RULE[PULL_EXISTS,reduction_list_trans]) >>
       strip_tac >>
-      fs[reduction_list_trans_alt] >>
-      dxrule payload_confluence_weak_contract_alt >>
+      goal_assum drule >>
+      PRED_ASSUM is_forall (resolve_then (Pos hd) mp_tac prim_recTheory.LESS_SUC_REFL) >>
       disch_then drule >>
-      impl_tac
-      >- (metis_tac[endpoint_names_trans_alt,reduction_alt_def,
-                    compile_network_alt_endpoints]) >>
+      drule_all list_trans_compile_rel >>
       strip_tac >>
-      drule_all compile_rel_alt_list_trans >>
-      strip_tac >>
-      rename1 `list_trans_alt _ (compile_network_alt _) (REPLICATE stepcount _) _` >>
-      first_x_assum(qspec_then `stepcount` mp_tac ) >>
-      impl_tac >- simp[] >>
-      disch_then drule >>
-      fs[reduction_alt_def] >>
-      drule_all_then strip_assume_tac fix_network_trans_alt_pres >>
-      disch_then drule >>
       disch_then(drule_at (Pos last)) >>
-      impl_tac >- cheat >>
+      impl_tac
+      >- (conj_tac >- metis_tac[fix_network_trans_pres,reduction_def] >>
+          conj_tac >- (fs[reduction_def] >> imp_res_tac free_fix_names_network_trans_pres >>
+                       rfs[]) >>
+          metis_tac[endpoint_names_trans,reduction_def,no_undefined_vars_network_trans_pres,
+                    compile_network_endpoints]) >>
       strip_tac >>
-      CONV_TAC(RESORT_EXISTS_CONV rev) >>
-      CONV_TAC SWAP_EXISTS_CONV >>
-      Q.REFINE_EXISTS_TAC ‘SUC _’ >>
-      simp[list_trans_alt_def,PULL_EXISTS] >>
-      goal_assum drule >>
-      goal_assum drule >>
-      drule_all compile_rel_alt_list_trans' >>
-      strip_tac >>
-      Q.REFINE_EXISTS_TAC ‘_ + _’ >>
-      simp[GSYM REPLICATE_APPEND,list_trans_alt_append,PULL_EXISTS] >>
       rpt(goal_assum drule) >>
-      metis_tac[compile_rel_alt_trans])
+      metis_tac[compile_rel_trans])
 QED
 
 val _ = export_theory ();

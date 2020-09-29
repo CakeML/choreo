@@ -3345,6 +3345,36 @@ Proof
   fs[EVERY_MEM] >> res_tac >> fs[letrec_closure_def]
 QED
 
+Theorem letrec_network_reduction_pres:
+  ∀conf p q.
+  reduction conf p q ∧
+  letrec_network p ⇒
+  letrec_network q
+Proof
+  metis_tac[letrec_network_trans_pres,reduction_def]
+QED
+
+Theorem letrec_network_reduction_pres:
+  ∀conf p q.
+  reduction conf p q ∧
+  letrec_network p ⇒
+  letrec_network q
+Proof
+  metis_tac[letrec_network_trans_pres,reduction_def]
+QED
+
+Theorem letrec_network_weak_reduction_pres:
+  ∀conf p q.
+  (reduction conf)^* p q ∧
+  letrec_network p ⇒
+  letrec_network q
+Proof
+  rpt GEN_TAC >>
+  simp[GSYM CONJ_SYM] >>
+  match_mp_tac RTC_lifts_invariants >>
+  metis_tac[letrec_network_reduction_pres]
+QED
+
 Definition no_undefined_vars_closure_def:
   no_undefined_vars_closure (Closure args env e) =
   (set(free_var_names_endpoint e) ⊆ set args ∪ FDOM(SND env) ∧
@@ -3391,6 +3421,15 @@ Proof
       fs[UNION_COMM,EVERY_MEM])
 QED
 
+Theorem no_undefined_vars_network_reduction_pres:
+  ∀conf n1 n2.
+    reduction conf n1 n2 ∧
+    no_undefined_vars_network n1 ⇒
+    no_undefined_vars_network n2
+Proof
+  metis_tac[reduction_def,no_undefined_vars_network_trans_pres]
+QED
+
 Theorem reduction_list_trans:
   (reduction conf)^* p q = ?n. list_trans conf p (REPLICATE n LTau) q
 Proof
@@ -3410,6 +3449,38 @@ Proof
       rw[list_trans_def] >>
       fs[GSYM payloadSemTheory.reduction_def] >>
       metis_tac[RTC_RULES])
+QED
+
+Theorem MEM_free_fix_names_endpoint_dsubst_strong:
+  ∀e dn e'.
+  MEM x (free_fix_names_endpoint (dsubst e dn e')) ⇒
+  (x ≠ dn ∧ MEM x (free_fix_names_endpoint e)) ∨
+  MEM x (free_fix_names_endpoint e')
+Proof
+  Induct >> rw[free_fix_names_endpoint_def,dsubst_def] >>
+  fs[MEM_FILTER] >> res_tac >> fs[]
+QED
+
+Theorem free_fix_names_network_trans_pres:
+  ∀conf n1 α n2.
+  trans conf n1 α n2 ∧ fix_network n1 ⇒
+  set(free_fix_names_network n2) ⊆ set(free_fix_names_network n1)
+Proof
+  simp[GSYM AND_IMP_INTRO] >>
+  ho_match_mp_tac trans_ind >>
+  rw[free_fix_names_network_def,fix_network_NPar,free_fix_names_endpoint_def] >>
+  TRY(rw[SUBSET_DEF] >> fs[] >> drule_all SUBSET_THM >> simp[] >> NO_TAC) >>
+  fs[fix_network_def,fix_endpoint_def,endpoints_def] >>
+  rw[SUBSET_DEF,MEM_FILTER] >>
+  imp_res_tac MEM_free_fix_names_endpoint_dsubst_strong >> fs[free_fix_names_endpoint_def,MEM_FILTER]
+QED
+
+Theorem free_fix_names_network_reduction_pres:
+  ∀conf n1 n2.
+  reduction conf n1 n2 ∧ fix_network n1 ⇒
+  set(free_fix_names_network n2) ⊆ set(free_fix_names_network n1)
+Proof
+  metis_tac[reduction_def,free_fix_names_network_trans_pres]
 QED
 
 val _ = export_theory ();
