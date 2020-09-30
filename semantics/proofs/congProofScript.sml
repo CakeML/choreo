@@ -1,6 +1,8 @@
 open preamble
 
-open chorSemTheory chorPropsTheory chorCongSemTheory chorLangTheory
+open chorSemTheory chorPropsTheory
+open chorCongSemTheory chorLangTheory
+open choreoUtilsTheory
 
 val _ = new_theory "congProof";
 
@@ -582,68 +584,144 @@ QED
 
 (* Equality of chorSem$freeprocs and chorTrm$freeprocs *)
 Theorem freeprocs_eq:
-  ∀τ. freeprocs τ = freeprocs (toCong τ)
+  ∀τ τ'. toCong τ = SOME τ' ⇒ freeprocs τ = freeprocs τ'
 Proof
-  Cases_on `τ`
+  Cases
+  >> rw [freeprocs_def,chorSemTheory.freeprocs_def,toCong_def]
   >> rw [freeprocs_def,chorSemTheory.freeprocs_def,toCong_def]
 QED
 
 (* Equality of chorSem$written and chorTrm$written *)
 Theorem written_eq:
-  ∀τ. written τ = written (toCong τ)
+  ∀τ τ'. toCong τ = SOME τ' ⇒ written τ = written τ'
 Proof
-  Cases_on `τ`
+  Cases
   >> rw [written_def,chorSemTheory.written_def,toCong_def]
+  >> rw [written_def,chorSemTheory.written_def,toCong_def]
+QED
+
+Theorem trans_LFix_state:
+  ∀s c s' c'.
+    trans (s,c) (LFix,[]) (s',c')
+    ⇒ s = s'
+Proof
+  ‘∀s c τ l s' c'.
+     trans (s,c) (τ,l) (s',c')
+     ⇒ τ = LFix ∧ l = []
+     ⇒ s = s'’
+  suffices_by metis_tac []
+  \\ ho_match_mp_tac trans_pairind
+  \\ rw []
+QED
+
+Theorem trans_unfold_com_swap:
+  ∀s c c' p1 v1 p2 v2.
+    trans_unfold (s,c) (s,c')
+    ⇒ trans_unfold (s,Com p1 v1 p2 v2 c) (s,Com p1 v1 p2 v2 c')
+Proof
+  rw [trans_unfold_def]
+  \\ qmatch_goalsub_abbrev_tac ‘RTC r0 (s,com c)’
+  \\ ‘RTC r0 (s,com c) (s,com c') = (λ(s,c) (s',c'). r0꙳ (s,com c) (s',com c')) (s,c) (s,c')’ by simp []
+  \\ pop_assum (ONCE_REWRITE_TAC o single)
+  \\ qmatch_asmsub_abbrev_tac ‘RTC r0 a0 a1’
+  \\ ‘FST a0 = FST a1’ by (UNABBREV_ALL_TAC \\ rw [])
+  \\ pop_assum mp_tac
+  \\ last_x_assum mp_tac
+  \\ ntac 2 (pop_assum kall_tac)
+  \\ MAP_EVERY (W(curry Q.SPEC_TAC)) (rev [‘a0’,‘a1’])
+  \\ ho_match_mp_tac RTC_ind
+  \\ UNABBREV_ALL_TAC
+  \\ rw []
+  >- (Cases_on ‘a0’ \\ simp [])
+  \\ PairCases_on ‘a0’ \\ PairCases_on ‘a1’
+  \\ PairCases_on ‘a0'’  \\ fs []
+  \\ qmatch_asmsub_rename_tac ‘trans (s,c) _ (s',c')’
+  \\ drule trans_LFix_state \\ rw []
+  \\ qmatch_asmsub_rename_tac ‘RTC _ _ (s,_ c'')’
+  \\ ho_match_mp_tac RTC_TRANS
+  \\ qexists_tac ‘(s,Com p1 v1 p2 v2 c')’
+  \\ rw [trans_com_swap,chorSemTheory.freeprocs_def]
+QED
+
+Theorem trans_unfold_sel_swap:
+  ∀s c c' p1 b p2.
+    trans_unfold (s,c) (s,c')
+    ⇒ trans_unfold (s,Sel p1 b p2 c) (s,Sel p1 b p2 c')
+Proof
+  rw [trans_unfold_def]
+  \\ qmatch_goalsub_abbrev_tac ‘RTC r0 (s,com c)’
+  \\ ‘RTC r0 (s,com c) (s,com c') = (λ(s,c) (s',c'). r0꙳ (s,com c) (s',com c')) (s,c) (s,c')’ by simp []
+  \\ pop_assum (ONCE_REWRITE_TAC o single)
+  \\ qmatch_asmsub_abbrev_tac ‘RTC r0 a0 a1’
+  \\ ‘FST a0 = FST a1’ by (UNABBREV_ALL_TAC \\ rw [])
+  \\ pop_assum mp_tac
+  \\ last_x_assum mp_tac
+  \\ ntac 2 (pop_assum kall_tac)
+  \\ MAP_EVERY (W(curry Q.SPEC_TAC)) (rev [‘a0’,‘a1’])
+  \\ ho_match_mp_tac RTC_ind
+  \\ UNABBREV_ALL_TAC
+  \\ rw []
+  >- (Cases_on ‘a0’ \\ simp [])
+  \\ PairCases_on ‘a0’ \\ PairCases_on ‘a1’
+  \\ PairCases_on ‘a0'’  \\ fs []
+  \\ qmatch_asmsub_rename_tac ‘trans (s,c) _ (s',c')’
+  \\ drule trans_LFix_state \\ rw []
+  \\ qmatch_asmsub_rename_tac ‘RTC _ _ (s,_ c'')’
+  \\ ho_match_mp_tac RTC_TRANS
+  \\ qexists_tac ‘(s,Sel p1 b p2 c')’
+  \\ rw [trans_sel_swap,chorSemTheory.freeprocs_def]
 QED
 
 (* `transCong` implies `trans` up to `≅` on the resulting choreography *)
 Theorem transCong_imp_trans:
-   ∀c s τ c' s'.
+   ∀s c τ s' c'.
     transCong (s,c) τ (s',c')
-    ⇒ ∃l τ' c''. c' ≅ c'' ∧ trans (s,c) (τ',l) (s',c'') ∧ toCong τ' = τ
+    ⇒ ∃l τ' c'' c'''.
+        c' ≲ c''' ∧
+        trans_unfold (s,c) (s,c'') ∧
+        trans (s,c'') (τ',l) (s',c''') ∧
+        toCong τ' = SOME τ
 Proof
-  rpt GEN_TAC
-  \\ `∀s c τ s' c'.
-       transCong (s,c) τ (s',c')
-        ⇒ ∃l τ' c''. c' ≅ c'' ∧ trans (s,c) (τ',l) (s',c'') ∧ toCong τ' = τ`
-     suffices_by (metis_tac [])
-  \\ ho_match_mp_tac transCong_pairind
+  ho_match_mp_tac transCong_pairind
   \\ rw [toCong_def]
-  >- (EVERY (map Q.EXISTS_TAC [`[]`,`LCom p1 v1 p2 v2`,`c'`])
-     \\ rw [scong_rules,trans_rules,toCong_def])
-  >- (EVERY (map Q.EXISTS_TAC [`[]`,`LSel p1 b p2`,`c'`])
-     \\ rw [scong_rules,trans_rules,toCong_def])
-  >- (EVERY (map Q.EXISTS_TAC [`[]`,`LLet v p f vl`,`c'`])
-     \\ rw [scong_rules,trans_rules,toCong_def])
-  >- (EVERY (map Q.EXISTS_TAC [`[]`,`LTau p v`,`c'`])
-     \\ rw [scong_rules,trans_rules,toCong_def])
-  >- (EVERY (map Q.EXISTS_TAC [`[]`,`LTau p v`,`c'`])
-     \\ rw [scong_rules,trans_rules,toCong_def])
+  >- (EVERY (map Q.EXISTS_TAC [`[]`,`LCom p1 v1 p2 v2`,`Com p1 v1 p2 v2 c'`,‘c'’])
+     \\ rw [scong_rules,trans_rules,toCong_def,trans_unfold_def,RTC_REFL])
+  >- (EVERY (map Q.EXISTS_TAC [`[]`,`LSel p1 b p2`,‘Sel p1 b p2 c'’,`c'`])
+     \\ rw [scong_rules,trans_rules,toCong_def,trans_unfold_def])
+  >- (EVERY (map Q.EXISTS_TAC [`[]`,`LLet v p f vl`,‘Let v p f vl c'’,`c'`])
+     \\ rw [scong_rules,trans_rules,toCong_def,trans_unfold_def])
+  >- (EVERY (map Q.EXISTS_TAC [`[]`,`LTau p v`,‘IfThen v p c' c2’,`c'`])
+     \\ rw [scong_rules,trans_rules,toCong_def,trans_unfold_def])
+  >- (EVERY (map Q.EXISTS_TAC [`[]`,`LTau p v`,‘IfThen v p c1 c'’,`c'`])
+     \\ rw [scong_rules,trans_rules,toCong_def,trans_unfold_def])
   >- (rfs []
-     \\ EVERY (map Q.EXISTS_TAC [`LCom p1 v1 p2 v2 :: l`,`τ'`,`Com p1 v1 p2 v2 c''`])
-     \\ rw [scong_rules]
-     \\ `p1 ∈ freeprocs τ'` by rw [freeprocs_eq]
-     \\ `p2 ∉ freeprocs τ'` by rw [freeprocs_eq]
-     \\ `written τ' ≠ SOME (v1,p1)` by rw [written_eq]
+     \\ EVERY (map Q.EXISTS_TAC [`LCom p1 v1 p2 v2 :: l`,`τ'`,`Com p1 v1 p2 v2 c''`,`Com p1 v1 p2 v2 c'''`])
+     \\ rw [scong_rules,trans_unfold_com_swap]
+     \\ `p1 ∈ freeprocs τ'` by metis_tac [freeprocs_eq]
+     \\ `p2 ∉ freeprocs τ'` by metis_tac [freeprocs_eq]
+     \\ `written τ' ≠ SOME (v1,p1)` by metis_tac [written_eq]
      \\ rw [trans_rules])
   >- (rfs []
-     \\ EVERY (map Q.EXISTS_TAC [`LSel p1 b p2 :: l`,`τ'`,`Sel p1 b p2 c''`])
-     \\ rw [scong_rules]
-     \\ `p1 ∈ freeprocs τ'` by rw [freeprocs_eq]
-     \\ `p2 ∉ freeprocs τ'` by rw [freeprocs_eq]
+     \\ EVERY (map Q.EXISTS_TAC [`LSel p1 b p2 :: l`,`τ'`,`Sel p1 b p2 c''`,`Sel p1 b p2 c'''`])
+     \\ rw [scong_rules,trans_unfold_sel_swap]
+     \\ `p1 ∈ freeprocs τ'` by metis_tac [freeprocs_eq]
+     \\ `p2 ∉ freeprocs τ'` by metis_tac [freeprocs_eq]
      \\ rw [trans_rules])
-  >- (rfs []
-     \\ last_assum (ASSUME_TAC o MATCH_MP trans_from_cong)
-     \\ RES_TAC
-     \\ EVERY (map Q.EXISTS_TAC [`l'`,`τ'`,`c2`])
-     \\ rw []
-     \\IMP_RES_TAC scong_refl
-     \\ IMP_RES_TAC scong_trans
-     \\ IMP_RES_TAC trans_imp_chorTrm
-     \\ rw []
-     \\ match_mp_tac scong_trans
-     \\ Q.EXISTS_TAC `chorTrm s τ' c''`
-     \\ rw [chorTrm_scong])
+  \\ rfs []
+  \\ last_x_assum (mp_then Any assume_tac scong_lncong_flcong)
+  \\ fs []
+  \\ cheat (* TODO *)
+  (* \\ last_assum (ASSUME_TAC o MATCH_MP trans_from_cong) *)
+  (* \\ RES_TAC *)
+  (* \\ EVERY (map Q.EXISTS_TAC [`l'`,`τ'`,`c2`]) *)
+  (* \\ rw [] *)
+  (* \\IMP_RES_TAC scong_refl *)
+  (* \\ IMP_RES_TAC scong_trans *)
+  (* \\ IMP_RES_TAC trans_imp_chorTrm *)
+  (* \\ rw [] *)
+  (* \\ match_mp_tac scong_trans *)
+  (* \\ Q.EXISTS_TAC `chorTrm s τ' c''` *)
+  (* \\ rw [chorTrm_scong] *)
 QED
 
 val _ = export_theory()
