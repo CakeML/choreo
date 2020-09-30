@@ -218,4 +218,9 @@ Definition trans_sync_def:
   trans_sync = RTC (λp q. ∃τ. trans p (τ,[]) q)
 End
 
+(* A bunch of unfold operations *)
+Definition trans_unfold_def:
+  trans_unfold = RTC (λp q. trans p (LFix,[]) q)
+End
+
 val _ = export_theory ()
