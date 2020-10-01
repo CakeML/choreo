@@ -44,6 +44,7 @@ Definition chorTrm_def:
 ∧ chorTrm s τ Nil                  = Nil
 End
 
+(* A linear congruence is a pre-congruence  *)
 Theorem lncong_scong:
   ∀c c'. c ≅l c'  ⇒ c ≲ c'
 Proof
@@ -57,6 +58,7 @@ Proof
   \\ metis_tac [scong_rules]
 QED
 
+(* An unfolding is a pre-congruence *)
 Theorem flcong_scong:
   ∀c c'. c ≅⟩ c' ⇒ c ≲ c'
 Proof
@@ -65,6 +67,7 @@ Proof
   \\ metis_tac [scong_rules]
 QED
 
+(* Unfolding does not re-arrange communications *)
 Theorem Com_flcong:
   ∀p1 v1 p2 v2 c c'.
     Com p1 v1 p2 v2 c ≅⟩ c'
@@ -81,6 +84,7 @@ Proof
   \\ metis_tac [flcong_rules]
 QED
 
+(* Unfolding does not re-arrange selections *)
 Theorem Sel_flcong:
   ∀p1 b p2 c c'.
     Sel p1 b p2 c ≅⟩ c'
@@ -97,6 +101,7 @@ Proof
   \\ metis_tac [flcong_rules]
 QED
 
+(* Unfolding does not re-arrange let-bindings *)
 Theorem Let_flcong:
   ∀p v f vl c c'.
     Let v p f vl c ≅⟩ c'
@@ -113,6 +118,7 @@ Proof
   \\ metis_tac [flcong_rules]
 QED
 
+(* Unfolding does not re-arrange branches *)
 Theorem If_flcong:
   ∀v p c1 c2 c'.
     IfThen v p c1 c2 ≅⟩ c'
@@ -129,6 +135,7 @@ Proof
   \\ metis_tac [flcong_rules]
 QED
 
+(* Nil can only unfold to Nil *)
 Theorem Nil_flcong:
   ∀c'.
     Nil ≅⟩ c'
@@ -144,6 +151,7 @@ Proof
   \\ metis_tac [flcong_rules]
 QED
 
+(* Call can only unfold to Call *)
 Theorem Call_flcong:
   ∀c' x.
     Call x ≅⟩ c'
@@ -159,6 +167,7 @@ Proof
   \\ metis_tac [flcong_rules]
 QED
 
+(* One can either unfold Fix or do nothing *)
 Theorem Fix_flcong:
   ∀c c' x.
   Fix x c ≅⟩ c'
@@ -340,8 +349,10 @@ Proof
       \\ metis_tac [lncong_rules,flcong_rules]
 QED
 
-(* One can always find an unfolding such that it can be done before
-   instead of after a given congruence
+(* One can always group unfolding at the front
+   of linear congruence. Also implies unfolding
+   can (if done the same number of times) preserve
+   swapping (linear congruence)
  *)
 Theorem flcong_lncong:
 ∀c1 c2 c3.
@@ -351,7 +362,13 @@ Proof
   metis_tac [flcong_lncong_aux,flcong_refl]
 QED
 
-(*  *)
+(* scong can be split into an unfolding relations and linear
+   congruence (no unfolding).
+
+   *NOTE*: The most interesting thing about this lemma is that
+           whatever happens in scong can be grouped into first some
+           unfoldings and then all the swapping required.
+*)
 Theorem scong_lncong_flcong:
   ∀c1 c2.
     c1 ≲ c2
@@ -600,6 +617,7 @@ Proof
   >> rw [written_def,chorSemTheory.written_def,toCong_def]
 QED
 
+(* Unfolding transition do not change the state ” *)
 Theorem trans_LFix_state:
   ∀s c s' c'.
     trans (s,c) (LFix,[]) (s',c')
@@ -614,6 +632,7 @@ Proof
   \\ rw []
 QED
 
+(* Unfolding transitions can jump over communications *)
 Theorem trans_unfold_com_swap:
   ∀s c c' p1 v1 p2 v2.
     trans_unfold (s,c) (s,c')
@@ -643,6 +662,7 @@ Proof
   \\ rw [trans_com_swap,chorSemTheory.freeprocs_def]
 QED
 
+(* Unfolding transitions can jump over selections *)
 Theorem trans_unfold_sel_swap:
   ∀s c c' p1 b p2.
     trans_unfold (s,c) (s,c')
@@ -672,56 +692,282 @@ Proof
   \\ rw [trans_sel_swap,chorSemTheory.freeprocs_def]
 QED
 
-(* `transCong` implies `trans` up to `≅` on the resulting choreography *)
-Theorem transCong_imp_trans:
+(* Unfolding transitions can jump over let bindings *)
+Theorem trans_unfold_let_swap:
+  ∀s c c' v p f vl.
+    trans_unfold (s,c) (s,c')
+    ⇒ trans_unfold (s,Let v p f vl c) (s,Let v p f vl c')
+Proof
+  rw [trans_unfold_def]
+  \\ qmatch_goalsub_abbrev_tac ‘RTC r0 (s,com c)’
+  \\ ‘RTC r0 (s,com c) (s,com c') = (λ(s,c) (s',c'). r0꙳ (s,com c) (s',com c')) (s,c) (s,c')’ by simp []
+  \\ pop_assum (ONCE_REWRITE_TAC o single)
+  \\ qmatch_asmsub_abbrev_tac ‘RTC r0 a0 a1’
+  \\ ‘FST a0 = FST a1’ by (UNABBREV_ALL_TAC \\ rw [])
+  \\ pop_assum mp_tac
+  \\ last_x_assum mp_tac
+  \\ ntac 2 (pop_assum kall_tac)
+  \\ MAP_EVERY (W(curry Q.SPEC_TAC)) (rev [‘a0’,‘a1’])
+  \\ ho_match_mp_tac RTC_ind
+  \\ UNABBREV_ALL_TAC
+  \\ rw []
+  >- (Cases_on ‘a0’ \\ simp [])
+  \\ PairCases_on ‘a0’ \\ PairCases_on ‘a1’
+  \\ PairCases_on ‘a0'’  \\ fs []
+  \\ qmatch_asmsub_rename_tac ‘trans (s,c) _ (s',c')’
+  \\ drule trans_LFix_state \\ rw []
+  \\ qmatch_asmsub_rename_tac ‘RTC _ _ (s,_ c'')’
+  \\ ho_match_mp_tac RTC_TRANS
+  \\ qexists_tac ‘(s,Let v p f vl c')’
+  \\ rw [trans_let_swap,chorSemTheory.freeprocs_def]
+QED
+
+(* Unfolding transitions can jump over branches *)
+Theorem trans_unfold_if_swap:
+  ∀s c1 c1' c2 c2' e p.
+    trans_unfold (s,c1) (s,c1') ∧
+    trans_unfold (s,c2) (s,c2')
+    ⇒ trans_unfold (s,IfThen e p c1 c2) (s,IfThen e p c1' c2')
+Proof
+  rw [trans_unfold_def]
+  \\ qmatch_goalsub_abbrev_tac ‘RTC r0 (s,iff c1 c2)’
+  \\ irule RTC_SPLIT
+  \\ qexists_tac ‘(s,iff c1' c2)’
+  \\ conj_tac
+  >- (‘RTC r0 (s,iff c1 c2) (s,iff c1' c2) =
+        (λ(s,c1) (s',c1'). r0꙳ (s,iff c1 c2) (s',iff c1' c2)) (s,c1) (s,c1')’ by simp []
+      \\ pop_assum (ONCE_REWRITE_TAC o single)
+      \\ Q.ABBREV_TAC ‘a0 = (s,c1)’
+      \\ Q.ABBREV_TAC ‘a1 = (s,c1')’
+      \\ ‘FST a0 = FST a1’ by (UNABBREV_ALL_TAC \\ rw [])
+      \\ pop_assum mp_tac
+      \\ last_x_assum mp_tac
+      \\ ntac 2 (pop_assum kall_tac)
+      \\ MAP_EVERY (W(curry Q.SPEC_TAC)) (rev [‘a0’,‘a1’])
+      \\ qpat_x_assum ‘RTC _ _ _’ kall_tac
+      \\ ho_match_mp_tac RTC_ind
+      \\ UNABBREV_ALL_TAC
+      \\ rw []
+      >- (Cases_on ‘a0’ \\ simp [])
+      \\ PairCases_on ‘a0’ \\ PairCases_on ‘a1’
+      \\ PairCases_on ‘a0'’  \\ fs []
+      \\ qmatch_asmsub_rename_tac ‘trans (s,c) _ (s',c')’
+      \\ drule trans_LFix_state \\ rw []
+      \\ qmatch_asmsub_rename_tac ‘RTC _ _ (s,_ c'')’
+      \\ ho_match_mp_tac RTC_TRANS
+      \\ qexists_tac ‘(s,IfThen e p c' c'')’
+      \\ rw [trans_fix_if_true])
+  \\ ‘RTC r0 (s,iff c1' c2) (s,iff c1' c2') =
+      (λ(s,c2) (s',c2'). r0꙳ (s,iff c1' c2) (s',iff c1' c2')) (s,c2) (s,c2')’ by simp []
+  \\ pop_assum (ONCE_REWRITE_TAC o single)
+  \\ Q.ABBREV_TAC ‘a0 = (s,c2)’
+  \\ Q.ABBREV_TAC ‘a1 = (s,c2')’
+  \\ ‘FST a0 = FST a1’ by (UNABBREV_ALL_TAC \\ rw [])
+  \\ pop_assum mp_tac
+  \\ qpat_x_assum ‘RTC _ (s,_) _’ kall_tac
+  \\ last_x_assum mp_tac
+  \\ ntac 2 (pop_assum kall_tac)
+  \\ MAP_EVERY (W(curry Q.SPEC_TAC)) (rev [‘a0’,‘a1’])
+  \\ ho_match_mp_tac RTC_ind
+  \\ UNABBREV_ALL_TAC
+  \\ rw []
+  >- (Cases_on ‘a0’ \\ simp [])
+  \\ PairCases_on ‘a0’ \\ PairCases_on ‘a1’
+  \\ PairCases_on ‘a0'’  \\ fs []
+  \\ qmatch_asmsub_rename_tac ‘trans (s,c) _ (s',c')’
+  \\ drule trans_LFix_state \\ rw []
+  \\ qmatch_asmsub_rename_tac ‘RTC _ _ (s,_ c'')’
+  \\ ho_match_mp_tac RTC_TRANS
+  \\ qexists_tac ‘(s,IfThen e p c1' c')’
+  \\ rw [trans_fix_if_false]
+QED
+
+(* The unfolding relation implies unfolding transitions exists such
+   that ‘c’ can reach ‘c'’
+*)
+Theorem flcong_trans_unfold:
+  ∀s c c'.
+    c ≅⟩ c' ⇒ trans_unfold (s,c) (s,c')
+Proof
+  GEN_TAC
+  \\ ho_match_mp_tac flcong_strongind \\ rw []
+  >- rw [trans_unfold_def]
+  >- (fs [trans_unfold_def] \\ metis_tac [RTC_SPLIT])
+  >- metis_tac [trans_unfold_if_swap]
+  >- metis_tac [trans_unfold_let_swap]
+  >- metis_tac [trans_unfold_com_swap]
+  >- metis_tac [trans_unfold_sel_swap]
+  \\ simp [trans_unfold_def]
+  \\ irule RTC_SINGLE
+  \\ rw [trans_fix]
+QED
+
+(* A single unfolding transition implies an unfolding relation exists
+   between ‘c’ and ‘c'’
+*)
+Theorem trans_LFix_flcong:
+  ∀s c c'.
+    trans (s,c) (LFix,[]) (s,c')
+    ⇒ c ≅⟩ c'
+Proof
+  ‘∀s c τ l s' c'.
+     trans (s,c) (τ,l) (s',c')
+     ⇒ s' = s ∧ τ = LFix ∧ l = []
+     ⇒ c ≅⟩ c'’
+  suffices_by metis_tac []
+  \\ ho_match_mp_tac trans_pairind
+  \\ rw [flcong_rules]
+  \\ gs [lcong_nil_simp]
+  \\ metis_tac [flcong_rules]
+QED
+
+(* Multiple unfolding transitions imply an unfolding relation exists
+   between ‘c’ and ‘c'’
+*)
+Theorem trans_unfold_flcong:
+  ∀s c c'.
+    trans_unfold (s,c) (s,c') ⇒ c ≅⟩ c'
+Proof
+  rw [trans_unfold_def]
+  \\ qmatch_asmsub_abbrev_tac ‘RTC r0 a0 a1’
+  \\ ‘(λ(s,c) (s',c'). c ≅⟩ c') a0 a1’ suffices_by (UNABBREV_ALL_TAC \\ simp [])
+  \\ ‘FST a0 = FST a1’ by (UNABBREV_ALL_TAC \\ simp [])
+  \\ pop_assum mp_tac
+  \\ last_x_assum mp_tac
+  \\ ntac 2 (pop_assum kall_tac)
+  \\ MAP_EVERY (W(curry Q.SPEC_TAC)) (rev [‘a0’,‘a1’])
+  \\ ho_match_mp_tac RTC_ind
+  \\ UNABBREV_ALL_TAC
+  \\ rw []
+  >- (Cases_on ‘a0’ \\ simp [flcong_refl])
+  \\ PairCases_on ‘a0’ \\ PairCases_on ‘a1’
+  \\ PairCases_on ‘a0'’  \\ fs []
+  \\ metis_tac [trans_LFix_state,trans_LFix_flcong,flcong_trans]
+QED
+
+(* Given a linear congruence and the unfolding of one of the
+   choreographies there exists an unfolding that preserves
+   the liner congruence. This lemma is just ‘flcong_lncong’
+   with ‘trans_unfold’ instead of ‘flcong’
+ *)
+Theorem trans_unfold_from_cong:
+  ∀c1 c2 c3 s.
+    c1 ≅l c2 ∧ trans_unfold (s,c2) (s,c3)
+    ⇒ ∃c4. trans_unfold (s,c1) (s,c4) ∧ c3 ≅l c4
+Proof
+  metis_tac [flcong_trans_unfold,lncong_sym,flcong_lncong,trans_unfold_flcong]
+QED
+
+(* Transitivity of trans_unfold *)
+Theorem trans_unfold_trans:
+  ∀a b c.
+    trans_unfold a b ∧ trans_unfold b c
+    ⇒ trans_unfold a c
+Proof
+  rw [trans_unfold_def]
+  \\ metis_tac [RTC_SPLIT]
+QED
+
+(* `transCong` implies `trans` up to unfolding on both sides of the
+   resulting choreography and ‘≅’ at the end.
+
+   .-----------------------transCong---------------------------> (c')
+   |                                                              |
+  (c)                                                            ≅l
+   |                                                              |
+   '---trans_unfold--> (c0) ---trans--> (c1) ---trans_unfold---> (c2)
+
+   having the lncong at the end means no extra unfolding is required
+*)
+Theorem transCong_imp_trans_aux:
    ∀s c τ s' c'.
     transCong (s,c) τ (s',c')
-    ⇒ ∃l τ' c'' c'''.
-        c' ≲ c''' ∧
-        trans_unfold (s,c) (s,c'') ∧
-        trans (s,c'') (τ',l) (s',c''') ∧
+    ⇒ ∃l τ' c0 c1 c2.
+        trans_unfold (s,c) (s,c0) ∧
+        trans (s,c0) (τ',l) (s',c1) ∧
+        trans_unfold (s',c1) (s',c2) ∧
+        c' ≅l c2 ∧
         toCong τ' = SOME τ
 Proof
   ho_match_mp_tac transCong_pairind
   \\ rw [toCong_def]
-  >- (EVERY (map Q.EXISTS_TAC [`[]`,`LCom p1 v1 p2 v2`,`Com p1 v1 p2 v2 c'`,‘c'’])
-     \\ rw [scong_rules,trans_rules,toCong_def,trans_unfold_def,RTC_REFL])
-  >- (EVERY (map Q.EXISTS_TAC [`[]`,`LSel p1 b p2`,‘Sel p1 b p2 c'’,`c'`])
-     \\ rw [scong_rules,trans_rules,toCong_def,trans_unfold_def])
-  >- (EVERY (map Q.EXISTS_TAC [`[]`,`LLet v p f vl`,‘Let v p f vl c'’,`c'`])
-     \\ rw [scong_rules,trans_rules,toCong_def,trans_unfold_def])
-  >- (EVERY (map Q.EXISTS_TAC [`[]`,`LTau p v`,‘IfThen v p c' c2’,`c'`])
-     \\ rw [scong_rules,trans_rules,toCong_def,trans_unfold_def])
-  >- (EVERY (map Q.EXISTS_TAC [`[]`,`LTau p v`,‘IfThen v p c1 c'’,`c'`])
-     \\ rw [scong_rules,trans_rules,toCong_def,trans_unfold_def])
+  >- (EVERY (map Q.EXISTS_TAC [`[]`,`LCom p1 v1 p2 v2`,`Com p1 v1 p2 v2 c'`,‘c'’,‘c'’])
+     \\ rw [lncong_rules,trans_rules,toCong_def,trans_unfold_def,RTC_REFL])
+  >- (EVERY (map Q.EXISTS_TAC [`[]`,`LSel p1 b p2`,‘Sel p1 b p2 c'’,`c'`,`c'`])
+     \\ rw [lncong_rules,trans_rules,toCong_def,trans_unfold_def])
+  >- (EVERY (map Q.EXISTS_TAC [`[]`,`LLet v p f vl`,‘Let v p f vl c'’,`c'`,`c'`])
+     \\ rw [lncong_rules,trans_rules,toCong_def,trans_unfold_def])
+  >- (EVERY (map Q.EXISTS_TAC [`[]`,`LTau p v`,‘IfThen v p c' c2’,`c'`,`c'`])
+     \\ rw [lncong_rules,trans_rules,toCong_def,trans_unfold_def])
+  >- (EVERY (map Q.EXISTS_TAC [`[]`,`LTau p v`,‘IfThen v p c1 c'’,`c'`,`c'`])
+     \\ rw [lncong_rules,trans_rules,toCong_def,trans_unfold_def])
   >- (rfs []
-     \\ EVERY (map Q.EXISTS_TAC [`LCom p1 v1 p2 v2 :: l`,`τ'`,`Com p1 v1 p2 v2 c''`,`Com p1 v1 p2 v2 c'''`])
-     \\ rw [scong_rules,trans_unfold_com_swap]
+     \\ EVERY (map Q.EXISTS_TAC [`LCom p1 v1 p2 v2 :: l`,`τ'`,
+                                 `Com p1 v1 p2 v2 c0`,
+                                 `Com p1 v1 p2 v2 c1`,
+                                 `Com p1 v1 p2 v2 c2`])
+     \\ rw [lncong_rules,trans_unfold_com_swap]
      \\ `p1 ∈ freeprocs τ'` by metis_tac [freeprocs_eq]
      \\ `p2 ∉ freeprocs τ'` by metis_tac [freeprocs_eq]
      \\ `written τ' ≠ SOME (v1,p1)` by metis_tac [written_eq]
      \\ rw [trans_rules])
   >- (rfs []
-     \\ EVERY (map Q.EXISTS_TAC [`LSel p1 b p2 :: l`,`τ'`,`Sel p1 b p2 c''`,`Sel p1 b p2 c'''`])
-     \\ rw [scong_rules,trans_unfold_sel_swap]
+     \\ EVERY (map Q.EXISTS_TAC [`LSel p1 b p2 :: l`,`τ'`,
+                                 `Sel p1 b p2 c0`,
+                                 `Sel p1 b p2 c1`,
+                                 `Sel p1 b p2 c2`])
+     \\ rw [lncong_rules,trans_unfold_sel_swap]
      \\ `p1 ∈ freeprocs τ'` by metis_tac [freeprocs_eq]
      \\ `p2 ∉ freeprocs τ'` by metis_tac [freeprocs_eq]
      \\ rw [trans_rules])
-  \\ rfs []
-  \\ last_x_assum (mp_then Any assume_tac scong_lncong_flcong)
+  \\ ‘c ≲ c0’ by metis_tac [scong_trans,flcong_scong,trans_unfold_flcong]
+  \\ drule scong_lncong_flcong \\ rw []
+  \\ drule flcong_trans_unfold
+  \\ disch_then (qspec_then ‘s’ assume_tac)
+  \\ asm_exists_tac \\ simp []
+  \\ ‘τ' ≠ LFix’ by (Cases_on ‘τ'’ \\ fs [toCong_def])
+  \\ drule trans_from_cong
+  \\ disch_then (drule_then (qspecl_then [‘s’,‘s'’] assume_tac))
+  \\ RES_TAC \\ asm_exists_tac \\ simp []
+  \\ ‘c2' ≅l c1’ by metis_tac [lncong_sym,chorTrm_lncong,trans_imp_chorTrm]
+  \\ drule trans_unfold_from_cong \\ disch_then drule \\ rw []
+  \\ qpat_x_assum ‘_ ≲ c'’ (mp_then Any assume_tac scong_lncong_flcong)
   \\ fs []
-  \\ cheat (* TODO *)
-  (* \\ last_assum (ASSUME_TAC o MATCH_MP trans_from_cong) *)
-  (* \\ RES_TAC *)
-  (* \\ EVERY (map Q.EXISTS_TAC [`l'`,`τ'`,`c2`]) *)
-  (* \\ rw [] *)
-  (* \\IMP_RES_TAC scong_refl *)
-  (* \\ IMP_RES_TAC scong_trans *)
-  (* \\ IMP_RES_TAC trans_imp_chorTrm *)
-  (* \\ rw [] *)
-  (* \\ match_mp_tac scong_trans *)
-  (* \\ Q.EXISTS_TAC `chorTrm s τ' c''` *)
-  (* \\ rw [chorTrm_scong] *)
+  \\ ‘c4 ≅l c'''’ by metis_tac [lncong_rules]
+  \\ drule flcong_lncong \\ disch_then drule
+  \\ rw [] \\ qmatch_asmsub_rename_tac ‘c6 ≅l c5’
+  \\ ‘c' ≅l c6’ by metis_tac [lncong_rules]
+  \\ qexists_tac ‘c6’ \\ simp []
+  \\ metis_tac [trans_unfold_trans,flcong_trans_unfold]
+QED
+
+(* A congruence is just a reflexive pre-congruence *)
+Definition full_cong_def:
+  full_cong c c' = (c ≲ c' ∧ c' ≲ c)
+End
+
+val _ = Parse.add_infix("≅",425,Parse.NONASSOC);
+val _ = Parse.overload_on("≅",``full_cong``);
+
+(* A linear congruence is a real congruence (dah!) *)
+Theorem lncong_full_cong:
+  ∀c c'. c ≅l c' ⇒ c ≅ c'
+Proof
+  rw [full_cong_def] \\ metis_tac [lncong_scong,lncong_sym]
+QED
+
+(* trans_unfold_trans_aux but using full_cong instead of lncong *)
+Theorem transCong_imp_trans:
+   ∀s c τ s' c'.
+    transCong (s,c) τ (s',c')
+    ⇒ ∃l τ' c0 c1 c2.
+        trans_unfold (s,c) (s,c0) ∧
+        trans (s,c0) (τ',l) (s',c1) ∧
+        trans_unfold (s',c1) (s',c2) ∧
+        c' ≅ c2 ∧
+        toCong τ' = SOME τ
+Proof
+  metis_tac [transCong_imp_trans_aux,lncong_full_cong]
 QED
 
 val _ = export_theory()
