@@ -652,6 +652,13 @@ Proof
   Cases >> rpt strip_tac >> fs[intermediate_def,final_def] >> rveq >> fs[]
 QED
 
+Theorem final_intermediate_imps:
+  (final d ⇒ ~intermediate d) ∧
+  (intermediate d ⇒ ~final d)
+Proof
+  metis_tac[intermediate_final_IMP]
+QED
+
 Theorem intermediate_final_simps:
   (intermediate d ⇒ (final d = F)) ∧
   (final d ⇒ (intermediate d = F))
@@ -3167,6 +3174,41 @@ Proof
   \\ rw [net_end_def]
 QED
 
+Theorem junkcong_DRESTRICT_closure_hd:
+  ∀s p dn args fs bds e e' funs.
+  junkcong (𝕌(:varN))
+           (NEndpoint p (s with funs := (dn,Closure args (fs,bds) e)::funs) e')
+           (NEndpoint p (s with funs := (dn,Closure args (fs,DRESTRICT bds (λk. ~MEM k args)) e)::funs) e')
+Proof
+  rw[] >>
+  Q.ISPECL_THEN [‘λk. ~MEM k args’,‘bds’] assume_tac (GEN_ALL DRESTRICT_FUNION_DRESTRICT_COMPL) >>
+  pop_assum(fn thm => CONV_TAC(LAND_CONV(PURE_ONCE_REWRITE_CONV[GSYM thm]))) >>
+  qmatch_goalsub_abbrev_tac ‘_ ⊌ bds'’ >>
+  ‘FDOM bds' ⊆ set args’
+    by(rw[Abbr ‘bds'’,FDOM_DRESTRICT,COMPL_DEF,SUBSET_DEF]) >>
+  pop_assum mp_tac >>
+  pop_assum kall_tac >>
+  Induct_on ‘bds'’ >>
+  rw[junkcong_refl] >>
+  res_tac >>
+  first_x_assum(fn thm => resolve_then (Pos last) match_mp_tac thm junkcong_trans) >>
+  simp[FUNION_FUPDATE_2,FDOM_DRESTRICT] >>
+  match_mp_tac junkcong_sym >>
+  match_mp_tac junkcong_closure_add_junk_hd >>
+  simp[]
+QED
+
+Theorem junkcong_DRESTRICT_closure_hd':
+  ∀s p dn args fs bds e e' funs bds'.
+  junkcong (𝕌(:varN))
+           (NEndpoint p (s with <|bindings:= bds'; funs := (dn,Closure args (fs,bds) e)::funs|>) e')
+           (NEndpoint p (s with <|bindings:= bds'; funs := (dn,Closure args (fs,DRESTRICT bds (λk. ~MEM k args)) e)::funs|>) e')
+Proof
+  rw[] >>
+  Q.ISPEC_THEN ‘s with bindings := bds'’ assume_tac junkcong_DRESTRICT_closure_hd >>
+  fs[]
+QED
+
 Definition padded_queues_def:
   padded_queues conf qs = ∀k pm. MEM pm (qlk qs k) ⇒ ∃m. pm = pad conf m
 End
@@ -3493,6 +3535,16 @@ Theorem free_fix_names_network_reduction_pres:
   set(free_fix_names_network n2) ⊆ set(free_fix_names_network n1)
 Proof
   metis_tac[reduction_def,free_fix_names_network_trans_pres]
+QED
+
+Theorem MEM_free_fun_names_endpoint_dsubst:
+  ∀e dn e'.
+  MEM x (free_fun_names_endpoint (dsubst e dn e')) ⇒
+  MEM x (free_fun_names_endpoint e) ∨
+  MEM x (free_fun_names_endpoint e')
+Proof
+  Induct >> rw[free_fun_names_endpoint_def,dsubst_def] >>
+  fs[MEM_FILTER] >> res_tac >> fs[]
 QED
 
 val _ = export_theory ();

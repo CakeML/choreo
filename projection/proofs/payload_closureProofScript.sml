@@ -51,19 +51,6 @@ Proof
   Induct_on ‘e’ >> rw[dsubst_def,written_var_names_endpoint_def] >> fs[]
 QED
 
-(*Theorem written_var_names_endpoint_until_dsubst:
-  MEM x (written_var_names_endpoint_until (dsubst e dn e')) ∧
-  free_fix_names_endpoint e' = [] ⇒
-  MEM x (written_var_names_endpoint_until e) ∨ MEM x (written_var_names_endpoint_until e')
-Proof
-  Induct_on ‘e’ >> rw[dsubst_def,written_var_names_endpoint_until_def] >> fs[] >>
-  PURE_FULL_CASE_TAC >> fs[] >>
-  fs[free_fix_names_endpoint_def,FILTER_EQ_NIL,EVERY_MEM] >>
-  imp_res_tac MEM_free_fix_names_endpoint_dsubst >> fs[] >>
-  res_tac >>
-  rfs[]
-QED*)
-
 Theorem written_var_names_endpoint_dsubst':
   MEM x (written_var_names_endpoint e) ⇒
   MEM x (written_var_names_endpoint (dsubst e dn e'))
@@ -952,52 +939,6 @@ Proof
   fs[MEM_FILTER] >> rveq >> fs[]
 QED
 
-(* TODO: move to payloadProps *)
-Theorem junkcong_DRESTRICT_closure_hd:
-  ∀s p dn args fs bds e e' funs.
-  junkcong (𝕌(:varN))
-           (NEndpoint p (s with funs := (dn,Closure args (fs,bds) e)::funs) e')
-           (NEndpoint p (s with funs := (dn,Closure args (fs,DRESTRICT bds (λk. ~MEM k args)) e)::funs) e')
-Proof
-  rw[] >>
-  Q.ISPECL_THEN [‘λk. ~MEM k args’,‘bds’] assume_tac (GEN_ALL DRESTRICT_FUNION_DRESTRICT_COMPL) >>
-  pop_assum(fn thm => CONV_TAC(LAND_CONV(PURE_ONCE_REWRITE_CONV[GSYM thm]))) >>
-  qmatch_goalsub_abbrev_tac ‘_ ⊌ bds'’ >>
-  ‘FDOM bds' ⊆ set args’
-    by(rw[Abbr ‘bds'’,FDOM_DRESTRICT,COMPL_DEF,SUBSET_DEF]) >>
-  pop_assum mp_tac >>
-  pop_assum kall_tac >>
-  Induct_on ‘bds'’ >>
-  rw[junkcong_refl] >>
-  res_tac >>
-  first_x_assum(fn thm => resolve_then (Pos last) match_mp_tac thm junkcong_trans) >>
-  simp[FUNION_FUPDATE_2,FDOM_DRESTRICT] >>
-  match_mp_tac junkcong_sym >>
-  match_mp_tac junkcong_closure_add_junk_hd >>
-  simp[]
-QED
-
-(* TODO: move to payloadProps *)
-Theorem junkcong_DRESTRICT_closure_hd':
-  ∀s p dn args fs bds e e' funs bds'.
-  junkcong (𝕌(:varN))
-           (NEndpoint p (s with <|bindings:= bds'; funs := (dn,Closure args (fs,bds) e)::funs|>) e')
-           (NEndpoint p (s with <|bindings:= bds'; funs := (dn,Closure args (fs,DRESTRICT bds (λk. ~MEM k args)) e)::funs|>) e')
-Proof
-  rw[] >>
-  Q.ISPEC_THEN ‘s with bindings := bds'’ assume_tac junkcong_DRESTRICT_closure_hd >>
-  fs[]
-QED
-
-Theorem ALOOKUP_REVERSE_ALL_DISTINCT:
-  ALL_DISTINCT (MAP FST l) ⇒
-  ALOOKUP (REVERSE l) = ALOOKUP l
-Proof
-  strip_tac >>
-  match_mp_tac ALOOKUP_ALL_DISTINCT_PERM_same >>
-  fs[MAP_REVERSE]
-QED
-
 Theorem NOT_free_fun_names_endpoint_arsof:
   ~MEM dn (free_fun_names_endpoint e) ⇒
   arsof dn e = {}
@@ -1214,59 +1155,6 @@ Proof
   Induct_on ‘e’ >> rw[always_same_args_def,fsubst_def] >>
   TOP_CASE_TAC >> imp_res_tac ALOOKUP_MEM >>
   metis_tac[MEM_MAP,FST]
-QED
-
-(* TODO: move to payload_bisim *)
-Theorem tausim_reduction_pres:
-  ∀conf n1 n2 p1 s1 dn1 vars1 params1 funs1 bindings1 e1 s2 dn2 vars2 params2 funs2 bindings2 e2.
-        n1 = NEndpoint p1 s1 (FCall dn1 vars1) ∧
-        n2 = NEndpoint p1 s2 (FCall dn2 vars2) ∧
-        ALOOKUP s1.funs dn1 = SOME (Closure params1 (funs1,bindings1) e1) ∧
-        LENGTH vars1 = LENGTH params1 ∧
-        EVERY (IS_SOME ∘ FLOOKUP s1.bindings) vars1 ∧
-        ALOOKUP s2.funs dn2 = SOME (Closure params2 (funs2,bindings2) e2) ∧
-        LENGTH vars2 = LENGTH params2 ∧
-        EVERY (IS_SOME ∘ FLOOKUP s2.bindings) vars2 ∧
-        tausim conf
-               (NEndpoint p1
-                          (s1 with <|bindings := bindings1 |++ ZIP(params1,MAP (THE o FLOOKUP s1.bindings) vars1);
-                                     funs := (dn1,Closure params1 (funs1,bindings1) e1)::funs1|>)
-                          e1)
-               (NEndpoint p1
-                          (s2 with <|bindings := bindings2 |++ ZIP(params2,MAP (THE o FLOOKUP s2.bindings) vars2);
-                                     funs := (dn2,Closure params2 (funs2,bindings2) e2)::funs2|>)
-                          e2) ⇒
-  tausim conf n1 n2
-Proof
-  strip_tac >> Ho_Rewrite.PURE_REWRITE_TAC[GSYM PULL_EXISTS] >>
-  ho_match_mp_tac tausim_strong_coind >> rpt strip_tac >> rveq
-  >- (qhdtm_assum ‘trans’ (strip_assume_tac o REWRITE_RULE[Once trans_cases]) >>
-      fs[] >> rveq >>
-      simp[Once trans_cases] >>
-      disj1_tac >>
-      rename1 ‘LReceive r d p1’ >>
-      qhdtm_x_assum ‘tausim’ (strip_assume_tac o REWRITE_RULE[Once tausim_cases]) >>
-      last_x_assum(qspec_then ‘LReceive r d p1’ mp_tac o CONV_RULE SWAP_FORALL_CONV) >>
-      simp[Once trans_cases] >>
-      simp[Once trans_cases])
-   >- (qhdtm_assum ‘trans’ (strip_assume_tac o REWRITE_RULE[Once trans_cases]) >>
-       fs[] >> rveq >>
-       simp[Once trans_cases] >>
-       disj1_tac >>
-       rename1 ‘LReceive r d p1’ >>
-       qhdtm_x_assum ‘tausim’ (strip_assume_tac o REWRITE_RULE[Once tausim_cases]) >>
-       last_x_assum(qspec_then ‘LReceive r d p1’ kall_tac o CONV_RULE SWAP_FORALL_CONV) >>
-       last_x_assum(qspec_then ‘LReceive r d p1’ mp_tac o CONV_RULE SWAP_FORALL_CONV) >>
-       simp[Once trans_cases] >>
-       simp[Once trans_cases])
-   >- (qhdtm_assum ‘trans’ (strip_assume_tac o REWRITE_RULE[Once trans_cases]) >>
-       fs[] >> rveq >>
-       goal_assum(resolve_then (Pos hd) mp_tac TC_SUBSET) >>
-       simp[reduction_def,Once trans_cases])
-   >- (qhdtm_assum ‘trans’ (strip_assume_tac o REWRITE_RULE[Once trans_cases]) >>
-       fs[] >> rveq >>
-       goal_assum(resolve_then (Pos hd) mp_tac RC_SUBSET) >>
-       simp[reduction_def,Once trans_cases])
 QED
 
 Theorem bisim_defer_fundef:
@@ -3090,42 +2978,6 @@ Termination
   DECIDE_TAC
 End
 
-(* TODO: move *)
-Theorem PAIR_MAP_app:
-  (f ## g) = (λ(x,y). (f x,g y))
-Proof
-  rw[FUN_EQ_THM] >>
-  pairarg_tac >> rw[]
-QED
-
-Theorem ALOOKUP_LIST_REL_lemma:
-  ∀R l1 l2 x y.
-  MAP FST l1 = MAP FST l2 ∧
-  LIST_REL R (MAP SND l1) (MAP SND l2) ∧
-  ALOOKUP l1 x = SOME y ⇒
-  ∃z. ALOOKUP l2 x = SOME z ∧ R y z
-Proof
-  strip_tac >>
-  Induct >- fs[] >>
-  Cases >> Cases >- rw[] >>
-  rw[] >>
-  qmatch_goalsub_abbrev_tac ‘pair::_’ >> Cases_on ‘pair’ >> fs[]
-QED
-
-Theorem ALOOKUP_LIST_REL_lemma':
-  ∀R l1 l2 x y.
-  LIST_REL (λ(dn,cls) (dn',cls'). dn = dn' ∧ R dn cls cls') l1 l2 ∧
-  ALOOKUP l1 x = SOME y ⇒
-  ∃z. ALOOKUP l2 x = SOME z ∧ R x y z
-Proof
-  strip_tac >>
-  Induct >- fs[] >>
-  Cases >> Cases >- rw[] >>
-  rw[] >>
-  qmatch_goalsub_abbrev_tac ‘pair::_’ >> Cases_on ‘pair’ >> fs[] >>
-  rveq >> fs[]
-QED
-
 Theorem compile_network_preservation_trans_alt:
   ∀p1 p2 conf.
     conf.payload_size > 0
@@ -3490,8 +3342,6 @@ Proof
   goal_assum(resolve_then (Pos hd) mp_tac RTC_SUBSET) >>
   goal_assum drule >>
   simp[]
-(*  ‘fix_network p2’ by metis_tac[fix_network_trans_pres,reduction_def] >>
-    simp[compile_rel_def,letrec_network_compile_network,letrec_network_compile_network_alt] *)
 QED
 
 Theorem bisim_reductionE:

@@ -97,7 +97,7 @@ Proof
   \\ Induct_on `l`
   \\ rw [ALL_DISTINCT,nub'_def,FILTER_ALL_DISTINCT,MEM_FILTER]
 QED
-        
+
 (* nub' preserves membership *)
 Theorem MEM_nub':
   ∀l x. MEM x (nub' l) = MEM x l
@@ -156,5 +156,49 @@ Proof
   strip_tac >>
   AP_THM_TAC >> AP_TERM_TAC >> rw[FUN_EQ_THM,EQ_IMP_THM]
 QED
-        
+
+Theorem ALOOKUP_REVERSE_ALL_DISTINCT:
+  ALL_DISTINCT (MAP FST l) ⇒
+  ALOOKUP (REVERSE l) = ALOOKUP l
+Proof
+  strip_tac >>
+  match_mp_tac ALOOKUP_ALL_DISTINCT_PERM_same >>
+  fs[MAP_REVERSE]
+QED
+
+Theorem PAIR_MAP_app:
+  (f ## g) = (λ(x,y). (f x,g y))
+Proof
+  rw[FUN_EQ_THM] >>
+  pairarg_tac >> rw[]
+QED
+
+Theorem ALOOKUP_LIST_REL_lemma:
+  ∀R l1 l2 x y.
+  MAP FST l1 = MAP FST l2 ∧
+  LIST_REL R (MAP SND l1) (MAP SND l2) ∧
+  ALOOKUP l1 x = SOME y ⇒
+  ∃z. ALOOKUP l2 x = SOME z ∧ R y z
+Proof
+  strip_tac >>
+  Induct >- fs[] >>
+  Cases >> Cases >- rw[] >>
+  rw[] >>
+  qmatch_goalsub_abbrev_tac ‘pair::_’ >> Cases_on ‘pair’ >> fs[]
+QED
+
+Theorem ALOOKUP_LIST_REL_lemma':
+  ∀R l1 l2 x y.
+  LIST_REL (λ(dn,cls) (dn',cls'). dn = dn' ∧ R dn cls cls') l1 l2 ∧
+  ALOOKUP l1 x = SOME y ⇒
+  ∃z. ALOOKUP l2 x = SOME z ∧ R x y z
+Proof
+  strip_tac >>
+  Induct >- fs[] >>
+  Cases >> Cases >- rw[] >>
+  rw[] >>
+  qmatch_goalsub_abbrev_tac ‘pair::_’ >> Cases_on ‘pair’ >> fs[] >>
+  rveq >> fs[]
+QED
+
 val _ = export_theory ()

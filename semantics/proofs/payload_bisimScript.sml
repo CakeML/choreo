@@ -130,17 +130,6 @@ Proof
   metis_tac[bisim_trans,bisim_par_left,bisim_par_right]
 QED
 
-(* TODO: move to props *)
-Theorem MEM_free_fun_names_endpoint_dsubst:
-  ∀e dn e'.
-  MEM x (free_fun_names_endpoint (dsubst e dn e')) ⇒
-  MEM x (free_fun_names_endpoint e) ∨
-  MEM x (free_fun_names_endpoint e')
-Proof
-  Induct >> rw[free_fun_names_endpoint_def,dsubst_def] >>
-  fs[MEM_FILTER] >> res_tac >> fs[]
-QED
-
 Definition used_closures_rel_def:
   used_closures_rel s (Closure vars1 (fs1,bds1) e1) (Closure vars2 (fs2,bds2) e2) ⇔
   e1 = e2 ∧ bds1 = bds2 ∧ vars1 = vars2 ∧
@@ -168,14 +157,6 @@ Definition used_closures_endpoint_rel_def:
              ALOOKUP fs1 dn = SOME cl1 ∧ ALOOKUP fs2 dn = SOME cl2 ∧
              used_closures_rel {dn} cl1 cl2)))
 End
-
-(* TODO: move? *)
-Triviality final_intermediate_imps:
-  (final d ⇒ ~intermediate d) ∧
-  (intermediate d ⇒ ~final d)
-Proof
-  metis_tac[intermediate_final_IMP]
-QED
 
 Theorem used_closures_rel_refl:
   ∀s cl1. used_closures_rel s cl1 cl1
@@ -438,6 +419,58 @@ Theorem tausim_par:
   ∀conf p q r s. tausim conf p s ∧ tausim conf q r ⇒ tausim conf (NPar p q) (NPar s r)
 Proof
   metis_tac[tausim_trans,tausim_par_left,tausim_par_right]
+QED
+
+Theorem tausim_reduction_pres:
+  ∀conf n1 n2 p1 s1 dn1 vars1 params1 funs1 bindings1 e1 s2 dn2 vars2 params2 funs2 bindings2 e2.
+        n1 = NEndpoint p1 s1 (FCall dn1 vars1) ∧
+        n2 = NEndpoint p1 s2 (FCall dn2 vars2) ∧
+        ALOOKUP s1.funs dn1 = SOME (Closure params1 (funs1,bindings1) e1) ∧
+        LENGTH vars1 = LENGTH params1 ∧
+        EVERY (IS_SOME ∘ FLOOKUP s1.bindings) vars1 ∧
+        ALOOKUP s2.funs dn2 = SOME (Closure params2 (funs2,bindings2) e2) ∧
+        LENGTH vars2 = LENGTH params2 ∧
+        EVERY (IS_SOME ∘ FLOOKUP s2.bindings) vars2 ∧
+        tausim conf
+               (NEndpoint p1
+                          (s1 with <|bindings := bindings1 |++ ZIP(params1,MAP (THE o FLOOKUP s1.bindings) vars1);
+                                     funs := (dn1,Closure params1 (funs1,bindings1) e1)::funs1|>)
+                          e1)
+               (NEndpoint p1
+                          (s2 with <|bindings := bindings2 |++ ZIP(params2,MAP (THE o FLOOKUP s2.bindings) vars2);
+                                     funs := (dn2,Closure params2 (funs2,bindings2) e2)::funs2|>)
+                          e2) ⇒
+  tausim conf n1 n2
+Proof
+  strip_tac >> Ho_Rewrite.PURE_REWRITE_TAC[GSYM PULL_EXISTS] >>
+  ho_match_mp_tac tausim_strong_coind >> rpt strip_tac >> rveq
+  >- (qhdtm_assum ‘trans’ (strip_assume_tac o REWRITE_RULE[Once trans_cases]) >>
+      fs[] >> rveq >>
+      simp[Once trans_cases] >>
+      disj1_tac >>
+      rename1 ‘LReceive r d p1’ >>
+      qhdtm_x_assum ‘tausim’ (strip_assume_tac o REWRITE_RULE[Once tausim_cases]) >>
+      last_x_assum(qspec_then ‘LReceive r d p1’ mp_tac o CONV_RULE SWAP_FORALL_CONV) >>
+      simp[Once trans_cases] >>
+      simp[Once trans_cases])
+   >- (qhdtm_assum ‘trans’ (strip_assume_tac o REWRITE_RULE[Once trans_cases]) >>
+       fs[] >> rveq >>
+       simp[Once trans_cases] >>
+       disj1_tac >>
+       rename1 ‘LReceive r d p1’ >>
+       qhdtm_x_assum ‘tausim’ (strip_assume_tac o REWRITE_RULE[Once tausim_cases]) >>
+       last_x_assum(qspec_then ‘LReceive r d p1’ kall_tac o CONV_RULE SWAP_FORALL_CONV) >>
+       last_x_assum(qspec_then ‘LReceive r d p1’ mp_tac o CONV_RULE SWAP_FORALL_CONV) >>
+       simp[Once trans_cases] >>
+       simp[Once trans_cases])
+   >- (qhdtm_assum ‘trans’ (strip_assume_tac o REWRITE_RULE[Once trans_cases]) >>
+       fs[] >> rveq >>
+       goal_assum(resolve_then (Pos hd) mp_tac TC_SUBSET) >>
+       simp[reduction_def,Once trans_cases])
+   >- (qhdtm_assum ‘trans’ (strip_assume_tac o REWRITE_RULE[Once trans_cases]) >>
+       fs[] >> rveq >>
+       goal_assum(resolve_then (Pos hd) mp_tac RC_SUBSET) >>
+       simp[reduction_def,Once trans_cases])
 QED
 
 val _ = export_theory ();
