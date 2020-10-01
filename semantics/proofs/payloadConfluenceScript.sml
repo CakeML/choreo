@@ -854,4 +854,18 @@ Proof
   >> metis_tac[]
 QED
 
+Theorem payload_confluence:
+  ∀conf p1 p2 p3.
+   (reduction conf)^* p1 p2 /\
+   (reduction conf)^* p1 p3 /\
+   ALL_DISTINCT (MAP FST (endpoints p1)) /\
+   conf.payload_size > 0
+   ==>
+   (∃p4. (reduction conf)^* p2 p4 /\
+         (reduction conf)^* p3 p4)
+Proof
+  rw[reduction_list_trans] >>
+  metis_tac[payload_confluence_weak_contract]
+QED
+
 val _ = export_theory();

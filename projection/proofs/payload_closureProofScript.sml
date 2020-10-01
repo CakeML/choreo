@@ -37,18 +37,6 @@ Proof
   rw[no_undefined_writes_def,endpoints_def]
 QED
 
-Theorem fix_network_NPar:
-  fix_network (NPar n1 n2) = (fix_network n1 ∧ fix_network n2)
-Proof
-  rw[fix_network_def,endpoints_def]
-QED
-
-Theorem letrec_network_NPar:
-  letrec_network (NPar n1 n2) = (letrec_network n1 ∧ letrec_network n2)
-Proof
-  rw[letrec_network_def,endpoints_def]
-QED
-
 Theorem MEM_written_var_names_endpoint_until_IMP:
   MEM v (written_var_names_endpoint_until e) ⇒
   MEM v (written_var_names_endpoint e)

@@ -3398,6 +3398,18 @@ Proof
   rw[no_undefined_vars_network_def,endpoints_def]
 QED
 
+Theorem fix_network_NPar:
+  fix_network (NPar n1 n2) = (fix_network n1 ∧ fix_network n2)
+Proof
+  rw[fix_network_def,endpoints_def]
+QED
+
+Theorem letrec_network_NPar:
+  letrec_network (NPar n1 n2) = (letrec_network n1 ∧ letrec_network n2)
+Proof
+  rw[letrec_network_def,endpoints_def]
+QED
+
 Theorem no_undefined_vars_network_trans_pres:
   ∀conf n1 α n2.
     trans conf n1 α n2 ∧
