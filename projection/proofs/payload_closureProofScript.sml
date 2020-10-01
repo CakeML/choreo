@@ -3967,4 +3967,27 @@ Proof
       metis_tac[compile_rel_trans])
 QED
 
+Theorem compile_network_reflection:
+  ∀p1 p2 conf.
+    conf.payload_size > 0
+    ∧ fix_network p1
+    ∧ free_fix_names_network p1 = []
+    ∧ no_undefined_vars_network p1
+    ∧ ALL_DISTINCT (MAP FST (endpoints p1))
+    ∧ (reduction conf)^* (compile_network p1) p2
+    ⇒ ∃p3 p4.
+           (reduction conf)^* p1 p3 ∧
+           (reduction conf)^* p2 p4 ∧
+           compile_rel conf p4 (compile_network_alt p3)
+Proof
+  rpt strip_tac >>
+  qspecl_then [‘conf’,‘p1’] assume_tac compile_network_reduction_alt >>
+  drule payload_confluence >>
+  disch_then(qspec_then ‘p2’ mp_tac) >> simp[compile_network_endpoints] >>
+  strip_tac >>
+  drule_all compile_network_reflection_alt >>
+  strip_tac >>
+  rpt(goal_assum drule)
+QED
+
 val _ = export_theory ();
