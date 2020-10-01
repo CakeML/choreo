@@ -181,7 +181,6 @@ Definition valid_actions_def:
   valid_actions alpha l = EVERY (valid_action alpha) l
 End
 
-
 (* Any valid transition ensures that both transition tag `t` and
    asyncronous transitions list `l` satisfies valid_actions
 *)
@@ -201,6 +200,17 @@ QED
 (* In a list of valid actions (`h`) there are no LTau actions *)
 Theorem valid_actions_not_ltau:
   ∀t h p v. valid_actions t h ⇒ ¬ MEM (LTau p v) h
+Proof
+  rw []
+  \\ CCONTR_TAC
+  \\ fs [valid_actions_def,EVERY_MEM]
+  \\ RES_TAC
+  \\ fs [valid_action_def]
+QED
+
+(* In a list of valid actions (`h`) there are no LFix actions *)
+Theorem valid_actions_not_lfix:
+  ∀t h p v. valid_actions t h ⇒ ¬ MEM LFix h
 Proof
   rw []
   \\ CCONTR_TAC
