@@ -536,11 +536,128 @@ val asynch_trans_filter_labels = Q.store_thm("asynch_trans_filter_labels",
      >> metis_tac[lcong_cons,lcong_rules])
 );
 
-(* TODO *)
-val semantics_locally_confluent = Q.store_thm("semantics_locally_confluent",
-  `!sc alpha beta l l' sc' sc''.
-    trans sc (alpha,l) sc' /\ trans sc (beta,l') sc'' /\ alpha ≠ beta ==> ?sc''' l'' l'''. trans sc' (beta,l'') sc''' /\ trans sc'' (alpha,l''') sc'''
-  `,
+Theorem trans_LFix_confluence:
+  ∀s0 c0 τ l s1 c1 c2.
+   trans (s0,c0) (τ,l) (s1,c1) ∧ τ ≠ LFix ∧
+   trans (s0,c0) (LFix,[]) (s0,c2)
+   ⇒ ∃c3. trans (s0,c2) (τ,l) (s1,c3) ∧ (trans (s1,c1) (LFix,[]) (s1,c3) ∨ c1 = c3)
+Proof
+  rw []
+  \\ pop_assum mp_tac
+  \\ Q.SPEC_TAC (‘c2’,‘c2’)
+  \\ pop_assum mp_tac
+  \\ pop_assum mp_tac
+  \\ MAP_EVERY (W(curry Q.SPEC_TAC)) (rev [‘s0’,‘c0’,‘τ’,‘l’,‘s1’,‘c1’])
+  \\ ho_match_mp_tac trans_pairind \\ rw []
+  \\ qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+  \\ fs[] \\ fs[freeprocs_def,sender_def,receiver_def]
+  \\ gs [lcong_nil_simp] \\ rveq
+  >- (qexists_tac ‘c'’
+      \\ conj_tac >- metis_tac [trans_rules]
+      \\ disj1_tac
+      \\ irule semantics_add_irrelevant_state
+      \\ simp [freeprocs_def])
+  >- metis_tac [trans_rules,lcong_nil_simp,lcong_rules]
+  >- (qexists_tac ‘c'’
+      \\ conj_tac >- metis_tac [trans_rules]
+      \\ disj1_tac
+      \\ irule semantics_add_irrelevant_state
+      \\ simp [freeprocs_def])
+  >- metis_tac [trans_rules,lcong_nil_simp,lcong_rules]
+  >- metis_tac [trans_rules,lcong_nil_simp,lcong_rules]
+  >- metis_tac [trans_rules,lcong_nil_simp,lcong_rules]
+  >- (qexists_tac ‘c2''’
+      \\ conj_tac >- metis_tac [trans_if_false]
+      \\ simp [freeprocs_def])
+  >- metis_tac [trans_rules,lcong_nil_simp,lcong_rules]
+  >- (qexists_tac ‘c'’
+      \\ conj_tac >- metis_tac [trans_if_false]
+      \\ simp [freeprocs_def])
+  >- (first_x_assum drule \\ first_x_assum drule \\ rw []
+      >- (qexists_tac ‘IfThen v p c3 c3'’
+          \\ conj_tac >- metis_tac [trans_rules]
+          \\ disj1_tac \\ irule trans_if_swap
+          \\ simp [freeprocs_def] \\ first_assum (part_match_exists_tac (last o strip_conj) o concl)
+          \\ simp [lcong_sym])
+      \\ metis_tac [trans_rules])
+  >- (first_x_assum drule \\ rw [] \\ metis_tac [trans_rules])
+  >- (first_x_assum drule \\ rw [] \\ metis_tac [trans_rules])
+  >- (first_x_assum drule \\ rw []
+      >- (qexists_tac ‘Com p1 v1 p2 v2 c3’
+          \\ conj_tac >- metis_tac [trans_rules]
+          \\ disj1_tac \\ irule trans_com_swap
+          \\ simp [freeprocs_def])
+      \\ metis_tac [trans_rules,lcong_nil_simp,lcong_rules])
+  >- (first_x_assum drule \\ rw []
+      >- (qexists_tac ‘Sel p1 b p2 c3’
+          \\ conj_tac >- metis_tac [trans_rules]
+          \\ disj1_tac \\ irule trans_sel_swap
+          \\ simp [freeprocs_def])
+      \\ metis_tac [trans_rules])
+  >- (first_x_assum drule \\ rw []
+      >- (qexists_tac ‘Let v p f vl c3’
+          \\ conj_tac >- metis_tac [trans_rules]
+          \\ disj1_tac \\ irule trans_let_swap
+          \\ simp [freeprocs_def])
+      \\ metis_tac [trans_rules])
+  >- (first_x_assum drule \\ rw []
+      >- (qexists_tac ‘Com p1 v1 p2 v2 c3’
+          \\ conj_tac >- metis_tac [trans_rules]
+          \\ disj1_tac \\ irule trans_com_swap
+          \\ simp [freeprocs_def])
+      \\ metis_tac [trans_rules])
+  \\ first_x_assum drule \\ rw []
+  >- (qexists_tac ‘Sel p1 b p2 c3’
+      \\ conj_tac >- metis_tac [trans_rules]
+      \\ disj1_tac \\ irule trans_sel_swap
+      \\ simp [freeprocs_def])
+  \\ metis_tac [trans_rules]
+QED
+
+Theorem trans_LFix_async:
+  ∀s c s' c' l.
+    trans (s,c) (LFix,l) (s',c')
+    ⇒ s = s' ∧ l = []
+Proof
+  ‘∀s c τ l s' c'.
+     trans (s,c) (τ,l) (s',c')
+     ⇒ τ = LFix
+     ⇒ s = s' ∧ l = []’
+  suffices_by metis_tac []
+  \\ ho_match_mp_tac trans_pairind
+  \\ rw []
+  \\ CCONTR_TAC \\ fs [freeprocs_def]
+QED
+
+(* Auxiliary lemma to drop a disjunct within an existential *)
+Triviality drop_disj_aux1:
+  (∃sc l l'. P1 sc l l' ∧ P2 sc l l')
+  ⇒ ∃sc l l'. (P1 sc l l' ∨ Q sc) ∧ P2 sc l l'
+Proof
+  METIS_TAC []
+QED
+
+Triviality drop_disj_aux2:
+  (∃sc l l'. P1 sc l l' ∧ P2 sc l l')
+  ⇒ ∃sc l l'. P1 sc l l' ∧ (P2 sc l l' ∨ Q sc)
+Proof
+  METIS_TAC []
+QED
+
+Triviality drop_disj_aux:
+  (∃sc l l'. P1 sc l l' ∧ P2 sc l l')
+  ⇒ ∃sc l l'. (P1 sc l l' ∨ Q1 sc) ∧ (P2 sc l l' ∨ Q2 sc)
+Proof
+  METIS_TAC []
+QED
+
+Theorem semantics_locally_confluent:
+  ∀sc alpha beta l l' sc' sc''.
+    trans sc (alpha,l) sc' ∧  trans sc (beta,l') sc'' ∧  alpha ≠ beta
+    ⇒ ∃sc''' l'' l'''.
+        (trans sc' (beta,l'') sc''' ∨ (sc' = sc''' ∧  beta = LFix)) ∧
+        (trans sc'' (alpha,l''') sc''' ∨ (sc'' = sc''' ∧  alpha = LFix))
+Proof
   rpt gen_tac
   >> qpat_abbrev_tac `al = (alpha,l)`
   >> rpt strip_tac
@@ -552,13 +669,12 @@ val semantics_locally_confluent = Q.store_thm("semantics_locally_confluent",
   >> ho_match_mp_tac trans_strongind
   >> rpt strip_tac >> fs[] >> rveq
   >- (* Com *)
-   (qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+   (ho_match_mp_tac drop_disj_aux
+    >> qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
     >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
     >- (imp_res_tac semantics_add_irrelevant_state_tup
         >> fs[] >> rpt(first_x_assum (qspecl_then [`v2`,`d`] assume_tac))
-        >> asm_exists_tac >> simp[] >> qexists_tac `[]`
-        >> match_mp_tac trans_com
-        >> metis_tac[lookup_fresh_after_trans,FST])
+        >> metis_tac[lookup_fresh_after_trans,FST,trans_com])
     >> rveq
     >> reverse(Cases_on `(v2,p2) ∈ read beta`)
     >- (imp_res_tac semantics_add_irrelevant_state4_tup
@@ -571,18 +687,19 @@ val semantics_locally_confluent = Q.store_thm("semantics_locally_confluent",
         >> fs[written_def])
     >> Cases_on `beta` >> fs[read_def,freeprocs_def,written_def,MEM_MAP])
   >- (* Sel *)
-   (qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+   (ho_match_mp_tac drop_disj_aux
+    >> qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
     >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
     >- (imp_res_tac semantics_add_irrelevant_state_tup
         >> fs[] >> rpt(first_x_assum (qspecl_then [`v2`,`d`] assume_tac))
         >> asm_exists_tac >> simp[] >> qexists_tac `[]`
-        >> match_mp_tac trans_sel
-        >> metis_tac[lookup_fresh_after_trans,FST])
+        >> metis_tac[lookup_fresh_after_trans,FST,trans_sel])
     >> rveq
     >> asm_exists_tac >> fs[] >> qexists_tac `[]`
     >> match_mp_tac trans_sel >> Cases_on `beta` >> fs[freeprocs_def])
   >- (* Let *)
-   (qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+   (ho_match_mp_tac drop_disj_aux
+    >> qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
     >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
     >> rveq
     >> imp_res_tac semantics_add_irrelevant_state_tup
@@ -595,8 +712,11 @@ val semantics_locally_confluent = Q.store_thm("semantics_locally_confluent",
     >> metis_tac[FST,map_lookup_fresh_after_trans,map_lookup_fresh_after_trans',trans_let])
   >- (* If-true *)
    (qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
-    >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
-    >> rveq >> cheat (* TODO *)
+    >> reverse (fs[]) >> fs[freeprocs_def,sender_def,receiver_def]
+    >> rveq
+    >- (qexists_tac ‘(s,c1)’ >> simp []
+        >> metis_tac [trans_if_true])
+    >> ho_match_mp_tac drop_disj_aux1
     >> asm_exists_tac >> fs[]
     >> qexists_tac `[]`
     >> match_mp_tac trans_if_true
@@ -604,62 +724,78 @@ val semantics_locally_confluent = Q.store_thm("semantics_locally_confluent",
   >- (* If-false *)
    (qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
     >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
-    >> rveq >> cheat (* TODO *)
+    >> rveq
+    >> TRY (qexists_tac ‘(s,c2)’ >> simp []
+            >> metis_tac [trans_if_false])
+    >> ho_match_mp_tac drop_disj_aux1
     >> asm_exists_tac >> fs[]
     >> qexists_tac `[]`
     >> match_mp_tac trans_if_false
     >> metis_tac[lookup_fresh_after_trans,FST])
   >- (* If-swap *)
    (qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
-    >> cheat (* TODO *)
-    (* >> fs[] >> fs[freeprocs_def,sender_def,receiver_def] *)
-    (* >> rveq >> rpt(first_x_assum drule >> disch_then assume_tac) >> fs[] *)
-    (* >- metis_tac[trans_if_true,lookup_fresh_after_trans,FST] *)
-    (* >- metis_tac[trans_if_false,lookup_fresh_after_trans,FST] *)
-    (* (* TODO: proof script depends on generated names *) *)
-    (* >> `l''''''  τ≅ lrm l'' alpha`  by(metis_tac[asynch_trans_filter_labels]) *)
-    (* >> `l''''    τ≅ lrm l''' alpha` by(metis_tac[asynch_trans_filter_labels]) *)
-    (* >> `l''''''' τ≅ lrm l beta`     by(metis_tac[asynch_trans_filter_labels]) *)
-    (* >> `l'''''   τ≅ lrm l' beta`    by(metis_tac[asynch_trans_filter_labels]) *)
-    (* >> rveq *)
-    (* >> Cases_on `sc'''` *)
-    (* >> Cases_on `sc''''` *)
-    (* >> sg `l'''''' τ≅ l''''` *)
-    (* >- (last_x_assum (ASSUME_TAC o Q.SPEC `alpha` o MATCH_MP lcong_lrm) *)
-    (*    \\ last_x_assum (ASSUME_TAC o Q.SPEC `alpha` o MATCH_MP lcong_lrm) *)
-    (*    \\metis_tac [lcong_rules]) *)
-    (* >> sg `l''''''' τ≅ l'''''` *)
-    (* >- (last_x_assum (ASSUME_TAC o Q.SPEC `beta` o MATCH_MP lcong_lrm) *)
-    (*    \\ last_x_assum (ASSUME_TAC o Q.SPEC `beta` o MATCH_MP lcong_lrm) *)
-    (*    \\metis_tac [lcong_rules]) *)
-    (* >> Cases_on `written alpha` *)
-    (* >- (imp_res_tac no_written_same_state >> rfs[] >> rveq *)
-    (*     >> metis_tac [trans_if_swap]) *)
-    (* >> Cases_on `written beta` *)
-    (* >- (imp_res_tac no_written_same_state >> rfs[] >> rveq *)
-    (*     >> metis_tac [trans_if_swap]) *)
-    (* >> `written alpha ≠ written beta` by(metis_tac[concurrent_events_write_neq,IS_SOME_DEF]) *)
-    (* >> Cases_on `x` >> Cases_on `x'` *)
-    (* >> Cases_on `q'' = q'''` *)
-    (* >> imp_res_tac some_write_update_state >> fs[] >> rveq *)
-    (* >> imp_res_tac FUPD_SAME_KEY_UNWIND >> rveq >> fs[FUPDATE_EQ] >> rfs[] *)
-    (* >> imp_res_tac FUPD_SAME_KEY_UNWIND >> rveq >> fs[FUPDATE_EQ] >> rfs[] *)
-    (* >> rfs[FUPDATE_COMMUTES] *)
-    (* >> imp_res_tac FUPD_SAME_KEY_UNWIND >> rveq >> fs[FUPDATE_EQ] >> rfs[] *)
-    (* >> fs[] *)
-    (* >> `d'''''' = d''` by metis_tac[FUPDATE_COMMUTES,FUPD_SAME_KEY_UNWIND,FST,SND] *)
-    (* >> rveq *)
-    (* >> `d'' = d` by metis_tac[FUPDATE_COMMUTES,FUPD_SAME_KEY_UNWIND,FST,SND] *)
-    (* >> rveq *)
-    (* >> CONV_TAC SWAP_EXISTS_CONV >> qexists_tac `l''''''` *)
-    (* >> CONV_TAC SWAP_EXISTS_CONV >> qexists_tac `l'''''''` *)
-    (* >> rename1 `(s |+ ((v1,p1),d1) |+ ((v2,p2),d2),_)` *)
-    (* >> metis_tac[trans_if_swap,FUPDATE_COMMUTES] *))
+    >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
+    >> rveq >> rpt(first_x_assum drule >> disch_then assume_tac) >> fs[]
+    >- metis_tac[trans_if_true,lookup_fresh_after_trans,FST]
+    >- metis_tac[trans_if_false,lookup_fresh_after_trans,FST]
+    (* TODO: proof script depends on generated names *)
+    >-(ho_match_mp_tac drop_disj_aux
+       >> `l''''''  τ≅ lrm l'' alpha`  by(metis_tac[asynch_trans_filter_labels])
+       >> `l''''    τ≅ lrm l''' alpha` by(metis_tac[asynch_trans_filter_labels])
+       >> `l''''''' τ≅ lrm l beta`     by(metis_tac[asynch_trans_filter_labels])
+       >> `l'''''   τ≅ lrm l' beta`    by(metis_tac[asynch_trans_filter_labels])
+       >> rveq
+       >> Cases_on `sc'''`
+       >> Cases_on `sc''''`
+       >> sg `l'''''' τ≅ l''''`
+       >- (last_x_assum (ASSUME_TAC o Q.SPEC `alpha` o MATCH_MP lcong_lrm)
+           \\ last_x_assum (ASSUME_TAC o Q.SPEC `alpha` o MATCH_MP lcong_lrm)
+           \\metis_tac [lcong_rules])
+       >> sg `l''''''' τ≅ l'''''`
+       >- (last_x_assum (ASSUME_TAC o Q.SPEC `beta` o MATCH_MP lcong_lrm)
+           \\ last_x_assum (ASSUME_TAC o Q.SPEC `beta` o MATCH_MP lcong_lrm)
+           \\metis_tac [lcong_rules])
+       >> Cases_on `written alpha`
+       >- (imp_res_tac no_written_same_state >> rfs[] >> rveq
+           >> metis_tac [trans_if_swap])
+       >> Cases_on `written beta`
+       >- (imp_res_tac no_written_same_state >> rfs[] >> rveq
+           >> metis_tac [trans_if_swap])
+       >> `written alpha ≠ written beta` by(metis_tac[concurrent_events_write_neq,IS_SOME_DEF])
+       >> Cases_on `x` >> Cases_on `x'`
+       >> Cases_on `q'' = q'''`
+       >> imp_res_tac some_write_update_state >> fs[] >> rveq
+       >> imp_res_tac FUPD_SAME_KEY_UNWIND >> rveq >> fs[FUPDATE_EQ] >> rfs[]
+       >> imp_res_tac FUPD_SAME_KEY_UNWIND >> rveq >> fs[FUPDATE_EQ] >> rfs[]
+       >> rfs[FUPDATE_COMMUTES]
+       >> imp_res_tac FUPD_SAME_KEY_UNWIND >> rveq >> fs[FUPDATE_EQ] >> rfs[]
+       >> fs[]
+       >> `d'''''' = d''` by metis_tac[FUPDATE_COMMUTES,FUPD_SAME_KEY_UNWIND,FST,SND]
+       >> rveq
+       >> `d'' = d` by metis_tac[FUPDATE_COMMUTES,FUPD_SAME_KEY_UNWIND,FST,SND]
+       >> rveq
+       >> CONV_TAC SWAP_EXISTS_CONV >> qexists_tac `l''''''`
+       >> CONV_TAC SWAP_EXISTS_CONV >> qexists_tac `l'''''''`
+       >> rename1 `(s |+ ((v1,p1),d1) |+ ((v2,p2),d2),_)`
+       >> metis_tac[trans_if_swap,FUPDATE_COMMUTES])
+    (* Beautiful yet bizarre concoction covering 20 subgoals *)
+    >> rveq
+    >> TRY (first_assum (fn t => let val p = (snd o dest_comb o concl) t
+                                 in if is_pair p
+                                    then NO_TAC
+                                    else PairCases_on ‘^p’
+                                                      end))
+    >> imp_res_tac trans_LFix_async \\ rveq
+    >> dxrule_then (first_x_assum o (mp_then (Pos last) mp_tac)) trans_LFix_confluence
+    >> TRY (dxrule_then (first_x_assum o (mp_then (Pos last) mp_tac)) trans_LFix_confluence)
+    >> rw []
+    >> metis_tac [trans_rules])
   >- (* Com-swap *)
    (qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
     >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
     >> rveq
-    >- (imp_res_tac semantics_add_irrelevant_state_tup
+    >- (ho_match_mp_tac drop_disj_aux2
+        >> imp_res_tac semantics_add_irrelevant_state_tup
         >> rpt(first_x_assum (qspecl_then [`v2`,`d`] assume_tac))
         >> simp[Once CONJ_SYM] >> asm_exists_tac
         >> fs[]
@@ -667,12 +803,14 @@ val semantics_locally_confluent = Q.store_thm("semantics_locally_confluent",
         >> match_mp_tac trans_com
         >> metis_tac[lookup_fresh_after_trans,FST])
     >> first_x_assum drule >> disch_then drule >> strip_tac
-    >> Cases_on `sc'''` >> metis_tac[lookup_fresh_after_trans,FST,trans_com_swap,trans_com_async])
+    >> Cases_on `sc'''`
+    >> metis_tac[lookup_fresh_after_trans,FST,trans_com_swap,trans_com_async])
   >- (* Sel-swap *)
    (qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
     >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
     >> rveq
-    >- (imp_res_tac semantics_add_irrelevant_state_tup
+    >- (ho_match_mp_tac drop_disj_aux2
+        >> imp_res_tac semantics_add_irrelevant_state_tup
         >> rpt(first_x_assum (qspecl_then [`v2`,`d`] assume_tac))
         >> simp[Once CONJ_SYM] >> asm_exists_tac
         >> fs[]
@@ -685,7 +823,8 @@ val semantics_locally_confluent = Q.store_thm("semantics_locally_confluent",
    (qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
     >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
     >> rveq
-    >- (imp_res_tac semantics_add_irrelevant_state_tup
+    >- (ho_match_mp_tac drop_disj_aux2
+        >> imp_res_tac semantics_add_irrelevant_state_tup
         >> qpat_abbrev_tac `a1 = f _`
         >> rpt(first_x_assum (qspecl_then [`v`,`a1`] assume_tac))
         >> simp[Once CONJ_SYM] >> asm_exists_tac
@@ -703,7 +842,8 @@ val semantics_locally_confluent = Q.store_thm("semantics_locally_confluent",
    (qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
     >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
     >> rveq
-    >- (imp_res_tac semantics_add_irrelevant_state_tup
+    >- (ho_match_mp_tac drop_disj_aux2
+        >> imp_res_tac semantics_add_irrelevant_state_tup
         >> rpt(first_x_assum (qspecl_then [`v2`,`d`] assume_tac))
         >> simp[Once CONJ_SYM] >> asm_exists_tac
         >> fs[]
@@ -716,7 +856,8 @@ val semantics_locally_confluent = Q.store_thm("semantics_locally_confluent",
    (qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
     >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
     >> rveq
-    >- (imp_res_tac semantics_add_irrelevant_state_tup
+    >- (ho_match_mp_tac drop_disj_aux2
+        >>imp_res_tac semantics_add_irrelevant_state_tup
         >> rpt(first_x_assum (qspecl_then [`v2`,`d`] assume_tac))
         >> simp[Once CONJ_SYM] >> asm_exists_tac
         >> fs[]
@@ -724,8 +865,29 @@ val semantics_locally_confluent = Q.store_thm("semantics_locally_confluent",
         >> match_mp_tac trans_sel >> fs[])
     >> first_x_assum drule >> disch_then drule >> strip_tac
     >> Cases_on `sc'''` >> metis_tac[trans_sel_swap,trans_sel_async])
-  >> cheat
+  >- (* LFix *)
+   (qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+    \\ fs [])
+  >- (* Fix-if-false *)
+   (qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+    >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
+    >> rveq >> rpt(first_x_assum drule >> disch_then assume_tac) >> fs[]
+    >- metis_tac [trans_rules]
+    >- metis_tac [trans_rules]
+    >> imp_res_tac trans_LFix_async >> rveq
+    >> dxrule_then (first_x_assum o (mp_then (Pos last) mp_tac)) trans_LFix_confluence
+    >> rw []
+    >> metis_tac [trans_rules])
+  (* Fix-if-true *)
   >> qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
-  >> fs[]);
+  >> fs[] >> fs[freeprocs_def,sender_def,receiver_def]
+  >> rveq >> rpt(first_x_assum drule >> disch_then assume_tac) >> fs[]
+  >- metis_tac [trans_rules]
+  >- metis_tac [trans_rules]
+  >> imp_res_tac trans_LFix_async >> rveq
+  >> dxrule_then (first_x_assum o (mp_then (Pos last) mp_tac)) trans_LFix_confluence
+  >> rw []
+  >> metis_tac [trans_rules]
+);
 
 val _ = export_theory ()
