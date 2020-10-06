@@ -5,22 +5,36 @@ open preamble choreoUtilsTheory
 (*  syncronoush  choreograhies *)
 val _ = new_theory "chorSyncProps"
 
+Theorem syncTrm_chor_tl:
+  ∀c n s c'.
+    syncTrm n (s,c) (chor_tag c) = SOME c'
+    ⇒ c' = chor_tl s c
+Proof
+  Cases
+  \\ rw [chor_tag_def,syncTrm_def,chor_tl_def]
+  \\ fs [chor_match_def,chor_tag_def]
+QED
+
 Definition lSyncTrm_def:
   lSyncTrm (s,Nil) l = (s,Nil)
+∧ lSyncTrm (s,Call x) l = (s,Call x)
+∧ lSyncTrm (s,Fix x c) l =  (if l = EMPTY_BAG then (s,Fix x c)
+                             else (s,dsubst c x (Fix x c)))
 ∧ lSyncTrm (s,IfThen v p c1 c2) l = (if FLOOKUP s (v,p) = NONE
                                      then (s,IfThen v p c1 c2)
                                      else if (LTau p v) ⋲ l
-                                          then lSyncTrm (syncTrm (s,IfThen v p c1 c2) (LTau p v))
+                                          then lSyncTrm (chor_tl s (IfThen v p c1 c2))
                                                         (l − {|LTau p v|})
                                           else if l = EMPTY_BAG then (s,IfThen v p c1 c2)
                                                else lSyncTrm (chor_tl s (IfThen v p c1 c2)) l)
 ∧ lSyncTrm (s,c) l   = (if (chor_tag c) ⋲ l
-                        then lSyncTrm (syncTrm (s,c) (chor_tag c)) (l − {|chor_tag c|})
+                        then lSyncTrm (chor_tl s c) (l − {|chor_tag c|})
                         else if  l = EMPTY_BAG then (s,c)
                              else lSyncTrm (chor_tl s c) l)
 Termination
   WF_REL_TAC ‘measure (chor_size o SND o FST)’ \\ rw [chor_tag_def,chor_tl_def]
   \\ rfs [chor_size_def,syncTrm_def,chor_match_def,chor_tl_def]
+  >- (Cases_on ‘FLOOKUP s (v,p)’ \\ fs [])
   >- (Cases_on ‘FLOOKUP s (v,p)’ \\ fs [])
   \\ every_case_tac \\ rw []
   \\ Cases_on ‘FLOOKUP s (v,p)’ \\ fs []
@@ -51,7 +65,7 @@ Proof
   \\ rfs []
   \\ rw [] \\ fs []
   \\ irule trans_sync_step
-  \\ metis_tac [trans_rules]
+  \\ metis_tac [trans_rules,trans_sync_refl]
 QED
 
 Theorem lcong_PERM:
@@ -228,6 +242,10 @@ Proof
              no_undefined_vars_def,
              free_variables_def]
       \\ asm_exists_tac \\ fs [])
+  (* Fix-if-true *)
+  >- metis_tac [trans_sync_one,trans_rules,lSyncTrm_simps]
+  (* Fix-if-false *)
+  >- metis_tac [trans_sync_one,trans_rules,lSyncTrm_simps]
   (* Com-Normal *)
   >- (irule trans_sync_step
       \\ qmatch_goalsub_abbrev_tac ‘lSyncTrm (s'',_)’
@@ -374,19 +392,21 @@ Proof
              DELETE_SUBSET_INSERT]
       \\ asm_exists_tac \\ fs [])
   (* Let-Async *)
-  \\ rw [lSyncTrm_def,chor_tag_def,syncTrm_def,chor_match_def,chor_tl_def]
-  \\ ho_match_mp_tac trans_sync_step
-  \\ fs [no_self_comunication_def]
-  \\ rename1 ‘trans (st,_)’
-  \\ qspec_then ‘st’ mp_tac trans_sel
-  \\ disch_then drule
-  \\ disch_then (qspecl_then [‘b’,‘c’] assume_tac)
-  \\ asm_exists_tac \\ fs []
-  \\ first_x_assum irule
-  \\ fs [no_undefined_vars_def,
-         free_variables_def,
-         DELETE_SUBSET_INSERT]
-  \\ asm_exists_tac \\ fs []
+  >- (rw [lSyncTrm_def,chor_tag_def,syncTrm_def,chor_match_def,chor_tl_def]
+      \\ ho_match_mp_tac trans_sync_step
+      \\ fs [no_self_comunication_def]
+      \\ rename1 ‘trans (st,_)’
+      \\ qspec_then ‘st’ mp_tac trans_sel
+      \\ disch_then drule
+      \\ disch_then (qspecl_then [‘b’,‘c’] assume_tac)
+      \\ asm_exists_tac \\ fs []
+      \\ first_x_assum irule
+      \\ fs [no_undefined_vars_def,
+             free_variables_def,
+             DELETE_SUBSET_INSERT]
+      \\ asm_exists_tac \\ fs [])
+  (* Fix *)
+  \\  metis_tac [trans_sync_one,trans_rules,lSyncTrm_simps]
 QED
 
 Theorem trans_sync_imp_trans_s:
@@ -450,6 +470,36 @@ Proof
   metis_tac[]
 QED
 
+Theorem trans_ln_refl:
+  trans_ln sc sc
+Proof
+  rw[trans_ln_def]
+QED
+
+Theorem trans_ln_one:
+  ∀p τ q.
+    trans p (τ,[]) q ∧ q = UNCURRY chor_tl p ⇒ trans_ln p q
+Proof
+  rw [trans_ln_def]
+  \\ irule RTC_SINGLE
+  \\ metis_tac []
+QED
+
+Theorem trans_s_refl:
+  trans_s sc sc
+Proof
+  rw[trans_s_def]
+QED
+
+Theorem trans_s_one:
+  ∀p τ q.
+    trans p τ q ⇒ trans_s p q
+Proof
+  rw [trans_s_def]
+  \\ irule RTC_SINGLE
+  \\ metis_tac []
+QED
+
 Theorem trans_trans_ln:
   ∀c s τ l s' c'.
   no_self_comunication c ∧ no_undefined_vars (s,c) ∧
@@ -506,6 +556,40 @@ Proof
         metis_tac[trans_if_false]) >>
       match_mp_tac trans_s_step >>
       metis_tac[trans_if_false])
+  >- (rename1 ‘IfThen v p’ >>
+      Cases_on ‘FLOOKUP s' (v,p)’ >-
+       fs[no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP] >>
+      fs[no_self_comunication_def] >>
+      ‘no_undefined_vars (s',c)’ by fs[no_undefined_vars_def,free_variables_def] >>
+      ‘no_undefined_vars (s',c')’ by fs[no_undefined_vars_def,free_variables_def] >>
+      first_x_assum drule_all >> rw [] >>
+      rename1 ‘FLOOKUP _ _ = SOME d’ >>
+      Cases_on ‘d = [1w]’ >-
+       (rveq >> MAP_EVERY qexists_tac [‘s''’,‘c''’] >>
+        conj_tac >-
+         (irule trans_ln_step >> simp [chor_tl_def] >> metis_tac [trans_rules]) >>
+        irule trans_s_step >> asm_exists_tac >> metis_tac [trans_rules]) >>
+      MAP_EVERY qexists_tac [‘s'’,‘c'’] >>
+      conj_tac >-
+       (irule trans_ln_one >> simp [chor_tl_def] >> metis_tac [trans_rules]) >>
+      metis_tac [trans_s_one,trans_rules])
+  >- (rename1 ‘IfThen v p’ >>
+      Cases_on ‘FLOOKUP s' (v,p)’ >-
+       fs[no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP] >>
+      fs[no_self_comunication_def] >>
+      ‘no_undefined_vars (s',c)’ by fs[no_undefined_vars_def,free_variables_def] >>
+      ‘no_undefined_vars (s',c')’ by fs[no_undefined_vars_def,free_variables_def] >>
+      first_x_assum drule_all >> rw [] >>
+      rename1 ‘FLOOKUP _ _ = SOME d’ >>
+      Cases_on ‘d = [1w]’ >-
+       (rveq >> MAP_EVERY qexists_tac [‘s'’,‘c’] >>
+        conj_tac >-
+         (irule trans_ln_one >> simp [chor_tl_def] >> metis_tac [trans_rules]) >>
+        metis_tac [trans_s_one,trans_rules]) >>
+      MAP_EVERY qexists_tac [‘s''’,‘c''’] >>
+      conj_tac >-
+       (irule trans_ln_step >> simp [chor_tl_def] >> metis_tac [trans_rules]) >>
+      irule trans_s_step >> asm_exists_tac >> metis_tac [trans_rules])
   >- (rename1 ‘Com p1 v1 p2 v2’ >>
       qexists_tac ‘s' |+ ((v2,p2),d)’ >>
       qexists_tac ‘c’ >>
@@ -616,7 +700,11 @@ Proof
         (match_mp_tac trans_ln_step >> simp[chor_tl_def] >>
          metis_tac[trans_sel]) >>
       match_mp_tac trans_s_step >>
-      metis_tac[trans_sel])
+      metis_tac[trans_sel]) >>
+  MAP_EVERY qexists_tac [‘s'’,‘dsubst c s (Fix s c)’] >>
+  conj_tac >-
+   (irule trans_ln_one >> simp [chor_tl_def] >> metis_tac [trans_rules]) >>
+  irule trans_s_refl
 QED
 
 Theorem trans_ln_elim:
@@ -674,12 +762,7 @@ Proof
   fs[]
 QED
 
-Theorem trans_ln_refl:
-  trans_ln sc sc
-Proof
-  rw[trans_ln_def]
-QED
-
+(* TODO: tedious but doable *)
 Theorem trans_ln_merge:
   ∀c s τ l s' c' s'' c'' s''' c'''.
   trans (s,c) (τ,l) (s',c') ∧
@@ -795,6 +878,27 @@ Proof
           \\ metis_tac [trans_if_false])
       \\ pop_assum irule \\ fs [chor_tl_def] \\ rfs [])
   >- (rfs[no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP] \\ metis_tac[])
+  >- (fs [no_self_comunication_def]
+      \\ ‘no_undefined_vars (s',c)’ by fs[no_undefined_vars_def,free_variables_def]
+      \\ drule trans_ln_elim \\ rw []
+      >- (first_x_assum drule \\ simp [] \\ disch_then (qspecl_then [‘s'’,‘c’,‘s'’,‘c'''''’] mp_tac)
+          \\ impl_tac >- simp [trans_ln_refl]
+          \\ rw [] \\ MAP_EVERY qexists_tac [‘s''''’,‘c''''’]
+          \\ conj_tac \\ irule trans_ln_step \\ simp [chor_tl_def] \\ metis_tac [trans_rules])
+      \\ gs [chor_tl_def]
+      \\ first_x_assum drule \\ disch_then drule \\ disch_then (qspecl_then [‘s'’,‘c’] mp_tac)
+      \\ simp [trans_ln_refl] \\ disch_then drule
+      \\ rw [] \\ MAP_EVERY qexists_tac [‘s'''''’,‘c''''''’] \\ simp []
+      \\ irule trans_ln_step \\ simp [chor_tl_def] \\ metis_tac [trans_rules])
+  >- cheat
+  >- cheat
+  >- cheat
+  >- cheat
+  >- cheat
+  >- cheat
+  >- cheat
+  >- cheat
+  >- cheat
   >- (map_every qexists_tac [‘s''''’,‘c'''’]
       \\ simp [trans_ln_refl]
       \\ irule trans_ln_step
@@ -1060,17 +1164,18 @@ Proof
       \\ fs [chor_tl_def]
       \\ match_mp_tac trans_ln_step \\  rw[chor_tl_def]
       \\ metis_tac[trans_ln_trans_ln,trans_rules])
-  \\ fs[no_self_comunication_def]
-  \\ ‘no_undefined_vars (s',c)’ by(fs[no_undefined_vars_def,free_variables_def])
-  \\ first_x_assum (drule_then drule) \\ strip_tac
-  \\ fs [] \\ pop_assum drule \\ strip_tac
-  \\ qpat_assum ‘trans_ln (s'',_) _’ (mp_then Any  mp_tac trans_ln_elim)
-  \\ rw []
-  >- (pop_assum (qspecl_then [‘s''’,‘c''''’] mp_tac) >> fs [trans_ln_refl]
-      \\ rw [] >> asm_exists_tac >> fs []
-      \\ irule trans_ln_step >> fs [chor_tl_def]
-      \\ metis_tac [trans_rules])
-  \\ first_x_assum irule \\ fs [chor_tl_def] \\ rfs []
+  >- (fs[no_self_comunication_def]
+      \\ ‘no_undefined_vars (s',c)’ by(fs[no_undefined_vars_def,free_variables_def])
+      \\ first_x_assum (drule_then drule) \\ strip_tac
+      \\ fs [] \\ pop_assum drule \\ strip_tac
+      \\ qpat_assum ‘trans_ln (s'',_) _’ (mp_then Any  mp_tac trans_ln_elim)
+      \\ rw []
+      >- (pop_assum (qspecl_then [‘s''’,‘c''''’] mp_tac) >> fs [trans_ln_refl]
+          \\ rw [] >> asm_exists_tac >> fs []
+          \\ irule trans_ln_step >> fs [chor_tl_def]
+          \\ metis_tac [trans_rules])
+      \\ first_x_assum irule \\ fs [chor_tl_def] \\ rfs [])
+  \\ cheat
 QED
 
 Theorem trans_s_trans_s:
