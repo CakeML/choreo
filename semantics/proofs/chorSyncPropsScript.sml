@@ -762,7 +762,28 @@ Proof
   fs[]
 QED
 
-(* TODO: tedious but doable *)
+(* TODO: fix weak confluence proof *)
+Theorem trans_ln_weak_confluence:
+  ∀p1 q1 q2.
+    trans_ln p1 q1 ∧ trans_ln p1 q2
+    ⇒ ∃p2. trans_ln q1 p2 ∧ trans_ln q2 p2
+Proof
+  cheat
+QED
+
+Theorem trans_ln_weak_confluence_pair:
+  ∀s1 c1 c2 s2 c2 s3 c3.
+    trans_ln (s1,c1) (s2,c2) ∧
+    trans_ln (s1,c1) (s3,c3)
+    ⇒ ∃s4 c4. trans_ln (s2,c2) (s4,c4) ∧
+              trans_ln (s3,c3) (s4,c4)
+Proof
+  rw [] \\ dxrule_all trans_ln_weak_confluence \\  rw []
+  \\ PairCases_on ‘p2’
+  \\ asm_exists_tac \\ simp []
+QED
+
+(* TODO: trans_ln confluence *)
 Theorem trans_ln_merge:
   ∀c s τ l s' c' s'' c'' s''' c'''.
   trans (s,c) (τ,l) (s',c') ∧
@@ -771,6 +792,48 @@ Theorem trans_ln_merge:
   trans_ln (s',c') (s''',c''')
   ⇒ ∃s'''' c''''. trans_ln (s'',c'') (s'''',c'''') ∧ trans_ln (s''',c''') (s'''',c'''')
 Proof
+  let val trans_ln_split_tac =
+        (* This tactic split all trans_ln assumptions that actually make some progress
+           (no trans_ln_refl) into trans_ln_elim cases.
+         *)
+        fs [no_self_comunication_def]
+        \\ ‘no_undefined_vars (s',c)’ by fs[no_undefined_vars_def,free_variables_def]
+        \\ ‘no_undefined_vars (s',c')’ by fs[no_undefined_vars_def,free_variables_def]
+        \\ TRY (qmatch_asmsub_abbrev_tac ‘trans_ln (s',IfThen _ _ _ _) (s',cc0)’
+                \\ qpat_x_assum ‘trans_ln _ (s',cc0)’ mp_tac
+                \\ qpat_abbrev_tac ‘trans0 = trans_ln _ (s',cc0)’
+                \\ strip_tac)
+        \\ TRY (qmatch_asmsub_abbrev_tac ‘trans_ln (s',IfThen _ _ _ _) (s',cc1)’
+                \\ qpat_x_assum ‘trans_ln _ (s',cc1)’ mp_tac
+                \\ qpat_abbrev_tac ‘trans0 = trans_ln _ (s',cc1)’
+                \\ strip_tac)
+        \\ TRY (qpat_x_assum ‘trans_ln (s',IfThen _ _ _ _) _’ (mp_then Any mp_tac trans_ln_elim))
+        \\ TRY (qpat_x_assum ‘trans_ln (s',IfThen _ _ _ _) _’ (mp_then Any mp_tac trans_ln_elim))
+        \\ MAP_EVERY (TRY o qunabbrev_tac) [‘trans0’,‘cc0’,‘trans1’,‘cc1’]
+        \\ rw [] \\ gs [trans_ln_refl,chor_tl_def];
+     val trans_ln_close =
+       gs [trans_ln_refl] \\ rw []
+       \\ TRY(asm_exists_tac \\ simp [])
+       \\ TRY(irule_at Any trans_ln_step) \\ simp [chor_tl_def]
+       \\ TRY((irule_at Any trans_if_true ORELSE irule_at Any trans_if_false) \\ simp [])
+       \\ TRY(asm_exists_tac \\ simp []);
+    (* drules  depending of how much relevant trans_ln assumptions are around *)
+    val trans_ln_open =
+      first_x_assum drule \\ simp [] \\ gs [trans_ln_refl,chor_tl_def]
+      \\ TRY (disch_then drule)
+      \\ TRY (qmatch_goalsub_abbrev_tac ‘trans_ln (s',c0)’
+              \\ qspec_then ‘(s',c0)’ assume_tac (GEN_ALL trans_ln_refl)
+              \\ disch_then dxrule
+              \\ qunabbrev_tac ‘c0’)
+      \\ TRY (disch_then drule)
+      \\ TRY (qmatch_goalsub_abbrev_tac ‘trans_ln (s',c0)’
+              \\ qspec_then ‘(s',c0)’ assume_tac (GEN_ALL trans_ln_refl)
+              \\ disch_then dxrule
+              \\ qunabbrev_tac ‘c0’);
+    val trans_ln_tac =
+      trans_ln_open
+      \\ trans_ln_close \\ trans_ln_close
+  in
   Induct
   >- fs [Once trans_cases]
   \\ rw []
@@ -878,27 +941,34 @@ Proof
           \\ metis_tac [trans_if_false])
       \\ pop_assum irule \\ fs [chor_tl_def] \\ rfs [])
   >- (rfs[no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP] \\ metis_tac[])
-  >- (fs [no_self_comunication_def]
-      \\ ‘no_undefined_vars (s',c)’ by fs[no_undefined_vars_def,free_variables_def]
-      \\ drule trans_ln_elim \\ rw []
-      >- (first_x_assum drule \\ simp [] \\ disch_then (qspecl_then [‘s'’,‘c’,‘s'’,‘c'''''’] mp_tac)
-          \\ impl_tac >- simp [trans_ln_refl]
-          \\ rw [] \\ MAP_EVERY qexists_tac [‘s''''’,‘c''''’]
-          \\ conj_tac \\ irule trans_ln_step \\ simp [chor_tl_def] \\ metis_tac [trans_rules])
-      \\ gs [chor_tl_def]
-      \\ first_x_assum drule \\ disch_then drule \\ disch_then (qspecl_then [‘s'’,‘c’] mp_tac)
-      \\ simp [trans_ln_refl] \\ disch_then drule
-      \\ rw [] \\ MAP_EVERY qexists_tac [‘s'''''’,‘c''''''’] \\ simp []
-      \\ irule trans_ln_step \\ simp [chor_tl_def] \\ metis_tac [trans_rules])
-  >- cheat
-  >- cheat
-  >- cheat
-  >- cheat
-  >- cheat
-  >- cheat
-  >- cheat
-  >- cheat
-  >- cheat
+  >- (trans_ln_split_tac \\ trans_ln_tac)
+  >- (trans_ln_split_tac \\ trans_ln_tac)
+  >- (trans_ln_split_tac
+      \\ trans_ln_close \\ irule_at Any trans_ln_refl
+      \\ trans_ln_close  \\ irule_at Any trans_ln_refl)
+  >- (trans_ln_split_tac
+      >- trans_ln_tac
+      >- trans_ln_tac
+      >- (irule_at Any trans_ln_refl \\ trans_ln_close)
+      \\ metis_tac [trans_ln_weak_confluence_pair])
+  >- (‘∃w. FLOOKUP s' (s0,s) = SOME w’
+        by gs [no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP]
+      \\ fs [])
+  >- (trans_ln_split_tac
+      \\ trans_ln_close
+      \\ irule_at Any trans_ln_refl
+      \\ trans_ln_close
+      \\ irule_at Any trans_ln_refl)
+  >- (trans_ln_split_tac
+      >- trans_ln_tac
+      >- trans_ln_tac
+      >- (irule_at Any trans_ln_refl \\ trans_ln_close)
+      \\ metis_tac [trans_ln_weak_confluence_pair])
+  >- (trans_ln_split_tac \\ trans_ln_tac)
+  >- (trans_ln_split_tac \\ trans_ln_tac)
+  >- (‘∃w. FLOOKUP s' (s0,s) = SOME w’
+        by gs [no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP]
+      \\ fs [])
   >- (map_every qexists_tac [‘s''''’,‘c'''’]
       \\ simp [trans_ln_refl]
       \\ irule trans_ln_step
@@ -1175,7 +1245,11 @@ Proof
           \\ irule trans_ln_step >> fs [chor_tl_def]
           \\ metis_tac [trans_rules])
       \\ first_x_assum irule \\ fs [chor_tl_def] \\ rfs [])
-  \\ cheat
+  >- (irule_at Any trans_ln_step \\ simp [chor_tl_def]
+      \\ irule_at Any trans_fix \\ asm_exists_tac
+      \\ simp [trans_ln_refl])
+  \\ metis_tac [trans_ln_weak_confluence_pair] (* needs trans_ln confluence *)
+end
 QED
 
 Theorem trans_s_trans_s:
