@@ -1,4 +1,4 @@
-open preamble chorSemTheory chorPropsTheory
+open preamble chorSemTheory chorPropsTheory choreoUtilsTheory
 
 val _ = new_theory "chorConfluence";
 
@@ -889,5 +889,112 @@ Proof
   >> rw []
   >> metis_tac [trans_rules]
 );
+
+Theorem trans_LFix_LFix_confluence:
+  ∀s0 c0 s1 c1 s2 c2.
+   trans (s0,c0) (LFix,[]) (s1,c1) ∧
+   trans (s0,c0) (LFix,[]) (s2,c2)
+   ⇒ ∃c3. (trans (s0,c2) (LFix,[]) (s0,c3) ∨ c2 = c3) ∧ (trans (s0,c1) (LFix,[]) (s0,c3) ∨ c1 = c3)
+Proof
+  rw []
+  \\ pop_assum mp_tac
+  \\ MAP_EVERY (W(curry Q.SPEC_TAC)) (rev [‘s2’,‘c2’])
+  \\ qmatch_asmsub_abbrev_tac ‘trans _ (τ,l) _’
+  \\ pop_assum (mp_tac o REWRITE_RULE [markerTheory.Abbrev_def])
+  \\ pop_assum (mp_tac o REWRITE_RULE [markerTheory.Abbrev_def])
+  \\ pop_assum mp_tac
+  \\ MAP_EVERY (W(curry Q.SPEC_TAC)) (rev [‘s0’,‘c0’,‘τ’,‘l’,‘s1’,‘c1’])
+  \\ ho_match_mp_tac trans_pairind \\ rw []
+  >- (qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+      \\ fs [] \\ imp_res_tac trans_LFix_async \\ rveq \\ fs []
+      \\ first_x_assum drule \\ first_x_assum drule \\ rw []
+      \\ metis_tac [trans_rules])
+  >- (qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+      \\ fs [] \\ first_x_assum drule \\ rw [] \\ metis_tac [trans_rules])
+  >- (qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+      \\ fs [] \\ first_x_assum drule \\ rw [] \\ metis_tac [trans_rules])
+  >- (qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+      \\ fs [] \\ first_x_assum drule \\ rw [] \\ metis_tac [trans_rules])
+  >- (qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+      \\ fs [] \\ rveq \\ metis_tac [trans_rules])
+  >- (qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+      \\ fs [] \\ imp_res_tac trans_LFix_async \\ rveq \\ fs []
+      \\ first_x_assum drule \\ rw [] \\ metis_tac [trans_rules])
+  \\ qpat_x_assum `trans _ _ _` (assume_tac o SIMP_RULE std_ss [Once trans_cases])
+  \\ fs [] \\ imp_res_tac trans_LFix_async \\ rveq \\ fs []
+  \\ first_x_assum drule \\ rw [] \\ metis_tac [trans_rules]
+QED
+
+Theorem semantics_globally_confluent:
+  ∀sc sc' alpha l sc''.
+  trans_s sc sc' ∧
+  trans sc (alpha,l) sc''
+  ⇒ ∃sc'''.
+      trans_s sc' sc''' ∧
+      trans_s sc'' sc'''
+Proof
+  simp[trans_s_def,GSYM PULL_FORALL,GSYM AND_IMP_INTRO]
+  \\ ho_match_mp_tac RTC_strongind >> conj_tac
+  >- (rw[] \\  qexists_tac `sc''` \\  simp[]
+      \\ match_mp_tac RTC_SUBSET \\  simp[] \\  goal_assum drule)
+  \\ rw[]
+  \\ Cases_on `s`
+  \\ rename1 `trans sc (beta,l') sc'`
+  \\ Cases_on `alpha = beta`
+  >- (rveq \\  res_tac
+      \\ Cases_on ‘alpha = LFix’
+      >- (rveq
+          \\ PairCases_on ‘sc’
+          \\ PairCases_on ‘sc'’
+          \\ PairCases_on ‘sc'''’
+          \\ imp_res_tac trans_LFix_async
+          \\ rveq \\  simp []
+          \\ dxrule_all trans_LFix_LFix_confluence \\ rw []
+          >- (first_x_assum drule \\ rw []
+              \\ asm_exists_tac \\ simp []
+              \\ irule RTC_TRANS \\  metis_tac [])
+          >- (first_x_assum drule \\ rw [])
+          >- (irule_at Any RTC_REFL \\ irule_at Any RTC_TRANS \\ metis_tac [])
+          \\ irule_at Any RTC_REFL \\ simp [])
+      \\ dxrule_all semantics_deterministic
+      \\ disch_then SUBST_ALL_TAC
+      \\ qexists_tac `sc''`
+      \\ metis_tac[RTC_REFL])
+  \\ dxrule_all semantics_locally_confluent
+  \\ rw []
+  >- (first_x_assum drule \\ rw []
+      \\ asm_exists_tac \\  simp []
+      \\ irule RTC_TRANS
+      \\ metis_tac [])
+  >- ((drule o GEN_ALL o fst o EQ_IMP_RULE o SPEC_ALL) RTC_CASES1
+      \\ rw []
+      >- (asm_exists_tac \\  simp []
+          \\ irule RTC_SINGLE \\ simp []
+          \\ metis_tac [])
+      \\ PairCases_on ‘s’ \\ first_x_assum drule
+      \\  rw [] \\ asm_exists_tac \\  simp []
+      \\ irule RTC_SPLIT \\ first_x_assum (irule_at (Pos last))
+      \\ irule RTC_TRANS \\ irule_at Any RTC_SINGLE
+      \\ metis_tac [])
+  >- (first_x_assum drule \\ rw [])
+  \\ irule_at Any RTC_REFL \\  simp []
+QED
+
+(* TODO: move *)
+Theorem semantics_globally_weakly_confluent:
+  !sc sc' sc''.
+  trans_s sc sc' /\ trans_s sc sc'' ==>
+  ?sc'''. trans_s sc' sc''' /\ trans_s sc'' sc'''
+Proof
+  simp[trans_s_def,GSYM PULL_FORALL,GSYM AND_IMP_INTRO] >>
+  ho_match_mp_tac RTC_INDUCT >> conj_tac >- metis_tac[RTC_REFL] >>
+  rw[] >>
+  Cases_on `s` >>
+  dxrule_all (REWRITE_RULE [trans_s_def] semantics_globally_confluent) >>
+  strip_tac >>
+  res_tac >>
+  goal_assum drule >>
+  metis_tac[RTC_RTC]
+QED
 
 val _ = export_theory ()
