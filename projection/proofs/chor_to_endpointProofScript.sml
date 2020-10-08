@@ -2540,49 +2540,6 @@ Proof
   simp[]
 QED
 
-Theorem semantics_globally_confluent:
-  !sc sc' alpha l sc''.
-  trans_s sc sc' /\ trans sc (alpha,l) sc'' ==>
-  ?sc'''. trans_s sc' sc''' /\ trans_s sc'' sc'''
-Proof
-  simp[trans_s_def,GSYM PULL_FORALL,GSYM AND_IMP_INTRO] >>
-  ho_match_mp_tac RTC_strongind >> conj_tac >-
-    (rw[] >> qexists_tac `sc''` >> simp[] >>
-     match_mp_tac RTC_SUBSET >> simp[] >> goal_assum drule) >>
-  rw[] >>
-  Cases_on `s` >>
-  rename1 `trans sc (beta,l') sc'` >>
-  Cases_on `alpha = beta` >-
-    (rveq >> res_tac >>
-     dxrule_all semantics_deterministic >> disch_then SUBST_ALL_TAC >>
-     qexists_tac `sc''` >>
-     metis_tac[RTC_REFL]) >>
-  dxrule_all semantics_locally_confluent >>
-  strip_tac >>
-  res_tac >>
-  goal_assum drule >>
-  match_mp_tac RTC_TRANS >>
-  simp[PULL_EXISTS] >>
-  goal_assum drule >>
-  simp[]
-QED
-
-(* TODO: move *)
-Theorem semantics_globally_weakly_confluent:
-  !sc sc' sc''.
-  trans_s sc sc' /\ trans_s sc sc'' ==>
-  ?sc'''. trans_s sc' sc''' /\ trans_s sc'' sc'''
-Proof
-  simp[trans_s_def,GSYM PULL_FORALL,GSYM AND_IMP_INTRO] >>
-  ho_match_mp_tac RTC_INDUCT >> conj_tac >- metis_tac[RTC_REFL] >>
-  rw[] >>
-  Cases_on `s` >>
-  dxrule_all (REWRITE_RULE [trans_s_def] semantics_globally_confluent) >>
-  strip_tac >>
-  res_tac >>
-  goal_assum drule >>
-  metis_tac[RTC_RTC]
-QED
 
 Theorem trans_s_nil:
   trans_s (s,Nil) sc ==> sc = (s,Nil)
