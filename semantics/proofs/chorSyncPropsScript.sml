@@ -739,12 +739,6 @@ Proof
   metis_tac[trans_ln_def,RTC_RTC]
 QED
 
-(* Theorem trans_ln_NIL: *)
-(*   ∀s sc. trans_ln (s,Nil) sc ⇒ sc = (s,Nil) *)
-(* Proof *)
-(*   metis_tac[trans_s_NIL,trans_ln_IMP_trans_s] *)
-(* QED *)
-
 Theorem trans_ln_merge_lemma:
   ∀sc sc' sc''.
   trans_ln (sc) (sc') ∧
@@ -762,13 +756,12 @@ Proof
   fs[]
 QED
 
-(* TODO: fix weak confluence proof *)
 Theorem trans_ln_weak_confluence:
   ∀p1 q1 q2.
     trans_ln p1 q1 ∧ trans_ln p1 q2
     ⇒ ∃p2. trans_ln q1 p2 ∧ trans_ln q2 p2
 Proof
-  cheat
+  rw [] \\ metis_tac [trans_ln_merge_lemma]
 QED
 
 Theorem trans_ln_weak_confluence_pair:
@@ -783,7 +776,6 @@ Proof
   \\ asm_exists_tac \\ simp []
 QED
 
-(* TODO: trans_ln confluence *)
 Theorem trans_ln_merge:
   ∀c s τ l s' c' s'' c'' s''' c'''.
   trans (s,c) (τ,l) (s',c') ∧
