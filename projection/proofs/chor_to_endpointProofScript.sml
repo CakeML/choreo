@@ -355,6 +355,8 @@ val cut_ext_choice_upto_presel_def = Define `
 /\ (cut_ext_choice_upto_presel p1 p2 presel (IfThen b e1 e2) = IfThen b e1 e2)
 /\ (cut_ext_choice_upto_presel p1 p2 presel (IntChoice p b' e) = IntChoice p b' e)
 /\ (cut_ext_choice_upto_presel p1 p2 presel (Let s f l c) = Let s f l c)
+/\ (cut_ext_choice_upto_presel p1 p2 presel (Fix s c) = Fix s c)
+/\ (cut_ext_choice_upto_presel p1 p2 presel (Call s) = Call s)
 /\ (cut_ext_choice_upto_presel p1 p2 presel (ExtChoice p e1 e2) =
     (if p = p1 then
       (case SPLITP ($= p2 o SND) presel of
@@ -532,9 +534,10 @@ Proof
 QED
 
 Theorem trans_not_eq:
-  ∀s c τ l s' c'. trans (s,c) (τ,l) (s',c') ⇒ c ≠ c'
+  ∀s c τ l s' c'. trans (s,c) (τ,l) (s',c') ∧ τ ≠ LFix ⇒ c ≠ c'
 Proof
-  ho_match_mp_tac trans_pairind \\ rw []
+  ONCE_REWRITE_TAC [GSYM AND_IMP_INTRO]
+  \\ ho_match_mp_tac trans_pairind \\ rw []
   \\ disch_then (mp_tac o AP_TERM “chor_size”) \\ EVAL_TAC \\ fs []
 QED
 
@@ -566,6 +569,9 @@ Proof
   rw[chor_tl_def] >>
   metis_tac[trans_sel]
 QED
+
+Theorem trans_ln_catchup_of_pair =
+  Q.SPEC ‘(s,c)’ trans_ln_catchup_of  |> SIMP_RULE std_ss []  |> GEN_ALL
 
 Theorem trans_ln_cut_sel_upto:
   ∀s c p.
@@ -632,8 +638,68 @@ Proof
      rw[] >>
      rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
      metis_tac[split_sel_project_ok,split_sel_project_ok2]
-     )
+     ) >-
+    (asm_exists_tac \\ simp [])
 QED
+
+Triviality dsubst_subset_procsOf:
+  ∀c dn c'.
+    set (procsOf (dsubst c dn c')) ⊆ set (procsOf c) ∪ set (procsOf c')
+Proof
+  rw []
+  \\ Induct_on ‘c’ \\ rw [procsOf_def,chorLangTheory.dsubst_def,set_nub']
+  \\ irule SUBSET_TRANS \\ asm_exists_tac \\ fs []
+  \\ fs [SUBSET_DEF]
+QED
+
+Triviality procsOf_subset_dsubst:
+  ∀c dn c'.
+    set (procsOf c) ⊆ set (procsOf (dsubst c dn c'))
+Proof
+  rw []
+  \\ Induct_on ‘c’ \\ rw [procsOf_def,chorLangTheory.dsubst_def,set_nub']
+  \\ fs [SUBSET_DEF]
+QED
+
+Theorem dsubst_procsOf_set_eq:
+  ∀c dn. set (procsOf c) = set (procsOf (dsubst c dn c))
+Proof
+  rw [] \\ irule SUBSET_ANTISYM
+  \\ metis_tac [procsOf_subset_dsubst,
+                dsubst_subset_procsOf,
+                UNION_IDEMPOT]
+QED
+
+Theorem dsubst_procsOf_set_eq_Fix:
+  ∀c x y. set (procsOf c) = set (procsOf (dsubst c x (Fix y c)))
+Proof
+  rw [] \\ irule SUBSET_ANTISYM
+  \\ metis_tac [procsOf_subset_dsubst,
+                dsubst_subset_procsOf,
+                procsOf_def,
+                set_nub',
+                UNION_IDEMPOT]
+QED
+
+Theorem procsOf_dsubst_MEM_eq:
+  ∀c p x y. MEM p (procsOf c) ⇔ MEM p (procsOf (dsubst c x (Fix y c)))
+Proof
+  rw []
+  \\ qspecl_then [‘c’,‘x’,‘y’] (assume_tac) dsubst_procsOf_set_eq_Fix
+  \\ pop_assum (assume_tac o Q.AP_TERM ‘(λx. p IN x)’) \\ fs []
+QED
+
+Theorem procsOf_dsubst_MEM =
+  SPEC_ALL procsOf_dsubst_MEM_eq
+  |> EQ_IMP_RULE
+  |> fst
+  |> GEN_ALL
+
+Theorem dsubst_procsOf_MEM =
+  SPEC_ALL procsOf_dsubst_MEM_eq
+  |> EQ_IMP_RULE
+  |> snd
+  |> GEN_ALL
 
 Theorem compile_network_preservation_ln:
    ∀s c α s' c' . compile_network_ok s c (procsOf c)
@@ -663,7 +729,8 @@ Proof
         , catchup_of_def
         , trans_ln_refl
         , no_self_comunication_def
-        , trans_ln_cut_sel_upto]
+        , trans_ln_cut_sel_upto
+        , dsubst_def]
   (* Com *)
   >- (IMP_RES_TAC lookup_projectS
      \\ rw [trans_ln_def,fupdate_projectS]
@@ -1149,6 +1216,7 @@ Proof
          >> rw[cut_ext_choice_upto_presel_def,SPLITP])
      >- (`proc <> q` by(CCONTR_TAC >> fs[ALL_DISTINCT_APPEND] >> metis_tac[])
          \\ fs[project_def,cut_ext_choice_upto_presel_def,cut_ext_choice_upto_presel_cons]))
+  \\ TRY (simp [trans_ln_catchup_of_pair,no_self_comunication_def] \\ NO_TAC)
   >- (CCONTR_TAC
       \\ qpat_x_assum ‘p ∉ _’ mp_tac
       \\ qpat_x_assum ‘trans _ (α,[]) _’ mp_tac
@@ -1158,17 +1226,10 @@ Proof
       \\ ONCE_REWRITE_TAC [trans_cases]
       \\ rw [freeprocs_def]
       \\ rw [freeprocs_def]
-      \\ metis_tac [])
-  >- (CCONTR_TAC
-      \\ qpat_x_assum ‘p ∉ _’ mp_tac
-      \\ qpat_x_assum ‘trans _ (α,[]) _’ mp_tac
-      \\ rpt (pop_assum kall_tac)
-      \\ map_every qid_spec_tac [‘s’,‘v’,‘p’,‘c'''’,‘α’]
-      \\ Induct_on ‘c''’ \\ simp []
-      \\ ONCE_REWRITE_TAC [trans_cases]
-      \\ rw [freeprocs_def]
-      \\ rw [freeprocs_def]
-      \\ metis_tac [])
+      >- metis_tac []
+      >- (first_x_assum drule \\ simp [freeprocs_def])
+      \\ qpat_x_assum ‘_ = _’ (mp_tac o AP_TERM “chor_size”)
+      \\ EVAL_TAC \\ fs [])
   >- (fs [lcong_nil_simp]
       \\ CCONTR_TAC
       \\ qpat_x_assum ‘p ∉ _’ mp_tac
@@ -1179,20 +1240,13 @@ Proof
       \\ ONCE_REWRITE_TAC [trans_cases]
       \\ rw [freeprocs_def]
       \\ rw [freeprocs_def]
-      \\ metis_tac [lcong_nil_simp])
-  >- (fs [lcong_nil_simp]
-      \\ CCONTR_TAC
-      \\ qpat_x_assum ‘p ∉ _’ mp_tac
-      \\ qpat_x_assum ‘trans _ (α,[]) _’ mp_tac
-      \\ rpt (pop_assum kall_tac)
-      \\ map_every qid_spec_tac [‘s’,‘v’,‘p’,‘c''’,‘α’]
-      \\ Induct_on ‘c'''’ \\ simp []
-      \\ ONCE_REWRITE_TAC [trans_cases]
-      \\ rw [freeprocs_def]
-      \\ rw [freeprocs_def]
-      \\ metis_tac [lcong_nil_simp])
-  >- (drule trans_not_eq \\ fs [])
-  >- (drule trans_not_eq \\ fs [])
+      >- metis_tac [lcong_nil_simp]
+      >- (qpat_x_assum ‘_ = _’ (mp_tac o AP_TERM “chor_size”)
+          \\ EVAL_TAC \\ fs [])
+      \\ first_x_assum drule \\ simp [freeprocs_def])
+  >- (Cases_on ‘α ≠ LFix’
+      >- (drule trans_not_eq \\ fs [])
+      \\ gs [catchup_of_def,project_def])
   >- (CCONTR_TAC
       \\ ntac 5 (pop_assum kall_tac)
       \\ last_x_assum kall_tac
@@ -1236,10 +1290,9 @@ Proof
       \\ res_tac
       \\ rfs[])
   >- (CCONTR_TAC
-      \\ ntac 5 (pop_assum kall_tac)
-      \\ last_x_assum kall_tac
+      \\ ntac 4 (pop_assum kall_tac)
       \\ rpt (pop_assum mp_tac)
-      \\ map_every qid_spec_tac [‘s’,‘p1’,‘v1’,‘p2’,‘v2’,‘α’]
+      \\ map_every qid_spec_tac [‘s’,‘p’,‘v’,‘f’,‘vl’]
       \\ Induct_on ‘c'’ \\ simp []
       \\ ONCE_REWRITE_TAC [trans_cases]
       \\ rw [freeprocs_def]
@@ -1249,47 +1302,34 @@ Proof
       \\ rw[]
       \\ res_tac
       \\ rfs[])
-  >- (CCONTR_TAC
-      \\ ntac 5 (pop_assum kall_tac)
-      \\ last_x_assum kall_tac
-      \\ rpt (pop_assum mp_tac)
-      \\ map_every qid_spec_tac [‘s’,‘p1’,‘v1’,‘p2’,‘v2’,‘α’]
-      \\ Induct_on ‘c'’ \\ simp []
-      \\ ONCE_REWRITE_TAC [trans_cases]
-      \\ rw [freeprocs_def]
-      \\ rw [freeprocs_def]
-      \\ fs[freeprocs_def]
-      \\ fs[project_def]
-      \\ rw[]
-      \\ res_tac
-      \\ rfs[])
-  >- (CCONTR_TAC
-      \\ ntac 5 (pop_assum kall_tac)
-      \\ last_x_assum kall_tac
-      \\ rpt (pop_assum mp_tac)
-      \\ map_every qid_spec_tac [‘s’,‘p1’,‘v1’,‘p2’,‘v2’,‘α’]
-      \\ Induct_on ‘c'’ \\ simp []
-      \\ ONCE_REWRITE_TAC [trans_cases]
-      \\ rw [freeprocs_def]
-      \\ rw [freeprocs_def]
-      \\ fs[freeprocs_def]
-      \\ fs[project_def]
-      \\ rw[]
-      \\ res_tac
-      \\ rfs[])
-  \\ CCONTR_TAC
-  \\ ntac 4 (pop_assum kall_tac)
-  \\ rpt (pop_assum mp_tac)
-  \\ map_every qid_spec_tac [‘s’,‘p’,‘v’,‘f’,‘vl’]
-  \\ Induct_on ‘c'’ \\ simp []
-  \\ ONCE_REWRITE_TAC [trans_cases]
-  \\ rw [freeprocs_def]
-  \\ rw [freeprocs_def]
-  \\ fs[freeprocs_def]
-  \\ fs[project_def]
-  \\ rw[]
-  \\ res_tac
-  \\ rfs[]
+  (* TODO: Fix *)
+  >- (qmatch_goalsub_abbrev_tac ‘compile_network s _ l’
+      \\ pop_assum kall_tac
+      \\ Induct_on ‘l’
+      \\ rw [compile_network_gen_def]
+      \\ gs []
+      \\ qmatch_goalsub_abbrev_tac ‘reduction^* (NPar a1 b1) (NPar a2 b2)’
+      \\ irule RTC_SPLIT
+      \\ qexists_tac ‘NPar a1 b2’
+      \\ conj_tac
+      >- (irule reduction_par_r \\ simp [])
+      \\ irule reduction_par_l
+      \\ unabbrev_all_tac
+      \\simp [project_def] \\ rw []
+      >- (irule RTC_TRANS \\ simp [reduction_def]
+          \\ irule_at Any endpointSemTheory.trans_fix
+          \\ cheat (* TODO: project distributes over dsubst *))
+      \\ qspecl_then [‘c’,‘h’,‘dn’,‘dn’] assume_tac procsOf_dsubst_MEM_eq
+      \\ cheat)
+  (* TODO: Prove that LFix can not remove stuff at the front of the choreography *)
+  >- (qpat_x_assum ‘trans _ _ _’ (assume_tac o ONCE_REWRITE_RULE [trans_cases])
+      \\ fs [] \\ cheat)
+  >- (qpat_x_assum ‘_ = _’ (mp_tac o AP_TERM “chor_size”)
+      \\ EVAL_TAC \\ fs [])
+  >- (qpat_x_assum ‘_ = _’ (mp_tac o AP_TERM “chor_size”)
+      \\ EVAL_TAC \\ fs [])
+  (* TODO:  Prove that LFix can not remove stuff at the front of the choreography *)
+  \\ cheat
 QED
 
 Theorem split_sel_nonproc_NONE:
@@ -1299,16 +1339,6 @@ Proof
   ho_match_mp_tac split_sel_ind >>
   rw[procsOf_def,MEM_nub'] >>
   fs[split_sel_def]
-QED
-
-Theorem project_nonmember_nil:
-  ∀p c.
-  ~MEM p (procsOf c) ⇒ project' p c = Nil
-Proof
-  ho_match_mp_tac project_ind >>
-  rw[project_def,procsOf_def,MEM_nub'] >>
-  rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
-  imp_res_tac split_sel_nonproc_NONE >> fs[]
 QED
 
 Theorem procsOf_catchup_of:

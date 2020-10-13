@@ -77,8 +77,11 @@ Definition project_def:
 ∧ (project proc (Fix dn c) =
     if MEM proc (procsOf c) then
       Fix dn <Γ> project proc c
-    else
-      (T,Nil))
+    else (* We must ensure we end the same way is if the fix was not there *)
+      case (project proc c) of
+        | (T,Nil) => (T,Nil)
+        | (T,Call dn) => (T,Call dn)
+        | _ => (F,Nil)) (* should't happen *)
 ∧ (project proc (Call dn) = (T, Call dn))
 Termination
 (WF_REL_TAC `measure (chor_size o SND)`
