@@ -6000,7 +6000,7 @@ QED
 
 Theorem network_NPar_forward_correctness_reduction:
   ∀conf p s c n s' c' n' st1 vs1 env1 st2.
-  (reduction conf)⃰ (NPar (NEndpoint p s c) n) (NPar (NEndpoint p s' c') n') ∧
+  (reduction conf)꙳ (NPar (NEndpoint p s c) n) (NPar (NEndpoint p s' c') n') ∧
 
   (* These assumptions should be dischargable by the static part of the compiler *)
   net_wf n ∧
@@ -6030,7 +6030,7 @@ Theorem network_NPar_forward_correctness_reduction:
 Proof
   strip_tac
   \\ ‘conf.payload_size > 0
-      ⇒ ∀n1 n2. (reduction conf)⃰ n1 n2
+      ⇒ ∀n1 n2. (reduction conf)꙳ n1 n2
          ⇒ ∀p s c n p s' c' n' st1 vs1 env1 st2.
             n1 = (NPar (NEndpoint p s  c)  n)  ∧
             n2 = (NPar (NEndpoint p s' c') n') ∧
