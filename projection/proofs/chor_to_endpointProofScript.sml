@@ -1749,711 +1749,20 @@ Proof
 QED
 
 Theorem compile_network_reflection_lemma:
-  ∀s c pn.
+  ∀s c pn p2.
     compile_network_ok s c pn
     ∧ ALL_DISTINCT pn
     ∧ set(procsOf c) ⊆ set pn
     ∧ no_undefined_vars (s,c)
     ∧ no_self_comunication c
-    ==> ∃s'' p2.
-             reduction^* (compile_network s c pn) p2
-             ∧ trans_s (s,c) (s'',Nil)
-             ∧ p2 = compile_network s'' Nil pn
+    ∧ reduction (compile_network s c pn) p2
+    ==> ∃s' c' p3.
+             reduction^* p2 p3
+             ∧ trans_s (s,c) (s',c')
+             ∧ p3 = compile_network s' c' pn (* TODO: does this need qcong? *)
+             ∧ compile_network_ok s' c' pn
 Proof
-  `∀cs s c pn.
-    cs = chor_to_endpoint$chor_size c
-    ∧ compile_network_ok s c pn
-    ∧ ALL_DISTINCT pn
-    ∧ set(procsOf c) ⊆ set pn
-    ∧ no_undefined_vars (s,c)
-    ∧ no_self_comunication c
-    ==> ∃s'' p2.
-             reduction^* (compile_network s c pn) p2
-             ∧ trans_s (s,c) (s'',Nil)
-             ∧ p2 = compile_network s'' Nil pn`
-    suffices_by metis_tac[compile_network_ok_no_self_comunication] >>
-  ho_match_mp_tac COMPLETE_INDUCTION >>
-  rpt strip_tac >>
-  Cases_on `c` >-
-    ((* Nil *)
-      MAP_EVERY qexists_tac [`s`,`compile_network s Nil pn`] >> simp[trans_s_def]) >-
-    ((* IfThen *)
-     rename1 `IfThen v p c1 c2` >>
-     `?d. FLOOKUP s (v,p) = SOME d`
-       by(fs[no_undefined_vars_def,free_variables_def] >>
-          imp_res_tac FDOM_FLOOKUP >> goal_assum drule) >>
-     Cases_on `d = [1w]` >-
-       (first_x_assum(qspec_then `chor_to_endpoint$chor_size(cut_sel_upto p c1)` mp_tac) >>
-        impl_tac >-
-          (fs[chor_size_def] >>
-           match_mp_tac LESS_EQ_LESS_TRANS >>
-           qspecl_then [`p`,`c1`] assume_tac chor_size_cut_sel_upto >>
-           goal_assum drule >> simp[]) >>
-        disch_then(qspecl_then [`s`,`cut_sel_upto p c1`,`pn`] mp_tac) >>
-        impl_tac >-
-          (simp[] >>
-           conj_tac >-
-             (dxrule_then assume_tac compile_network_if_l >>
-              fs[compile_network_ok_project_ok] >>
-              rw[] >>
-              res_tac >>
-              match_mp_tac project_ok_cut_sel_upto >> simp[]) >>
-           conj_tac >- (fs[procsOf_def,set_nub'] >> metis_tac[SUBSET_TRANS,procsOf_cut_sel_upto]) >>
-           conj_tac >- (match_mp_tac no_undefined_vars_cut_sel_upto >>
-                        fs[no_undefined_vars_def,free_variables_def]) >>
-           match_mp_tac no_self_comunication_cut_sel_upto >>
-           fs[no_self_comunication_def]) >>
-        strip_tac >>
-        rveq >>
-        qexists_tac `s''` >>
-        qexists_tac `compile_network s'' Nil pn` >>
-        conj_tac >-
-          (match_mp_tac(MP_CANON RTC_RTC) >> HINT_EXISTS_TAC >> simp[] >>
-           qpat_x_assum `reduction^* _ _` kall_tac >>
-           match_mp_tac PERM_chor_compile_network_reduction >>
-           qexists_tac `p::FILTER (λy. p ≠ y) pn` >>
-           conj_tac >-
-             (fs[SUBSET_DEF,procsOf_def,set_nub',DISJ_IMP_THM,FORALL_AND_THM] >>
-              qpat_x_assum `MEM _ _` (strip_assume_tac o REWRITE_RULE[MEM_SPLIT]) >>
-              rveq >> fs[ALL_DISTINCT_APPEND,FILTER_APPEND] >>
-              fs[PERM_CONS_EQ_APPEND] >>
-              qexists_tac `l1` >> qexists_tac `l2` >>
-              fs[] >>
-              match_mp_tac PERM_INTRO >>
-              rw[APPEND_EQ_APPEND,PULL_EXISTS] >>
-              disj1_tac >> qexists_tac `[]` >>
-              simp[FILTER_EQ_ID] >>
-              rw[EVERY_MEM] >>
-              metis_tac[]) >>
-           conj_tac >- (rw[MEM_FILTER,FILTER_ALL_DISTINCT]) >>
-           rw[compile_network_gen_def,project_def]
-           \\ MAP_EVERY Q.ABBREV_TAC [ `l = FILTER (λy. p ≠ y) pn`
-                                     , `sq = <|bindings := projectS p s; queue := []|>`]
-           \\ ho_match_mp_tac RTC_TRANS
-           \\ Q.EXISTS_TAC `NPar (NEndpoint p sq (SND (project p c1)))
-                           (compile_network s (IfThen v p c1 c2) l)`
-           \\ rw [reduction_def]
-           >- (ho_match_mp_tac trans_par_l
-               \\ ho_match_mp_tac endpointSemTheory.trans_if_true
-               \\ rw [Abbr `sq`,lookup_projectS])
-           \\ `¬MEM p l` by rw [Abbr `l`,MEM_FILTER]
-           \\ `MEM p pn` by(fs[procsOf_def,SUBSET_DEF,set_nub'])
-           \\ drule_then (strip_assume_tac o REWRITE_RULE [compile_network_ok_project_ok]) compile_network_if_l
-           \\ first_x_assum (drule_then assume_tac)
-           \\ rw [prefix_project_eq]
-           \\ match_mp_tac list_trans_com_choice_l'
-           \\ Q.ISPECL_THEN [`p`,`sq`,`c1`,`project' p (cut_sel_upto p c1)`]
-                          mp_tac list_trans_projpre
-           \\ impl_tac
-           >- (CCONTR_TAC >> fs[] >> imp_res_tac MEM_presel_MEM_procsOf >>
-               drule compile_network_if_l >>
-               metis_tac[compile_network_ok_project_ok])
-           \\ strip_tac
-           \\ MAP_EVERY qexists_tac
-                        [`(MAP (λ(b,q). LIntChoice p b q) (preSel p c1))`,
-                         `(MAP (λ(b,q). LExtChoice p b q) (preSel p c1))`]
-           \\ simp[GSYM PULL_EXISTS]
-           \\ conj_tac
-           >- (simp[EVERY2_MAP,ELIM_UNCURRY]
-               \\ match_mp_tac EVERY2_refl \\ Cases \\ rw[])
-           \\ simp[compile_network_ok_if_eq]
-           \\ qexists_tac
-              `FOLDR NPar NNil
-                (MAP
-                   (λproc.
-                        NEndpoint proc
-                          <|bindings := projectS proc s;
-                            queue := preSel_to_queue proc p (preSel p c1)|>
-                          (project' proc (IfThen v p c1 c2))) l)`
-           \\ imp_res_tac compile_network_if_l
-           \\ simp[compile_network_cut_sel_upto]
-           \\ `ALL_DISTINCT l`
-              by(qunabbrev_tac `l`
-                 \\ match_mp_tac FILTER_ALL_DISTINCT \\ simp[])
-           \\ `~MEM p (MAP SND (preSel p c1))`
-                by(qhdtm_x_assum `list_trans` mp_tac
-                   \\ qmatch_goalsub_abbrev_tac `list_trans n1 _ n2`
-                   \\ rpt(pop_assum kall_tac)
-                   \\ MAP_EVERY (W(curry Q.SPEC_TAC)) [`p`,`n1`,`n2`,`c1`]
-                   \\ Induct \\ rw[preSel_def,list_trans_def]
-                   \\ imp_res_tac sender_receiver_distinct_choice
-                   \\ metis_tac[])
-           \\ `!x. MEM x (MAP SND(preSel p c1)) ==> MEM x l`
-                by(qpat_x_assum `¬_` mp_tac \\ qpat_x_assum `¬_` mp_tac
-                   \\ unabbrev_all_tac\\ fs[procsOf_def,set_nub']
-                   \\ qpat_x_assum `set (procsOf c1) ⊆ set pn` mp_tac
-                   \\ rpt(pop_assum kall_tac)
-                   \\ simp[PULL_FORALL] \\ strip_tac \\ Induct_on `c1`
-                   \\ rw[preSel_def]
-                   \\ fs[procsOf_def,set_nub']
-                   \\ rw[MEM_FILTER])
-           \\ conj_tac
-           >- (rw[compile_network_project]
-               \\ `?qf. !proc. (qf:proc ->(proc,datum) alist) proc = []` by(qexists_tac `K []` \\ rw[])
-               \\ `!proc qff. <|bindings := projectS proc s; queue := qff proc|>
-                             = <|bindings := projectS proc s; queue := qf proc ++ qff proc|>`
-                   by(rw[])
-               \\ pop_assum mp_tac \\ pop_assum kall_tac
-               \\ disch_then (fn thm => Ho_Rewrite.PURE_ONCE_REWRITE_TAC [thm])
-               \\ simp[]
-               \\ pop_assum mp_tac
-               \\ qhdtm_x_assum `ALL_DISTINCT` mp_tac
-               \\ rpt(qpat_x_assum `¬_` mp_tac)
-               \\ rename1 `MAP SND psl`
-               \\ pop_assum mp_tac
-               \\ rpt(pop_assum kall_tac)
-               \\ rw[network_consume_LExtChoice])
-           \\ `compile_network_ok s (IfThen v p c1 c2) l`
-              by(fs[compile_network_ok_project_ok] >> rw[] >>
-                 first_x_assum match_mp_tac >> fs[Abbr `l`,MEM_FILTER])
-           \\ `!proc. MEM proc l ==> project_ok proc (if K T proc then IfThen v p c1 c2 else c1)`
-              by(rw[] >> fs[compile_network_ok_project_ok] >> res_tac)
-           \\ rename1 `_ ⊆ set ppn`
-           \\ `?pn. pn = LENGTH(preSel p c1)` by simp[]
-           \\ drule_then assume_tac compile_network_if_l
-           \\ simp[compile_network_cut_sel_upto]
-           \\ pop_assum kall_tac
-           \\ ntac 2 (pop_assum mp_tac)
-           \\ dxrule compile_network_if_l
-           \\ ntac 3 (pop_assum mp_tac)
-           \\ qhdtm_x_assum `list_trans` kall_tac
-           \\ rpt(qhdtm_x_assum `Abbrev` kall_tac)
-           \\ qpat_x_assum `~MEM p l` mp_tac
-           \\ qpat_x_assum `project_ok _ _` mp_tac
-           \\ drule_then (assume_tac o REWRITE_RULE[compile_network_ok_project_ok]) compile_network_if_r
-           \\ pop_assum drule
-           \\ rpt(pop_assum kall_tac) (* ? *)
-           \\ `!proc. project' proc (IfThen v p c1 c2) = project' proc (if K T proc then IfThen v p c1 c2 else c1)`
-              by(rw[])
-           \\ qabbrev_tac `iffy = (K T):proc -> bool`
-           \\ pop_assum kall_tac
-           \\ pop_assum (fn thm => Ho_Rewrite.PURE_ONCE_REWRITE_TAC [thm])
-           \\ MAP_EVERY (W(curry Q.SPEC_TAC)) [`s`,`v`,`p`,`c2`,`l`,`c1`,`iffy`,`pn`]
-           \\ Induct
-           >- (rw[preSel_def,list_trans_def,cut_ext_choice_upto_presel_nil,preSel_to_queue_def,
-                  compile_network_project]
-               >> qmatch_goalsub_abbrev_tac `_ (FOLDR NPar NNil a1) (FOLDR NPar NNil a2)`
-               >> `a1 = a2` suffices_by simp[]
-               >> unabbrev_all_tac
-               >> rw[MAP_EQ_f] >> rw[]
-               >> match_mp_tac project_if_l_eq
-               >> conj_tac
-               >- (first_x_assum drule >> fs[])
-               >> conj_tac
-               >- (CCONTR_TAC >> fs[])
-               >> CCONTR_TAC
-               >> fs[] >> rveq >> fs[preSel_def])
-           \\ rpt strip_tac
-           \\ `?b q c1'. c1 = Sel p b q c1'`
-              by(qpat_x_assum `SUC _ = LENGTH _` mp_tac >> Cases_on `c1` >> rw[preSel_def])
-           \\ rveq
-           \\ `MEM q l` by(fs[preSel_def])
-           \\ first_assum(strip_assume_tac o REWRITE_RULE[MEM_SPLIT])
-           \\ `p <> q` by(CCONTR_TAC >> fs[])
-           \\ `project_ok q c1'`
-              by(imp_res_tac compile_network_ok_project_ok
-                 \\ pop_assum mp_tac \\ rpt(pop_assum kall_tac)
-                 \\ rfs[project_def,split_sel_def]
-                 \\ every_case_tac \\ fs[])
-           \\ first_assum drule
-           \\ strip_tac
-           \\ qmatch_goalsub_abbrev_tac `reduction^* (FOLDR NPar NNil (MAP af _))`
-           \\ qabbrev_tac `ag = \q. (NEndpoint q <|bindings := projectS q s;
-                                    queue := preSel_to_queue q p (preSel p c1')|> (project' q c1'))`
-           \\ `trans (af q) (LTau) (ag q)`
-              by(unabbrev_all_tac >> Cases_on `iffy q`
-                 >> fs[project_def,cut_ext_choice_upto_presel_def,preSel_def,
-                       split_sel_def,compile_network_gen_def,preSel_to_queue_def]
-                 >> rfs[]
-                 >> rpt(PURE_CASE_TAC \\ fs[] \\ rveq)
-                 >> simp[cut_ext_choice_upto_presel_def,SPLITP]
-                 >> TRY(match_mp_tac trans_ext_choice_l_gen
-                        >> fs[] >> qexists_tac `[]` >> fs[])
-                 >> TRY(match_mp_tac trans_ext_choice_r_gen
-                        >> fs[] >> qexists_tac `[0w]` >> qexists_tac `[]` >> fs[]))
-           \\ `trans (FOLDR NPar NNil ((MAP af l1) ++ af q :: (MAP af l2)))
-                     LTau (FOLDR NPar NNil ((MAP af l1) ++ ag q :: (MAP af l2)))`
-                by(simp[trans_fold_par])
-           \\ qabbrev_tac `iffy' = λp. if p = q then F else iffy p`
-           \\ qabbrev_tac `ah = (λproc.
-                       NEndpoint proc
-                         <|bindings := projectS proc s;
-                         queue := preSel_to_queue proc p (preSel p c1')|>
-                         (project' proc (if iffy' proc then IfThen v p c1' c2 else c1')))`
-           \\ match_mp_tac(CONJUNCT2(SPEC_ALL RTC_RULES))
-           \\ qexists_tac `FOLDR NPar NNil (MAP ah l)`
-           \\ conj_tac
-           >- (simp[reduction_def]
-               \\ `MAP af l1 = MAP ah l1 /\ ag q = ah q /\ MAP af l2 = MAP ah l2`
-                   suffices_by metis_tac[]
-               \\ unabbrev_all_tac
-               \\ rw[MAP_EQ_f]
-               \\ fs[preSel_def,preSel_to_queue_def,ALL_DISTINCT_APPEND]
-               \\ rpt(qpat_x_assum `trans _ _ _` kall_tac)
-               \\ `proc <> p` by(CCONTR_TAC >> fs[])
-               \\ `proc <> q` by(CCONTR_TAC >> fs[] >> metis_tac[])
-               \\ rw[] \\ fs[project_def,split_sel_def])
-           \\ first_x_assum (qspecl_then [`iffy'`,`c1'`,`l`,`c2`,`p`,`v`,`s`] mp_tac)
-           \\ `project_ok p c1'` by(fs[project_def])
-           \\ `compile_network_ok s c1' l` by(imp_res_tac compile_network_if_l \\ imp_res_tac compile_network_ok_dest_sel)
-           \\ rpt(disch_then drule)
-           \\ impl_tac
-           >- (qpat_x_assum `_ = _ ++ _::_` kall_tac
-               >> fs[preSel_def] >> unabbrev_all_tac >> fs[]
-               >> rw[] >> rpt(first_x_assum drule) >> simp[]
-               >> `proc <> p` by(CCONTR_TAC >> fs[])
-               >> fs[project_def,split_sel_def]
-               >> rw[])
-           \\ qmatch_goalsub_abbrev_tac
-                `reduction^* (FOLDR _ _ a1) (FOLDR _ _ a2) ==> reduction^* (FOLDR _ _ a3) (FOLDR _ _ a4)`
-           \\ `a1 = a3 /\ a2 = a4` suffices_by metis_tac[]
-           \\ unabbrev_all_tac
-           \\ rw[MAP_EQ_f,cut_ext_choice_upto_presel_def,preSel_def]
-           \\ `proc <> p` by(CCONTR_TAC >> fs[])
-           >- (`proc <> q` by(CCONTR_TAC >> fs[ALL_DISTINCT_APPEND] >> metis_tac[])
-               \\ fs[project_def,cut_ext_choice_upto_presel_def,cut_ext_choice_upto_presel_cons])
-           >- (fs[project_def,cut_ext_choice_upto_presel_def,cut_ext_choice_upto_presel_cons]
-               >> rw[cut_ext_choice_upto_presel_def,SPLITP])
-           >- (`proc <> q` by(CCONTR_TAC >> fs[ALL_DISTINCT_APPEND] >> metis_tac[])
-               \\ fs[project_def,cut_ext_choice_upto_presel_def,cut_ext_choice_upto_presel_cons])
-          ) >>
-        simp[] >>
-        fs[trans_s_def] >>
-        match_mp_tac RTC_TRANS >>
-        qexists_tac `(s,c1)` >>
-        simp[] >>
-        conj_tac >- metis_tac[trans_if_true] >>
-        pop_assum mp_tac >>
-        fs[no_self_comunication_def] >>
-        qpat_x_assum `no_self_comunication c1` mp_tac >>
-        rpt(pop_assum kall_tac) >>
-        Induct_on `c1` >>
-        fs[cut_sel_upto_def] >>
-        rw[no_self_comunication_def] >>
-        res_tac >>
-        match_mp_tac RTC_TRANS >>
-        HINT_EXISTS_TAC >> simp[] >>
-        metis_tac[trans_sel]) >>
-     (* If False *)
-          first_x_assum(qspec_then `chor_to_endpoint$chor_size(cut_sel_upto p c2)` mp_tac) >>
-     impl_tac >-
-       (fs[chor_size_def] >>
-        match_mp_tac LESS_EQ_LESS_TRANS >>
-        qspecl_then [`p`,`c2`] assume_tac chor_size_cut_sel_upto >>
-        goal_assum drule >> simp[]) >>
-     disch_then(qspecl_then [`s`,`cut_sel_upto p c2`,`pn`] mp_tac) >>
-     impl_tac >-
-       (simp[] >>
-        conj_tac >-
-          (dxrule_then assume_tac compile_network_if_r >>
-           fs[compile_network_ok_project_ok] >>
-           rw[] >>
-           res_tac >>
-           match_mp_tac project_ok_cut_sel_upto >> simp[]) >>
-        conj_tac >- (fs[procsOf_def,set_nub'] >> metis_tac[SUBSET_TRANS,procsOf_cut_sel_upto]) >>
-        conj_tac >- (match_mp_tac no_undefined_vars_cut_sel_upto >>
-                     fs[no_undefined_vars_def,free_variables_def]) >>
-        match_mp_tac no_self_comunication_cut_sel_upto >>
-        fs[no_self_comunication_def]) >>
-     strip_tac >>
-     rveq >>
-     qexists_tac `s''` >>
-     qexists_tac `compile_network s'' Nil pn` >>
-     conj_tac >-
-       (match_mp_tac(MP_CANON RTC_RTC) >> HINT_EXISTS_TAC >> simp[] >>
-        qpat_x_assum `reduction^* _ _` kall_tac >>
-        match_mp_tac PERM_chor_compile_network_reduction >>
-        qexists_tac `p::FILTER (λy. p ≠ y) pn` >>
-        conj_tac >-
-          (fs[SUBSET_DEF,procsOf_def,set_nub',DISJ_IMP_THM,FORALL_AND_THM] >>
-           qpat_x_assum `MEM _ _` (strip_assume_tac o REWRITE_RULE[MEM_SPLIT]) >>
-           rveq >> fs[ALL_DISTINCT_APPEND,FILTER_APPEND] >>
-           fs[PERM_CONS_EQ_APPEND] >>
-           qexists_tac `l1` >> qexists_tac `l2` >>
-           fs[] >>
-           match_mp_tac PERM_INTRO >>
-           rw[APPEND_EQ_APPEND,PULL_EXISTS] >>
-           disj1_tac >> qexists_tac `[]` >>
-           simp[FILTER_EQ_ID] >>
-           rw[EVERY_MEM] >>
-           metis_tac[]) >>
-        conj_tac >- (rw[MEM_FILTER,FILTER_ALL_DISTINCT]) >>
-        rw[compile_network_gen_def,project_def]
-        \\ MAP_EVERY Q.ABBREV_TAC [ `l = FILTER (λy. p ≠ y) pn`
-                                  , `sq = <|bindings := projectS p s; queue := []|>`]
-        \\ ho_match_mp_tac RTC_TRANS
-        \\ Q.EXISTS_TAC `NPar (NEndpoint p sq (SND (project p c2)))
-                        (compile_network s (IfThen v p c1 c2) l)`
-        \\ rw [reduction_def]
-        >- (ho_match_mp_tac trans_par_l
-            \\ ho_match_mp_tac endpointSemTheory.trans_if_false
-            \\ rw [Abbr `sq`,lookup_projectS] \\ metis_tac[lookup_projectS])
-        \\ `¬MEM p l` by rw [Abbr `l`,MEM_FILTER]
-        \\ `MEM p pn` by(fs[procsOf_def,SUBSET_DEF,set_nub'])
-        \\ drule_then (strip_assume_tac o REWRITE_RULE [compile_network_ok_project_ok]) compile_network_if_r
-        \\ first_x_assum (drule_then assume_tac)
-        \\ rw [prefix_project_eq]
-        \\ match_mp_tac list_trans_com_choice_l'
-        \\ Q.ISPECL_THEN [`p`,`sq`,`c2`,`project' p (cut_sel_upto p c2)`]
-                       mp_tac list_trans_projpre
-        \\ impl_tac
-        >- (CCONTR_TAC >> fs[] >> imp_res_tac MEM_presel_MEM_procsOf >>
-            drule compile_network_if_r >>
-            metis_tac[compile_network_ok_project_ok])
-        \\ strip_tac
-        \\ MAP_EVERY qexists_tac
-                     [`(MAP (λ(b,q). LIntChoice p b q) (preSel p c2))`,
-                      `(MAP (λ(b,q). LExtChoice p b q) (preSel p c2))`]
-        \\ simp[GSYM PULL_EXISTS]
-        \\ conj_tac
-        >- (simp[EVERY2_MAP,ELIM_UNCURRY]
-            \\ match_mp_tac EVERY2_refl \\ Cases \\ rw[])
-        \\ simp[compile_network_ok_if_eq]
-        \\ qexists_tac
-           `FOLDR NPar NNil
-             (MAP
-                (λproc.
-                     NEndpoint proc
-                       <|bindings := projectS proc s;
-                         queue := preSel_to_queue proc p (preSel p c2)|>
-                       (project' proc (IfThen v p c1 c2))) l)`
-        \\ imp_res_tac compile_network_if_r
-        \\ simp[compile_network_cut_sel_upto]
-        \\ `ALL_DISTINCT l`
-           by(qunabbrev_tac `l`
-              \\ match_mp_tac FILTER_ALL_DISTINCT \\ simp[])
-        \\ `~MEM p (MAP SND (preSel p c2))`
-             by(qhdtm_x_assum `list_trans` mp_tac
-                \\ qmatch_goalsub_abbrev_tac `list_trans n1 _ n2`
-                \\ rpt(pop_assum kall_tac)
-                \\ MAP_EVERY (W(curry Q.SPEC_TAC)) [`p`,`n1`,`n2`,`c2`]
-                \\ Induct \\ rw[preSel_def,list_trans_def]
-                \\ imp_res_tac sender_receiver_distinct_choice
-                \\ metis_tac[])
-        \\ `!x. MEM x (MAP SND(preSel p c2)) ==> MEM x l`
-             by(qpat_x_assum `¬_` mp_tac \\ qpat_x_assum `¬_` mp_tac
-                \\ unabbrev_all_tac\\ fs[procsOf_def,set_nub']
-                \\ qpat_x_assum `set (procsOf c2) ⊆ set pn` mp_tac
-                \\ rpt(pop_assum kall_tac)
-                \\ simp[PULL_FORALL] \\ strip_tac \\ Induct_on `c2`
-                \\ rw[preSel_def]
-                \\ fs[procsOf_def,set_nub']
-                \\ rw[MEM_FILTER])
-        \\ conj_tac
-        >- (rw[compile_network_project]
-            \\ `?qf. !proc. (qf:proc ->(proc,datum) alist) proc = []` by(qexists_tac `K []` \\ rw[])
-            \\ `!proc qff. <|bindings := projectS proc s; queue := qff proc|>
-                          = <|bindings := projectS proc s; queue := qf proc ++ qff proc|>`
-                by(rw[])
-            \\ pop_assum mp_tac \\ pop_assum kall_tac
-            \\ disch_then (fn thm => Ho_Rewrite.PURE_ONCE_REWRITE_TAC [thm])
-            \\ simp[]
-            \\ pop_assum mp_tac
-            \\ qhdtm_x_assum `ALL_DISTINCT` mp_tac
-            \\ rpt(qpat_x_assum `¬_` mp_tac)
-            \\ rename1 `MAP SND psl`
-            \\ pop_assum mp_tac
-            \\ rpt(pop_assum kall_tac)
-            \\ rw[network_consume_LExtChoice])
-        \\ `compile_network_ok s (IfThen v p c1 c2) l`
-           by(fs[compile_network_ok_project_ok] >> rw[] >>
-              first_x_assum match_mp_tac >> fs[Abbr `l`,MEM_FILTER])
-        \\ `!proc. MEM proc l ==> project_ok proc (if K T proc then IfThen v p c1 c2 else c2)`
-           by(rw[] >> fs[compile_network_ok_project_ok] >> res_tac)
-        \\ rename1 `_ ⊆ set ppn`
-        \\ `?pn. pn = LENGTH(preSel p c2)` by simp[]
-        \\ drule_then assume_tac compile_network_if_r
-        \\ simp[compile_network_cut_sel_upto]
-        \\ pop_assum kall_tac
-        \\ ntac 2 (pop_assum mp_tac)
-        \\ dxrule compile_network_if_r
-        \\ ntac 3 (pop_assum mp_tac)
-        \\ qhdtm_x_assum `list_trans` kall_tac
-        \\ rpt(qhdtm_x_assum `Abbrev` kall_tac)
-        \\ qpat_x_assum `~MEM p l` mp_tac
-        \\ qpat_x_assum `project_ok _ _` mp_tac
-        \\ drule_then (assume_tac o REWRITE_RULE[compile_network_ok_project_ok]) compile_network_if_l
-        \\ pop_assum drule
-        \\ rpt(pop_assum kall_tac) (* ? *)
-        \\ `!proc. project' proc (IfThen v p c1 c2) = project' proc (if K T proc then IfThen v p c1 c2 else c2)`
-           by(rw[])
-        \\ qabbrev_tac `iffy = (K T):proc -> bool`
-        \\ pop_assum kall_tac
-        \\ pop_assum (fn thm => Ho_Rewrite.PURE_ONCE_REWRITE_TAC [thm])
-        \\ MAP_EVERY (W(curry Q.SPEC_TAC)) [`s`,`v`,`p`,`c2`,`l`,`c1`,`iffy`,`pn`]
-        \\ Induct
-        >- (rw[preSel_def,list_trans_def,cut_ext_choice_upto_presel_nil,preSel_to_queue_def,
-               compile_network_project]
-            >> qmatch_goalsub_abbrev_tac `_ (FOLDR NPar NNil a1) (FOLDR NPar NNil a2)`
-            >> `a1 = a2` suffices_by simp[]
-            >> unabbrev_all_tac
-            >> rw[MAP_EQ_f] >> rw[]
-            >> match_mp_tac project_if_r_eq
-            >> conj_tac
-            >- (first_x_assum drule >> fs[])
-            >> conj_tac
-            >- (CCONTR_TAC >> fs[])
-            >> CCONTR_TAC
-            >> fs[] >> rveq >> fs[preSel_def])
-        \\ rpt strip_tac
-        \\ `?b q c2'. c2 = Sel p b q c2'`
-           by(qpat_x_assum `SUC _ = LENGTH _` mp_tac >> Cases_on `c2` >> rw[preSel_def])
-        \\ rveq
-        \\ `MEM q l` by(fs[preSel_def])
-        \\ first_assum(strip_assume_tac o REWRITE_RULE[MEM_SPLIT])
-        \\ `p <> q` by(CCONTR_TAC >> fs[])
-        \\ `project_ok q c2'`
-           by(imp_res_tac compile_network_ok_project_ok
-              \\ pop_assum mp_tac \\ rpt(pop_assum kall_tac)
-              \\ rfs[project_def,split_sel_def]
-              \\ every_case_tac \\ fs[])
-        \\ first_assum drule
-        \\ strip_tac
-        \\ qmatch_goalsub_abbrev_tac `reduction^* (FOLDR NPar NNil (MAP af _))`
-        \\ qabbrev_tac `ag = \q. (NEndpoint q <|bindings := projectS q s;
-                                 queue := preSel_to_queue q p (preSel p c2')|> (project' q c2'))`
-        \\ `trans (af q) (LTau) (ag q)`
-           by(unabbrev_all_tac >> Cases_on `iffy q`
-              >> fs[project_def,cut_ext_choice_upto_presel_def,preSel_def,
-                    split_sel_def,compile_network_gen_def,preSel_to_queue_def]
-              >> rfs[]
-              >> rpt(PURE_CASE_TAC \\ fs[] \\ rveq)
-              >> simp[cut_ext_choice_upto_presel_def,SPLITP]
-              >> TRY(match_mp_tac trans_ext_choice_l_gen
-                     >> fs[] >> qexists_tac `[]` >> fs[])
-              >> TRY(match_mp_tac trans_ext_choice_r_gen
-                     >> fs[] >> qexists_tac `[0w]` >> qexists_tac `[]` >> fs[]))
-        \\ `trans (FOLDR NPar NNil ((MAP af l1) ++ af q :: (MAP af l2)))
-                  LTau (FOLDR NPar NNil ((MAP af l1) ++ ag q :: (MAP af l2)))`
-             by(simp[trans_fold_par])
-        \\ qabbrev_tac `iffy' = λp. if p = q then F else iffy p`
-        \\ qabbrev_tac `ah = (λproc.
-                    NEndpoint proc
-                      <|bindings := projectS proc s;
-                      queue := preSel_to_queue proc p (preSel p c2')|>
-                      (project' proc (if iffy' proc then IfThen v p c1 c2' else c2')))`
-        \\ match_mp_tac(CONJUNCT2(SPEC_ALL RTC_RULES))
-        \\ qexists_tac `FOLDR NPar NNil (MAP ah l)`
-        \\ conj_tac
-        >- (simp[reduction_def]
-            \\ `MAP af l1 = MAP ah l1 /\ ag q = ah q /\ MAP af l2 = MAP ah l2`
-                suffices_by metis_tac[]
-            \\ unabbrev_all_tac
-            \\ rw[MAP_EQ_f]
-            \\ fs[preSel_def,preSel_to_queue_def,ALL_DISTINCT_APPEND]
-            \\ rpt(qpat_x_assum `trans _ _ _` kall_tac)
-            \\ `proc <> p` by(CCONTR_TAC >> fs[])
-            \\ `proc <> q` by(CCONTR_TAC >> fs[] >> metis_tac[])
-            \\ rw[] \\ fs[project_def,split_sel_def])
-        \\ first_x_assum (qspecl_then [`iffy'`,`c1`,`l`,`c2'`,`p`,`v`,`s`] mp_tac)
-        \\ `project_ok p c2'` by(fs[project_def])
-        \\ `compile_network_ok s c2' l` by(imp_res_tac compile_network_if_r \\ imp_res_tac compile_network_ok_dest_sel)
-        \\ rpt(disch_then drule)
-        \\ impl_tac
-        >- (qpat_x_assum `_ = _ ++ _::_` kall_tac
-            >> fs[preSel_def] >> unabbrev_all_tac >> fs[]
-            >> rw[] >> rpt(first_x_assum drule) >> simp[]
-            >> `proc <> p` by(CCONTR_TAC >> fs[])
-            >> fs[project_def,split_sel_def]
-            >> rw[])
-        \\ qmatch_goalsub_abbrev_tac
-             `reduction^* (FOLDR _ _ a1) (FOLDR _ _ a2) ==> reduction^* (FOLDR _ _ a3) (FOLDR _ _ a4)`
-        \\ `a1 = a3 /\ a2 = a4` suffices_by metis_tac[]
-        \\ unabbrev_all_tac
-        \\ rw[MAP_EQ_f,cut_ext_choice_upto_presel_def,preSel_def]
-        \\ `proc <> p` by(CCONTR_TAC >> fs[])
-        >- (`proc <> q` by(CCONTR_TAC >> fs[ALL_DISTINCT_APPEND] >> metis_tac[])
-            \\ fs[project_def,cut_ext_choice_upto_presel_def,cut_ext_choice_upto_presel_cons])
-        >- (fs[project_def,cut_ext_choice_upto_presel_def,cut_ext_choice_upto_presel_cons]
-            >> rw[cut_ext_choice_upto_presel_def,SPLITP])
-        >- (`proc <> q` by(CCONTR_TAC >> fs[ALL_DISTINCT_APPEND] >> metis_tac[])
-            \\ fs[project_def,cut_ext_choice_upto_presel_def,cut_ext_choice_upto_presel_cons])
-       ) >>
-     simp[] >>
-     fs[trans_s_def] >>
-     match_mp_tac RTC_TRANS >>
-     qexists_tac `(s,c2)` >>
-     simp[] >>
-     conj_tac >- metis_tac[trans_if_false] >>
-     pop_assum mp_tac >>
-     fs[no_self_comunication_def] >>
-     qpat_x_assum `no_self_comunication c2` mp_tac >>
-     rpt(pop_assum kall_tac) >>
-     Induct_on `c2` >>
-     fs[cut_sel_upto_def] >>
-     rw[no_self_comunication_def] >>
-     res_tac >>
-     match_mp_tac RTC_TRANS >>
-     HINT_EXISTS_TAC >> simp[] >>
-     metis_tac[trans_sel]) >-
-    ((* Com *)
-     rename1 `Com p vp q vq c` >>
-     `?d. FLOOKUP s (vp,p) = SOME d`
-       by(fs[no_undefined_vars_def,free_variables_def] >>
-          imp_res_tac FDOM_FLOOKUP >> goal_assum drule) >>
-     first_x_assum(qspec_then `chor_to_endpoint$chor_size c` mp_tac) >>
-     impl_tac >- fs[chor_size_def] >>
-     disch_then(qspecl_then [`s |+ ((vq,q),d)`,`c`] mp_tac) >>
-     fs[] >>
-     drule_then(qspec_then `d` assume_tac) compile_network_ok_dest_com >>
-     disch_then drule >>
-     impl_tac >-
-       (fs[no_self_comunication_def,procsOf_def,no_undefined_vars_def,free_variables_def,
-           set_nub',SUBSET_DEF,DELETE_DEF] >> metis_tac[]) >>
-     strip_tac >>
-     qexists_tac `s''` >>
-     conj_tac >-
-       (match_mp_tac (MP_CANON RTC_RTC) >>
-        HINT_EXISTS_TAC >> simp[] >>
-        match_mp_tac chor_compile_network_COM' >>
-        fs[procsOf_def,set_nub',no_self_comunication_def] >>
-        fs[compile_network_gen_def,project_def] >>
-        match_mp_tac RTC_TRANS >>
-        qexists_tac `
-              (NPar
-                 (NEndpoint p <|bindings := projectS p s; queue := []|>
-                    (project' p c))
-                 (NPar
-                    (NEndpoint q <|bindings := projectS q s; queue := [(p,d)]|>
-                       (Receive p vq (project' q c)))
-                    (compile_network s c
-                       (FILTER (λx. p ≠ x ∧ q ≠ x) pn))))` >>
-        conj_tac >-
-          (simp[reduction_def] >>
-           match_mp_tac trans_com_l >>
-           goal_assum drule >>
-           qexists_tac `d` >>
-           conj_tac >-
-             (simp[fupdate_projectS] >>
-              match_mp_tac trans_send >> simp[lookup_projectS]) >>
-           simp[cn_ignore_state_update,MEM_FILTER,cn_ignore_com] >>
-           match_mp_tac trans_par_l >>
-           drule_then(qspecl_then [`<|bindings := projectS q s; queue := []|>`,`d`,
-                              `Receive p vq (project' q c)`] assume_tac) trans_enqueue >>
-           fs[]) >>
-        match_mp_tac RTC_SUBSET >>
-        simp[reduction_def] >>
-        simp[fupdate_projectS] >>
-        simp[cn_ignore_state_update,MEM_FILTER,cn_ignore_com] >>
-        match_mp_tac trans_par_r >>
-        match_mp_tac trans_par_l >>
-        match_mp_tac trans_dequeue_gen >>
-        simp[projectS_fupdate]) >>
-     fs[trans_s_def] >>
-     match_mp_tac RTC_TRANS >>
-     HINT_EXISTS_TAC >> simp[] >>
-     fs[no_self_comunication_def] >>
-     metis_tac[trans_com]) >-
-    (rename1 `Let v p f vl c` >>
-     `EVERY IS_SOME (MAP (FLOOKUP s) (MAP (λv. (v,p)) vl))`
-       by(fs[no_undefined_vars_def,free_variables_def] >>
-          rw[EVERY_MEM,MEM_MAP,PULL_EXISTS] >>
-          fs[SUBSET_DEF,MEM_MAP,PULL_EXISTS,procsOf_def,set_nub'] >>
-          metis_tac[IS_SOME_EXISTS,FDOM_FLOOKUP]) >>
-     first_x_assum(qspec_then `chor_to_endpoint$chor_size c` mp_tac) >>
-     impl_tac >- fs[chor_size_def] >>
-     disch_then(qspecl_then [`s |+ ((v,p),f(MAP (THE o FLOOKUP s) (MAP (λv. (v,p)) vl)))`,`c`] mp_tac) >>
-     fs[] >>
-     disch_then(qspec_then `pn` mp_tac) >>
-     impl_tac >-
-       (reverse conj_tac >-
-          (fs[no_undefined_vars_def,procsOf_def,no_self_comunication_def] >>
-           fs[SUBSET_DEF,set_nub',free_variables_def] >> metis_tac[]) >>
-        fs[compile_network_ok_project_ok] >>
-        rw[] >> res_tac >>
-        fs[project_def] >> every_case_tac >> fs[]) >>
-     strip_tac >>
-     qexists_tac `s''` >>
-     conj_tac >-
-       (match_mp_tac RTC_TRANS >>
-        HINT_EXISTS_TAC >> simp[] >>
-        fs[procsOf_def,set_nub'] >>
-        qhdtm_x_assum `EVERY` mp_tac >>
-        qhdtm_x_assum `ALL_DISTINCT` mp_tac >>
-        qpat_x_assum `MEM _ _` mp_tac >>
-        rpt(pop_assum kall_tac) >>
-        ntac 2 strip_tac >>
-        fs[MEM_SPLIT] >> rveq >> fs[ALL_DISTINCT_APPEND,DISJ_IMP_THM,FORALL_AND_THM] >>
-        rpt(qpat_x_assum `~MEM _ _` mp_tac) >>
-        rpt(pop_assum kall_tac) >>
-        MAP_EVERY qid_spec_tac [`p`,`l1`,`l2`,`s`,`vl`,`v`,`c`,`f`] >>
-        Induct_on `l1` >-
-          (rw[compile_network_gen_def,project_def,reduction_def] >>
-           fs[cn_ignore_let,cn_ignore_state_update] >>
-           match_mp_tac trans_par_l >>
-           match_mp_tac trans_let_gen >>
-           simp[] >>
-           rw []
-           >- (Induct_on `vl` \\ rw [lookup_projectS'])
-           >- (rw [projectS_fupdate] >> rpt AP_TERM_TAC
-               \\ Induct_on `vl` >> rw [lookup_projectS'])) >-
-          (rw[compile_network_gen_def,project_def,reduction_def] >>
-           fs[cn_ignore_let,cn_ignore_state_update] >>
-           simp[projectS_fupdate,projectS_fupdate_fresh] >>
-           match_mp_tac trans_par_r >>
-           fs[reduction_def])) >>
-     fs[trans_s_def] >>
-     match_mp_tac RTC_TRANS >>
-     HINT_EXISTS_TAC >> simp[] >>
-     metis_tac[trans_let]) >-
-    (rename1 `Sel p b q c` >>
-     first_x_assum(qspec_then `chor_to_endpoint$chor_size c` mp_tac) >>
-     impl_tac >- fs[chor_size_def] >>
-     disch_then(qspecl_then [`s`,`c`] mp_tac) >>
-     fs[] >>
-     drule_then assume_tac compile_network_ok_dest_sel >>
-     disch_then drule >>
-     impl_tac >-
-       (fs[no_self_comunication_def,procsOf_def,no_undefined_vars_def,free_variables_def,
-           set_nub',SUBSET_DEF,DELETE_DEF] >> metis_tac[]) >>
-     strip_tac >>
-     qexists_tac `s''` >>
-     conj_tac >-
-       (match_mp_tac (MP_CANON RTC_RTC) >>
-        HINT_EXISTS_TAC >> simp[] >>
-        match_mp_tac chor_compile_network_Sel' >>
-        fs[procsOf_def,set_nub',no_self_comunication_def] >>
-        fs[compile_network_gen_def,project_def] >>
-        match_mp_tac RTC_TRANS >>
-        qmatch_goalsub_abbrev_tac `(NPar _ (NPar (NEndpoint _ _ a1) _))` >>
-        qexists_tac `
-              (NPar
-                 (NEndpoint p <|bindings := projectS p s; queue := []|>
-                    (project' p c))
-                 (NPar
-                    (NEndpoint q <|bindings := projectS q s; queue := [(p,if b then [1w] else [0w])]|>
-                       a1)
-                    (compile_network s c
-                       (FILTER (λx. p ≠ x ∧ q ≠ x) pn))))` >>
-        qunabbrev_tac `a1` >>
-        conj_tac >-
-          (simp[reduction_def] >>
-           match_mp_tac trans_com_choice_l >>
-           goal_assum drule >>
-           qexists_tac `b` >>
-           conj_tac >-
-             (simp[fupdate_projectS] >>
-              match_mp_tac trans_int_choice >> simp[]) >>
-           simp[cn_ignore_state_update,MEM_FILTER,cn_ignore_sel] >>
-           match_mp_tac trans_par_l >>
-           rw[] >-
-             (drule_then(qspecl_then [`<|bindings := projectS q s; queue := []|>`] assume_tac) trans_enqueue_choice_l >>
-              fs[]) >>
-           drule_then(qspecl_then [`<|bindings := projectS q s; queue := []|>`] assume_tac) trans_enqueue_choice_r >>
-           fs[]) >>
-        match_mp_tac RTC_SUBSET >>
-        simp[reduction_def] >>
-        simp[fupdate_projectS] >>
-        simp[cn_ignore_state_update,MEM_FILTER,cn_ignore_sel] >>
-        match_mp_tac trans_par_r >>
-        match_mp_tac trans_par_l >>
-        rw[] >- (match_mp_tac trans_ext_choice_l_gen >> rw[]) >>
-        match_mp_tac trans_ext_choice_r_gen >> rw[]) >>
-     fs[trans_s_def] >>
-     match_mp_tac RTC_TRANS >>
-     HINT_EXISTS_TAC >> simp[] >>
-     fs[no_self_comunication_def] >>
-     metis_tac[trans_sel])
+  cheat
 QED
 
 Theorem reduction_list_trans:
@@ -2480,6 +1789,12 @@ Proof
   simp[reduction_def] >>
   res_tac >> goal_assum drule >>
   simp[]
+QED
+
+Theorem reduction_list_trans_eq:
+  reduction^* p1 p2 ⇔ ∃n. list_trans p1 (REPLICATE n LTau) p2
+Proof
+  metis_tac[reduction_list_trans,list_trans_reduction]
 QED
 
 Theorem trans_Send_compile_network_Nil:
@@ -2539,37 +1854,81 @@ Proof
   imp_res_tac trans_compile_network_Nil
 QED
 
+(* TODO: move to endpointProps *)
+Theorem qcong_list_trans_pres:
+  ∀p1 q1 alpha p2.
+    qcong p1 q1 ∧ list_trans p1 alpha p2 ⇒
+    ∃q2. list_trans q1 alpha q2 ∧ qcong p2 q2
+Proof
+  Induct_on ‘alpha’ >> rw[list_trans_def] >> simp[] >>
+  drule_all_then strip_assume_tac qcong_trans_pres >>
+  metis_tac[]
+QED
+
 Theorem compile_network_reflection:
-   ∀s c p2.
-    compile_network_ok s c (procsOf c)
-    ∧ reduction^* (compile_network s c (procsOf c)) p2
+   ∀s c pn p2.
+    reduction^* (compile_network s c pn) p2
+    ∧ compile_network_ok s c pn
+    ∧ ALL_DISTINCT pn
+    ∧ set(procsOf c) ⊆ set pn
+    ∧ no_self_comunication c
+    ∧ no_undefined_vars (s,c)
+    ==> ∃s'' c'' p3.
+              reduction^* p2 p3
+              ∧ trans_s (s,c) (s'',c'')
+              ∧ qcong p3 (compile_network s'' c'' pn)
+Proof
+  simp[reduction_list_trans_eq,PULL_EXISTS] >>
+  CONV_TAC(RESORT_FORALL_CONV rev) >>
+  ho_match_mp_tac COMPLETE_INDUCTION >>
+  Cases
+  >- (rw[list_trans_def] >>
+      CONV_TAC(RESORT_EXISTS_CONV rev) >>
+      qexists_tac `0` >> rw[list_trans_def] >>
+      metis_tac[trans_s_def,RTC_REFL,qcong_refl])
+  >- (rw[list_trans_def,GSYM reduction_def] >>
+      drule(compile_network_reflection_lemma
+            |> REWRITE_RULE[PULL_EXISTS,reduction_list_trans_eq]) >>
+      rpt(disch_then drule) >>
+      strip_tac >>
+      rveq >>
+      dxrule endpoint_confluence_weak_contract >>
+      disch_then dxrule >>
+      impl_tac >- (cheat) >>
+      strip_tac >>
+      rename1 `list_trans (compile_network _ _ _) (REPLICATE stepcount _) _` >>
+      first_x_assum(qspec_then `stepcount` mp_tac ) >>
+      impl_tac >- simp[] >>
+      disch_then drule >>
+      impl_tac >- (cheat) >>
+      strip_tac >>
+      drule_all qcong_list_trans_pres >>
+      strip_tac >>
+      CONV_TAC(RESORT_EXISTS_CONV List.rev) >>
+      Q.REFINE_EXISTS_TAC ‘_ + _’ >>
+      simp[GSYM REPLICATE_APPEND,list_trans_append,PULL_EXISTS] >>
+      ntac 2 (goal_assum drule) >>
+      irule_at Any trans_s_trans_s >>
+      rpt(goal_assum drule) >>
+      metis_tac[qcong_trans,qcong_sym])
+QED
+
+Theorem compile_network_reflection_procs:
+   ∀s c pn p2.
+    reduction^* (compile_network s c (procsOf c)) p2
+    ∧ compile_network_ok s c (procsOf c)
     ∧ no_undefined_vars (s,c)
     ==> ∃s'' c'' p3.
               reduction^* p2 p3
               ∧ trans_s (s,c) (s'',c'')
               ∧ qcong p3 (compile_network s'' c'' (procsOf c))
 Proof
-  rw[] >>
-  imp_res_tac compile_network_ok_no_self_comunication >>
-  drule compile_network_reflection_lemma >>
+  rpt strip_tac >>
+  drule compile_network_reflection >>
+  disch_then match_mp_tac >>
   simp[procsOf_all_distinct] >>
-  strip_tac >>
-  qexists_tac `s''` >>
-  qexists_tac `Nil` >>
-  simp[] >>
-  rpt(dxrule_then strip_assume_tac reduction_list_trans) >>
-  drule endpoint_confluence_weak_contract >>
-  qpat_x_assum `list_trans _ _ (compile_network _ _ _)` assume_tac >>
-  disch_then drule >>
-  impl_tac >- simp[FST_endpoints_compile_network,procsOf_all_distinct] >>
-  strip_tac >>
-  rpt(dxrule_then strip_assume_tac list_trans_reduction) >>
-  goal_assum drule >>
-  imp_res_tac reduction_compile_network_Nil >>
-  rveq >>
-  simp[]
+  imp_res_tac compile_network_ok_no_self_comunication
 QED
-
 
 Theorem trans_s_nil:
   trans_s (s,Nil) sc ==> sc = (s,Nil)
