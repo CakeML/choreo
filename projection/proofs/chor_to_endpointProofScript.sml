@@ -1865,6 +1865,51 @@ Proof
   metis_tac[]
 QED
 
+(* TODO: move to chorProps *)
+Theorem no_undefined_vars_trans_s_pres:
+  ∀sc alpha sc'.
+    no_undefined_vars sc ∧ trans_s sc sc' ⇒ no_undefined_vars sc'
+Proof
+  simp[trans_s_def,CONJ_SYM] >>
+  ho_match_mp_tac RTC_lifts_invariants >>
+  metis_tac[no_undefined_vars_trans_pres]
+QED
+
+Theorem no_self_comunication_trans_s_pres:
+  ∀c s c s' c'.
+  no_self_comunication c ∧ trans_s (s,c) (s',c') ⇒
+  no_self_comunication c'
+Proof
+  ‘∀sc alpha sc'.
+    (no_self_comunication o SND) sc ∧ trans_s sc sc' ⇒ (no_self_comunication o SND) sc'’
+    by(simp[trans_s_def,CONJ_SYM] >>
+       ho_match_mp_tac RTC_lifts_invariants >>
+       rpt Cases >> rw[] >>
+       rename1 ‘trans _ α’ >> Cases_on ‘α’ >> imp_res_tac no_self_comunication_trans_pres) >>
+  metis_tac[o_DEF,SND]
+QED
+
+(* TODO: move to chorProps *)
+Theorem procsOf_trans_SUBSET:
+  ∀sc α sc'.
+  trans sc α sc' ⇒ set(procsOf(SND sc')) ⊆ set(procsOf(SND sc))
+Proof
+  ho_match_mp_tac trans_ind >>
+  rw[procsOf_def,set_nub',SUBSET_DEF] >> res_tac >> gs[] >>
+  metis_tac[procsOf_dsubst_MEM_eq]
+QED
+
+Theorem procsOf_trans_s_SUBSET:
+  ∀sc sc'.
+    trans_s sc sc' ⇒ set(procsOf(SND sc')) ⊆ set(procsOf(SND sc))
+Proof
+  simp[trans_s_def] >>
+  ho_match_mp_tac RTC_INDUCT >>
+  rw[] >>
+  imp_res_tac procsOf_trans_SUBSET >>
+  metis_tac[SUBSET_TRANS]
+QED
+
 Theorem compile_network_reflection:
    ∀s c pn p2.
     reduction^* (compile_network s c pn) p2
@@ -1894,13 +1939,21 @@ Proof
       rveq >>
       dxrule endpoint_confluence_weak_contract >>
       disch_then dxrule >>
-      impl_tac >- (cheat) >>
+      impl_tac
+      >- (fs[reduction_def] >>
+          drule endpoint_names_trans >>
+          simp[FST_endpoints_compile_network]) >>
       strip_tac >>
       rename1 `list_trans (compile_network _ _ _) (REPLICATE stepcount _) _` >>
       first_x_assum(qspec_then `stepcount` mp_tac ) >>
       impl_tac >- simp[] >>
       disch_then drule >>
-      impl_tac >- (cheat) >>
+      impl_tac
+      >- (imp_res_tac no_undefined_vars_trans_s_pres >>
+          imp_res_tac no_self_comunication_trans_s_pres >>
+          simp[] >>
+          imp_res_tac procsOf_trans_s_SUBSET >>
+          metis_tac[SND,SUBSET_TRANS]) >>
       strip_tac >>
       drule_all qcong_list_trans_pres >>
       strip_tac >>
