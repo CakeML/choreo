@@ -37,9 +37,7 @@ QED
 
 Theorem forward_implies_back:
   (∀s1 s2. sR s1 s2 ⇒ tR⁺ (compile s1) (compile s2)) ∧
-  (∀t0 t1 t2. tR t0 t1 ∧ tR t0 t2 ⇒ t1 = t2) ∧
-  (∀s0 t. tR (compile s0) t ⇒ ∃s. sR s0 s)
-     (* alternatively: if s0 is a normal form, so too is compile s0 *)
+  (∀t0 t1 t2. tR t0 t1 ∧ tR t0 t2 ⇒ t1 = t2)
   ⇒
   ∀s0 t0 t. postcloud compile sR tR s0 t0 ∧ tR t0 t ⇒
             ∃s. postcloud compile sR tR s t ∧ RC sR s0 s
@@ -57,9 +55,7 @@ QED
 
 Theorem forwardTC_back_simulates:
   simulates (λs t. t = compile s) sR tR⁺ ∧
-  (∀t0 t1 t2. tR t0 t1 ∧ tR t0 t2 ⇒ t1 = t2) ∧
-  (∀s0 t. tR (compile s0) t ⇒ ∃s. sR s0 s)
-     (* alternatively: if s0 is a normal form, so too is compile s0 *)
+  (∀t0 t1 t2. tR t0 t1 ∧ tR t0 t2 ⇒ t1 = t2)
   ⇒
   simulates (postcloud compile sR tR)ᵀ tR (RC sR)
 Proof
