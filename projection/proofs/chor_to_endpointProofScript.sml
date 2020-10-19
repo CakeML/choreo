@@ -701,6 +701,69 @@ Theorem dsubst_procsOf_MEM =
   |> snd
   |> GEN_ALL
 
+Theorem procsOf_dsubst_not_MEM_eq =
+  “¬MEM p (procsOf (c : chorLang$chor))”
+  |> ONCE_REWRITE_CONV [procsOf_dsubst_MEM_eq]
+  |> GEN_ALL
+
+Theorem procsOf_dsubst_not_MEM =
+  SPEC_ALL procsOf_dsubst_not_MEM_eq
+  |> EQ_IMP_RULE
+  |> fst
+  |> GEN_ALL
+
+Theorem dsubst_procsOf_not_MEM =
+  SPEC_ALL procsOf_dsubst_not_MEM_eq
+  |> EQ_IMP_RULE
+  |> snd
+  |> GEN_ALL
+
+Theorem split_sel_nonproc_NONE:
+  ∀p p1 c.
+  ~MEM p (procsOf c) ⇒ split_sel p p1 c = NONE
+Proof
+  ho_match_mp_tac split_sel_ind >>
+  rw[procsOf_def,MEM_nub'] >>
+  fs[split_sel_def]
+QED
+
+Theorem project_nonmember_nil:
+  ∀p c.
+  ~MEM p (procsOf c) ⇒ (project' p c = Nil ∨ ∃dn. project' p c = Call dn)
+Proof
+  ho_match_mp_tac project_ind >>
+  rw[project_def,procsOf_def,MEM_nub'] >>
+  rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
+  imp_res_tac split_sel_nonproc_NONE >> fs[]
+QED
+
+Theorem project_pair_nonmember_nil:
+  ∀p c.
+  ~MEM p (procsOf c) ⇒ ∃ok. (project p c = (ok,Nil) ∨ ∃dn. project p c = (ok,Call dn))
+Proof
+  ho_match_mp_tac project_ind >>
+  rw[project_def,procsOf_def,MEM_nub'] >>
+  rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
+  imp_res_tac split_sel_nonproc_NONE >> fs[]
+QED
+
+Theorem split_sel_dsubst:
+  ∀c p q c' x y.
+    IS_SOME (split_sel p q (dsubst c x (Fix y c'))) = IS_SOME (split_sel p q c)
+Proof
+  Induct \\ rw [split_sel_def,chorLangTheory.dsubst_def]
+QED
+
+Theorem procsOf_dsubst_any_not_MEM:
+  ∀p c c' dn.
+    ¬MEM p (procsOf c) ∧ ¬MEM p (procsOf c') ⇒ ¬MEM p (procsOf (dsubst c dn c'))
+Proof
+  rw []
+ \\ qspecl_then [‘c’,‘dn’,‘c'’] assume_tac dsubst_subset_procsOf
+ \\ CCONTR_TAC \\ fs [SUBSET_DEF]
+ \\ first_x_assum drule \\  rw[]
+QED
+
 Theorem compile_network_preservation_ln:
    ∀s c α s' c' . compile_network_ok s c (procsOf c)
     ∧ trans (s,c) (α,[]) (s',c') ∧ chor_tl s c = (s',c')
@@ -1315,8 +1378,8 @@ Proof
       >- (irule reduction_par_r \\ simp [])
       \\ irule reduction_par_l
       \\ unabbrev_all_tac
-      \\simp [project_def] \\ rw []
-      >- (irule RTC_TRANS \\ simp [reduction_def]
+      \\ Cases_on ‘MEM h (procsOf c)’
+      >- (irule RTC_TRANS \\ simp [project_def,reduction_def]
           \\ irule_at Any endpointSemTheory.trans_fix
           \\ cheat (* TODO: project distributes over dsubst *))
       \\ qspecl_then [‘c’,‘h’,‘dn’,‘dn’] assume_tac procsOf_dsubst_MEM_eq
@@ -1330,15 +1393,6 @@ Proof
       \\ EVAL_TAC \\ fs [])
   (* TODO:  Prove that LFix can not remove stuff at the front of the choreography *)
   \\ cheat
-QED
-
-Theorem split_sel_nonproc_NONE:
-  ∀p p1 c.
-  ~MEM p (procsOf c) ⇒ split_sel p p1 c = NONE
-Proof
-  ho_match_mp_tac split_sel_ind >>
-  rw[procsOf_def,MEM_nub'] >>
-  fs[split_sel_def]
 QED
 
 Theorem procsOf_catchup_of:
