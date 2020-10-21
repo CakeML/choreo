@@ -2018,10 +2018,94 @@ Proof
       goal_assum drule >>
       metis_tac[qcong_trans,qcong_sym])
   >- ((* Let *)
-      cheat
+      rw[] >>
+      rename [‘compile_network s (Let v p f vl c) pn’] >>
+      rename [‘reduction _ n2’] >>
+      gs[no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP,LIST_TO_SET_MAP] >>
+      ‘EVERY IS_SOME (MAP (FLOOKUP s) (MAP (λv. (v,p)) vl))’
+        by(rw[EVERY_MEM,MEM_MAP] >> fs[SUBSET_DEF,PULL_EXISTS] >>
+           res_tac >> fs[FDOM_FLOOKUP]) >>
+      ‘reduction (compile_network s (Let v p f vl c) pn)
+                 (compile_network (s |+ ((v,p),f (MAP (THE ∘ FLOOKUP s) (MAP (λv. (v,p)) vl)))) c pn)’
+        by cheat >>
+      ‘ALL_DISTINCT (MAP FST (endpoints (compile_network s (Let v p f vl c) pn)))’
+        by(fs[FST_endpoints_compile_network]) >>
+      Cases_on ‘n2 = compile_network (s |+ ((v,p),f (MAP (THE ∘ FLOOKUP s) (MAP (λv. (v,p)) vl)))) c pn’ >-
+        (rveq >>
+         irule_at (Pos hd) RTC_REFL >>
+         simp[trans_s_def] >>
+         irule_at (Pos hd) RTC_SUBSET >>
+         simp[PULL_EXISTS] >>
+         irule_at (Pos hd) trans_let >>
+         simp[qcong_refl] >>
+         fs[compile_network_ok_project_ok] >>
+         rw[] >> res_tac >> fs[project_def] >>
+         FULL_CASE_TAC >> fs[]) >>
+      drule_all_then strip_assume_tac (endpoint_local_confluence_tau |> SIMP_RULE std_ss [GSYM reduction_def]) >>
+      first_x_assum(qspec_then ‘chor_to_endpoint$chor_size c’ mp_tac) >>
+      impl_tac >- gs[] >>
+      disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+      disch_then (drule_at (Pos last)) >>
+      impl_tac >-
+        (fs[no_self_comunication_def,procsOf_def,set_nub',DELETE_SUBSET_INSERT] >>
+         fs[compile_network_ok_project_ok] >>
+         rw[] >> res_tac >> fs[project_def] >>
+         FULL_CASE_TAC >> fs[]) >>
+      strip_tac >>
+      drule_at (Pos last) qcong_reduction_pres >>
+      disch_then(resolve_then (Pos hd) mp_tac qcong_sym) >>
+      disch_then drule >>
+      strip_tac >>
+      irule_at (Pos hd) RTC_TRANS >>
+      rpt(goal_assum drule) >>
+      irule_at (Pos hd) trans_s_step >>
+      irule_at (Pos hd) trans_let >>
+      simp[] >>
+      goal_assum drule >>
+      metis_tac[qcong_trans,qcong_sym]
      )
   >- ((* Sel *)
-      cheat
+      rw[] >>
+      rename [‘compile_network s (Sel p1 b p2 c) pn’] >>
+      rename [‘reduction _ n2’] >>
+      gs[no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP] >>
+      ‘p1 ≠ p2’
+        by (fs[compile_network_ok_project_ok,procsOf_def,set_nub'] >>
+            res_tac >> fs[project_def] >>
+            FULL_CASE_TAC >> fs[]) >>
+      ‘reduction (compile_network s (Sel p1 b p2 c) pn) (compile_network s c pn)’
+        by cheat >>
+      ‘ALL_DISTINCT (MAP FST (endpoints (compile_network s (Sel p1 b p2 c) pn)))’
+        by(fs[FST_endpoints_compile_network]) >>
+      Cases_on ‘n2 = compile_network s c pn’ >-
+        (rveq >>
+         irule_at (Pos hd) RTC_REFL >>
+         simp[trans_s_def] >>
+         irule_at (Pos hd) RTC_SUBSET >>
+         simp[PULL_EXISTS] >>
+         irule_at (Pos hd) trans_sel >>
+         simp[qcong_refl] >>
+         drule_then MATCH_ACCEPT_TAC compile_network_ok_dest_sel) >>
+      drule_all_then strip_assume_tac (endpoint_local_confluence_tau |> SIMP_RULE std_ss [GSYM reduction_def]) >>
+      first_x_assum(qspec_then ‘chor_to_endpoint$chor_size c’ mp_tac) >>
+      impl_tac >- gs[] >>
+      disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+      disch_then (drule_at (Pos last)) >>
+      impl_tac >-
+        (fs[no_self_comunication_def,procsOf_def,set_nub',DELETE_SUBSET_INSERT] >>
+         drule_then MATCH_ACCEPT_TAC compile_network_ok_dest_sel) >>
+      strip_tac >>
+      drule_at (Pos last) qcong_reduction_pres >>
+      disch_then(resolve_then (Pos hd) mp_tac qcong_sym) >>
+      disch_then drule >>
+      strip_tac >>
+      irule_at (Pos hd) RTC_TRANS >>
+      rpt(goal_assum drule) >>
+      irule_at (Pos hd) trans_s_step >>
+      irule_at (Pos hd) trans_sel >>
+      simp[] >>
+      goal_assum drule >>
+      metis_tac[qcong_trans,qcong_sym]
      )
   >- ((* Fix *)
       cheat
