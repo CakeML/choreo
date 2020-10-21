@@ -175,7 +175,7 @@ Definition compile_network_gen_def:
 ∧ compile_network_gen s c (p::lp) =
        let mkState = (λp. <| bindings := projectS p s;
                              queue    := [] |>);
-           mkEP    = (λp. project p c);
+           mkEP    = (λp. project p [] c);
            mkNEP   = (λp. NEndpoint p (mkState p) <Γ> mkEP p)
        in  mapRPP NPar (mkNEP p)  (compile_network_gen s c lp)
 End
@@ -184,9 +184,9 @@ Overload compile_network = “λs c l. SND (compile_network_gen s c l)”
 
 Overload compile_network_ok = “λs c l. FST (compile_network_gen s c l)”
 
-Overload project' = “λp c. SND (project p c)”
+Overload project' = “λp dvars c. SND (project p dvars c)”
 
-Overload project_ok = “λp c. FST (project p c)”
+Overload project_ok = “λp dvars c. FST (project p dvars c)”
 
 (* Network projection can ignore communications that do not involve
    processes in (pl) the process list
