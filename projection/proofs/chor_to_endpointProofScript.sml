@@ -1980,10 +1980,14 @@ Proof
       rename [‘reduction _ n2’] >>
       gs[no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP] >>
       rename1 ‘FLOOKUP _ _ = SOME d’ >>
+      ‘p1 ≠ p2’
+        by (fs[compile_network_ok_project_ok,procsOf_def,set_nub'] >>
+            res_tac >> fs[project_def] >>
+            FULL_CASE_TAC >> fs[]) >>
       ‘reduction (compile_network s (Com p1 v1 p2 v2 c) pn) (compile_network (s |+ ((v2,p2),d)) c pn)’
         by cheat >>
-      ‘p1 ≠ p2’ by cheat >>
-      ‘ALL_DISTINCT (MAP FST (endpoints (compile_network s (Com p1 v1 p2 v2 c) pn)))’ by cheat >>
+      ‘ALL_DISTINCT (MAP FST (endpoints (compile_network s (Com p1 v1 p2 v2 c) pn)))’
+        by(fs[FST_endpoints_compile_network]) >>
       Cases_on ‘n2 = compile_network (s |+ ((v2,p2),d)) c pn’ >-
         (rveq >>
          irule_at (Pos hd) RTC_REFL >>
@@ -1992,13 +1996,15 @@ Proof
          simp[PULL_EXISTS] >>
          irule_at (Pos hd) trans_com >>
          simp[] >> irule_at Any qcong_refl >>
-         cheat) >>
+         drule_then MATCH_ACCEPT_TAC compile_network_ok_dest_com) >>
       drule_all_then strip_assume_tac (endpoint_local_confluence_tau |> SIMP_RULE std_ss [GSYM reduction_def]) >>
       first_x_assum(qspec_then ‘chor_to_endpoint$chor_size c’ mp_tac) >>
       impl_tac >- gs[] >>
       disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
       disch_then (drule_at (Pos last)) >>
-      impl_tac >- cheat >>
+      impl_tac >-
+        (fs[no_self_comunication_def,procsOf_def,set_nub',DELETE_SUBSET_INSERT] >>
+         drule_then MATCH_ACCEPT_TAC compile_network_ok_dest_com) >>
       strip_tac >>
       drule_at (Pos last) qcong_reduction_pres >>
       disch_then(resolve_then (Pos hd) mp_tac qcong_sym) >>
