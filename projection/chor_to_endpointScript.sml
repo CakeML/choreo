@@ -34,57 +34,58 @@ Definition chor_size_def:
 End
 
 Definition project_def:
-   project proc Nil = (T,Nil)
-∧ (project proc (Com p1 v1 p2 v2 c) =
+   project proc dvars Nil = (T,Nil)
+∧ (project proc dvars (Com p1 v1 p2 v2 c) =
     if proc = p1 ∧ proc = p2 then
       (F,Nil)
     else if proc = p1 then
-      Send p2 v1 <Γ> project proc c
+      Send p2 v1 <Γ> project proc dvars c
     else if proc = p2 then
-      Receive p1 v2 <Γ> project proc c
+      Receive p1 v2 <Γ> project proc dvars c
     else
-      project proc c)
-∧ (project proc (Let v p1 f vs c) =
+      project proc dvars c)
+∧ (project proc dvars (Let v p1 f vs c) =
     if proc = p1 then
-      Let v f vs <Γ> project proc c
+      Let v f vs <Γ> project proc dvars c
     else
-      project proc c)
-∧ (project proc (IfThen v p1 c1 c2) =
+      project proc dvars c)
+∧ (project proc dvars (IfThen v p1 c1 c2) =
     if proc = p1 then
-      mapRPP (IfThen v) (project proc c1) (project proc c2)
+      mapRPP (IfThen v) (project proc dvars c1) (project proc dvars c2)
     else
       case (split_sel proc p1 c1,split_sel proc p1 c2) of
         | (SOME(T,c1'),SOME(F,c2')) =>
-           mapRPP (ExtChoice p1) (project proc c1') (project proc c2')
+           mapRPP (ExtChoice p1) (project proc dvars c1') (project proc dvars c2')
         | (NONE,NONE) =>
-          if project proc c1 = project proc c2 then
-            project proc c1
+          if project proc dvars c1 = project proc dvars c2 then
+            project proc dvars c1
           else
             (F,Nil)
         | _ => (F,Nil)) (* shouldn't happen *)
-∧ (project proc (Sel p1 b p2 c) =
+∧ (project proc dvars (Sel p1 b p2 c) =
     if proc = p1 ∧ proc = p2 then
       (F,Nil)
     else if proc = p1 then
-      IntChoice b p2 <Γ> project proc c
+      IntChoice b p2 <Γ> project proc dvars c
     else if proc = p2 then
       if b then
-        (λx. ExtChoice p1 x Nil) <Γ> project proc c
+        (λx. ExtChoice p1 x Nil) <Γ> project proc dvars c
       else
-        ExtChoice p1 Nil <Γ> project proc c
+        ExtChoice p1 Nil <Γ> project proc dvars c
    else
-     project proc c)
-∧ (project proc (Fix dn c) =
-    if MEM proc (procsOf c) then
-      Fix dn <Γ> project proc c
-    else (* We must ensure we end the same way is if the fix was not there *)
-      case (project proc c) of
-        | (T,Nil) => (T,Nil)
-        | (T,Call dn) => (T,Call dn)
-        | _ => (F,Nil)) (* should't happen *)
-∧ (project proc (Call dn) = (T, Call dn))
+     project proc dvars c)
+∧ (project proc dvars (Fix dn c) =
+    (Fix dn <Γ> project proc ((dn,procsOf c)::dvars) c))
+∧ (project proc dvars (Call dn) =
+    case ALOOKUP dvars dn of
+      NONE => (F,Nil)
+    | SOME pvars =>
+      if MEM proc pvars then
+       (T,Call dn)
+      else
+       (T, Nil))
 Termination
-(WF_REL_TAC `measure (chor_size o SND)`
+(WF_REL_TAC `measure (chor_size o SND o SND)`
 \\ rw [chor_size_def]
 >- (`chor_size p_2 ≤ chor_size c1`suffices_by rw []
    \\ Induct_on `c1` >> fs [split_sel_def,chor_size_def]
