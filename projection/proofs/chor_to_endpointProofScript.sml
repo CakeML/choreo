@@ -1411,7 +1411,8 @@ Proof
   simp[GSYM PULL_FORALL,GSYM AND_IMP_INTRO] >>
   ho_match_mp_tac trans_pairind >>
   rw[procsOf_def,MEM_nub'] >>
-  simp[]
+  simp[] >>
+  fs[GSYM dsubst_procsOf_set_eq_Fix]
 QED
 
 Theorem trans_label_procsOf_written:
@@ -1585,7 +1586,8 @@ Theorem no_self_comunication_chor_tl:
   no_self_comunication(SND p) ⇒
   no_self_comunication (SND(UNCURRY chor_tl p))
 Proof
-  PairCases >> Cases_on ‘p1’ >> rw[no_self_comunication_def,chor_tl_def]
+  PairCases >> Cases_on ‘p1’ >> rw[no_self_comunication_def,chor_tl_def] >>
+  match_mp_tac no_self_comunication_dsubst >> rw[no_self_comunication_def]
 QED
 
 Theorem trans_ln_cut_IMP_trans_ln:
@@ -1802,6 +1804,139 @@ Proof
    >> fs[project_def]
 QED
 
+Theorem compile_network_eq_FOLDR:
+  ∀s c l.
+  compile_network s c l =
+  FOLDR NPar NNil
+        (MAP
+         (λproc.
+           NEndpoint proc
+                     <|bindings := projectS proc s; queue := []|>
+                     (project' proc c)) l)
+Proof
+  Induct_on ‘l’ >> rw[compile_network_gen_def]
+QED
+
+(* TODO: move to endpointProps? *)
+Theorem trans_FOLDR_NPar_cases:
+ ∀ps α q.
+  trans (FOLDR NPar NNil ps) α q =
+  ((∃ps1 p p' ps2.
+     ps = ps1 ++ p::ps2 ∧
+     trans p α p' ∧
+     q = FOLDR NPar NNil (ps1 ++ p'::ps2)) ∨
+   (∃ps1 n1 n1' ps2 n2 n2' ps3 p1 d p2.
+     α = LTau ∧
+     ps = ps1 ++ n1::ps2 ++ n2::ps3 ∧
+     p1 ≠ p2 ∧
+     trans n1 (LSend p1 d p2) n1' ∧
+     trans n2 (LReceive p1 d p2) n2' ∧
+     q = FOLDR NPar NNil (ps1 ++ n1'::ps2 ++ n2'::ps3)) ∨
+   (∃ps1 n1 n1' ps2 n2 n2' ps3 p1 d p2.
+     α = LTau ∧
+     ps = ps1 ++ n1::ps2 ++ n2::ps3 ∧
+     p1 ≠ p2 ∧
+     trans n1 (LReceive p1 d p2) n1' ∧
+     trans n2 (LSend p1 d p2) n2' ∧
+     q = FOLDR NPar NNil (ps1 ++ n1'::ps2 ++ n2'::ps3)) ∨
+   (∃ps1 n1 n1' ps2 n2 n2' ps3 p1 b p2.
+     α = LTau ∧
+     ps = ps1 ++ n1::ps2 ++ n2::ps3 ∧
+     p1 ≠ p2 ∧
+     trans n1 (LIntChoice p1 b p2) n1' ∧
+     trans n2 (LExtChoice p1 b p2) n2' ∧
+     q = FOLDR NPar NNil (ps1 ++ n1'::ps2 ++ n2'::ps3)) ∨
+   (∃ps1 n1 n1' ps2 n2 n2' ps3 p1 b p2.
+     α = LTau ∧
+     ps = ps1 ++ n1::ps2 ++ n2::ps3 ∧
+     p1 ≠ p2 ∧
+     trans n1 (LExtChoice p1 b p2) n1' ∧
+     trans n2 (LIntChoice p1 b p2) n2' ∧
+     q = FOLDR NPar NNil (ps1 ++ n1'::ps2 ++ n2'::ps3)))
+Proof
+  Induct_on ‘ps’ >- (rw[Once endpointSemTheory.trans_cases]) >>
+  rw[EQ_IMP_THM]
+  >-  (qhdtm_x_assum ‘trans’ (strip_assume_tac o ONCE_REWRITE_RULE[endpointSemTheory.trans_cases]) >>
+       fs[] >> rveq >> fs[]
+       >- ((* com_l *)
+           rfs[] >>
+           disj2_tac >> disj1_tac >>
+           qexists_tac ‘[]’ >>
+           simp[] >>
+           irule_at (Pos hd) EQ_REFL >>
+           rpt(goal_assum drule) >>
+           simp[])
+       >- ((* com_r *)
+           rfs[] >>
+           ntac 2 disj2_tac >> disj1_tac >>
+           qexists_tac ‘[]’ >>
+           simp[] >>
+           irule_at (Pos hd) EQ_REFL >>
+           rpt(goal_assum drule) >>
+           simp[])
+       >- ((* com_choice_l *)
+           rfs[] >>
+           ntac 3 disj2_tac >> disj1_tac >>
+           qexists_tac ‘[]’ >>
+           simp[] >>
+           irule_at (Pos hd) EQ_REFL >>
+           rpt(goal_assum drule) >>
+           simp[])
+       >- ((* com_choice_r *)
+           rfs[] >>
+           ntac 4 disj2_tac >>
+           qexists_tac ‘[]’ >>
+           simp[] >>
+           irule_at (Pos hd) EQ_REFL >>
+           rpt(goal_assum drule) >>
+           simp[])
+       >- ((* par_l *)
+           disj1_tac >> qexists_tac ‘[]’ >> simp[])
+       >- ((* par_r *)
+           rfs[]
+           >- (disj1_tac >> Q.REFINE_EXISTS_TAC ‘_::_’ >> simp[] >>
+               irule_at (Pos hd) EQ_REFL >>
+               goal_assum drule >> simp[])
+           >- (disj2_tac >> disj1_tac >> Q.REFINE_EXISTS_TAC ‘_::_’ >> simp[] >>
+               irule_at (Pos hd) EQ_REFL >>
+               rpt(goal_assum drule) >> simp[])
+           >- (ntac 2 disj2_tac >> disj1_tac >> Q.REFINE_EXISTS_TAC ‘_::_’ >> simp[] >>
+               irule_at (Pos hd) EQ_REFL >>
+               rpt(goal_assum drule) >> simp[])
+           >- (ntac 3 disj2_tac >> disj1_tac >> Q.REFINE_EXISTS_TAC ‘_::_’ >> simp[] >>
+               irule_at (Pos hd) EQ_REFL >>
+               rpt(goal_assum drule) >> simp[])
+           >- (ntac 4 disj2_tac >> Q.REFINE_EXISTS_TAC ‘_::_’ >> simp[] >>
+               irule_at (Pos hd) EQ_REFL >>
+               rpt(goal_assum drule) >> simp[])))
+  >- (Cases_on ‘ps1’ >> fs[] >> rveq >- metis_tac[trans_par_l] >>
+      metis_tac[trans_par_r])
+  >- (Cases_on ‘ps1’ >> fs[] >> rveq >- metis_tac[trans_com_l] >>
+      metis_tac[trans_par_r,trans_com_l])
+  >- (Cases_on ‘ps1’ >> fs[] >> rveq >- metis_tac[trans_com_r] >>
+      metis_tac[trans_par_r,trans_com_r])
+  >- (Cases_on ‘ps1’ >> fs[] >> rveq >- metis_tac[trans_com_choice_l] >>
+      metis_tac[trans_par_r,trans_com_choice_l])
+  >- (Cases_on ‘ps1’ >> fs[] >> rveq >- metis_tac[trans_com_choice_r] >>
+      metis_tac[trans_par_r,trans_com_choice_r])
+QED
+
+(* TODO: move to endpointProps *)
+Theorem qcong_reduction_pres:
+  ∀p1 p2 q1.
+    qcong p1 q1 ∧ reduction꙳ p1 p2 ⇒
+    ∃q2. reduction꙳ q1 q2 ∧ qcong p2 q2
+Proof
+  simp[Once CONJ_SYM] >> simp[GSYM AND_IMP_INTRO,GSYM PULL_FORALL] >>
+  ho_match_mp_tac RTC_INDUCT >>
+  rw[] >- metis_tac[RTC_REFL,qcong_refl] >>
+  irule_at (Pos hd) RTC_TRANS >>
+  gs[reduction_def] >>
+  drule_all_then strip_assume_tac qcong_trans_pres >>
+  res_tac >>
+  rpt(goal_assum drule)
+QED
+
 Theorem compile_network_reflection_lemma:
   ∀s c pn p2.
     compile_network_ok s c pn
@@ -1813,10 +1948,84 @@ Theorem compile_network_reflection_lemma:
     ==> ∃s' c' p3.
              reduction^* p2 p3
              ∧ trans_s (s,c) (s',c')
-             ∧ p3 = compile_network s' c' pn (* TODO: does this need qcong? *)
+             ∧ qcong p3 (compile_network s' c' pn)
              ∧ compile_network_ok s' c' pn
 Proof
-  cheat
+  ‘∀cs c s pn p2.
+    cs = chor_to_endpoint$chor_size c ∧
+    compile_network_ok s c pn
+    ∧ ALL_DISTINCT pn
+    ∧ set(procsOf c) ⊆ set pn
+    ∧ no_undefined_vars (s,c)
+    ∧ no_self_comunication c
+    ∧ reduction (compile_network s c pn) p2
+    ==> ∃s' c' p3.
+             reduction^* p2 p3
+             ∧ trans_s (s,c) (s',c')
+             ∧ qcong p3 (compile_network s' c' pn)
+             ∧ compile_network_ok s' c' pn’ suffices_by metis_tac[] >>
+  ho_match_mp_tac COMPLETE_INDUCTION >> Cases >- (rpt strip_tac >> Cases_on ‘c’ >> fs[chor_size_def]) >>
+  strip_tac >> Cases >> fs[chor_size_def]
+  >- ((* Nil *)
+      pop_assum kall_tac >>
+      rw[compile_network_eq_FOLDR,reduction_def,Once trans_FOLDR_NPar_cases] >>
+      gs[MAP_EQ_APPEND] >> rveq >>
+      fs[project_def] >>
+      fs[Once endpointSemTheory.trans_cases])
+  >- ((* IfThen *)
+      cheat)
+  >- ((* Com *)
+      rw[] >>
+      rename [‘compile_network s (Com p1 v1 p2 v2 c) pn’] >>
+      rename [‘reduction _ n2’] >>
+      gs[no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP] >>
+      rename1 ‘FLOOKUP _ _ = SOME d’ >>
+      ‘reduction (compile_network s (Com p1 v1 p2 v2 c) pn) (compile_network (s |+ ((v2,p2),d)) c pn)’
+        by cheat >>
+      ‘p1 ≠ p2’ by cheat >>
+      ‘ALL_DISTINCT (MAP FST (endpoints (compile_network s (Com p1 v1 p2 v2 c) pn)))’ by cheat >>
+      Cases_on ‘n2 = compile_network (s |+ ((v2,p2),d)) c pn’ >-
+        (rveq >>
+         irule_at (Pos hd) RTC_REFL >>
+         simp[trans_s_def] >>
+         irule_at (Pos hd) RTC_SUBSET >>
+         simp[PULL_EXISTS] >>
+         irule_at (Pos hd) trans_com >>
+         simp[] >> irule_at Any qcong_refl >>
+         cheat) >>
+      drule_all_then strip_assume_tac (endpoint_local_confluence_tau |> SIMP_RULE std_ss [GSYM reduction_def]) >>
+      first_x_assum(qspec_then ‘chor_to_endpoint$chor_size c’ mp_tac) >>
+      impl_tac >- gs[] >>
+      disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+      disch_then (drule_at (Pos last)) >>
+      impl_tac >- cheat >>
+      strip_tac >>
+      drule_at (Pos last) qcong_reduction_pres >>
+      disch_then(resolve_then (Pos hd) mp_tac qcong_sym) >>
+      disch_then drule >>
+      strip_tac >>
+      irule_at (Pos hd) RTC_TRANS >>
+      rpt(goal_assum drule) >>
+      irule_at (Pos hd) trans_s_step >>
+      irule_at (Pos hd) trans_com >>
+      simp[] >>
+      goal_assum drule >>
+      metis_tac[qcong_trans,qcong_sym])
+  >- ((* Let *)
+      cheat
+     )
+  >- ((* Sel *)
+      cheat
+     )
+  >- ((* Fix *)
+      cheat
+     )
+  >- ((* Call *)
+      pop_assum kall_tac >>
+      rw[compile_network_eq_FOLDR,reduction_def,Once trans_FOLDR_NPar_cases] >>
+      gs[MAP_EQ_APPEND] >> rveq >>
+      fs[project_def] >>
+      fs[Once endpointSemTheory.trans_cases])
 QED
 
 Theorem reduction_list_trans:
