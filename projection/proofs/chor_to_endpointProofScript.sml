@@ -11,6 +11,134 @@ val _ = set_grammar_ancestry
   ["endpointProps","endpointLang","endpointConfluence",
    "chor_to_endpointProof","chorSem","chorLang"];
 
+Theorem split_sel_dvars:
+  ∀proc p c b r.
+  split_sel proc p c = SOME (b,r) ⇒
+  dvarsOf c = dvarsOf r
+Proof
+  ho_match_mp_tac split_sel_ind >>
+  rw[split_sel_def,dvarsOf_def] >>
+  rw[nub'_dvarsOf]
+QED
+
+Theorem project_ALOOKUP_EQ:
+  ∀proc dvars c dvars'.
+    (∀dn. MEM dn (dvarsOf c) ⇒
+       ALOOKUP dvars dn = ALOOKUP dvars' dn)
+    ⇒
+    project proc dvars c = project proc dvars' c
+Proof
+  ho_match_mp_tac project_ind >>
+  rw[project_def,dprocsOf_def,dvarsOf_def,MEM_nub',MEM_FILTER,PULL_EXISTS] >>
+  res_tac >> gs[CaseEq "bool"] >>
+  rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
+  TRY(conj_tac
+      >- (‘dprocsOf ((dn,[])::dvars) c = dprocsOf ((dn,[])::dvars') c’ suffices_by metis_tac[] >>
+          match_mp_tac dprocsOf_ALOOKUP_EQ >>
+          rw[]) >>
+      ‘dprocsOf ((dn,[])::dvars') c = dprocsOf ((dn,[])::dvars) c’
+        by(match_mp_tac dprocsOf_ALOOKUP_EQ >> rw[]) >>
+      simp[] >>
+      last_x_assum(qspec_then ‘(dn,dprocsOf ((dn,[])::dvars) c)::dvars'’ mp_tac) >>
+      impl_tac >- rw[] >>
+      simp[] >> NO_TAC) >>
+  TRY(‘dprocsOf ((dn,[])::dvars') c = dprocsOf ((dn,[])::dvars) c’
+        by(match_mp_tac dprocsOf_ALOOKUP_EQ >> rw[]) >>
+      simp[] >> NO_TAC) >>
+  metis_tac[split_sel_dvars,FST,SND]
+QED
+
+Theorem project_init_dup:
+  project proc ((dn,dvs)::(dn,dvs')::dvars) c = project proc ((dn,dvs)::dvars) c
+Proof
+  match_mp_tac project_ALOOKUP_EQ >> rw[]
+QED
+
+Theorem project'_dsubst_commute:
+  ∀dn c proc c' dvars.
+  dvarsOf(Fix dn c) = [] ∧
+  project_ok proc dvars (Fix dn c) ∧
+  project_ok proc ((dn,dprocsOf ((dn,[])::dvars) c)::dvars) c' ∧
+  (∀dn procs. ALOOKUP dvars dn = SOME procs ⇒ set procs ⊆ set(procsOf c)) ∧
+  set(procsOf c') ⊆ set(procsOf c)
+  ⇒
+  project' proc dvars (dsubst c' dn (Fix dn c)) =
+  dsubst (project' proc ((dn,dprocsOf ((dn,[])::dvars) c)::dvars) c') dn (project' proc dvars (Fix dn c))
+Proof
+  ntac 3 strip_tac >>
+  completeInduct_on ‘chor_to_endpoint$chor_size c'’ >>
+  Cases >> rpt conj_tac
+  >- (rw[endpointLangTheory.dsubst_def,chorLangTheory.dsubst_def,project_def,procsOf_def,SUBSET_DEF])
+  >- (cheat)
+  >- (rename1 ‘Com _ _ _ _ c'’ >>
+      first_x_assum(qspec_then ‘chor_to_endpoint$chor_size c'’ assume_tac) >>
+      strip_tac >> fs[chor_size_def] >>
+      PRED_ASSUM is_forall (resolve_then (Pos hd) assume_tac EQ_REFL) >>
+      strip_tac >>
+      first_x_assum(qspec_then ‘dvars’ mp_tac) >>
+      rw[endpointLangTheory.dsubst_def,chorLangTheory.dsubst_def,project_def,procsOf_def,set_nub',SUBSET_DEF,chor_size_def] >> fs[] >> metis_tac[])
+  >- (rename1 ‘Let _ _ _ _ c'’ >>
+      first_x_assum(qspec_then ‘chor_to_endpoint$chor_size c'’ assume_tac) >>
+      strip_tac >> fs[chor_size_def] >>
+      PRED_ASSUM is_forall (resolve_then (Pos hd) assume_tac EQ_REFL) >>
+      strip_tac >>
+      first_x_assum(qspec_then ‘dvars’ mp_tac) >>
+      rw[endpointLangTheory.dsubst_def,chorLangTheory.dsubst_def,project_def,procsOf_def,set_nub',SUBSET_DEF,chor_size_def] >> fs[] >> metis_tac[])
+  >- (rename1 ‘Sel _ _ _ c'’ >>
+      first_x_assum(qspec_then ‘chor_to_endpoint$chor_size c'’ assume_tac) >>
+      strip_tac >> fs[chor_size_def] >>
+      PRED_ASSUM is_forall (resolve_then (Pos hd) assume_tac EQ_REFL) >>
+      strip_tac >>
+      first_x_assum(qspec_then ‘dvars’ mp_tac) >>
+      rw[endpointLangTheory.dsubst_def,chorLangTheory.dsubst_def,project_def,procsOf_def,set_nub',SUBSET_DEF,chor_size_def] >> fs[] >> metis_tac[])
+  >- (rename1 ‘chor_size(Fix dn' c')’ >>
+      first_x_assum(qspec_then ‘chor_to_endpoint$chor_size c'’ assume_tac) >>
+      strip_tac >> fs[chor_size_def] >>
+      PRED_ASSUM is_forall (resolve_then (Pos hd) assume_tac EQ_REFL) >>
+      rw[endpointLangTheory.dsubst_def,chorLangTheory.dsubst_def,project_def,procsOf_def,set_nub'] >> fs[] >>
+      fs[dprocsOf_init_dup,project_init_dup] >>
+      gs[dprocsOf_dvarsOf_empty_cons,dprocsOf_empty]
+      >- (gs[dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub']
+          >- (qpat_x_assum ‘∀dvars. _ ⇒ project' _ _ _ = _’ (dep_rewrite.DEP_ONCE_REWRITE_TAC o single) >>
+              conj_asm1_tac >- cheat >>
+              simp[project_def] >>
+              gs[dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
+              fs[set_dvarsOf_dsubst_eq] >>
+              cheat) >>
+          gs[CaseEq "bool"] >> rveq >> gs[]
+          >- (qpat_x_assum ‘∀dvars. _ ⇒ project' _ _ _ = _’ (dep_rewrite.DEP_ONCE_REWRITE_TAC o single) >>
+              conj_asm1_tac >- cheat >>
+              simp[project_def] >>
+              gs[dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
+              fs[set_dvarsOf_dsubst_eq] >>
+              cheat) >>
+          reverse IF_CASES_TAC
+          >- (fs[] >> first_x_assum(qspecl_then [‘dn''’,‘procs’] mp_tac) >> simp[] >>
+              fs[set_dvarsOf_dsubst_eq]) >>
+          cheat)
+      >- (gs[dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
+          fs[set_dvarsOf_dsubst_eq] >>
+          IF_CASES_TAC >> gs[] >>
+          PURE_FULL_CASE_TAC >> fs[] >>
+          metis_tac[])
+      >- (gs[dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
+          fs[set_dvarsOf_dsubst_eq] >>
+          TRY(drule_all_then strip_assume_tac SUBSET_THM >> fs[]) >>
+          fs[CaseEq "bool"] >> rveq >> fs[] >>
+          res_tac >>
+          drule_all_then strip_assume_tac SUBSET_THM >> fs[])
+      >- (gs[dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
+          fs[set_dvarsOf_dsubst_eq] >>
+          IF_CASES_TAC >> fs[] >>
+          FULL_CASE_TAC >> fs[] >>
+          rveq >> fs[] >>
+          res_tac >>
+          metis_tac[SUBSET_THM]))
+  >- (rw[endpointLangTheory.dsubst_def,chorLangTheory.dsubst_def,project_def] >>
+      fs[endpointLangTheory.dsubst_def,chorLangTheory.dsubst_def] >>
+      TOP_CASE_TAC >> fs[] >> rw[endpointLangTheory.dsubst_def,chorLangTheory.dsubst_def])
+QED
+
 val trans_dequeue_gen = Q.store_thm("trans_dequeue_gen",
   `∀d s s' v p1 p2 e q1 q2.
     s.queue = q1 ⧺ [(p1,d)] ⧺ q2
@@ -1937,6 +2065,29 @@ Proof
   rpt(goal_assum drule)
 QED
 
+Theorem project_dsubst:
+  ∀proc c dn c'.
+  project_ok proc c (*∧ MEM proc (procsOf c')*) ⇒
+  project' proc (dsubst c dn (Fix dn c')) =
+  dsubst (project' proc c) dn (project' proc (Fix dn c'))
+Proof
+  ho_match_mp_tac project_ind >>
+  rw[project_def,chorLangTheory.dsubst_def,endpointLangTheory.dsubst_def,procsOf_def,MEM_nub'] >>
+  fs[]
+
+    fs[project_def]
+
+  >- cheat
+  >- cheat
+  >- cheat
+
+  rw[project_def] >>
+
+  rpt(TOP_CASE_TAC >> fs[] >> rveq) >> rw[dsubst_def]
+
+
+QED
+
 Theorem compile_network_reflection_lemma:
   ∀s c pn p2.
     compile_network_ok s c pn
@@ -2108,7 +2259,38 @@ Proof
       metis_tac[qcong_trans,qcong_sym]
      )
   >- ((* Fix *)
-      cheat
+      pop_assum kall_tac >>
+      rw[compile_network_eq_FOLDR,reduction_def,Once trans_FOLDR_NPar_cases]
+      >- ((* the interesting case *)
+          gs[MAP_EQ_APPEND] >> rveq >>
+          qhdtm_x_assum ‘trans’ (strip_assume_tac o REWRITE_RULE[project_def]) >>
+          rename [‘no_undefined_vars (s, Fix dn c)’] >>
+          reverse(Cases_on ‘MEM proc (procsOf c)’)
+          >- (fs[project_def] >>
+              spose_not_then kall_tac >>
+              fs[Once endpointSemTheory.trans_cases] >>
+              rveq >>
+              rpt(PURE_FULL_CASE_TAC >> fs[] >> rveq)) >>
+          fs[] >>
+          irule_at Any trans_s_one >>
+          irule_at Any trans_fix >>
+          irule_at Any qcong_refl >>
+          rename1 ‘ps1 ++ [proc] ++ ps2’ >>
+          reverse conj_tac >- cheat >>
+          Induct_on ‘ps1’ >-
+            (rw[] >> fs[Once endpointSemTheory.trans_cases] >> rveq >>
+
+
+                )
+
+
+          cheat) >>
+      gs[MAP_EQ_APPEND] >> rveq >>
+      fs[project_def] >>
+      spose_not_then kall_tac >>
+      fs[Once endpointSemTheory.trans_cases] >>
+      rveq >>
+      rpt(PURE_FULL_CASE_TAC >> fs[] >> rveq) >>
      )
   >- ((* Call *)
       pop_assum kall_tac >>
