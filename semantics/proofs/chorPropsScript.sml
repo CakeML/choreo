@@ -685,4 +685,50 @@ Proof
   \\ asm_exists_tac \\ fs []
 QED
 
+Theorem dprocsOf_empty:
+  ∀c. dprocsOf [] c = procsOf c
+Proof
+  ‘∀c dvars. EVERY ($= []) (MAP SND dvars) ⇒ dprocsOf dvars c = procsOf c’
+    by(Induct >>
+       rw[dprocsOf_def,procsOf_def] >>
+       TOP_CASE_TAC >> fs[EVERY_MEM] >>
+       imp_res_tac ALOOKUP_MEM >>
+       fs[MEM_MAP,PULL_EXISTS] >>
+       res_tac >> fs[]) >>
+  first_x_assum match_mp_tac >> simp[]
+QED
+
+Theorem procsOf_dprocsOf_SUBSET:
+  ∀dvars c.
+    set(procsOf c) ⊆ set(dprocsOf dvars c)
+Proof
+  simp[SUBSET_DEF] >>
+  Induct_on ‘c’ >>
+  rw[procsOf_def,dprocsOf_def,set_nub'] >>
+  fs[]
+QED
+
+Theorem procsOf_dprocsOf_MEM:
+  ∀proc dvars c.
+    MEM proc (procsOf c) ⇒ MEM proc (dprocsOf dvars c)
+Proof
+  metis_tac[procsOf_dprocsOf_SUBSET,SUBSET_DEF]
+QED
+
+Theorem dprocsOf_MEM_IMP:
+  ∀proc dvars c.
+    MEM proc (dprocsOf dvars c) ⇒
+    MEM proc (procsOf c) ∨
+    ∃dn procs.
+      MEM dn (dvarsOf c) ∧
+      ALOOKUP dvars dn = SOME procs ∧
+      MEM proc procs
+Proof
+  Induct_on ‘c’ >>
+  rw[dprocsOf_def,procsOf_def,dvarsOf_def,MEM_nub',MEM_FILTER,PULL_EXISTS] >>
+  res_tac >> gs[CaseEq "bool"] >>
+  TRY(PURE_FULL_CASE_TAC >> fs[]) >>
+  metis_tac[]
+QED
+
 val _ = export_theory ()
