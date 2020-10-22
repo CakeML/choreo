@@ -75,7 +75,12 @@ Definition project_def:
    else
      project proc dvars c)
 ∧ (project proc dvars (Fix dn c) =
-    (Fix dn <Γ> project proc ((dn,procsOf c)::dvars) c))
+   (if MEM proc (dprocsOf ((dn,[])::dvars) c) then
+      Fix dn <Γ> project proc ((dn,dprocsOf ((dn,[])::dvars) c)::dvars) c
+    else
+      (T,Nil)
+    )
+   )
 ∧ (project proc dvars (Call dn) =
     case ALOOKUP dvars dn of
       NONE => (F,Nil)
