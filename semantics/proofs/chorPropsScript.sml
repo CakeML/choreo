@@ -731,4 +731,47 @@ Proof
   metis_tac[]
 QED
 
+Theorem dprocsOf_ALOOKUP_EQ:
+  ∀dvars dvars' c.
+    (∀dn. MEM dn (dvarsOf c) ⇒ ALOOKUP dvars dn = ALOOKUP dvars' dn) ⇒
+    dprocsOf dvars c = dprocsOf dvars' c
+Proof
+  Induct_on ‘c’ >>
+  rw[dprocsOf_def,procsOf_def,dvarsOf_def,MEM_nub',MEM_FILTER,PULL_EXISTS] >>
+  res_tac >> gs[CaseEq "bool"] >>
+  TRY(PURE_FULL_CASE_TAC >> fs[]) >>
+  TRY(AP_TERM_TAC >>
+      first_x_assum match_mp_tac >>
+      rw[] >> NO_TAC) >>
+  metis_tac[]
+QED
+
+Theorem dprocsOf_init_dup:
+  dprocsOf ((dn,dvs)::(dn,dvs')::dvars) c = dprocsOf ((dn,dvs)::dvars) c
+Proof
+  ho_match_mp_tac dprocsOf_ALOOKUP_EQ >> rw[]
+QED
+
+(* TODO: move to choreoUtils *)
+Theorem nub'_FILTER:
+  ∀P l. nub'(FILTER P l) = FILTER P (nub' l)
+Proof
+  Induct_on ‘l’ >> rw[nub'_def,FILTER_FILTER] >>
+  simp[CONJ_SYM] >>
+  rw[FILTER_EQ,EQ_IMP_THM]
+QED
+
+Theorem nub'_idem:
+  ∀l. nub'(nub' l) = nub' l
+Proof
+  Induct >>
+  rw[nub'_def,nub'_FILTER,FILTER_FILTER]
+QED
+
+Theorem nub'_dvarsOf:
+  ∀c. nub'(dvarsOf c) = dvarsOf c
+Proof
+  Induct >> rw[dvarsOf_def,nub'_idem,nub'_FILTER] >> rw[nub'_def]
+QED
+
 val _ = export_theory ()
