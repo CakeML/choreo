@@ -102,6 +102,30 @@ Proof
   rw[]
 QED
 
+Theorem split_sel_dsubst_NONE:
+  split_sel proc p c = NONE ⇒
+  split_sel proc p (dsubst c dn (Fix dn c')) = NONE
+Proof
+  Induct_on ‘c’ >> rw[chorLangTheory.dsubst_def,split_sel_def]
+QED
+
+Theorem split_sel_dsubst_SOME:
+  split_sel proc p c = SOME(b,c'') ⇒
+  split_sel proc p (dsubst c dn (Fix dn c')) = SOME(b,dsubst c'' dn (Fix dn c'))
+Proof
+  MAP_EVERY qid_spec_tac [‘b’,‘c''’] >>
+  Induct_on ‘c’ >> rw[chorLangTheory.dsubst_def,split_sel_def]
+QED
+
+Theorem split_sel_dsubst_eq:
+  split_sel proc p (dsubst c dn (Fix dn c')) =
+  OPTION_MAP (λ(b,c''). (b,dsubst c'' dn (Fix dn c'))) (split_sel proc p c)
+Proof
+  Cases_on ‘split_sel proc p c’ >- simp[split_sel_dsubst_NONE] >>
+  simp[] >>
+  pairarg_tac >> gs[split_sel_dsubst_SOME]
+QED
+
 Theorem project'_dsubst_commute:
   ∀dn c proc c' dvars.
   dvarsOf(Fix dn c) = [] ∧
@@ -117,7 +141,54 @@ Proof
   completeInduct_on ‘chor_to_endpoint$chor_size c'’ >>
   Cases >> rpt conj_tac
   >- (rw[endpointLangTheory.dsubst_def,chorLangTheory.dsubst_def,project_def,procsOf_def,SUBSET_DEF])
-  >- (cheat)
+  >- (rename [‘IfThen v p c1 c2’] >>
+      strip_tac >> fs[chor_size_def] >> rveq >>
+      rw[endpointLangTheory.dsubst_def,chorLangTheory.dsubst_def,project_def,procsOf_def,set_nub',SUBSET_DEF,chor_size_def] >> fs[]
+      >- (last_x_assum(qspec_then ‘chor_to_endpoint$chor_size c1’ mp_tac) >>
+          impl_tac >- simp[] >>
+          disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+          disch_then(qspec_then ‘dvars’ mp_tac) >>
+          simp[project_def] >>
+          impl_tac >- (rw[SUBSET_DEF] >> metis_tac[]) >>
+          simp[])
+      >- (last_x_assum(qspec_then ‘chor_to_endpoint$chor_size c2’ mp_tac) >>
+          impl_tac >- simp[] >>
+          disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+          disch_then(qspec_then ‘dvars’ mp_tac) >>
+          simp[project_def] >>
+          impl_tac >- (rw[SUBSET_DEF] >> metis_tac[]) >>
+          simp[])
+      >- (last_x_assum(qspec_then ‘chor_to_endpoint$chor_size c1’ mp_tac) >>
+          impl_tac >- simp[] >>
+          disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+          disch_then(qspec_then ‘dvars’ mp_tac) >>
+          simp[project_def] >>
+          impl_tac >- (rw[SUBSET_DEF] >> metis_tac[]) >>
+          simp[])
+      >- (last_x_assum(qspec_then ‘chor_to_endpoint$chor_size c2’ mp_tac) >>
+          impl_tac >- simp[] >>
+          disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+          disch_then(qspec_then ‘dvars’ mp_tac) >>
+          simp[project_def] >>
+          impl_tac >- (rw[SUBSET_DEF] >> metis_tac[]) >>
+          simp[])
+      >- (fs[split_sel_dsubst_eq] >>
+          Cases_on ‘split_sel proc p c1’ >> gs[] >>
+          Cases_on ‘split_sel proc p c2’ >> gs[]
+          >- (last_x_assum(qspec_then ‘chor_to_endpoint$chor_size c2’ mp_tac) >>
+              impl_tac >- simp[] >>
+              disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+              disch_then(qspec_then ‘dvars’ mp_tac) >>
+              simp[project_def] >>
+              impl_tac >- (rw[SUBSET_DEF] >> metis_tac[]) >>
+              simp[]) >>
+          pairarg_tac >> fs[] >> rveq >>
+          rw[] >> fs[] >>
+          pairarg_tac >> fs[] >> rveq >>
+          rw[] >> fs[] >>
+          simp[endpointLangTheory.dsubst_def] >>
+          cheat) >>
+     cheat)
   >- (rename1 ‘Com _ _ _ _ c'’ >>
       first_x_assum(qspec_then ‘chor_to_endpoint$chor_size c'’ assume_tac) >>
       strip_tac >> fs[chor_size_def] >>
