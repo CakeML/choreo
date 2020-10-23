@@ -1,4 +1,4 @@
-open preamble choreoUtilsTheory
+oopen preamble choreoUtilsTheory
               endpointLangTheory chor_to_endpointTheory
               endpointSemTheory endpointPropsTheory
               endpointCongTheory chorSemTheory chorPropsTheory
@@ -19,33 +19,6 @@ Proof
   ho_match_mp_tac split_sel_ind >>
   rw[split_sel_def,dvarsOf_def] >>
   rw[nub'_dvarsOf]
-QED
-
-Theorem project_ALOOKUP_EQ:
-  ∀proc dvars c dvars'.
-    (∀dn. MEM dn (dvarsOf c) ⇒
-       ALOOKUP dvars dn = ALOOKUP dvars' dn)
-    ⇒
-    project proc dvars c = project proc dvars' c
-Proof
-  ho_match_mp_tac project_ind >>
-  rw[project_def,dprocsOf_def,dvarsOf_def,MEM_nub',MEM_FILTER,PULL_EXISTS] >>
-  res_tac >> gs[CaseEq "bool"] >>
-  rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
-  TRY(conj_tac
-      >- (‘dprocsOf ((dn,[])::dvars) c = dprocsOf ((dn,[])::dvars') c’ suffices_by metis_tac[] >>
-          match_mp_tac dprocsOf_ALOOKUP_EQ >>
-          rw[]) >>
-      ‘dprocsOf ((dn,[])::dvars') c = dprocsOf ((dn,[])::dvars) c’
-        by(match_mp_tac dprocsOf_ALOOKUP_EQ >> rw[]) >>
-      simp[] >>
-      last_x_assum(qspec_then ‘(dn,dprocsOf ((dn,[])::dvars) c)::dvars'’ mp_tac) >>
-      impl_tac >- rw[] >>
-      simp[] >> NO_TAC) >>
-  TRY(‘dprocsOf ((dn,[])::dvars') c = dprocsOf ((dn,[])::dvars) c’
-        by(match_mp_tac dprocsOf_ALOOKUP_EQ >> rw[]) >>
-      simp[] >> NO_TAC) >>
-  metis_tac[split_sel_dvars,FST,SND]
 QED
 
 Theorem project_ALOOKUP_EQ:
