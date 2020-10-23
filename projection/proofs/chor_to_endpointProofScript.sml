@@ -128,7 +128,7 @@ Proof
   match_mp_tac project_ALOOKUP_EQ >>
   rw[]
 QED
-        
+
 Theorem project'_dsubst_commute:
   ∀dn c proc c' dvars.
   dvarsOf(Fix dn c) = [] ∧

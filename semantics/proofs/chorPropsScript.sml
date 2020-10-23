@@ -770,7 +770,7 @@ Proof
   rw[dprocsOf_def,procsOf_def,dvarsOf_def,set_nub',MEM_FILTER,PULL_EXISTS] >>
   fs[DISJ_IMP_THM,FORALL_AND_THM] >>
   rw[] >>
-  res_tac >> gs[CaseEq "bool"] >>          
+  res_tac >> gs[CaseEq "bool"] >>
   TRY(last_x_assum match_mp_tac >> rw[] >> NO_TAC) >>
   TRY(rpt(PURE_FULL_CASE_TAC >> fs[libTheory.the_def]) >> NO_TAC) >>
   metis_tac[]
@@ -785,7 +785,7 @@ Proof
   rw[dprocsOf_def,procsOf_def,dvarsOf_def,set_nub',MEM_FILTER,PULL_EXISTS] >>
   fs[DISJ_IMP_THM,FORALL_AND_THM] >>
   rw[] >>
-  res_tac >> gs[CaseEq "bool"] >>          
+  res_tac >> gs[CaseEq "bool"] >>
   TRY(last_x_assum match_mp_tac >> rw[] >> NO_TAC) >>
   TRY(rpt(PURE_FULL_CASE_TAC >> fs[libTheory.the_def]) >> NO_TAC) >>
   metis_tac[]
@@ -830,7 +830,7 @@ Proof
   rw[] >> fs[dvarsOf_def,FILTER_EQ_NIL,EVERY_MEM,MEM_nub',libTheory.the_def] >>
   res_tac >> fs[]
 QED
-        
+
 Triviality ALOOKUP_FILTER':
   ALOOKUP (FILTER (λkv. P (FST kv)) ls) x =
   if P x then ALOOKUP ls x else NONE
@@ -839,7 +839,7 @@ Proof
   Cases >> rw[] >> rw[] >>
   metis_tac[]
 QED
-        
+
 Theorem dprocsOf_nil:
   dprocsOf ((dn,[])::dvars) c = dprocsOf (FILTER ($<> dn o FST) dvars) c
 Proof
@@ -873,7 +873,7 @@ Theorem dprocsOf_MEM_eq:
   MEM proc (procsOf c) ∨
   ∃dn procs.
     MEM dn (dvarsOf c) ∧ ALOOKUP dvars dn = SOME procs ∧
-    MEM proc procs  
+    MEM proc procs
 Proof
   rw[EQ_IMP_THM]
   >- (imp_res_tac dprocsOf_MEM_IMP >> fs[] >> metis_tac[])
@@ -903,7 +903,7 @@ Theorem dsubst_vacuous:
 Proof
   rpt strip_tac >> Induct_on ‘c’ >> rw[dvarsOf_def,chorLangTheory.dsubst_def,MEM_nub',MEM_FILTER]
 QED
-        
+
 Theorem set_dvarsOf_dsubst_eq:
   ∀c dn c'.
     dvarsOf c' = [] ⇒
@@ -914,5 +914,5 @@ Proof
   gs[] >>
   rw[SET_EQ_SUBSET,SUBSET_DEF,MEM_FILTER,MEM_nub'] >> fs[]
 QED
-        
+
 val _ = export_theory ()
