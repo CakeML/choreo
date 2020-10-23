@@ -761,6 +761,36 @@ Proof
   metis_tac[]
 QED
 
+Theorem dprocsOf_ALOOKUP_EQ_set:
+  ∀dvars dvars' c.
+    (∀dn. MEM dn (dvarsOf c) ⇒ set(the [] (ALOOKUP dvars dn)) = set(the [] (ALOOKUP dvars' dn))) ⇒
+    set(dprocsOf dvars c) = set(dprocsOf dvars' c)
+Proof
+  Induct_on ‘c’ >>
+  rw[dprocsOf_def,procsOf_def,dvarsOf_def,set_nub',MEM_FILTER,PULL_EXISTS] >>
+  fs[DISJ_IMP_THM,FORALL_AND_THM] >>
+  rw[] >>
+  res_tac >> gs[CaseEq "bool"] >>          
+  TRY(last_x_assum match_mp_tac >> rw[] >> NO_TAC) >>
+  TRY(rpt(PURE_FULL_CASE_TAC >> fs[libTheory.the_def]) >> NO_TAC) >>
+  metis_tac[]
+QED
+
+Theorem dprocsOf_ALOOKUP_EQ_set_opt:
+  ∀dvars dvars' c.
+    (∀dn. MEM dn (dvarsOf c) ⇒ OPTION_REL (λx y. set x = set y) (ALOOKUP dvars dn) (ALOOKUP dvars' dn)) ⇒
+    set(dprocsOf dvars c) = set(dprocsOf dvars' c)
+Proof
+  Induct_on ‘c’ >>
+  rw[dprocsOf_def,procsOf_def,dvarsOf_def,set_nub',MEM_FILTER,PULL_EXISTS] >>
+  fs[DISJ_IMP_THM,FORALL_AND_THM] >>
+  rw[] >>
+  res_tac >> gs[CaseEq "bool"] >>          
+  TRY(last_x_assum match_mp_tac >> rw[] >> NO_TAC) >>
+  TRY(rpt(PURE_FULL_CASE_TAC >> fs[libTheory.the_def]) >> NO_TAC) >>
+  metis_tac[]
+QED
+
 Theorem dprocsOf_init_dup:
   dprocsOf ((dn,dvs)::(dn,dvs')::dvars) c = dprocsOf ((dn,dvs)::dvars) c
 Proof

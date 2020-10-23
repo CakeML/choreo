@@ -48,12 +48,87 @@ Proof
   metis_tac[split_sel_dvars,FST,SND]
 QED
 
+Theorem project_ALOOKUP_EQ:
+  ∀proc dvars c dvars'.
+    (∀dn. MEM dn (dvarsOf c) ⇒
+       ALOOKUP dvars dn = ALOOKUP dvars' dn)
+    ⇒
+    project proc dvars c = project proc dvars' c
+Proof
+  ho_match_mp_tac project_ind >>
+  rw[project_def,dprocsOf_def,dvarsOf_def,MEM_nub',MEM_FILTER,PULL_EXISTS] >>
+  res_tac >> gs[CaseEq "bool"] >>
+  rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
+  TRY(conj_tac
+      >- (‘dprocsOf ((dn,[])::dvars) c = dprocsOf ((dn,[])::dvars') c’ suffices_by metis_tac[] >>
+          match_mp_tac dprocsOf_ALOOKUP_EQ >>
+          rw[]) >>
+      ‘dprocsOf ((dn,[])::dvars') c = dprocsOf ((dn,[])::dvars) c’
+        by(match_mp_tac dprocsOf_ALOOKUP_EQ >> rw[]) >>
+      simp[] >>
+      last_x_assum(qspec_then ‘(dn,dprocsOf ((dn,[])::dvars) c)::dvars'’ mp_tac) >>
+      impl_tac >- rw[] >>
+      simp[] >> NO_TAC) >>
+  TRY(‘dprocsOf ((dn,[])::dvars') c = dprocsOf ((dn,[])::dvars) c’
+        by(match_mp_tac dprocsOf_ALOOKUP_EQ >> rw[]) >>
+      simp[] >> NO_TAC) >>
+  metis_tac[split_sel_dvars,FST,SND]
+QED
+
+Theorem project_ALOOKUP_EQ_strong:
+  ∀proc dvars c dvars'.
+    (∀dn. MEM dn (dvarsOf c) ⇒
+       OPTION_REL (λx y. set x = set y) (ALOOKUP dvars dn) (ALOOKUP dvars' dn))
+    ⇒
+    project proc dvars c = project proc dvars' c
+Proof
+  ho_match_mp_tac project_ind >>
+  rw[project_def,dprocsOf_def,dvarsOf_def,MEM_nub',MEM_FILTER,PULL_EXISTS,libTheory.the_def] >>
+  res_tac >> gs[CaseEq "bool"] >>
+  rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
+  gs[libTheory.the_def] >>
+  TRY(conj_tac
+      >- (‘set(dprocsOf ((dn,[])::dvars) c) = set(dprocsOf ((dn,[])::dvars') c)’ suffices_by metis_tac[] >>
+          match_mp_tac dprocsOf_ALOOKUP_EQ_set_opt >>
+          rw[]) >>
+      last_x_assum(qspec_then ‘(dn,dprocsOf ((dn,[])::dvars') c)::dvars'’ mp_tac) >>
+      impl_tac >-
+       (rw[libTheory.the_def] >>
+        match_mp_tac dprocsOf_ALOOKUP_EQ_set_opt >>
+        rw[]) >>
+      simp[] >> NO_TAC) >>
+  TRY(‘set(dprocsOf ((dn,[])::dvars') c) = set(dprocsOf ((dn,[])::dvars) c)’
+        by(CONV_TAC SYM_CONV >>
+           match_mp_tac dprocsOf_ALOOKUP_EQ_set_opt >> rw[] >>
+           first_x_assum match_mp_tac) >>
+      simp[] >> NO_TAC) >>
+  metis_tac[split_sel_dvars,FST,SND]
+QED
+
 Theorem project_init_dup:
   project proc ((dn,dvs)::(dn,dvs')::dvars) c = project proc ((dn,dvs)::dvars) c
 Proof
   match_mp_tac project_ALOOKUP_EQ >> rw[]
 QED
 
+Theorem project_dvarsOf_empty:
+  dvarsOf c = [] ⇒
+  project proc dvars c = project proc [] c
+Proof
+  strip_tac >>
+  match_mp_tac project_ALOOKUP_EQ >>
+  rw[]
+QED
+
+Theorem project_dvarsOf_empty_Fix:
+  dvarsOf (Fix dn c) = [] ⇒
+  project proc ((dn,procs)::dvars) c = project proc [(dn,procs)] c
+Proof
+  rw[dvarsOf_def,FILTER_EQ_NIL,EVERY_MEM,MEM_nub'] >>
+  match_mp_tac project_ALOOKUP_EQ >>
+  rw[]
+QED
+        
 Theorem project'_dsubst_commute:
   ∀dn c proc c' dvars.
   dvarsOf(Fix dn c) = [] ∧
@@ -100,22 +175,226 @@ Proof
       gs[dprocsOf_dvarsOf_empty_cons,dprocsOf_empty]
       >- (gs[dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub']
           >- (qpat_x_assum ‘∀dvars. _ ⇒ project' _ _ _ = _’ (dep_rewrite.DEP_ONCE_REWRITE_TAC o single) >>
-              conj_asm1_tac >- cheat >>
+              conj_asm1_tac
+              >- (gs[project_dvarsOf_empty,project_dvarsOf_empty_Fix,project_def] >>
+                  fs[dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
+                  qmatch_asmsub_abbrev_tac ‘project_ok proc adv1 c’ >>
+                  qmatch_goalsub_abbrev_tac ‘project_ok proc adv2 c’ >>
+                  ‘project proc adv1 c = project proc adv2 c’
+                    by(unabbrev_all_tac >>
+                       match_mp_tac project_ALOOKUP_EQ_strong >>
+                       rw[SUBSET_DEF,SET_EQ_SUBSET,dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub',
+                          CaseEq "bool"] >>
+                       fs[dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
+                       res_tac >>
+                       imp_res_tac SUBSET_THM >>
+                       PURE_FULL_CASE_TAC >> fs[] >>
+                       rveq >> fs[] >>
+                       metis_tac[SUBSET_THM]) >>
+                  fs[] >>
+                  unabbrev_all_tac >>
+                  conj_tac >-
+                    (qmatch_asmsub_abbrev_tac ‘project_ok proc adv1 c'’ >>
+                     qmatch_goalsub_abbrev_tac ‘project_ok proc adv2 c'’ >>
+                     ‘project proc adv1 c' = project proc adv2 c'’
+                       by(unabbrev_all_tac >>
+                          match_mp_tac project_ALOOKUP_EQ_strong >>
+                          rw[SUBSET_DEF,SET_EQ_SUBSET,dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub',
+                             CaseEq "bool"] >>
+                          gs[set_dvarsOf_dsubst_eq,dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
+                          res_tac >>
+                          imp_res_tac SUBSET_THM >> fs[] >>
+                          TRY PURE_FULL_CASE_TAC >> fs[] >>
+                          rveq >> fs[] >>
+                          metis_tac[SUBSET_THM]) >>
+                     fs[]) >>
+                  rw[set_dvarsOf_dsubst_eq,dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub',SUBSET_DEF] >>
+                  gs[set_dvarsOf_dsubst_eq,dprocsOf_MEM_eq,set_procsOf_dsubst_eq] >>
+                  res_tac >>
+                  imp_res_tac SUBSET_THM >> fs[] >>
+                  TRY PURE_FULL_CASE_TAC >> fs[procsOf_def,MEM_nub'] >>
+                  rveq >> fs[] >>
+                  metis_tac[SUBSET_THM]) >>
               simp[project_def] >>
               gs[dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
               fs[set_dvarsOf_dsubst_eq] >>
-              cheat) >>
+              fs[project_dvarsOf_empty_Fix] >>
+              qmatch_goalsub_abbrev_tac ‘dsubst _ _ (Fix _ (project' proc adv1 c)) = dsubst _ _ (Fix _ (project' proc adv2 c))’ >>
+              ‘project proc adv1 c = project proc adv2 c’
+                by(unabbrev_all_tac >>
+                   match_mp_tac project_ALOOKUP_EQ_strong >>
+                   rw[SUBSET_DEF,SET_EQ_SUBSET,dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub',
+                      CaseEq "bool"] >>
+                   gs[set_dvarsOf_dsubst_eq,dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
+                   res_tac >>
+                   imp_res_tac SUBSET_THM >> fs[] >>
+                   TRY PURE_FULL_CASE_TAC >> fs[] >>
+                   rveq >> fs[] >>
+                   metis_tac[SUBSET_THM]) >>
+              fs[] >>
+              unabbrev_all_tac >>
+              AP_THM_TAC >>
+              AP_THM_TAC >>
+              AP_TERM_TAC >>
+              AP_TERM_TAC >>
+              match_mp_tac project_ALOOKUP_EQ_strong >>
+              rw[SUBSET_DEF,SET_EQ_SUBSET,dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub',
+                 CaseEq "bool"] >>
+              gs[set_dvarsOf_dsubst_eq,dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
+              res_tac >>
+              imp_res_tac SUBSET_THM >> fs[] >>
+              TRY PURE_FULL_CASE_TAC >> fs[] >>
+              rveq >> fs[] >>
+              metis_tac[SUBSET_THM]) >>
           gs[CaseEq "bool"] >> rveq >> gs[]
           >- (qpat_x_assum ‘∀dvars. _ ⇒ project' _ _ _ = _’ (dep_rewrite.DEP_ONCE_REWRITE_TAC o single) >>
-              conj_asm1_tac >- cheat >>
+              conj_asm1_tac
+              >- (gs[project_dvarsOf_empty,project_dvarsOf_empty_Fix,project_def] >>
+                  fs[dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
+                  qmatch_asmsub_abbrev_tac ‘project_ok proc adv1 c’ >>
+                  qmatch_goalsub_abbrev_tac ‘project_ok proc adv2 c’ >>
+                  ‘project proc adv1 c = project proc adv2 c’
+                    by(unabbrev_all_tac >>
+                       match_mp_tac project_ALOOKUP_EQ_strong >>
+                       rw[SUBSET_DEF,SET_EQ_SUBSET,dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub',
+                          CaseEq "bool"] >>
+                       fs[dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
+                       res_tac >>
+                       imp_res_tac SUBSET_THM >>
+                       PURE_FULL_CASE_TAC >> fs[] >>
+                       rveq >> fs[] >>
+                       metis_tac[SUBSET_THM]) >>
+                  fs[] >>
+                  unabbrev_all_tac >>
+                  conj_tac >-
+                    (qmatch_asmsub_abbrev_tac ‘project_ok proc adv1 c'’ >>
+                     qmatch_goalsub_abbrev_tac ‘project_ok proc adv2 c'’ >>
+                     ‘project proc adv1 c' = project proc adv2 c'’
+                       by(unabbrev_all_tac >>
+                          match_mp_tac project_ALOOKUP_EQ_strong >>
+                          rw[SUBSET_DEF,SET_EQ_SUBSET,dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub',
+                             CaseEq "bool"] >>
+                          gs[set_dvarsOf_dsubst_eq,dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
+                          res_tac >>
+                          imp_res_tac SUBSET_THM >> fs[] >>
+                          TRY PURE_FULL_CASE_TAC >> fs[] >>
+                          rveq >> fs[] >>
+                          metis_tac[SUBSET_THM]) >>
+                     fs[]) >>
+                  rw[set_dvarsOf_dsubst_eq,dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub',SUBSET_DEF] >>
+                  gs[set_dvarsOf_dsubst_eq,dprocsOf_MEM_eq,set_procsOf_dsubst_eq] >>
+                  res_tac >>
+                  imp_res_tac SUBSET_THM >> fs[] >>
+                  TRY PURE_FULL_CASE_TAC >> fs[procsOf_def,MEM_nub'] >>
+                  rveq >> fs[] >>
+                  metis_tac[SUBSET_THM]) >>
               simp[project_def] >>
               gs[dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
               fs[set_dvarsOf_dsubst_eq] >>
-              cheat) >>
+              fs[project_dvarsOf_empty_Fix] >>
+              qmatch_goalsub_abbrev_tac ‘dsubst _ _ (Fix _ (project' proc adv1 c)) = dsubst _ _ (Fix _ (project' proc adv2 c))’ >>
+              ‘project proc adv1 c = project proc adv2 c’
+                by(unabbrev_all_tac >>
+                   match_mp_tac project_ALOOKUP_EQ_strong >>
+                   rw[SUBSET_DEF,SET_EQ_SUBSET,dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub',
+                      CaseEq "bool"] >>
+                   gs[set_dvarsOf_dsubst_eq,dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
+                   res_tac >>
+                   imp_res_tac SUBSET_THM >> fs[] >>
+                   TRY PURE_FULL_CASE_TAC >> fs[] >>
+                   rveq >> fs[] >>
+                   metis_tac[SUBSET_THM]) >>
+              fs[] >>
+              unabbrev_all_tac >>
+              AP_THM_TAC >>
+              AP_THM_TAC >>
+              AP_TERM_TAC >>
+              AP_TERM_TAC >>
+              match_mp_tac project_ALOOKUP_EQ_strong >>
+              rw[SUBSET_DEF,SET_EQ_SUBSET,dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub',
+                 CaseEq "bool"] >>
+              gs[set_dvarsOf_dsubst_eq,dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
+              res_tac >>
+              imp_res_tac SUBSET_THM >> fs[] >>
+              TRY PURE_FULL_CASE_TAC >> fs[] >>
+              rveq >> fs[] >>
+              metis_tac[SUBSET_THM]) >>
           reverse IF_CASES_TAC
           >- (fs[] >> first_x_assum(qspecl_then [‘dn''’,‘procs’] mp_tac) >> simp[] >>
               fs[set_dvarsOf_dsubst_eq]) >>
-          cheat)
+          gs[]
+          >> (qpat_x_assum ‘∀dvars. _ ⇒ project' _ _ _ = _’ (dep_rewrite.DEP_ONCE_REWRITE_TAC o single) >>
+              conj_asm1_tac
+              >- (gs[project_dvarsOf_empty,project_dvarsOf_empty_Fix,project_def] >>
+                  fs[dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
+                  qmatch_asmsub_abbrev_tac ‘project_ok proc adv1 c’ >>
+                  qmatch_goalsub_abbrev_tac ‘project_ok proc adv2 c’ >>
+                  ‘project proc adv1 c = project proc adv2 c’
+                    by(unabbrev_all_tac >>
+                       match_mp_tac project_ALOOKUP_EQ_strong >>
+                       rw[SUBSET_DEF,SET_EQ_SUBSET,dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub',
+                          CaseEq "bool"] >>
+                       fs[dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
+                       res_tac >>
+                       imp_res_tac SUBSET_THM >>
+                       PURE_FULL_CASE_TAC >> fs[] >>
+                       rveq >> fs[] >>
+                       metis_tac[SUBSET_THM]) >>
+                  fs[] >>
+                  unabbrev_all_tac >>
+                  conj_tac >-
+                    (qmatch_asmsub_abbrev_tac ‘project_ok proc adv1 c'’ >>
+                     qmatch_goalsub_abbrev_tac ‘project_ok proc adv2 c'’ >>
+                     ‘project proc adv1 c' = project proc adv2 c'’
+                       by(unabbrev_all_tac >>
+                          match_mp_tac project_ALOOKUP_EQ_strong >>
+                          rw[SUBSET_DEF,SET_EQ_SUBSET,dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub',
+                             CaseEq "bool"] >>
+                          gs[set_dvarsOf_dsubst_eq,dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
+                          res_tac >>
+                          imp_res_tac SUBSET_THM >> fs[] >>
+                          TRY PURE_FULL_CASE_TAC >> fs[] >>
+                          rveq >> fs[] >>
+                          metis_tac[SUBSET_THM]) >>
+                     fs[]) >>
+                  rw[set_dvarsOf_dsubst_eq,dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub',SUBSET_DEF] >>
+                  gs[set_dvarsOf_dsubst_eq,dprocsOf_MEM_eq,set_procsOf_dsubst_eq] >>
+                  res_tac >>
+                  imp_res_tac SUBSET_THM >> fs[] >>
+                  TRY PURE_FULL_CASE_TAC >> fs[procsOf_def,MEM_nub'] >>
+                  rveq >> fs[] >>
+                  metis_tac[SUBSET_THM]) >>
+              simp[project_def] >>
+              gs[dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
+              fs[set_dvarsOf_dsubst_eq] >>
+              fs[project_dvarsOf_empty_Fix] >>
+              qmatch_goalsub_abbrev_tac ‘dsubst _ _ (Fix _ (project' proc adv1 c)) = dsubst _ _ (Fix _ (project' proc adv2 c))’ >>
+              ‘project proc adv1 c = project proc adv2 c’
+                by(unabbrev_all_tac >>
+                   match_mp_tac project_ALOOKUP_EQ_strong >>
+                   rw[SUBSET_DEF,SET_EQ_SUBSET,dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub',
+                      CaseEq "bool"] >>
+                   gs[set_dvarsOf_dsubst_eq,dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
+                   res_tac >>
+                   imp_res_tac SUBSET_THM >> fs[] >>
+                   TRY PURE_FULL_CASE_TAC >> fs[] >>
+                   rveq >> fs[] >>
+                   metis_tac[SUBSET_THM]) >>
+              fs[] >>
+              unabbrev_all_tac >>
+              AP_THM_TAC >>
+              AP_THM_TAC >>
+              AP_TERM_TAC >>
+              AP_TERM_TAC >>
+              match_mp_tac project_ALOOKUP_EQ_strong >>
+              rw[SUBSET_DEF,SET_EQ_SUBSET,dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub',
+                 CaseEq "bool"] >>
+              gs[set_dvarsOf_dsubst_eq,dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
+              res_tac >>
+              imp_res_tac SUBSET_THM >> fs[] >>
+              TRY PURE_FULL_CASE_TAC >> fs[] >>
+              rveq >> fs[] >>
+              metis_tac[SUBSET_THM]))
       >- (gs[dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
           fs[set_dvarsOf_dsubst_eq] >>
           IF_CASES_TAC >> gs[] >>
