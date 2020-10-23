@@ -208,29 +208,6 @@ Proof
   fs[ALOOKUP_NONE]
 QED
 
-Theorem lkjb_lemma:
-  ∀proc p c1 c2 c3 c4 dn c5 dvars.
-    split_sel proc p c1 = SOME (T,c3) ∧
-    split_sel proc p c2 = SOME (F,c4) ∧
-    proc ≠ p ∧
-    project proc dvars (dsubst c1 dn c5) =
-    project proc dvars (dsubst c2 dn c5)
-    ⇒ F
-Proof
-  recInduct split_sel_ind >> rpt strip_tac >>
-  Cases_on ‘c2’ >> fs[split_sel_def,AllCaseEqs()] >>
-  rveq >> fs[] >>
-  gs[chorLangTheory.dsubst_def,project_def] >>
-
-
-
-  Cases_on ‘p2 = p’ >> fs[] >>
-
-
-  rw[split_sel_def]
-  Induct_on ‘c1’ >> rw[split
-QED
-
 Theorem project'_dsubst_commute:
   ∀dn c proc c' dvars.
   dvarsOf(Fix dn c) = [] ∧
