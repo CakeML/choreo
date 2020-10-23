@@ -21,6 +21,41 @@ Proof
   rw[nub'_dvarsOf]
 QED
 
+Theorem split_sel_procsOf:
+  ∀proc p c b r.
+  split_sel proc p c = SOME (b,r) ⇒
+  set(procsOf r) ⊆ set(procsOf c)
+Proof
+  ho_match_mp_tac split_sel_ind >>
+  rw[split_sel_def,procsOf_def,set_nub'] >>
+  rw[SUBSET_DEF] >>
+  res_tac >>
+  gs[SUBSET_DEF]
+QED
+
+Theorem split_sel_size:
+  ∀proc p c b r.
+  split_sel proc p c = SOME (b,r) ⇒
+  chor_to_endpoint$chor_size r ≤ chor_to_endpoint$chor_size c
+Proof
+  ho_match_mp_tac split_sel_ind >>
+  rw[split_sel_def,chor_to_endpointTheory.chor_size_def] >>
+  res_tac >>
+  DECIDE_TAC
+QED
+
+Theorem split_sel_procsOf:
+  ∀proc p c b r.
+  split_sel proc p c = SOME (b,r) ⇒
+  set(procsOf r) ⊆ set(procsOf c)
+Proof
+  ho_match_mp_tac split_sel_ind >>
+  rw[split_sel_def,procsOf_def,set_nub'] >>
+  rw[SUBSET_DEF] >>
+  res_tac >>
+  gs[SUBSET_DEF]
+QED
+
 Theorem project_ALOOKUP_EQ:
   ∀proc dvars c dvars'.
     (∀dn. MEM dn (dvarsOf c) ⇒
@@ -126,6 +161,53 @@ Proof
   pairarg_tac >> gs[split_sel_dsubst_SOME]
 QED
 
+Theorem split_sel_nonproc_NONE:
+  ∀p p1 c.
+  ~MEM p (procsOf c) ⇒ split_sel p p1 c = NONE
+Proof
+  ho_match_mp_tac split_sel_ind >>
+  rw[procsOf_def,MEM_nub'] >>
+  fs[split_sel_def]
+QED
+
+Theorem split_sel_nondproc_NONE:
+  ∀p dvars p1 c.
+  ~MEM p (dprocsOf dvars c) ⇒ split_sel p p1 c = NONE
+Proof
+  metis_tac[split_sel_nonproc_NONE,dprocsOf_MEM_eq]
+QED
+
+Theorem project_nonmember_nil_lemma:
+  ∀proc dvars c.
+  ~MEM proc (dprocsOf dvars c) ∧
+  set(dvarsOf c) ⊆ set(MAP FST dvars)
+  ⇒
+  project proc dvars c = (T,Nil)
+Proof
+  ho_match_mp_tac project_ind >>
+  rw[project_def,procsOf_def,dprocsOf_def,MEM_nub',dvarsOf_def,set_nub'] >>
+  fs[AllCaseEqs()] >>
+  imp_res_tac split_sel_nondproc_NONE >>
+  fs[] >>
+  PURE_FULL_CASE_TAC >> fs[] >>
+  fs[ALOOKUP_NONE]
+QED
+
+Theorem project_nonmember_nil_lemma':
+  ∀proc dvars c.
+  ~MEM proc (dprocsOf dvars c)
+  ⇒
+  ∃b. project proc dvars c = (b,Nil)
+Proof
+  ho_match_mp_tac project_ind >>
+  rw[project_def,procsOf_def,dprocsOf_def,MEM_nub',dvarsOf_def,set_nub'] >>
+  fs[AllCaseEqs()] >>
+  imp_res_tac split_sel_nondproc_NONE >>
+  fs[] >>
+  PURE_FULL_CASE_TAC >> fs[] >>
+  fs[ALOOKUP_NONE]
+QED
+
 Theorem project'_dsubst_commute:
   ∀dn c proc c' dvars.
   dvarsOf(Fix dn c) = [] ∧
@@ -187,8 +269,37 @@ Proof
           pairarg_tac >> fs[] >> rveq >>
           rw[] >> fs[] >>
           simp[endpointLangTheory.dsubst_def] >>
-          cheat) >>
-     cheat)
+          conj_tac >>
+          last_x_assum (dep_rewrite.DEP_ONCE_REWRITE_TAC o single) >>
+          simp[project_def] >>
+          imp_res_tac split_sel_procsOf >>
+          imp_res_tac split_sel_size >>
+          gs[SUBSET_DEF] >>
+          metis_tac[])
+      >- ((* Somehow, a contradiction should be derivable here from the project (in)equalities
+             in the assumptions. *)
+          cheat)
+      >- ( (* Somehow, a contradiction should be derivable here from the project (in)equalities
+              in the assumptions. *)
+          cheat)
+      >- (fs[split_sel_dsubst_eq] >>
+          Cases_on ‘split_sel proc p c1’ >> gs[] >>
+          Cases_on ‘split_sel proc p c2’ >> gs[] >>
+          pairarg_tac >> gs[] >> rveq >> rw[] >> fs[] >>
+          pairarg_tac >> gs[] >> rveq >> rw[] >> fs[] >>
+          simp[endpointLangTheory.dsubst_def] >>
+          conj_tac >>
+          last_x_assum (dep_rewrite.DEP_ONCE_REWRITE_TAC o single) >>
+          simp[project_def] >>
+          imp_res_tac split_sel_procsOf >>
+          imp_res_tac split_sel_size >>
+          gs[SUBSET_DEF] >>
+          metis_tac[])
+      >- (gs[dprocsOf_MEM_eq])
+      >- (gs[dprocsOf_MEM_eq])
+      >- (gs[dprocsOf_MEM_eq])
+      >- (gs[dprocsOf_MEM_eq]) >>
+      cheat)
   >- (rename1 ‘Com _ _ _ _ c'’ >>
       first_x_assum(qspec_then ‘chor_to_endpoint$chor_size c'’ assume_tac) >>
       strip_tac >> fs[chor_size_def] >>
@@ -460,6 +571,23 @@ Proof
   >- (rw[endpointLangTheory.dsubst_def,chorLangTheory.dsubst_def,project_def] >>
       fs[endpointLangTheory.dsubst_def,chorLangTheory.dsubst_def] >>
       TOP_CASE_TAC >> fs[] >> rw[endpointLangTheory.dsubst_def,chorLangTheory.dsubst_def])
+QED
+
+Theorem project'_dsubst_commute_nil:
+  ∀dn c proc c'.
+    dvarsOf(Fix dn c) = [] ∧
+    project_ok proc [] (Fix dn c)
+    ⇒
+    project' proc [] (dsubst c dn (Fix dn c)) =
+    dsubst (project' proc [(dn,dprocsOf [(dn,[])] c)] c) dn (project' proc [] (Fix dn c))
+Proof
+  rpt strip_tac >>
+  match_mp_tac project'_dsubst_commute >>
+  rw[] >>
+  fs[project_def] >>
+  every_case_tac >> fs[] >>
+  dep_rewrite.DEP_ONCE_REWRITE_TAC[project_nonmember_nil_lemma] >>
+  fs[dvarsOf_def,dprocsOf_MEM_eq,FILTER_EQ_NIL,EVERY_MEM,MEM_nub',SUBSET_DEF]
 QED
 
 val trans_dequeue_gen = Q.store_thm("trans_dequeue_gen",
@@ -1168,15 +1296,6 @@ Theorem dsubst_procsOf_not_MEM =
   |> EQ_IMP_RULE
   |> snd
   |> GEN_ALL
-
-Theorem split_sel_nonproc_NONE:
-  ∀p p1 c.
-  ~MEM p (procsOf c) ⇒ split_sel p p1 c = NONE
-Proof
-  ho_match_mp_tac split_sel_ind >>
-  rw[procsOf_def,MEM_nub'] >>
-  fs[split_sel_def]
-QED
 
 Theorem project_nonmember_nil:
   ∀p c.
