@@ -1,4 +1,4 @@
-oopen preamble choreoUtilsTheory
+open preamble choreoUtilsTheory
               endpointLangTheory chor_to_endpointTheory
               endpointSemTheory endpointPropsTheory
               endpointCongTheory chorSemTheory chorPropsTheory
