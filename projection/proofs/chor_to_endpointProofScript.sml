@@ -3031,6 +3031,7 @@ Theorem compile_network_reflection_lemma:
     ∧ set(procsOf c) ⊆ set pn
     ∧ no_undefined_vars (s,c)
     ∧ no_self_comunication c
+    ∧ dvarsOf c = []
     ∧ reduction (compile_network s c pn) p2
     ==> ∃s' c' p3.
              reduction^* p2 p3
@@ -3045,6 +3046,7 @@ Proof
     ∧ set(procsOf c) ⊆ set pn
     ∧ no_undefined_vars (s,c)
     ∧ no_self_comunication c
+    ∧ dvarsOf c = []
     ∧ reduction (compile_network s c pn) p2
     ==> ∃s' c' p3.
              reduction^* p2 p3
@@ -3090,7 +3092,7 @@ Proof
       disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
       disch_then (drule_at (Pos last)) >>
       impl_tac >-
-        (fs[no_self_comunication_def,procsOf_def,set_nub',DELETE_SUBSET_INSERT] >>
+        (fs[no_self_comunication_def,procsOf_def,set_nub',DELETE_SUBSET_INSERT,dvarsOf_def,nub'_nil] >>
          drule_then MATCH_ACCEPT_TAC compile_network_ok_dest_com) >>
       strip_tac >>
       drule_at (Pos last) qcong_reduction_pres >>
@@ -3134,7 +3136,7 @@ Proof
       disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
       disch_then (drule_at (Pos last)) >>
       impl_tac >-
-        (fs[no_self_comunication_def,procsOf_def,set_nub',DELETE_SUBSET_INSERT] >>
+        (fs[no_self_comunication_def,procsOf_def,set_nub',DELETE_SUBSET_INSERT,dvarsOf_def,nub'_nil] >>
          fs[compile_network_ok_project_ok] >>
          rw[] >> res_tac >> fs[project_def] >>
          FULL_CASE_TAC >> fs[]) >>
@@ -3179,7 +3181,7 @@ Proof
       disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
       disch_then (drule_at (Pos last)) >>
       impl_tac >-
-        (fs[no_self_comunication_def,procsOf_def,set_nub',DELETE_SUBSET_INSERT] >>
+        (fs[no_self_comunication_def,procsOf_def,set_nub',DELETE_SUBSET_INSERT,dvarsOf_def,nub'_nil] >>
          drule_then MATCH_ACCEPT_TAC compile_network_ok_dest_sel) >>
       strip_tac >>
       drule_at (Pos last) qcong_reduction_pres >>
@@ -3201,6 +3203,7 @@ Proof
           gs[MAP_EQ_APPEND] >> rveq >>
           qhdtm_x_assum ‘trans’ (strip_assume_tac o REWRITE_RULE[project_def]) >>
           rename [‘no_undefined_vars (s, Fix dn c)’] >>
+          fs[dprocsOf_MEM_eq] >>
           reverse(Cases_on ‘MEM proc (procsOf c)’)
           >- (fs[project_def] >>
               spose_not_then kall_tac >>
@@ -3212,21 +3215,90 @@ Proof
           irule_at Any trans_fix >>
           irule_at Any qcong_refl >>
           rename1 ‘ps1 ++ [proc] ++ ps2’ >>
-          reverse conj_tac >- cheat >>
+          reverse conj_tac
+          >- (fs[compile_network_ok_project_ok] >>
+              rw[] >>
+              match_mp_tac (project'_dsubst_commute
+                            |> Ho_Rewrite.REWRITE_RULE [IMP_CONJ_THM,FORALL_AND_THM]
+                            |> CONJUNCT2) >>
+              fs[DISJ_IMP_THM,FORALL_AND_THM] >>
+              gs[project_def,dprocsOf_MEM_eq] >>
+              res_tac >>
+              PURE_FULL_CASE_TAC >> fs[] >>
+              dep_rewrite.DEP_ONCE_REWRITE_TAC [project_nonmember_nil_lemma] >>
+              fs[dprocsOf_MEM_eq,dvarsOf_def,FILTER_EQ_NIL,EVERY_MEM,SUBSET_DEF,MEM_nub']
+             ) >>
+          qpat_x_assum ‘_ ⊆ _’ kall_tac >>
           Induct_on ‘ps1’ >-
             (rw[] >> fs[Once endpointSemTheory.trans_cases] >> rveq >>
-
-
-                )
-
-
-          cheat) >>
+             fs[compile_network_gen_def] >>
+             drule project'_dsubst_commute >>
+             disch_then drule >>
+             qpat_assum ‘project_ok _ _ _’ (mp_tac o REWRITE_RULE[project_def,dprocsOf_MEM_eq]) >>
+             simp[] >>
+             strip_tac >>
+             disch_then drule >>
+             impl_tac >- simp[] >>
+             disch_then(mp_tac o REWRITE_RULE[project_def,dprocsOf_MEM_eq]) >>
+             simp[] >>
+             strip_tac >>
+             CONV_TAC(RAND_CONV(REWRITE_CONV [project_def,dprocsOf_MEM_eq])) >>
+             simp[] >>
+             match_mp_tac reduction_par_r >>
+             ntac 3 (pop_assum kall_tac) >>
+             Induct_on ‘ps2’ >- simp[] >>
+             rw[compile_network_gen_def] >>
+             first_x_assum drule_all >>
+             strip_tac >>
+             match_mp_tac (MP_CANON RTC_RTC) >>
+             irule_at (Pos last) reduction_par_r >>
+             first_x_assum (irule_at (Pos hd)) >>
+             match_mp_tac reduction_par_l >>
+             simp[project_def,dprocsOf_MEM_eq] >>
+             IF_CASES_TAC >-
+               (simp[] >>
+                match_mp_tac RTC_SUBSET >>
+                simp[reduction_def,Once endpointSemTheory.trans_cases] >>
+                drule project'_dsubst_commute >>
+                disch_then drule >>
+                qpat_assum ‘project_ok _ _ _’ (mp_tac o REWRITE_RULE[project_def,dprocsOf_MEM_eq]) >>
+                simp[] >>
+                strip_tac >>
+                disch_then drule >>
+                impl_tac >- simp[] >>
+                rw[project_def,dprocsOf_MEM_eq]) >>
+             dep_rewrite.DEP_ONCE_REWRITE_TAC[project_nonmember_nil] >>
+             simp[] >>
+             simp[procsOf_dsubst_not_MEM]) >>
+          rw[compile_network_gen_def] >>
+          first_x_assum drule_all >>
+          strip_tac >>
+          match_mp_tac (MP_CANON RTC_RTC) >>
+          irule_at (Pos last) reduction_par_r >>
+          first_x_assum (irule_at (Pos hd)) >>
+          match_mp_tac reduction_par_l >>
+          simp[project_def,dprocsOf_MEM_eq] >>
+          IF_CASES_TAC >-
+           (simp[] >>
+            match_mp_tac RTC_SUBSET >>
+            simp[reduction_def,Once endpointSemTheory.trans_cases] >>
+            drule project'_dsubst_commute >>
+            disch_then drule >>
+            qpat_assum ‘project_ok _ _ _’ (mp_tac o REWRITE_RULE[project_def,dprocsOf_MEM_eq]) >>
+            simp[] >>
+            strip_tac >>
+            disch_then drule >>
+            impl_tac >- simp[] >>
+            rw[project_def,dprocsOf_MEM_eq]) >>
+          dep_rewrite.DEP_ONCE_REWRITE_TAC[project_nonmember_nil] >>
+          simp[] >>
+          simp[procsOf_dsubst_not_MEM]) >>
       gs[MAP_EQ_APPEND] >> rveq >>
       fs[project_def] >>
       spose_not_then kall_tac >>
       fs[Once endpointSemTheory.trans_cases] >>
       rveq >>
-      rpt(PURE_FULL_CASE_TAC >> fs[] >> rveq) >>
+      rpt(PURE_FULL_CASE_TAC >> fs[] >> rveq)
      )
   >- ((* Call *)
       pop_assum kall_tac >>
