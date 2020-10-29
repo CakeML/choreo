@@ -214,10 +214,8 @@ Theorem project'_dsubst_commute:
   project_ok proc dvars (Fix dn c) ∧
   project_ok proc ((dn,dprocsOf ((dn,[])::dvars) c)::dvars) c' ∧
   (∀dn procs. ALOOKUP dvars dn = SOME procs ⇒ set procs ⊆ set(procsOf c)) ∧
-  set(procsOf c') ⊆ set(procsOf c)
-  ⇒
-  project' proc dvars (dsubst c' dn (Fix dn c)) =
-  dsubst (project' proc ((dn,dprocsOf ((dn,[])::dvars) c)::dvars) c') dn (project' proc dvars (Fix dn c))
+  set(procsOf c') ⊆ set(procsOf c) ⇒
+  project_ok proc dvars (dsubst c' dn (Fix dn c))
 Proof
   ntac 3 strip_tac >>
   completeInduct_on ‘chor_to_endpoint$chor_size c'’ >>
@@ -226,6 +224,74 @@ Proof
   >- (rename [‘IfThen v p c1 c2’] >>
       strip_tac >> fs[chor_size_def] >> rveq >>
       rw[endpointLangTheory.dsubst_def,chorLangTheory.dsubst_def,project_def,procsOf_def,set_nub',SUBSET_DEF,chor_size_def] >> fs[]
+      )
+QED
+
+Theorem split_sel_project_ok:
+  !h p c b r. h <> p /\ split_sel h p c = SOME (b,r)
+   /\ project_ok h dvars r
+   ==> project_ok h dvars c
+Proof
+  Induct_on `c` >> rw[project_def,split_sel_def]
+  >> metis_tac[]
+QED
+
+Theorem split_sel_project_ok2:
+  !h p c b r. h <> p /\ split_sel h p c = SOME (b,r)
+   /\ project_ok h dvars c
+   ==> project_ok h dvars r
+Proof
+  Induct_on `c` >> rw[project_def,split_sel_def]
+  >> metis_tac[]
+QED
+
+Theorem project'_dsubst_commute:
+  ∀dn c proc c' dvars.
+  dvarsOf(Fix dn c) = [] ∧
+  project_ok proc dvars (Fix dn c) ∧
+  project_ok proc ((dn,dprocsOf ((dn,[])::dvars) c)::dvars) c' ∧
+  (∀dn procs. ALOOKUP dvars dn = SOME procs ⇒ set procs ⊆ set(procsOf c)) ∧
+  set(procsOf c') ⊆ set(procsOf c)
+  ⇒
+  (project' proc dvars (dsubst c' dn (Fix dn c)) =
+   dsubst (project' proc ((dn,dprocsOf ((dn,[])::dvars) c)::dvars) c') dn (project' proc dvars (Fix dn c)) ∧
+   project_ok proc dvars (dsubst c' dn (Fix dn c)))
+Proof
+  ntac 3 strip_tac >>
+  completeInduct_on ‘chor_to_endpoint$chor_size c'’ >>
+  Cases >> rpt conj_tac
+  >- (rw[endpointLangTheory.dsubst_def,chorLangTheory.dsubst_def,project_def,procsOf_def,SUBSET_DEF])
+  >- (rename [‘IfThen v p c1 c2’] >>
+      strip_tac >> fs[chor_size_def] >> rveq >>
+      rw[endpointLangTheory.dsubst_def,chorLangTheory.dsubst_def,project_def,procsOf_def,set_nub',SUBSET_DEF,chor_size_def] >> fs[]
+      >- (last_x_assum(qspec_then ‘chor_to_endpoint$chor_size c1’ mp_tac) >>
+          impl_tac >- simp[] >>
+          disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+          disch_then(qspec_then ‘dvars’ mp_tac) >>
+          simp[project_def] >>
+          impl_tac >- (rw[SUBSET_DEF] >> metis_tac[]) >>
+          simp[])
+      >- (last_x_assum(qspec_then ‘chor_to_endpoint$chor_size c2’ mp_tac) >>
+          impl_tac >- simp[] >>
+          disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+          disch_then(qspec_then ‘dvars’ mp_tac) >>
+          simp[project_def] >>
+          impl_tac >- (rw[SUBSET_DEF] >> metis_tac[]) >>
+          simp[])
+      >- (last_x_assum(qspec_then ‘chor_to_endpoint$chor_size c1’ mp_tac) >>
+          impl_tac >- simp[] >>
+          disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+          disch_then(qspec_then ‘dvars’ mp_tac) >>
+          simp[project_def] >>
+          impl_tac >- (rw[SUBSET_DEF] >> metis_tac[]) >>
+          simp[])
+      >- (last_x_assum(qspec_then ‘chor_to_endpoint$chor_size c2’ mp_tac) >>
+          impl_tac >- simp[] >>
+          disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+          disch_then(qspec_then ‘dvars’ mp_tac) >>
+          simp[project_def] >>
+          impl_tac >- (rw[SUBSET_DEF] >> metis_tac[]) >>
+          simp[])
       >- (last_x_assum(qspec_then ‘chor_to_endpoint$chor_size c1’ mp_tac) >>
           impl_tac >- simp[] >>
           disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
@@ -270,15 +336,103 @@ Proof
           rw[] >> fs[] >>
           simp[endpointLangTheory.dsubst_def] >>
           conj_tac >>
+          fs[PULL_FORALL,AND_IMP_INTRO,IMP_CONJ_THM] >>
+          rfs[FORALL_AND_THM] >>
+          last_x_assum (dep_rewrite.DEP_ONCE_REWRITE_TAC o single) >>
           last_x_assum (dep_rewrite.DEP_ONCE_REWRITE_TAC o single) >>
           simp[project_def] >>
           imp_res_tac split_sel_procsOf >>
           imp_res_tac split_sel_size >>
           gs[SUBSET_DEF] >>
           metis_tac[])
-      >- ((* Somehow, a contradiction should be derivable here from the project (in)equalities
-             in the assumptions. *)
-          cheat)
+      >- (fs[split_sel_dsubst_eq] >>
+          Cases_on ‘split_sel proc p c1’ >> gs[] >>
+          Cases_on ‘split_sel proc p c2’ >> gs[]
+          >- (last_x_assum(qspec_then ‘chor_to_endpoint$chor_size c2’ mp_tac) >>
+              impl_tac >- simp[] >>
+              disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+              disch_then(qspec_then ‘dvars’ mp_tac) >>
+              simp[project_def] >>
+              impl_tac >- (rw[SUBSET_DEF] >> metis_tac[]) >>
+              simp[]) >>
+          pairarg_tac >> fs[] >> rveq >>
+          rw[] >> fs[] >>
+          pairarg_tac >> fs[] >> rveq >>
+          rw[] >> fs[] >>
+          simp[endpointLangTheory.dsubst_def] >>
+          fs[PULL_FORALL,AND_IMP_INTRO,IMP_CONJ_THM] >>
+          rfs[FORALL_AND_THM] >>
+          last_x_assum (dep_rewrite.DEP_ONCE_REWRITE_TAC o single) >>
+          last_x_assum (dep_rewrite.DEP_ONCE_REWRITE_TAC o single) >>
+          simp[project_def] >>
+          imp_res_tac split_sel_procsOf >>
+          imp_res_tac split_sel_size >>
+          gs[SUBSET_DEF] >>
+          metis_tac[])
+      >- (spose_not_then kall_tac >>
+          Cases_on ‘split_sel proc p c1’ >> gs[] >>
+          Cases_on ‘split_sel proc p c2’ >> gs[]
+          >- (last_assum(qspec_then ‘chor_to_endpoint$chor_size c1’ mp_tac) >>
+              impl_tac >- simp[] >>
+              disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+              disch_then(qspec_then ‘dvars’ mp_tac) >>
+              impl_tac >- (simp[project_def] >> metis_tac[SUBSET_DEF]) >>
+              strip_tac >>
+              last_assum(qspec_then ‘chor_to_endpoint$chor_size c2’ mp_tac) >>
+              impl_tac >- simp[] >>
+              disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+              disch_then(qspec_then ‘dvars’ mp_tac) >>
+              impl_tac >- (simp[project_def] >> metis_tac[SUBSET_DEF]) >>
+              strip_tac >>
+              qpat_x_assum ‘_ ≠ _’ mp_tac >>
+              simp[PAIR_FST_SND_EQ]) >>
+          rpt(PURE_FULL_CASE_TAC >> gs[] >> rveq) >>
+          last_assum(qspec_then ‘chor_to_endpoint$chor_size c1’ mp_tac) >>
+          impl_tac >- simp[] >>
+          disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+          disch_then(qspec_then ‘dvars’ mp_tac) >>
+          impl_tac >- (simp[project_def] >> metis_tac[SUBSET_DEF,split_sel_project_ok]) >>
+          strip_tac >>
+          last_assum(qspec_then ‘chor_to_endpoint$chor_size c2’ mp_tac) >>
+          impl_tac >- simp[] >>
+          disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+          disch_then(qspec_then ‘dvars’ mp_tac) >>
+          impl_tac >- (simp[project_def] >> metis_tac[SUBSET_DEF,split_sel_project_ok,FST]) >>
+          strip_tac >>
+          qpat_x_assum ‘_ ≠ _’ mp_tac >>
+          simp[PAIR_FST_SND_EQ])
+      >- (spose_not_then kall_tac >>
+          Cases_on ‘split_sel proc p c1’ >> gs[] >>
+          Cases_on ‘split_sel proc p c2’ >> gs[]
+          >- (last_assum(qspec_then ‘chor_to_endpoint$chor_size c1’ mp_tac) >>
+              impl_tac >- simp[] >>
+              disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+              disch_then(qspec_then ‘dvars’ mp_tac) >>
+              impl_tac >- (simp[project_def] >> metis_tac[SUBSET_DEF]) >>
+              strip_tac >>
+              last_assum(qspec_then ‘chor_to_endpoint$chor_size c2’ mp_tac) >>
+              impl_tac >- simp[] >>
+              disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+              disch_then(qspec_then ‘dvars’ mp_tac) >>
+              impl_tac >- (simp[project_def] >> metis_tac[SUBSET_DEF]) >>
+              strip_tac >>
+              qpat_x_assum ‘_ ≠ _’ mp_tac >>
+              simp[PAIR_FST_SND_EQ]) >>
+          rpt(PURE_FULL_CASE_TAC >> gs[] >> rveq) >>
+          last_assum(qspec_then ‘chor_to_endpoint$chor_size c1’ mp_tac) >>
+          impl_tac >- simp[] >>
+          disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+          disch_then(qspec_then ‘dvars’ mp_tac) >>
+          impl_tac >- (simp[project_def] >> metis_tac[SUBSET_DEF,split_sel_project_ok]) >>
+          strip_tac >>
+          last_assum(qspec_then ‘chor_to_endpoint$chor_size c2’ mp_tac) >>
+          impl_tac >- simp[] >>
+          disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+          disch_then(qspec_then ‘dvars’ mp_tac) >>
+          impl_tac >- (simp[project_def] >> metis_tac[SUBSET_DEF,split_sel_project_ok,FST]) >>
+          strip_tac >>
+          qpat_x_assum ‘_ ≠ _’ mp_tac >>
+          simp[PAIR_FST_SND_EQ])
       >- (fs[split_sel_dsubst_eq] >>
           Cases_on ‘split_sel proc p c1’ >> gs[] >>
           Cases_on ‘split_sel proc p c2’ >> gs[] >>
@@ -286,6 +440,24 @@ Proof
           pairarg_tac >> gs[] >> rveq >> rw[] >> fs[] >>
           fs[endpointLangTheory.dsubst_def] >>
           conj_tac >>
+          fs[PULL_FORALL,AND_IMP_INTRO,IMP_CONJ_THM] >>
+          rfs[FORALL_AND_THM] >>
+          last_x_assum (dep_rewrite.DEP_ONCE_REWRITE_TAC o single) >>
+          last_x_assum (dep_rewrite.DEP_ONCE_REWRITE_TAC o single) >>
+          simp[project_def] >>
+          imp_res_tac split_sel_procsOf >>
+          imp_res_tac split_sel_size >>
+          gs[SUBSET_DEF] >>
+          metis_tac[])
+      >- (fs[split_sel_dsubst_eq] >>
+          Cases_on ‘split_sel proc p c1’ >> gs[] >>
+          Cases_on ‘split_sel proc p c2’ >> gs[] >>
+          pairarg_tac >> gs[] >> rveq >> rw[] >> fs[] >>
+          pairarg_tac >> gs[] >> rveq >> rw[] >> fs[] >>
+          fs[endpointLangTheory.dsubst_def] >>
+          fs[PULL_FORALL,AND_IMP_INTRO,IMP_CONJ_THM] >>
+          rfs[FORALL_AND_THM] >>
+          last_x_assum (dep_rewrite.DEP_ONCE_REWRITE_TAC o single) >>
           last_x_assum (dep_rewrite.DEP_ONCE_REWRITE_TAC o single) >>
           simp[project_def] >>
           imp_res_tac split_sel_procsOf >>
@@ -299,12 +471,34 @@ Proof
           pairarg_tac >> gs[] >> rveq >> rw[] >> fs[] >>
           simp[endpointLangTheory.dsubst_def] >>
           conj_tac >>
+          fs[PULL_FORALL,AND_IMP_INTRO,IMP_CONJ_THM] >>
+          rfs[FORALL_AND_THM] >>
+          last_x_assum (dep_rewrite.DEP_ONCE_REWRITE_TAC o single) >>
           last_x_assum (dep_rewrite.DEP_ONCE_REWRITE_TAC o single) >>
           simp[project_def] >>
           imp_res_tac split_sel_procsOf >>
           imp_res_tac split_sel_size >>
           gs[SUBSET_DEF] >>
           metis_tac[])
+      >- (fs[split_sel_dsubst_eq] >>
+          Cases_on ‘split_sel proc p c1’ >> gs[] >>
+          Cases_on ‘split_sel proc p c2’ >> gs[] >>
+          pairarg_tac >> gs[] >> rveq >> rw[] >> fs[] >>
+          pairarg_tac >> gs[] >> rveq >> rw[] >> fs[] >>
+          simp[endpointLangTheory.dsubst_def] >>
+          fs[PULL_FORALL,AND_IMP_INTRO,IMP_CONJ_THM] >>
+          rfs[FORALL_AND_THM] >>
+          last_x_assum (dep_rewrite.DEP_ONCE_REWRITE_TAC o single) >>
+          last_x_assum (dep_rewrite.DEP_ONCE_REWRITE_TAC o single) >>
+          simp[project_def] >>
+          imp_res_tac split_sel_procsOf >>
+          imp_res_tac split_sel_size >>
+          gs[SUBSET_DEF] >>
+          metis_tac[])
+      >- (gs[dprocsOf_MEM_eq])
+      >- (gs[dprocsOf_MEM_eq])
+      >- (gs[dprocsOf_MEM_eq])
+      >- (gs[dprocsOf_MEM_eq])
       >- (gs[dprocsOf_MEM_eq])
       >- (gs[dprocsOf_MEM_eq])
       >- (gs[dprocsOf_MEM_eq])
@@ -339,7 +533,9 @@ Proof
       fs[dprocsOf_init_dup,project_init_dup] >>
       gs[dprocsOf_dvarsOf_empty_cons,dprocsOf_empty]
       >- (gs[dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub']
-          >- (qpat_x_assum ‘∀dvars. _ ⇒ project' _ _ _ = _’ (dep_rewrite.DEP_ONCE_REWRITE_TAC o single) >>
+          >- (fs[PULL_FORALL,AND_IMP_INTRO,IMP_CONJ_THM] >>
+              rfs[FORALL_AND_THM] >>
+              qpat_x_assum ‘∀dvars. _ ⇒ project' _ _ _ = _’ (dep_rewrite.DEP_ONCE_REWRITE_TAC o single) >>
               conj_asm1_tac
               >- (gs[project_dvarsOf_empty,project_dvarsOf_empty_Fix,project_def] >>
                   fs[dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
@@ -412,7 +608,9 @@ Proof
               rveq >> fs[] >>
               metis_tac[SUBSET_THM]) >>
           gs[CaseEq "bool"] >> rveq >> gs[]
-          >- (qpat_x_assum ‘∀dvars. _ ⇒ project' _ _ _ = _’ (dep_rewrite.DEP_ONCE_REWRITE_TAC o single) >>
+          >- (fs[PULL_FORALL,AND_IMP_INTRO,IMP_CONJ_THM] >>
+              rfs[FORALL_AND_THM] >>
+              qpat_x_assum ‘∀dvars. _ ⇒ project' _ _ _ = _’ (dep_rewrite.DEP_ONCE_REWRITE_TAC o single) >>
               conj_asm1_tac
               >- (gs[project_dvarsOf_empty,project_dvarsOf_empty_Fix,project_def] >>
                   fs[dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
@@ -488,7 +686,9 @@ Proof
           >- (fs[] >> first_x_assum(qspecl_then [‘dn''’,‘procs’] mp_tac) >> simp[] >>
               fs[set_dvarsOf_dsubst_eq]) >>
           gs[]
-          >> (qpat_x_assum ‘∀dvars. _ ⇒ project' _ _ _ = _’ (dep_rewrite.DEP_ONCE_REWRITE_TAC o single) >>
+          >> (fs[PULL_FORALL,AND_IMP_INTRO,IMP_CONJ_THM] >>
+              rfs[FORALL_AND_THM] >>
+              qpat_x_assum ‘∀dvars. _ ⇒ project' _ _ _ = _’ (dep_rewrite.DEP_ONCE_REWRITE_TAC o single) >>
               conj_asm1_tac
               >- (gs[project_dvarsOf_empty,project_dvarsOf_empty_Fix,project_def] >>
                   fs[dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
@@ -560,6 +760,12 @@ Proof
               TRY PURE_FULL_CASE_TAC >> fs[] >>
               rveq >> fs[] >>
               metis_tac[SUBSET_THM]))
+      >- cheat
+      >- (gs[dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
+          fs[set_dvarsOf_dsubst_eq] >>
+          IF_CASES_TAC >> gs[] >>
+          PURE_FULL_CASE_TAC >> fs[] >>
+          metis_tac[])
       >- (gs[dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
           fs[set_dvarsOf_dsubst_eq] >>
           IF_CASES_TAC >> gs[] >>
@@ -571,6 +777,19 @@ Proof
           fs[CaseEq "bool"] >> rveq >> fs[] >>
           res_tac >>
           drule_all_then strip_assume_tac SUBSET_THM >> fs[])
+      >- (gs[dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
+          fs[set_dvarsOf_dsubst_eq] >>
+          TRY(drule_all_then strip_assume_tac SUBSET_THM >> fs[]) >>
+          fs[CaseEq "bool"] >> rveq >> fs[] >>
+          res_tac >>
+          drule_all_then strip_assume_tac SUBSET_THM >> fs[])
+      >- (gs[dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
+          fs[set_dvarsOf_dsubst_eq] >>
+          IF_CASES_TAC >> fs[] >>
+          FULL_CASE_TAC >> fs[] >>
+          rveq >> fs[] >>
+          res_tac >>
+          metis_tac[SUBSET_THM])
       >- (gs[dprocsOf_MEM_eq,set_procsOf_dsubst_eq,procsOf_def,set_nub'] >>
           fs[set_dvarsOf_dsubst_eq] >>
           IF_CASES_TAC >> fs[] >>
@@ -783,20 +1002,6 @@ val compile_network_if_l_eq = Q.store_thm("compile_network_if_l_eq",
   \\ Cases_on `p = p'`
   \\ fs []
 );
-
-val split_sel_project_ok = Q.store_thm("split_sel_project_ok",
-  `!h p c b r. h <> p /\ split_sel h p c = SOME (b,r)
-   /\ project_ok h r
-   ==> project_ok h c`,
-  Induct_on `c` >> rw[project_def,split_sel_def]
-  >> metis_tac[]);
-
-val split_sel_project_ok2 = Q.store_thm("split_sel_project_ok2",
-  `!h p c b r. h <> p /\ split_sel h p c = SOME (b,r)
-   /\ project_ok h c
-   ==> project_ok h r`,
-  Induct_on `c` >> rw[project_def,split_sel_def]
-  >> metis_tac[]);
 
 val compile_network_if_l = Q.store_thm("compile_network_if_l",
   `∀s v p c1 c2 l.
