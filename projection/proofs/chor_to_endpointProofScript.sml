@@ -1188,6 +1188,50 @@ val cut_sel_upto_def = Define`
 ∧ cut_sel_upto p c = c
 `;
 
+Theorem dvarsOf_cut_sel_upto:
+  ∀p c. dvarsOf(cut_sel_upto p c) = dvarsOf c
+Proof
+  strip_tac >> Induct >> rw[dvarsOf_def,cut_sel_upto_def,nub'_dvarsOf] >> simp[]
+QED
+
+Theorem free_variables_cut_sel_upto:
+  ∀p c. free_variables(cut_sel_upto p c) = free_variables c
+Proof
+  strip_tac >> Induct >> rw[free_variables_def,cut_sel_upto_def] >> simp[]
+QED
+
+(* TODO: move *)
+Theorem dvarsOf_nil_trans:
+  ∀s c α l s' c'.
+  trans (s,c) (α,l) (s',c') ∧ dvarsOf c = [] ⇒
+  dvarsOf c' = []
+Proof
+  simp[GSYM AND_IMP_INTRO] >>
+  ho_match_mp_tac trans_pairind >>
+  rw[dvarsOf_def,nub'_nil] >>
+  fs[FILTER_EQ_NIL,EVERY_MEM,MEM_nub'] >>
+  ‘∀x. MEM x (dvarsOf (dsubst c dn (Fix dn c))) ⇒ F’
+    by(dep_rewrite.DEP_ONCE_REWRITE_TAC[set_dvarsOf_dsubst_eq] >>
+       fs[dvarsOf_def,nub'_nil,FILTER_EQ_NIL,EVERY_MEM,MEM_nub'] >>
+       metis_tac[]) >>
+  spose_not_then strip_assume_tac >>
+  Cases_on ‘dvarsOf (dsubst c dn (Fix dn c))’ >> fs[FORALL_AND_THM]
+QED
+
+Theorem dvarsOf_nil_trans_s:
+  ∀sc sc'.
+    trans_s sc sc'  ∧ dvarsOf(SND sc) = [] ⇒
+    dvarsOf(SND sc') = []
+Proof
+  simp[trans_s_def,GSYM AND_IMP_INTRO] >>
+  ho_match_mp_tac RTC_INDUCT >>
+  rw[] >>
+  Cases_on ‘sc’ >> Cases_on ‘sc'’ >> rename1 ‘trans _ α _’ >>
+  Cases_on ‘α’ >> fs[] >>
+  imp_res_tac dvarsOf_nil_trans >>
+  fs[]
+QED
+
 val compile_network_eq_all_project = Q.store_thm("compile_network_eq_all_project",
   `∀c c' s l. compile_network_ok s c l
     ∧ (∀p. MEM p l ⇒ project' p [] c = project' p [] c')
@@ -3024,6 +3068,55 @@ Proof
   rpt(goal_assum drule)
 QED
 
+Theorem reduction_list_trans:
+  reduction^* p1 p2 ==>
+  ?n. list_trans p1 (REPLICATE n LTau) p2
+Proof
+  rw[RTC_eq_NRC] >>
+  qexists_tac `n` >>
+  pop_assum mp_tac >>
+  MAP_EVERY qid_spec_tac [`p1`,`p2`] >>
+  Induct_on `n` >>
+  rw[list_trans_def,NRC,reduction_def] >>
+  res_tac >> goal_assum drule >> rw[]
+QED
+
+Theorem list_trans_reduction:
+  !n p1 p2.
+  list_trans p1 (REPLICATE n LTau) p2 ==>
+  reduction^* p1 p2
+Proof
+  Induct >>
+  rw[list_trans_def] >>
+  match_mp_tac RTC_TRANS >>
+  simp[reduction_def] >>
+  res_tac >> goal_assum drule >>
+  simp[]
+QED
+
+Theorem reduction_list_trans_eq:
+  reduction^* p1 p2 ⇔ ∃n. list_trans p1 (REPLICATE n LTau) p2
+Proof
+  metis_tac[reduction_list_trans,list_trans_reduction]
+QED
+
+Theorem endpoint_confluence:
+  ∀m p1 p2 p3.
+   reduction p1 p2 /\
+   reduction꙳ p1 p3 /\
+   ALL_DISTINCT (MAP FST (endpoints p1))
+   ==>
+   (?n p4. reduction꙳ p2 p4 /\
+        qcong p3 p4) \/
+   (?n p4 p5. reduction꙳ p2 p4 /\
+        reduction p3 p5 ∧
+        qcong p4 p5)
+Proof
+  rw[reduction_list_trans_eq,reduction_def] >>
+  drule_all_then strip_assume_tac endpoint_confluence_contract >>
+  metis_tac[]
+QED
+
 Theorem compile_network_reflection_lemma:
   ∀s c pn p2.
     compile_network_ok s c pn
@@ -3062,7 +3155,122 @@ Proof
       fs[project_def] >>
       fs[Once endpointSemTheory.trans_cases])
   >- ((* IfThen *)
-      cheat)
+      rw[] >>
+      rename [‘compile_network s (IfThen v p c1 c2) pn’] >>
+      rename [‘reduction _ n2’] >>
+      gs[no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP] >>
+      rename1 ‘FLOOKUP _ _ = SOME d’ >>
+      Cases_on ‘d = [1w]’ >-
+        (‘reduction꙳ (compile_network s (IfThen v p c1 c2) pn)
+                     (compile_network s (cut_sel_upto p c1) pn)’
+           by cheat >>
+         drule_then drule endpoint_confluence >>
+         simp[FST_endpoints_compile_network] >>
+         strip_tac
+         >- (goal_assum drule >>
+             irule_at (Pos hd) trans_s_step >>
+             irule_at (Pos hd) trans_if_true >>
+             simp[] >>
+             irule_at (Pos hd) trans_ln_IMP_trans_s >>
+             irule_at (Pos hd) trans_ln_cut_sel_upto >>
+             fs[no_self_comunication_def] >>
+             irule_at (Pos hd) qcong_sym >>
+             goal_assum drule >>
+             fs[compile_network_ok_project_ok,procsOf_def,set_nub'] >>
+             rpt strip_tac >> first_x_assum drule >>
+             rw[project_def] >>
+             TRY(drule_then MATCH_ACCEPT_TAC project_ok_cut_sel_upto) >>
+             rpt(PURE_FULL_CASE_TAC >> fs[] >> rveq) >>
+             metis_tac[project_ok_cut_sel_upto,split_sel_project_ok]) >>
+         last_x_assum(qspec_then ‘chor_to_endpoint$chor_size(cut_sel_upto p c1)’ mp_tac) >>
+         impl_tac >- (qspecl_then [‘p’,‘c1’] assume_tac chor_size_cut_sel_upto >> DECIDE_TAC) >>
+         disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+         first_x_assum(fn thm => disch_then(resolve_then (Pat ‘reduction _ _’) mp_tac thm)) >>
+         simp[] >>
+         impl_tac
+         >- (gs[dvarsOf_cut_sel_upto,no_self_comunication_cut_sel_upto,no_self_comunication_def,dvarsOf_def,
+                free_variables_cut_sel_upto,procsOf_def,set_nub',nub'_nil] >>
+             conj_tac
+             >- (fs[compile_network_ok_project_ok,procsOf_def,set_nub'] >>
+                 rpt strip_tac >> first_x_assum drule >>
+                 rw[project_def] >>
+                 TRY(drule_then MATCH_ACCEPT_TAC project_ok_cut_sel_upto) >>
+                 rpt(PURE_FULL_CASE_TAC >> fs[] >> rveq) >>
+                 metis_tac[project_ok_cut_sel_upto,split_sel_project_ok]) >>
+             metis_tac[SUBSET_TRANS,procsOf_cut_sel_upto]) >>
+         strip_tac >>
+         goal_assum (drule_at (Pos last)) >>
+         irule_at Any trans_s_step >>
+         irule_at (Pos hd) trans_if_true >>
+         simp[] >>
+         irule_at (Pos hd) trans_s_trans_s >>
+         irule_at (Pos hd) trans_ln_IMP_trans_s >>
+         irule_at (Pos hd) trans_ln_cut_sel_upto >>
+         fs[no_self_comunication_def] >>
+         goal_assum drule >>
+         irule_at (Pos hd) (MP_CANON RTC_RTC) >>
+         goal_assum drule >>
+         drule_at (Pos last) qcong_reduction_pres >>
+         disch_then (resolve_then (Pos hd) mp_tac qcong_sym) >>
+         disch_then drule >>
+         strip_tac >>
+         goal_assum drule >>
+         metis_tac[qcong_trans,qcong_sym]) >>
+      ‘reduction꙳ (compile_network s (IfThen v p c1 c2) pn)
+                     (compile_network s (cut_sel_upto p c2) pn)’
+           by cheat >>
+      drule_then drule endpoint_confluence >>
+      simp[FST_endpoints_compile_network] >>
+      strip_tac
+      >- (goal_assum drule >>
+          irule_at (Pos hd) trans_s_step >>
+          irule_at (Pos hd) trans_if_false >>
+          simp[] >>
+          irule_at (Pos hd) trans_ln_IMP_trans_s >>
+          irule_at (Pos hd) trans_ln_cut_sel_upto >>
+          fs[no_self_comunication_def] >>
+          irule_at (Pos hd) qcong_sym >>
+          goal_assum drule >>
+          fs[compile_network_ok_project_ok,procsOf_def,set_nub'] >>
+          rpt strip_tac >> first_x_assum drule >>
+          rw[project_def] >>
+          TRY(drule_then MATCH_ACCEPT_TAC project_ok_cut_sel_upto) >>
+          rpt(PURE_FULL_CASE_TAC >> fs[] >> rveq) >>
+          metis_tac[project_ok_cut_sel_upto,split_sel_project_ok]) >>
+      last_x_assum(qspec_then ‘chor_to_endpoint$chor_size(cut_sel_upto p c2)’ mp_tac) >>
+      impl_tac >- (qspecl_then [‘p’,‘c2’] assume_tac chor_size_cut_sel_upto >> DECIDE_TAC) >>
+      disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+      first_x_assum(fn thm => disch_then(resolve_then (Pat ‘reduction _ _’) mp_tac thm)) >>
+      simp[] >>
+      impl_tac
+      >- (gs[dvarsOf_cut_sel_upto,no_self_comunication_cut_sel_upto,no_self_comunication_def,dvarsOf_def,
+             free_variables_cut_sel_upto,procsOf_def,set_nub',nub'_nil] >>
+          conj_tac
+          >- (fs[compile_network_ok_project_ok,procsOf_def,set_nub'] >>
+              rpt strip_tac >> first_x_assum drule >>
+              rw[project_def] >>
+              TRY(drule_then MATCH_ACCEPT_TAC project_ok_cut_sel_upto) >>
+              rpt(PURE_FULL_CASE_TAC >> fs[] >> rveq) >>
+              metis_tac[project_ok_cut_sel_upto,split_sel_project_ok]) >>
+          metis_tac[SUBSET_TRANS,procsOf_cut_sel_upto]) >>
+      strip_tac >>
+      goal_assum (drule_at (Pos last)) >>
+      irule_at Any trans_s_step >>
+      irule_at (Pos hd) trans_if_false >>
+      simp[] >>
+      irule_at (Pos hd) trans_s_trans_s >>
+      irule_at (Pos hd) trans_ln_IMP_trans_s >>
+      irule_at (Pos hd) trans_ln_cut_sel_upto >>
+      fs[no_self_comunication_def] >>
+      goal_assum drule >>
+      irule_at (Pos hd) (MP_CANON RTC_RTC) >>
+      goal_assum drule >>
+      drule_at (Pos last) qcong_reduction_pres >>
+      disch_then (resolve_then (Pos hd) mp_tac qcong_sym) >>
+      disch_then drule >>
+      strip_tac >>
+      goal_assum drule >>
+      metis_tac[qcong_trans,qcong_sym])
   >- ((* Com *)
       rw[] >>
       rename [‘compile_network s (Com p1 v1 p2 v2 c) pn’] >>
@@ -3308,36 +3516,31 @@ Proof
       fs[Once endpointSemTheory.trans_cases])
 QED
 
-Theorem reduction_list_trans:
-  reduction^* p1 p2 ==>
-  ?n. list_trans p1 (REPLICATE n LTau) p2
+Theorem compile_network_reflection_lemma':
+  ∀s c pn p2.
+    compile_network_ok s c pn
+    ∧ ALL_DISTINCT pn
+    ∧ set(procsOf c) ⊆ set pn
+    ∧ no_undefined_vars (s,c)
+    ∧ no_self_comunication c
+    ∧ dvarsOf c = []
+    ∧ reduction (compile_network s c pn) p2
+    ==> ∃s' c'.
+             reduction^* p2 (compile_network s' c' pn)
+             ∧ trans_s (s,c) (s',c')
+             ∧ compile_network_ok s' c' pn
 Proof
-  rw[RTC_eq_NRC] >>
-  qexists_tac `n` >>
-  pop_assum mp_tac >>
-  MAP_EVERY qid_spec_tac [`p1`,`p2`] >>
-  Induct_on `n` >>
-  rw[list_trans_def,NRC,reduction_def] >>
-  res_tac >> goal_assum drule >> rw[]
-QED
-
-Theorem list_trans_reduction:
-  !n p1 p2.
-  list_trans p1 (REPLICATE n LTau) p2 ==>
-  reduction^* p1 p2
-Proof
-  Induct >>
-  rw[list_trans_def] >>
-  match_mp_tac RTC_TRANS >>
-  simp[reduction_def] >>
-  res_tac >> goal_assum drule >>
-  simp[]
-QED
-
-Theorem reduction_list_trans_eq:
-  reduction^* p1 p2 ⇔ ∃n. list_trans p1 (REPLICATE n LTau) p2
-Proof
-  metis_tac[reduction_list_trans,list_trans_reduction]
+  rpt strip_tac >>
+  drule_all compile_network_reflection_lemma >>
+  strip_tac >>
+  dxrule_then assume_tac qcong_sym >>
+  drule empty_queue_qcong >>
+  impl_tac
+  >- (fs[compile_network_project] >>
+      rename1 ‘MAP _ l’ >>
+      rpt(pop_assum kall_tac) >>
+      Induct_on ‘l’ >> fs[empty_q_def]) >>
+  metis_tac[]
 QED
 
 Theorem trans_Send_compile_network_Nil:
@@ -3461,6 +3664,7 @@ Theorem compile_network_reflection:
     ∧ set(procsOf c) ⊆ set pn
     ∧ no_self_comunication c
     ∧ no_undefined_vars (s,c)
+    ∧ dvarsOf c = []
     ==> ∃s'' c'' p3.
               reduction^* p2 p3
               ∧ trans_s (s,c) (s'',c'')
@@ -3475,7 +3679,7 @@ Proof
       qexists_tac `0` >> rw[list_trans_def] >>
       metis_tac[trans_s_def,RTC_REFL,qcong_refl])
   >- (rw[list_trans_def,GSYM reduction_def] >>
-      drule(compile_network_reflection_lemma
+      drule(compile_network_reflection_lemma'
             |> REWRITE_RULE[PULL_EXISTS,reduction_list_trans_eq]) >>
       rpt(disch_then drule) >>
       strip_tac >>
@@ -3496,7 +3700,7 @@ Proof
           imp_res_tac no_self_comunication_trans_s_pres >>
           simp[] >>
           imp_res_tac procsOf_trans_s_SUBSET >>
-          metis_tac[SND,SUBSET_TRANS]) >>
+          metis_tac[SND,SUBSET_TRANS,dvarsOf_nil_trans_s]) >>
       strip_tac >>
       drule_all qcong_list_trans_pres >>
       strip_tac >>
@@ -3509,18 +3713,44 @@ Proof
       metis_tac[qcong_trans,qcong_sym])
 QED
 
+Theorem compile_network_reflection':
+   ∀s c pn p2.
+    reduction^* (compile_network s c pn) p2
+    ∧ compile_network_ok s c pn
+    ∧ ALL_DISTINCT pn
+    ∧ set(procsOf c) ⊆ set pn
+    ∧ no_self_comunication c
+    ∧ no_undefined_vars (s,c)
+    ∧ dvarsOf c = []
+    ==> ∃s'' c''.
+              reduction^* p2 (compile_network s'' c'' pn)
+              ∧ trans_s (s,c) (s'',c'')
+Proof
+  rpt strip_tac >>
+  drule_all compile_network_reflection >>
+  strip_tac >>
+  dxrule_then assume_tac qcong_sym >>
+  drule empty_queue_qcong >>
+  impl_tac
+  >- (fs[compile_network_project] >>
+      rename1 ‘MAP _ l’ >>
+      rpt(pop_assum kall_tac) >>
+      Induct_on ‘l’ >> fs[empty_q_def]) >>
+  metis_tac[]
+QED
+
 Theorem compile_network_reflection_procs:
    ∀s c pn p2.
     reduction^* (compile_network s c (procsOf c)) p2
     ∧ compile_network_ok s c (procsOf c)
     ∧ no_undefined_vars (s,c)
-    ==> ∃s'' c'' p3.
-              reduction^* p2 p3
+    ∧ dvarsOf c = []
+    ==> ∃s'' c''.
+              reduction^* p2 (compile_network s'' c'' (procsOf c))
               ∧ trans_s (s,c) (s'',c'')
-              ∧ qcong p3 (compile_network s'' c'' (procsOf c))
 Proof
   rpt strip_tac >>
-  drule compile_network_reflection >>
+  drule compile_network_reflection' >>
   disch_then match_mp_tac >>
   simp[procsOf_all_distinct] >>
   imp_res_tac compile_network_ok_no_self_comunication
