@@ -208,25 +208,6 @@ Proof
   fs[ALOOKUP_NONE]
 QED
 
-Theorem project'_dsubst_commute:
-  ∀dn c proc c' dvars.
-  dvarsOf(Fix dn c) = [] ∧
-  project_ok proc dvars (Fix dn c) ∧
-  project_ok proc ((dn,dprocsOf ((dn,[])::dvars) c)::dvars) c' ∧
-  (∀dn procs. ALOOKUP dvars dn = SOME procs ⇒ set procs ⊆ set(procsOf c)) ∧
-  set(procsOf c') ⊆ set(procsOf c) ⇒
-  project_ok proc dvars (dsubst c' dn (Fix dn c))
-Proof
-  ntac 3 strip_tac >>
-  completeInduct_on ‘chor_to_endpoint$chor_size c'’ >>
-  Cases >> rpt conj_tac
-  >- (rw[endpointLangTheory.dsubst_def,chorLangTheory.dsubst_def,project_def,procsOf_def,SUBSET_DEF])
-  >- (rename [‘IfThen v p c1 c2’] >>
-      strip_tac >> fs[chor_size_def] >> rveq >>
-      rw[endpointLangTheory.dsubst_def,chorLangTheory.dsubst_def,project_def,procsOf_def,set_nub',SUBSET_DEF,chor_size_def] >> fs[]
-      )
-QED
-
 Theorem split_sel_project_ok:
   !h p c b r. h <> p /\ split_sel h p c = SOME (b,r)
    /\ project_ok h dvars r
@@ -1209,7 +1190,7 @@ val cut_sel_upto_def = Define`
 
 val compile_network_eq_all_project = Q.store_thm("compile_network_eq_all_project",
   `∀c c' s l. compile_network_ok s c l
-    ∧ (∀p. MEM p l ⇒ project' p c = project' p c')
+    ∧ (∀p. MEM p l ⇒ project' p [] c = project' p [] c')
     ⇒ compile_network s c l = compile_network s c' l`,
   Induct_on `l`
   \\ rw [compile_network_gen_def,project_def]
@@ -1219,7 +1200,7 @@ val compile_network_ok_project_ok = Q.store_thm("compile_network_ok_project_ok",
   `∀s c l p.
     compile_network_ok s c l
     ∧ MEM p l
-    ⇒ project_ok p c`,
+    ⇒ project_ok p [] c`,
   Induct_on `l`
   \\ rw [compile_network_gen_def,project_def]
   \\ metis_tac []
@@ -1275,35 +1256,34 @@ Proof
 QED
 
 val project_if_l_eq = Q.store_thm("project_if_l_eq",
-  `∀v p q c1 c2.
-    project_ok q (IfThen v p c1 c2)
+  `∀v p q dvars c1 c2.
+    project_ok q dvars (IfThen v p c1 c2)
     ∧ p ≠ q
     ∧ (∀b t c'. c1 ≠ Sel p b t c')
-    ⇒ project' q (IfThen v p c1 c2) = project' q c1`,
+    ⇒ project' q dvars (IfThen v p c1 c2) = project' q dvars c1`,
   Cases_on `c1`
   \\ rw [project_def,cut_sel_upto_def,split_sel_def]
   \\ fs [project_def,cut_sel_upto_def,split_sel_def]
-  \\ TRY (qpat_x_assum `(_,_) = project _ _` (ASSUME_TAC o GSYM))
+  \\ TRY (qpat_x_assum `(_,_) = project _ _ _` (ASSUME_TAC o GSYM))
   \\ rfs []
   \\ fs []
-  \\ TRY (qpat_x_assum `(_,_) = project _ _` (ASSUME_TAC o GSYM))
+  \\ TRY (qpat_x_assum `(_,_) = project _ _ _` (ASSUME_TAC o GSYM))
   \\ every_case_tac
-  \\ rw []
-);
+  \\ rw []);
 
 val project_if_r_eq = Q.store_thm("project_if_r_eq",
-  `∀v p q c1 c2.
-    project_ok q (IfThen v p c1 c2)
+  `∀v p dvars q c1 c2.
+    project_ok q dvars (IfThen v p c1 c2)
     ∧ p ≠ q
     ∧ (∀b t c'. c2 ≠ Sel p b t c')
-    ⇒ project' q (IfThen v p c1 c2) = project' q c2`,
+    ⇒ project' q dvars (IfThen v p c1 c2) = project' q dvars c2`,
   Cases_on `c2`
   \\ rw [project_def,cut_sel_upto_def,split_sel_def]
   \\ fs [project_def,cut_sel_upto_def,split_sel_def]
-  \\ TRY (qpat_x_assum `(_,_) = project _ _` (ASSUME_TAC o GSYM))
+  \\ TRY (qpat_x_assum `(_,_) = project _ _ _` (ASSUME_TAC o GSYM))
   \\ rfs []
   \\ fs []
-  \\ TRY (qpat_x_assum `(_,_) = project _ _` (ASSUME_TAC o GSYM))
+  \\ TRY (qpat_x_assum `(_,_) = project _ _ _` (ASSUME_TAC o GSYM))
   \\ every_case_tac
   \\ rw []
 );
@@ -1378,8 +1358,8 @@ val projPre_def = Define`
 `
 
 val prefix_project_eq = Q.store_thm("prefix_project_eq",
-  `∀p c. project_ok p c
-    ⇒ project' p c = projPre p (preSel p c) (project' p (cut_sel_upto p c))`,
+  `∀p dvars c. project_ok p dvars c
+    ⇒ project' p dvars c = projPre p (preSel p c) (project' p dvars (cut_sel_upto p c))`,
   Induct_on `c`
   \\ rw []
   \\ TRY (Cases_on `p = s0`)
@@ -1456,7 +1436,7 @@ val compile_network_ok_if_eq = Q.store_thm("compile_network_ok_if_eq",
    compile_network s (IfThen v p c' c2) l =
    FOLDR NPar NNil
    (MAP (\proc. NEndpoint proc (<| bindings := projectS proc s;
-                                   queue    := [] |>) (project' proc (IfThen v p c' c2))) l)`,
+                                   queue    := [] |>) (project' proc [] (IfThen v p c' c2))) l)`,
    Induct_on `l`
    >- rw[compile_network_gen_def]
    >> rpt strip_tac
@@ -1494,10 +1474,10 @@ val cut_ext_choice_upto_presel_cons = Q.store_thm("cut_ext_choice_upto_presel_co
   >> rpt(PURE_FULL_CASE_TAC >> fs[] >> rveq));
 
 val project_cut_sel_eq = Q.store_thm("project_cut_sel_eq",
-  `!h p c1.
-   p ≠ h /\ project_ok h c1 ==>
-   project' h (cut_sel_upto p c1) =
-   cut_ext_choice_upto_presel p h (preSel p c1) (project' h c1)`,
+  `!h p dvars c1.
+   p ≠ h /\ project_ok h dvars c1 ==>
+   project' h dvars (cut_sel_upto p c1) =
+   cut_ext_choice_upto_presel p h (preSel p c1) (project' h dvars c1)`,
   Induct_on `c1`
   >- rw[cut_sel_upto_def,cut_ext_choice_upto_presel_nil,preSel_def]
   >- rw[cut_sel_upto_def,cut_ext_choice_upto_presel_nil,preSel_def]
@@ -1518,13 +1498,6 @@ val FILTER_nub = Q.store_thm("FILTER_nub",
   >> simp[FILTER_FILTER] >> simp[Once CONJ_SYM]
   >> rw[FILTER_EQ,EQ_IMP_THM] >> CCONTR_TAC >> fs[]);
 
-val set_nub' = Q.store_thm("set_nub'",
-  `!l. set(nub' l) = set l`,
-  Induct >> rw[nub'_def] >> simp[GSYM FILTER_nub]
-  >> simp[LIST_TO_SET_FILTER,INTER_DEF]
-  >> rw[FUN_EQ_THM,EQ_IMP_THM] >> simp[]
-  >> metis_tac[]);
-
 val compile_network_cut_sel_upto = Q.store_thm("compile_network_cut_sel_upto",
   `!s v p c1 l.
   compile_network_ok s c1 l /\
@@ -1532,7 +1505,7 @@ val compile_network_cut_sel_upto = Q.store_thm("compile_network_cut_sel_upto",
   compile_network s (cut_sel_upto p c1) l =
   FOLDR NPar NNil
    (MAP (\proc. NEndpoint proc (<| bindings := projectS proc s;
-                                   queue    := [] |>) (cut_ext_choice_upto_presel p proc (preSel p c1) (project' proc c1))) l)`,
+                                   queue    := [] |>) (cut_ext_choice_upto_presel p proc (preSel p c1) (project' proc [] c1))) l)`,
   Induct_on `l`
   >- (rw[compile_network_gen_def])
   >> rpt strip_tac
@@ -1541,7 +1514,7 @@ val compile_network_cut_sel_upto = Q.store_thm("compile_network_cut_sel_upto",
   >> fs[project_cut_sel_eq]);
 
 val MEM_presel_MEM_procsOf = Q.store_thm("MEM_presel_MEM_procsOf",
-  `!c p. project_ok p c  /\ MEM p (MAP SND (preSel p c))
+  `!c dvars p. project_ok p dvars c  /\ MEM p (MAP SND (preSel p c))
    ==> F`,
   Induct
   >- rw[preSel_def,project_def]
@@ -1553,7 +1526,7 @@ val MEM_presel_MEM_procsOf = Q.store_thm("MEM_presel_MEM_procsOf",
   >> rpt(PURE_FULL_CASE_TAC >> fs[]) >> metis_tac[]);
 
 val network_consume_LExtChoice = Q.store_thm("network_consume_LExtChoice",
-  `∀psl qf s c l p.
+  `∀psl qf s c l p dvars.
        ¬MEM p l ∧ ¬MEM p (MAP SND psl) ∧ ALL_DISTINCT l ∧
        (∀x. MEM x (MAP SND psl) ⇒ MEM x l) ⇒
        list_trans
@@ -1562,7 +1535,7 @@ val network_consume_LExtChoice = Q.store_thm("network_consume_LExtChoice",
                (λproc.
                     NEndpoint proc
                       <|bindings := projectS proc s; queue := qf proc|>
-                      (project' proc c)) l))
+                      (project' proc dvars c)) l))
          (MAP (λ(b,q). LExtChoice p b q) psl)
          (FOLDR NPar NNil
             (MAP
@@ -1570,7 +1543,7 @@ val network_consume_LExtChoice = Q.store_thm("network_consume_LExtChoice",
                     NEndpoint proc
                       <|bindings := projectS proc s;
                       queue := qf proc ⧺ preSel_to_queue proc p psl|>
-                      (project' proc c)) l))`,
+                      (project' proc dvars c)) l))`,
   Induct
   >- (rw[list_trans_def,preSel_to_queue_def])
   \\ rw[list_trans_def]
@@ -1585,7 +1558,7 @@ val network_consume_LExtChoice = Q.store_thm("network_consume_LExtChoice",
                   NEndpoint proc
                     <|bindings := projectS proc s; queue :=
                       qf proc ++ if proc = p2 then [(p1, if b then [1w] else [0w])] else [] |>
-                    (project' proc c)) l)`
+                    (project' proc dvars c)) l)`
   \\ conj_tac
   >- (pop_assum(strip_assume_tac o REWRITE_RULE [MEM_SPLIT])
       \\ simp[] \\ match_mp_tac trans_fold_par'
@@ -1598,7 +1571,7 @@ val network_consume_LExtChoice = Q.store_thm("network_consume_LExtChoice",
   \\ first_x_assum(qspec_then `\proc. qf proc ⧺
                    if proc = p2 then [(p1,if b then [1w] else [0w])] else []` mp_tac)
   \\ disch_then(mp_tac o CONV_RULE(RESORT_FORALL_CONV List.rev))
-  \\ disch_then(qspecl_then [`p1`,`l`] mp_tac)
+  \\ disch_then(qspecl_then [‘dvars’,`p1`,`l`] mp_tac)
   \\ rpt(disch_then drule)
   \\ Ho_Rewrite.PURE_REWRITE_TAC [GSYM PULL_FORALL]
   \\ impl_tac >- rw[]
@@ -1706,24 +1679,30 @@ Proof
   rw[] >>
   dxrule compile_network_ok_project_ok >>
   simp[Once MONO_NOT_EQ] >>
+  ‘∃dvars. dvars:((string # string list) list) = []’ by simp[] >>
+  pop_assum(SUBST_ALL_TAC o GSYM) >>
+  qid_spec_tac ‘dvars’ >>
   Induct_on ‘c’ >>
   rw[project_def,no_self_comunication_def,procsOf_def,nub'_def,procsOf_all_distinct] >>
   res_tac >> fs[] >>
   rw[MEM_FILTER,MEM_nub'] >>
   rw[RIGHT_AND_OVER_OR,EXISTS_OR_THM] >-
-    (Cases_on ‘s = p’ >> simp[] >>
+    (rpt(first_x_assum(qspec_then ‘dvars’ strip_assume_tac)) >>
+     Cases_on ‘s = p’ >> simp[] >>
      disj2_tac >>
      qexists_tac ‘p’ >>
      rw[] >>
      rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
      metis_tac[split_sel_project_ok,split_sel_project_ok2]) >-
-    (Cases_on ‘s = p’ >> simp[] >>
+    (rpt(first_x_assum(qspec_then ‘dvars’ strip_assume_tac)) >>
+     Cases_on ‘s = p’ >> simp[] >>
      disj2_tac >>
      qexists_tac ‘p’ >>
      rw[] >>
      rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
      metis_tac[split_sel_project_ok,split_sel_project_ok2]) >-
-    (Cases_on ‘s0 = p’ >> simp[] >>
+    (rpt(first_x_assum(qspec_then ‘dvars’ strip_assume_tac)) >>
+     Cases_on ‘s0 = p’ >> simp[] >>
      Cases_on ‘s2 = p’ >> simp[] >>
      rpt disj2_tac >>
      qexists_tac ‘p’ >>
@@ -1731,14 +1710,7 @@ Proof
      rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
      metis_tac[split_sel_project_ok,split_sel_project_ok2]
      ) >-
-    (Cases_on ‘s = p’ >> simp[] >>
-     rpt disj2_tac >>
-     qexists_tac ‘p’ >>
-     rw[] >>
-     rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
-     metis_tac[split_sel_project_ok,split_sel_project_ok2]
-     ) >-
-    (Cases_on ‘s0 = p’ >> simp[] >>
+    (rpt(first_x_assum(qspec_then ‘dvars’ strip_assume_tac)) >>
      Cases_on ‘s = p’ >> simp[] >>
      rpt disj2_tac >>
      qexists_tac ‘p’ >>
@@ -1746,7 +1718,8 @@ Proof
      rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
      metis_tac[split_sel_project_ok,split_sel_project_ok2]
      ) >-
-    (Cases_on ‘s0 = p’ >> simp[] >>
+    (rpt(first_x_assum(qspec_then ‘dvars’ strip_assume_tac)) >>
+     Cases_on ‘s0 = p’ >> simp[] >>
      Cases_on ‘s = p’ >> simp[] >>
      rpt disj2_tac >>
      qexists_tac ‘p’ >>
@@ -1754,7 +1727,18 @@ Proof
      rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
      metis_tac[split_sel_project_ok,split_sel_project_ok2]
      ) >-
-    (asm_exists_tac \\ simp [])
+    (rpt(first_x_assum(qspec_then ‘dvars’ strip_assume_tac)) >>
+     Cases_on ‘s0 = p’ >> simp[] >>
+     Cases_on ‘s = p’ >> simp[] >>
+     rpt disj2_tac >>
+     qexists_tac ‘p’ >>
+     rw[] >>
+     rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
+     metis_tac[split_sel_project_ok,split_sel_project_ok2]
+     ) >-
+    (first_x_assum (qspec_then ‘(s,dprocsOf ((s,[])::dvars) c)::dvars’ strip_assume_tac) >>
+     asm_exists_tac \\ rw [] \\
+     fs[dprocsOf_MEM_eq])
 QED
 
 Triviality dsubst_subset_procsOf:
@@ -1835,22 +1819,19 @@ Theorem dsubst_procsOf_not_MEM =
 
 Theorem project_nonmember_nil:
   ∀p c.
-  ~MEM p (procsOf c) ⇒ (project' p c = Nil ∨ ∃dn. project' p c = Call dn)
+  ~MEM p (procsOf c) ⇒ project' p [] c = Nil
 Proof
-  ho_match_mp_tac project_ind >>
-  rw[project_def,procsOf_def,MEM_nub'] >>
-  rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
-  imp_res_tac split_sel_nonproc_NONE >> fs[]
+  rpt strip_tac >>
+  qspecl_then [‘p’,‘[]’,‘c’] assume_tac project_nonmember_nil_lemma' >>
+  gs[dprocsOf_MEM_eq]
 QED
 
 Theorem project_pair_nonmember_nil:
   ∀p c.
-  ~MEM p (procsOf c) ⇒ ∃ok. (project p c = (ok,Nil) ∨ ∃dn. project p c = (ok,Call dn))
+  ~MEM p (procsOf c) ⇒ ∃ok. (project p [] c = (ok,Nil))
 Proof
-  ho_match_mp_tac project_ind >>
-  rw[project_def,procsOf_def,MEM_nub'] >>
-  rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
-  imp_res_tac split_sel_nonproc_NONE >> fs[]
+  rw[quantHeuristicsTheory.PAIR_EQ_EXPAND] >>
+  imp_res_tac project_nonmember_nil
 QED
 
 Theorem split_sel_dsubst:
@@ -2864,7 +2845,7 @@ Proof
 QED
 
 Theorem compile_network_ok_project_ok:
-  !s c pn. compile_network_ok s c pn <=> (!p. MEM p pn ==> project_ok p c)
+  !s c pn. compile_network_ok s c pn <=> (!p. MEM p pn ==> project_ok p [] c)
 Proof
   simp[EQ_IMP_THM,FORALL_AND_THM] >> conj_tac >>
   Induct_on `pn` >>
@@ -2879,9 +2860,9 @@ Proof
 QED
 
 Theorem project_ok_cut_sel_upto:
-  !p' c1 p.
-  project_ok p' c1 ==>
-  project_ok p' (cut_sel_upto p c1)
+  !p' c1 p dvars.
+  project_ok p' dvars c1 ==>
+  project_ok p' dvars (cut_sel_upto p c1)
 Proof
   Induct_on `c1` >> rw[cut_sel_upto_def] >>
   fs[project_def] >>
@@ -2901,7 +2882,7 @@ Theorem compile_network_project:
    compile_network s c l =
    FOLDR NPar NNil
    (MAP (λproc. NEndpoint proc (<| bindings := projectS proc s;
-                                   queue    := [] |>) (project' proc c)) l)
+                                   queue    := [] |>) (project' proc [] c)) l)
 Proof
    Induct_on `l`
    >- rw[compile_network_gen_def]
@@ -2918,7 +2899,7 @@ Theorem compile_network_eq_FOLDR:
          (λproc.
            NEndpoint proc
                      <|bindings := projectS proc s; queue := []|>
-                     (project' proc c)) l)
+                     (project' proc [] c)) l)
 Proof
   Induct_on ‘l’ >> rw[compile_network_gen_def]
 QED
@@ -3041,29 +3022,6 @@ Proof
   drule_all_then strip_assume_tac qcong_trans_pres >>
   res_tac >>
   rpt(goal_assum drule)
-QED
-
-Theorem project_dsubst:
-  ∀proc c dn c'.
-  project_ok proc c (*∧ MEM proc (procsOf c')*) ⇒
-  project' proc (dsubst c dn (Fix dn c')) =
-  dsubst (project' proc c) dn (project' proc (Fix dn c'))
-Proof
-  ho_match_mp_tac project_ind >>
-  rw[project_def,chorLangTheory.dsubst_def,endpointLangTheory.dsubst_def,procsOf_def,MEM_nub'] >>
-  fs[]
-
-    fs[project_def]
-
-  >- cheat
-  >- cheat
-  >- cheat
-
-  rw[project_def] >>
-
-  rpt(TOP_CASE_TAC >> fs[] >> rveq) >> rw[dsubst_def]
-
-
 QED
 
 Theorem compile_network_reflection_lemma:
