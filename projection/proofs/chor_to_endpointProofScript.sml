@@ -2702,7 +2702,7 @@ QED
 Definition trans_ln_cut_def:
   trans_ln_cut = (λp r. ∃τ q. trans p (τ,[]) q ∧
                  q = UNCURRY chor_tl p ∧
-                 r = (FST q, catchup_of τ (SND q)))⃰
+                 r = (FST q, catchup_of τ (SND q)))^*
 End
 
 Theorem compile_network_ok_catchup_of:
@@ -2718,7 +2718,7 @@ QED
 
 Theorem compile_network_preservation_trans_ln_cut:
   ∀s c s' c'.
-    compile_network_ok s  c (procsOf c) ∧
+    compile_network_ok s  c (procsOf c) ∧ dvarsOf c = [] ∧
     trans_ln_cut (s,c) (s',c')
     ⇒ ∃s'' c''. trans_ln_cut (s',c') (s'',c'')
        ∧ reduction^* (compile_network s   c   (procsOf c))
@@ -2727,7 +2727,7 @@ Proof
    ‘∀p q.
     trans_ln_cut p q
     ⇒ ∀s c s' c' ps.
-       compile_network_ok s  c ps ∧
+       compile_network_ok s  c ps ∧ dvarsOf c = [] ∧
        p = (s,c) ∧ q = (s',c') ∧ set(procsOf c) ⊆ set(ps) ∧ ALL_DISTINCT ps
        ⇒ ∃s'' c''.
           trans_ln_cut (s',c') (s'',c'') ∧
@@ -2748,7 +2748,7 @@ Proof
         by metis_tac[compile_network_ok_chor_tl,compile_network_ok_catchup_of]
    \\ first_x_assum drule
    \\ impl_tac
-   >- (simp[] >>
+   >- (simp[] >> cheat >> (* TODO: dvarsOf over catch_of and chor_tl  *)
        fs[SUBSET_DEF] >> rw[] >> imp_res_tac procsOf_catchup_of >>
        imp_res_tac trans_procsOf >> res_tac)
    \\ strip_tac
@@ -2925,7 +2925,7 @@ QED
 
 Theorem compile_network_preservation_trans_ln:
   ∀s c s' c' pn.
-    compile_network_ok s  c (procsOf c) ∧
+    compile_network_ok s  c (procsOf c) ∧ dvarsOf c = [] ∧
     trans_ln (s,c) (s',c')
     ⇒ ∃s'' c''. trans_ln (s',c') (s'',c'')
        ∧ reduction^* (compile_network s   c   (procsOf c))
@@ -2950,7 +2950,7 @@ Proof
   drule_then drule trans_ln_trans_ln >>
   strip_tac >>
   goal_assum drule >>
-  simp[]
+  simp[] >> cheat
 QED
 
 Theorem compile_network_ok_project_ok:
