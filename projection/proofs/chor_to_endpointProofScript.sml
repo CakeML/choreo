@@ -2985,8 +2985,15 @@ Proof
   strip_tac >>
   drule_then drule trans_ln_trans_ln >>
   strip_tac >>
-  goal_assum drule >>
-  simp[] >> cheat
+  res_tac >>
+  goal_assum(drule_at (Pos last)) >>
+  drule trans_ln_cut_IMP_trans_ln >>
+  impl_tac >-
+    (drule compile_network_ok_no_self_comunication >>
+     strip_tac >>
+     imp_res_tac trans_ln_no_self_comunication >>
+     fs[]) >>
+  metis_tac[trans_ln_trans_ln]
 QED
 
 Theorem compile_network_ok_project_ok:
