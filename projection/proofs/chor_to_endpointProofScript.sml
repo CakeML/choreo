@@ -3459,7 +3459,21 @@ Proof
            res_tac >> fs[FDOM_FLOOKUP]) >>
       ‘reduction (compile_network s (Let v p f vl c) pn)
                  (compile_network (s |+ ((v,p),f (MAP (THE ∘ FLOOKUP s) (MAP (λv. (v,p)) vl)))) c pn)’
-        by cheat >>
+        by(simp[reduction_def] >>
+           match_mp_tac chor_PERM_compile_network_trans' >>
+           qexists_tac ‘p::FILTER ($<> p) pn’ >>
+           conj_tac
+           >- (match_mp_tac PERM_ALL_DISTINCT >>
+               rw[MEM_FILTER,FILTER_ALL_DISTINCT,EQ_IMP_THM] >>
+               fs[procsOf_def,set_nub'] >>
+               metis_tac[]) >>
+           conj_tac >- (rw[MEM_FILTER,FILTER_ALL_DISTINCT,EQ_IMP_THM]) >>
+           simp[compile_network_gen_def,project_def] >>
+           rw[MEM_FILTER, cn_ignore_let, cn_ignore_state_update] >>
+           match_mp_tac trans_par_l >>
+           match_mp_tac trans_let_gen >>
+           rw [projectS_fupdate] >>
+           fs[EVERY_MEM,MAP_MAP_o,o_DEF,lookup_projectS'] >> metis_tac[]) >>
       ‘ALL_DISTINCT (MAP FST (endpoints (compile_network s (Let v p f vl c) pn)))’
         by(fs[FST_endpoints_compile_network]) >>
       Cases_on ‘n2 = compile_network (s |+ ((v,p),f (MAP (THE ∘ FLOOKUP s) (MAP (λv. (v,p)) vl)))) c pn’ >-
