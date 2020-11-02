@@ -2716,6 +2716,42 @@ Proof
   simp[]
 QED
 
+Theorem dvarsOf_cut_sel_upto:
+  ∀α c.
+    dvarsOf(cut_sel_upto p c) = dvarsOf c
+Proof
+  Induct_on ‘c’ >>
+  rw[cut_sel_upto_def,dvarsOf_def,nub'_dvarsOf] >> first_x_assum MATCH_ACCEPT_TAC
+QED
+
+Theorem dvarsOf_catchup_of:
+  ∀α c.
+    dvarsOf(catchup_of α c) = dvarsOf c
+Proof
+  ho_match_mp_tac catchup_of_ind >>
+  rw[catchup_of_def,dvarsOf_def,dvarsOf_cut_sel_upto]
+QED
+
+Theorem dvarsOf_chor_tl_nil:
+  ∀s c s' c'.
+    dvarsOf c = [] ∧
+    chor_tl s c = (s',c') ⇒
+    dvarsOf c' = []
+Proof
+  Induct_on ‘c’ >>
+  rw[chor_tl_def,dvarsOf_def,MEM_nub',nub'_nil] >>
+  fs[dvarsOf_def,nub'_nil] >>
+  fs[FILTER_EQ_NIL,EVERY_MEM,MEM_nub'] >>
+  ‘∀x. MEM x (dvarsOf (dsubst c s (Fix s c))) ⇒ F’
+    by(strip_tac >>
+       dep_rewrite.DEP_ONCE_REWRITE_TAC[set_dvarsOf_dsubst_eq] >>
+       rw[dvarsOf_def,FILTER_EQ_NIL,EVERY_MEM,MEM_nub'] >>
+       spose_not_then strip_assume_tac >> gs[]) >>
+  spose_not_then strip_assume_tac >>
+  Cases_on ‘dvarsOf (dsubst c s (Fix s c))’ >>
+  fs[FORALL_AND_THM]
+QED
+
 Theorem compile_network_preservation_trans_ln_cut:
   ∀s c s' c'.
     compile_network_ok s  c (procsOf c) ∧ dvarsOf c = [] ∧
@@ -2748,7 +2784,7 @@ Proof
         by metis_tac[compile_network_ok_chor_tl,compile_network_ok_catchup_of]
    \\ first_x_assum drule
    \\ impl_tac
-   >- (simp[] >> cheat >> (* TODO: dvarsOf over catch_of and chor_tl  *)
+   >- (simp[dvarsOf_catchup_of] >> imp_res_tac dvarsOf_chor_tl_nil >>
        fs[SUBSET_DEF] >> rw[] >> imp_res_tac procsOf_catchup_of >>
        imp_res_tac trans_procsOf >> res_tac)
    \\ strip_tac
