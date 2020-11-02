@@ -3389,8 +3389,28 @@ Proof
         by (fs[compile_network_ok_project_ok,procsOf_def,set_nub'] >>
             res_tac >> fs[project_def] >>
             FULL_CASE_TAC >> fs[]) >>
-      ‘reduction (compile_network s (Com p1 v1 p2 v2 c) pn) (compile_network (s |+ ((v2,p2),d)) c pn)’
-        by cheat >>
+      ‘reduction^* (compile_network s (Com p1 v1 p2 v2 c) pn) (compile_network (s |+ ((v2,p2),d)) c pn)’
+        by(irule_at (Pos hd) chor_compile_network_COM' >>
+           fs[procsOf_def,set_nub'] >>
+           match_mp_tac RTC_TRANS >>
+           simp[reduction_def] >>
+           simp[compile_network_gen_def,project_def] >>
+           irule_at (Pos hd) trans_com_l >>
+           goal_assum drule >>
+           irule_at (Pos hd) trans_send >>
+           imp_res_tac lookup_projectS >>
+           simp[] >>
+           irule_at (Pos hd) trans_par_l >>
+           irule_at (Pos hd) trans_enqueue >>
+           simp[] >>
+           match_mp_tac RTC_SUBSET >>
+           simp[reduction_def] >>
+           simp[fupdate_projectS] >>
+           match_mp_tac trans_par_r >>
+           rw[MEM_FILTER, cn_ignore_com, cn_ignore_state_update] >>
+           match_mp_tac trans_par_l >>
+           match_mp_tac trans_dequeue_gen >>
+           simp[projectS_fupdate]) >>
       ‘ALL_DISTINCT (MAP FST (endpoints (compile_network s (Com p1 v1 p2 v2 c) pn)))’
         by(fs[FST_endpoints_compile_network]) >>
       Cases_on ‘n2 = compile_network (s |+ ((v2,p2),d)) c pn’ >-
@@ -3402,7 +3422,14 @@ Proof
          irule_at (Pos hd) trans_com >>
          simp[] >> irule_at Any qcong_refl >>
          drule_then MATCH_ACCEPT_TAC compile_network_ok_dest_com) >>
-      drule_all_then strip_assume_tac (endpoint_local_confluence_tau |> SIMP_RULE std_ss [GSYM reduction_def]) >>
+      drule_then drule endpoint_confluence >>
+      simp[FST_endpoints_compile_network] >>
+      strip_tac
+      >- (goal_assum drule >>
+          irule_at (Pos hd) trans_s_one >>
+          irule_at (Pos hd) trans_com >>
+          simp[qcong_sym] >>
+          drule_then MATCH_ACCEPT_TAC compile_network_ok_dest_com) >>
       first_x_assum(qspec_then ‘chor_to_endpoint$chor_size c’ mp_tac) >>
       impl_tac >- gs[] >>
       disch_then(resolve_then (Pos hd) mp_tac EQ_REFL) >>
@@ -3415,7 +3442,7 @@ Proof
       disch_then(resolve_then (Pos hd) mp_tac qcong_sym) >>
       disch_then drule >>
       strip_tac >>
-      irule_at (Pos hd) RTC_TRANS >>
+      irule_at (Pos hd) RTC_RTC >>
       rpt(goal_assum drule) >>
       irule_at (Pos hd) trans_s_step >>
       irule_at (Pos hd) trans_com >>
