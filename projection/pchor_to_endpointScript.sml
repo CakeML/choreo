@@ -40,13 +40,10 @@ Definition ok_bind_def[simp]:
     in (FST ma ∧ f1, f2)
 End
 
-val _ = Parse.add_infix("<Γ>",425,Parse.NONASSOC);
-val _ = Parse.overload_on("<Γ>",``ok_fmap``);
-
-val _ = Parse.add_infix("<*>",430,Parse.LEFT);
-val _ = Parse.overload_on("<*>",``ok_seq``);
-
-val _ = Parse.overload_on("Γ2>",``ok_liftA2``);
+val _ = set_fixity "<Γ>" (Infix(NONASSOC, 425))
+Overload "<Γ>" = “ok_fmap”
+Overload "<*>" = “ok_seq”
+Overload "Γ2>" = “ok_liftA2”
 
 
 (* A more simplistic size_metric for pchor *)
