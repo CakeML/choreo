@@ -3,6 +3,7 @@ CAKEDIR = ../../../../cakeml
 endif
 
 INCLUDES = $(CAKEDIR)/misc ../ ../../ $(CAKEDIR)/semantics \
+	   $(CAKEDIR)/semantics/alt_semantics/proofs \
            $(CAKEDIR)/semantics/ffi $(CAKEDIR)/semantics/proofs \
            $(CAKEDIR)/translator theory_tools lib_tools ffi \
            $(CAKEDIR)/basis \
