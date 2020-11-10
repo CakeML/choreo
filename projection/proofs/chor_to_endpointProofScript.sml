@@ -4033,6 +4033,7 @@ QED
 Theorem compile_network_preservation:
    ∀s c s'' c''.
     compile_network_ok s c (procsOf c)
+    ∧ dvarsOf c = []
     ∧ trans_s (s,c) (s'',c'')
     ∧ no_undefined_vars (s,c)
     ==> ∃s''' c''' p2.
