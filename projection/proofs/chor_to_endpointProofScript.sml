@@ -3342,7 +3342,18 @@ Proof
       Cases_on ‘d = [1w]’ >-
         (‘reduction꙳ (compile_network s (IfThen v p c1 c2) pn)
                      (compile_network s (cut_sel_upto p c1) pn)’
-           by cheat >>
+           by (irule SUBSET_compile_network_reduction \\ simp []
+               \\ conj_tac
+               >- (simp [procsOf_def,set_nub']
+                   \\ irule SUBSET_TRANS
+                   \\ qexists_tac ‘set (procsOf c1)’
+                   \\ simp [procsOf_cut_sel_upto]
+                   \\ irule SUBSET_INSERT_RIGHT
+                   \\ simp [])
+               \\ irule reduction_if_true
+               \\ fs [no_undefined_vars_def,free_variables_def,FLOOKUP_DEF]
+               \\ irule compile_network_ok_subset
+               \\ asm_exists_tac \\ simp []) >>
          drule_then drule endpoint_confluence >>
          simp[FST_endpoints_compile_network] >>
          strip_tac
@@ -3397,7 +3408,18 @@ Proof
          metis_tac[qcong_trans,qcong_sym]) >>
       ‘reduction꙳ (compile_network s (IfThen v p c1 c2) pn)
                      (compile_network s (cut_sel_upto p c2) pn)’
-           by cheat >>
+           by (irule SUBSET_compile_network_reduction \\ simp []
+               \\ conj_tac
+               >- (simp [procsOf_def,set_nub']
+                   \\ irule SUBSET_TRANS
+                   \\ qexists_tac ‘set (procsOf c2)’
+                   \\ simp [procsOf_cut_sel_upto]
+                   \\ irule SUBSET_INSERT_RIGHT
+                   \\ simp [])
+               \\ irule reduction_if_false
+               \\ fs [no_undefined_vars_def,free_variables_def,FLOOKUP_DEF]
+               \\ irule compile_network_ok_subset
+               \\ asm_exists_tac \\ simp []) >>
       drule_then drule endpoint_confluence >>
       simp[FST_endpoints_compile_network] >>
       strip_tac
