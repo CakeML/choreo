@@ -721,7 +721,170 @@ Proof
     \\ metis_tac [PERM_chor_compile_network_reduction']
 QED
 
-(* `Com` instance of `PERM_pchor_compile_network_reduction` with more
+Triviality SUBSET_ep_trans_aux0:
+  ∀xs l1 l1' t.
+  trans (epnList l1) t (epnList l1')
+  ⇒ trans (epnList (xs ++ l1)) t (epnList (xs ++ l1'))
+Proof
+  Induct \\ rw []
+  \\ Cases_on ‘h’ \\ Cases_on ‘r’
+  \\ rename1 ‘(p,s,e)::_’
+  \\ simp [epnList_def]
+  \\ first_x_assum drule
+  \\ rw []
+  \\ metis_tac [trans_par_r]
+QED
+
+Theorem REPN_endpoints_eq:
+  ∀ep1 ep2.
+    REPN ep1 ∧ REPN ep2
+    ∧ endpoints ep1 = endpoints ep2
+    ⇒ ep1 = ep2
+Proof
+  Induct
+  >- (Cases_on ‘ep2’ \\ fs [endpoints_def]
+      \\ Cases_on ‘n’ \\ fs [endpoints_def,REPN_def])
+  >- (Induct \\ fs [endpoints_def,REPN_def]
+      >- (CCONTR_TAC \\ fs [] \\ Cases_on ‘ep1’ \\ fs [REPN_def,endpoints_def])
+      \\ Cases_on ‘ep1’ \\ Cases_on ‘ep2’ \\ fs [REPN_def]
+      \\ rw [endpoints_def])
+  \\ fs [REPN_def]
+QED
+
+Theorem REPN_trans:
+  ∀ep t ep'.
+   trans ep t ep'
+   ∧ REPN ep
+   ⇒ REPN ep'
+Proof
+  ho_match_mp_tac REPN_ind
+  \\ rw [REPN_def] \\ gs [REPN_def]
+  \\ qpat_x_assum ‘trans _ t _’ (assume_tac o ONCE_REWRITE_RULE [endpointSemTheory.trans_cases])
+  \\ fs [] \\ gs []
+  \\ TRY (first_x_assum drule \\  rw [REPN_def])
+  \\ qpat_x_assum ‘trans _ _ n1'’ (assume_tac o ONCE_REWRITE_RULE [endpointSemTheory.trans_cases])
+  \\ fs [REPN_def]
+QED
+
+Theorem epnList_endpoints:
+  ∀ep. REPN ep
+       ⇒ ep = epnList (endpoints ep)
+Proof
+  ho_match_mp_tac REPN_ind
+  \\ rw [epnList_def,endpoints_def,REPN_def]
+QED
+
+Theorem SUBSET_ep_trans_with_extra:
+∀xs p1 p2 p1' p2' t.
+  REPN p1
+  ∧ REPN p2
+  ∧ REPN p2'
+  ∧ endpoints p2  = xs ++ endpoints p1
+  ∧ endpoints p2' = xs ++ endpoints p1'
+  ∧ trans p1 t p1'
+  ⇒ trans p2 t p2'
+Proof
+  Induct \\ rw []
+  \\ drule_all_then assume_tac REPN_trans
+  >- (dxrule_all REPN_endpoints_eq
+      \\ dxrule_all REPN_endpoints_eq
+      \\ rw [] \\ simp [])
+  \\ IMP_RES_TAC epnList_endpoints
+  \\ gs [] \\ ONCE_REWRITE_TAC [APPEND  |> CONJUNCTS  |> el 2  |> GSYM]
+  \\ irule SUBSET_ep_trans_aux0 \\ metis_tac []
+QED
+
+Theorem SUBSET_ep_reduction_with_extra:
+∀p1 p1' p2 p2' xs t.
+  REPN p1
+  ∧ REPN p2
+  ∧ REPN p2'
+  ∧ endpoints p2  = xs ++ endpoints p1
+  ∧ endpoints p2' = xs ++ endpoints p1'
+  ∧ reduction^* p1 p1'
+  ⇒ reduction^* p2 p2'
+Proof
+  rw []
+  \\ ntac 5 (last_x_assum mp_tac)
+  \\  MAP_EVERY (W(curry Q.SPEC_TAC)) (rev [‘p2’,‘p2'’,‘xs’,‘t’])
+  \\ pop_assum mp_tac
+  \\ MAP_EVERY (W(curry Q.SPEC_TAC)) (rev [‘p1’,‘p1'’])
+  \\ ho_match_mp_tac RTC_INDUCT
+  \\  rw []
+  >- (last_x_assum (mp_then Any mp_tac REPN_endpoints_eq)
+      \\ disch_then (qspec_then ‘p2’ mp_tac) \\ simp [])
+  \\ irule RTC_TRANS
+  \\ fs [reduction_def]
+  \\ drule SUBSET_ep_trans_with_extra
+  \\ disch_then (qspecl_then [‘xs’,‘p2’,‘p1'’] mp_tac)
+  \\ disch_then (irule_at Any)
+  \\ first_x_assum drule \\ simp []
+  \\ disch_then (irule_at Any)
+  \\ drule_all REPN_trans
+  \\ simp [] \\  rw []
+  \\ qexists_tac ‘epnList (xs ++ endpoints p1')’
+  \\ simp [epnList_id,epnList_REPN]
+QED
+
+Theorem chor_endpoints_compile_network_append:
+  ∀xs ys s (c : chor).
+    endpoints (compile_network s c (xs ++ ys))
+    = endpoints (compile_network s c xs) ++ endpoints (compile_network s c ys)
+Proof
+  Induct \\ rw [chor_to_endpointTheory.compile_network_gen_def,endpoints_def]
+QED
+
+Theorem SUBSET_PERM_exists_APPEND:
+  ∀l r.
+    ALL_DISTINCT l
+    ∧ ALL_DISTINCT r
+    ∧ set r ⊆ set l
+    ⇒ ∃xs. PERM l (xs ++ r)
+Proof
+  simp [GSYM AND_IMP_INTRO]
+  \\ Induct \\ rw []
+  \\ Cases_on ‘MEM h r’
+  >- (first_x_assum drule
+      \\ disch_then (qspec_then ‘FILTER (λy. h ≠ y) r’ mp_tac)
+      \\ impl_tac
+      >- (fs [FILTER_ALL_DISTINCT]
+          \\ fs [SUBSET_DEF,MEM_FILTER] \\ rw [] \\ metis_tac [])
+      \\ rw []
+      \\ fs [MEM_SPLIT]
+      \\ irule_at Any PERM_TRANS
+      \\ qexists_tac ‘h::(xs ++ l1 ++ l2)’
+      \\ simp [] \\ rveq
+      \\ fs [FILTER_APPEND_DISTRIB]
+      \\ qmatch_asmsub_abbrev_tac ‘xs ++ ll1 ++ ll2’
+      \\ ‘ll1 = l1’
+        by (UNABBREV_ALL_TAC
+            \\ simp [FILTER_EQ_ID,EVERY_MEM]
+            \\ fs [ALL_DISTINCT_APPEND])
+      \\ ‘ll2 = l2’
+        by (UNABBREV_ALL_TAC
+            \\ simp [FILTER_EQ_ID,EVERY_MEM]
+            \\ fs [ALL_DISTINCT_APPEND])
+      \\ rveq \\ simp []
+      \\ qexists_tac ‘xs’
+      \\ irule PERM_TRANS
+      \\ qexists_tac ‘xs ++ [h] ++ l1 ++ l2’
+      \\ conj_tac
+      >- (simp [PERM_CONS_EQ_APPEND]
+          \\ MAP_EVERY qexists_tac [‘xs’,‘l1 ++ l2’]
+          \\ simp [])
+      \\ ONCE_REWRITE_TAC [GSYM APPEND_ASSOC]
+      \\ ONCE_REWRITE_TAC [GSYM APPEND_ASSOC]
+      \\ simp [PERM_APPEND_IFF]
+      \\ simp [PERM_CONS_EQ_APPEND]
+      \\ MAP_EVERY qexists_tac [‘l1’,‘l2’]
+      \\ simp [])
+  \\ drule SUBSET_INSERT \\ disch_then (fs o single)
+  \\ first_x_assum drule_all \\ rw []
+  \\ Q.REFINE_EXISTS_TAC ‘h::xs’
+  \\ simp [PERM_TO_APPEND_SIMPS]
+QED
+
+(* `com` instance of `PERM_pchor_compile_network_reduction` with more
    specific assumptions
 *)
 Theorem pchor_compile_network_COM:

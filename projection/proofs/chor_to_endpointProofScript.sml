@@ -3251,6 +3251,51 @@ Proof
   metis_tac[]
 QED
 
+Theorem SUBSET_compile_network_reduction:
+  ∀l s s' c c' t.
+    ALL_DISTINCT l
+    ∧ set (procsOf c) ⊆ set l
+    ∧ set (procsOf c') ⊆ set (procsOf c)
+    ∧ reduction^* (compile_network s c (procsOf c)) (compile_network s c' (procsOf c))
+    ⇒ reduction^* (compile_network s c l) (compile_network s c' l)
+Proof
+  rw []
+  \\ drule SUBSET_PERM_exists_APPEND
+  \\ disch_then (qspec_then ‘procsOf c’ mp_tac)
+  \\ simp [chorSemTheory.procsOf_all_distinct]
+  \\ rw []
+  \\ irule PERM_chor_compile_network_reduction
+  \\ qexists_tac ‘xs ++ procsOf c’
+  \\ conj_tac >- (drule ALL_DISTINCT_PERM \\ disch_then (fs o single))
+  \\ simp [PERM_SYM]
+  \\ irule SUBSET_ep_reduction_with_extra
+  \\ simp [chor_REPN_compile_network,chor_endpoints_compile_network_append]
+  \\ MAP_EVERY qexists_tac [‘compile_network s c (procsOf c)’
+                            ,‘compile_network s c' (procsOf c)’
+                            ,‘endpoints (compile_network s c xs)’]
+  \\ simp [chor_REPN_compile_network]
+  \\ drule ALL_DISTINCT_PERM \\ disch_then (fs o single)
+  \\ fs [ALL_DISTINCT_APPEND]
+  \\ ‘∀e. MEM e xs ⇒ ¬MEM e (procsOf c')’
+    by (rw [] \\ first_x_assum drule
+        \\ fs [SUBSET_DEF] \\ rw []
+        \\ drule MEM_PERM
+        \\ disch_then (qspec_then ‘e’ (assume_tac o GSYM))
+        \\ gs [MEM_APPEND]
+        \\ CCONTR_TAC \\ gs [])
+  \\ pop_assum mp_tac
+  \\ ntac 4 (pop_assum kall_tac)
+  \\ disch_then assume_tac
+  \\ ntac 2 (last_x_assum kall_tac)
+  \\ Induct_on ‘xs’
+  \\ rw [chor_to_endpointTheory.compile_network_gen_def,endpoints_def]
+  \\ RES_TAC \\ fs [SUBSET_DEF]
+  \\ pop_assum (qspec_then ‘h’ mp_tac)
+  \\ pop_assum (qspec_then ‘h’ mp_tac)
+  \\ rw []
+  \\ fs [project_nonmember_nil]
+QED
+
 Theorem compile_network_reflection_lemma:
   ∀s c pn p2.
     compile_network_ok s c pn
