@@ -20,11 +20,11 @@ open evaluateTheory terminationTheory ml_translatorTheory
      ml_progTheory evaluatePropsTheory namespaceTheory
      semanticPrimitivesTheory ffiTheory;
 
+open bigSmallEquivTheory smallStepHelpTheory smallStepTheory
+
 val _ = new_theory "payload_to_cakemlProof";
 
 val _ = temp_delsimps ["NORMEQ_CONV"];
-
-infixr 1 $
 
 val _ = set_grammar_ancestry
   ["option","rich_list","endpoint_to_payload",
@@ -39,6 +39,7 @@ val WORD8 = “WORD:word8 -> v -> bool”;
 Overload WORD8 = “WORD:word8 -> v -> bool”;
 Overload DATUM[local] = “LIST_TYPE WORD8”;
 Type plffi[local] = “:string # (string |-> word8 list list) # network”
+Overload trans = “payloadSem$trans”
 
 Theorem ps2cs_11[simp]:
   ps2cs x = ps2cs y ⇔ x = y
@@ -752,6 +753,38 @@ Proof
           simp[])
       >- (rw [Once EQ_SYM_EQ,Once send_events_def,
               Once compile_message_def,Once send_events_def]))
+QED
+
+Theorem nsLookup_sendloop_exists:
+  ∃slv. nsLookup (build_rec_env(sendloop conf data) cE cEv) (Short "sendloop") =
+        SOME slv
+Proof
+  simp[build_rec_env_def, sendloop_def]
+QED
+
+Theorem ALL_DISTINCT_sendloop_names[simp]:
+  ALL_DISTINCT (MAP (λ(x,y,z). x) (sendloop conf data))
+Proof
+  simp[sendloop_def]
+QED
+
+Theorem nsLookup_sendloop[simp]:
+  nsLookup (build_rec_env (sendloop conf data) env envv) (Short (ps2cs v)) =
+  nsLookup envv (Short (ps2cs v))
+Proof
+  simp[build_rec_env_def, ps2cs_def, nsLookup_def, sendloop_def]
+QED
+
+Theorem nsLookup_build_rec_env_drop:
+  cpEval_valid conf p env pSt pCd vs cSt ⇒
+  ∃dv. nsLookup (build_rec_env (sendloop conf data) env env.v) conf.drop =
+       SOME dv ∧
+       (LIST_TYPE (WORD : word8 -> v -> bool) --> NUM --> LIST_TYPE WORD)
+       (combin$C DROP) dv
+Proof
+  simp[build_rec_env_def, sendloop_def, nsLookup_def, nsBind_def,
+       cpEval_valid_def, env_asm_def, has_v_def, in_module_def, PULL_EXISTS] >>
+  rw[]
 QED
 
 (* ---- Past this point this file is entirely my contribution *)
@@ -1933,8 +1966,7 @@ Definition pFv_def[simp]:
   pFv (Receive _ fv _ npCd) =  pFv npCd DELETE fv ∧
   pFv (IfThen fv npCd1 npCd2) = fv INSERT pFv npCd1 ∪ pFv npCd2 ∧
   pFv (Let bv _ fvs npCd) = (pFv npCd DELETE bv) ∪ set fvs ∧
-  pFv (Letrec dv vars e1 e2) =
-    (pFv e1 DIFF set vars) ∪ pFv e2 ∧
+  pFv (Letrec dv vars e) = set vars ∪ pFv e ∧
   pFv (Fix dv e) = pFv e ∧
   pFv (Call dv) = ∅ ∧
   pFv (FCall dv vars) = set vars
@@ -1957,6 +1989,24 @@ Theorem pFv_dsubst_E:
   v ∈ pFv (dsubst M dn N) ⇒ v ∈ pFv M ∨ v ∈ pFv N
 Proof
   Induct_on ‘M’ >> rw[dsubst_def] >> metis_tac[]
+QED
+
+Definition EP_nodenames_def[simp]:
+  EP_nodenames Nil = ∅ ∧
+  EP_nodenames (Send dest _ _ e) = dest INSERT EP_nodenames e ∧
+  EP_nodenames (Receive sender _ _ e) = sender INSERT EP_nodenames e ∧
+  EP_nodenames (IfThen _ e1 e2) = EP_nodenames e1 ∪ EP_nodenames e2 ∧
+  EP_nodenames (Let _ _ _ e) = EP_nodenames e ∧
+  EP_nodenames (Letrec _ _ e) = EP_nodenames e ∧
+  EP_nodenames (Fix _ e) = EP_nodenames e ∧
+  EP_nodenames (Call _) = ∅ ∧
+  EP_nodenames (FCall _ _) = ∅
+End
+
+Theorem FINITE_EP_nodenames[simp]:
+  FINITE (EP_nodenames e)
+Proof
+  Induct_on ‘e’ >> simp[]
 QED
 
 Definition wfclosure_def[simp]:
@@ -1984,8 +2034,8 @@ Proof
 QED
 
 Theorem trans_pSt_pCd_corr_pres:
-  ∀conf p s c L s' c'.
-    trans conf (NEndpoint p s c) L (NEndpoint p s' c') ∧ pSt_pCd_corr s c ⇒
+  ∀conf p p' s c L s' c'.
+    trans conf (NEndpoint p s c) L (NEndpoint p' s' c') ∧ pSt_pCd_corr s c ⇒
     pSt_pCd_corr s' c'
 Proof
   Induct_on ‘trans’ >> simp[pSt_pCd_corr_alt] >> rw[] >>
@@ -2201,6 +2251,359 @@ Proof
   \\ metis_tac [result_eq_trans]
 QED
 
+Overload smSt[local] = “bigSmallEquiv$to_small_st”
+Overload smEv[local] = “smallStep$small_eval”
+Overload stepr[local] = “smallStep$e_step_reln”
+Theorem pSt_pCd_corr_Send:
+  pSt_pCd_corr pst (Send p v n e) ⇔
+    (∃vv. FLOOKUP pst.bindings v = SOME vv) ∧ pSt_pCd_corr pst e
+Proof
+  simp[pSt_pCd_corr_def, DISJ_IMP_THM, FORALL_AND_THM] >> metis_tac[]
+QED
+
+Theorem cpEval_valid_Send:
+  cpEval_valid conf p1 env pst (Send p2 v n e) vs cst ⇔
+    cpEval_valid conf p1 env pst e vs cst ∧
+    (∃vv. FLOOKUP pst.bindings v = SOME vv)
+Proof
+  simp[cpEval_valid_def, EQ_IMP_THM, letfuns_def, pSt_pCd_corr_Send]
+QED
+
+Theorem cpEval_nsLookup_PLbindings:
+  cpEval_valid conf p cEnv pSt e vs cSt ∧ FLOOKUP pSt.bindings v = SOME d ⇒
+  ∃dd. nsLookup cEnv.v (Short (ps2cs v)) = SOME dd ∧ DATUM d dd
+Proof
+  simp[cpEval_valid_def, pSt_pCd_corr_def, sem_env_cor_def] >> rw[]
+QED
+
+Theorem nsLookup_build_rec_env_sendloop =
+  (SIMP_CONV (srw_ss()) [build_rec_env_def, sendloop_def] THENC
+   SIMP_CONV (srw_ss()) [GSYM sendloop_def])
+  “nsLookup (build_rec_env (sendloop conf data) env v) (Short "sendloop")”;
+
+Theorem evaluate_choose_final_clock:
+  (∀(s0:α state) env es s res ck.
+     evaluate s0 env es = (s,res) ∧ ck ≤ s.clock ⇒
+     evaluate (s0 with clock := s0.clock + ck - s.clock) env es =
+     (s with clock := ck, res)) ∧
+  (∀(s0:α state) (env:v sem_env) (v1:v) (ms:(pat#exp)list) (v2:v) s res ck.
+     evaluate_match s0 env v1 ms v2 = (s,res) ∧ ck ≤ s.clock ⇒
+     evaluate_match (s0 with clock := s0.clock + ck - s.clock) env v1 ms v2 =
+     (s with clock := ck, res))
+Proof
+  ho_match_mp_tac evaluate_ind >> rpt strip_tac
+  >- (* nil *) gs[]
+  >- ((* cons *) simp[] >>
+      qpat_x_assum ‘evaluate _ _ _ = _’ mp_tac >> simp[] >>
+      Cases_on ‘evaluate s0 env [e1]’ >> gs[] >>
+      rename [‘evaluate _ _ [_] = (s00,res00)’] >> Cases_on ‘res00’ >> gs[]
+      >- (Cases_on ‘evaluate s00 env (e2::es)’ >>
+          rename1 ‘evaluate s00 env (e2::es) = (s01,r01)’ >>
+          Cases_on ‘r01’ >> gs[] >>
+          qabbrev_tac ‘d2 = s00.clock - s01.clock’ >>
+          qabbrev_tac ‘d1 = s0.clock - s00.clock’ >>
+          ‘s01.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
+          rw[] >> rename [‘s01.clock ≤ s00.clock’] >>
+          ‘ck + d2 ≤ s00.clock’ by simp[Abbr‘d2’] >>
+          first_x_assum drule >> simp[Abbr‘d2’]) >>
+      rw[] >> gs[])
+  >- ((* lit *) gs[])
+  >- ((* raise *) gs[find_evalform ‘Raise _’] >>
+      rename [‘evaluate s0 env [e] = _’] >> rw[] >>
+      Cases_on ‘evaluate s0 env [e]’ >>
+      rename [‘evaluate s0 env [e] = (s,r0)’] >>
+      Cases_on ‘r0’ >> gvs[])
+  >- ((* handle *)
+      gvs[find_evalform ‘Handle _ _’, AllCaseEqs()] >>
+      rename [‘evaluate s0 env [e] = (s00,Rerr (Rraise exn))’,
+              ‘evaluate_match s00 _ _ _ _ = (s, res)’] >>
+      qabbrev_tac ‘d2 = s00.clock - s.clock’ >>
+      qabbrev_tac ‘d1 = s0.clock - s00.clock’ >>
+      ‘s.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
+      ‘ck + d2 ≤ s00.clock’ by simp[Abbr‘d2’] >>
+      first_x_assum drule >> simp[Abbr‘d2’])
+  >- ((* Con *) gs[find_evalform ‘Con _ _’, AllCaseEqs()] >>
+      rename [‘evaluate s0 env (REVERSE es) = _’] >>
+      Cases_on ‘evaluate s0 env (REVERSE es)’ >> gvs[] >>
+      rename [‘evaluate s0 env (REVERSE es) = (s',res')’] >>
+      Cases_on ‘res'’ >> gvs[AllCaseEqs()])
+  >- (* Var *) gs[AllCaseEqs()]
+  >- (* Fun *) gs[AllCaseEqs(), find_evalform ‘Fun _ _’]
+  >- ((* App *) gvs[AllCaseEqs(), find_evalform ‘App _ _’] >>
+      rename [‘evaluate s0 env (REVERSE es) = _’] >>
+      Cases_on ‘evaluate s0 env (REVERSE es)’ >>
+      rename [‘evaluate s0 env (REVERSE es) = (s00,res00)’] >>
+      Cases_on ‘res00’ >> gvs[AllCaseEqs(), dec_clock_def] >>
+      qabbrev_tac ‘d2 = s00.clock - 1 - s.clock’ >>
+      ‘(s00 with clock := s00.clock - 1).clock = s00.clock - 1’ by simp[] >>
+      ‘s.clock ≤ s00.clock - 1’ by metis_tac[evaluate_clock] >>
+      ‘s00.clock = s.clock + d2 + 1’ by simp[Abbr‘d2’] >> gs[] >>
+      first_x_assum (qspec_then ‘ck + d2 + 1’ mp_tac) >> simp[])
+  >- ((* Log *) gvs[AllCaseEqs(), find_evalform ‘Log _ _ _’] >>
+      rename [‘evaluate s0 env [e1] = _’] >>
+      Cases_on ‘evaluate s0 env [e1]’ >>
+      rename [‘evaluate s0 env [e1] = (s00,res00)’] >>
+      Cases_on ‘res00’ >> gvs[AllCaseEqs()] >>
+      ‘s.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
+      first_x_assum (qspec_then ‘ck + (s00.clock - s.clock)’ mp_tac) >>
+      simp[])
+  >- ((* If *) gvs[AllCaseEqs(), find_evalform ‘If _ _ _ ’] >>
+      rename [‘evaluate s0 env [e1] = _’] >>
+      Cases_on ‘evaluate s0 env [e1]’ >>
+      rename [‘evaluate s0 env [e1] = (s00,res00)’] >>
+      Cases_on ‘res00’ >> gvs[AllCaseEqs()] >>
+      ‘s.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
+      first_x_assum (qspec_then ‘ck + (s00.clock - s.clock)’ mp_tac) >>
+      simp[])
+  >- ((* Mat *) gvs[AllCaseEqs(), find_evalform ‘Mat _ _ ’] >>
+      rename [‘evaluate s0 env [e1] = _’] >>
+      Cases_on ‘evaluate s0 env [e1]’ >>
+      rename [‘evaluate s0 env [e1] = (s00,res00)’] >>
+      Cases_on ‘res00’ >> gvs[AllCaseEqs()] >>
+      ‘s.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
+      first_x_assum (qspec_then ‘ck + (s00.clock - s.clock)’ mp_tac) >>
+      simp[])
+  >- ((* Let *) gvs[AllCaseEqs(), find_evalform ‘Let _ _ _’] >>
+      rename [‘evaluate s0 env [e1] = _’] >>
+      Cases_on ‘evaluate s0 env [e1]’ >>
+      rename [‘evaluate s0 env [e1] = (s00,res00)’] >>
+      Cases_on ‘res00’ >> gvs[AllCaseEqs()] >>
+      ‘s.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
+      first_x_assum (qspec_then ‘ck + (s00.clock - s.clock)’ mp_tac) >>
+      simp[])
+  >- ((* Letrec *) gvs[AllCaseEqs(), find_evalform ‘Letrec _ _ ’])
+  >- ((* Tannot *) gvs[AllCaseEqs(), find_evalform ‘Tannot _ _ ’])
+  >- ((* Lannot *) gvs[AllCaseEqs(), find_evalform ‘Lannot _ _ ’])
+  >- ((* match [] *) gs[evaluate_def]) >>
+  (* match (cons) *)
+  gvs[evaluate_def,AllCaseEqs()]
+QED
+
+Theorem final_padNIL[simp]:
+  conf.payload_size ≠ 0 ⇒ final (pad conf [])
+Proof
+  simp[pad_def, final_def]
+QED
+
+Theorem update_state_ffi_has_node[simp]:
+  ∀st. ffi_has_node dest st ∧ dest ≠ FST st ⇒
+       (ffi_has_node nd
+        (update_state st (comms_ffi_oracle conf)
+         (send_events conf (MAP (n2w o ORD) dest) data)) =
+        ffi_has_node nd st)
+Proof
+  simp[send_events_def] >> completeInduct_on ‘LENGTH data’ >>
+  Cases >> simp[update_state_def, Once compile_message_def] >>
+  rw[update_state_def, comms_ffi_oracle_def, ffi_send_def, pad_LENGTH] >>
+  simp[AllCaseEqs(), MAP_MAP_o, CHR_w2n_n2w_ORD]
+  >- (SELECT_ELIM_TAC >> conj_tac >>
+      DEEP_INTRO_TAC optionTheory.some_intro >> simp[]
+      >- (‘valid_send_dest (MAP (n2w o ORD) dest) st’
+            by simp[valid_send_dest_def, MAP_MAP_o, CHR_w2n_n2w_ORD] >>
+          drule strans_send_cond >> simp[MAP_MAP_o, CHR_w2n_n2w_ORD]) >>
+      metis_tac[strans_pres_nodes])
+  >- (SELECT_ELIM_TAC >> conj_tac >>
+      DEEP_INTRO_TAC optionTheory.some_intro >> simp[]
+      >- (‘valid_send_dest (MAP (n2w o ORD) dest) st’
+            by simp[valid_send_dest_def, MAP_MAP_o, CHR_w2n_n2w_ORD] >>
+          drule strans_send_cond >> simp[MAP_MAP_o, CHR_w2n_n2w_ORD]) >>
+      metis_tac[strans_pres_nodes]) >>
+  gs[PULL_FORALL] >>
+  first_x_assum (qspec_then ‘DROP (conf.payload_size - 1) t’ mp_tac) >>
+  simp[] >> strip_tac >>
+  qmatch_abbrev_tac ‘ffi_has_node nd (update_state ST _ _) = _’ >>
+  first_x_assum (qspec_then ‘ST’ mp_tac) >>
+  impl_tac
+  >- (simp[Abbr‘ST’] >> SELECT_ELIM_TAC >> conj_tac >>
+      DEEP_INTRO_TAC optionTheory.some_intro >> simp[]
+      >- (‘valid_send_dest (MAP (n2w o ORD) dest) st’
+            by simp[valid_send_dest_def, MAP_MAP_o, CHR_w2n_n2w_ORD] >>
+          drule strans_send_cond >> simp[MAP_MAP_o, CHR_w2n_n2w_ORD]) >>
+      metis_tac[strans_pres_pnum, strans_pres_nodes]) >> simp[] >>
+  disch_then kall_tac >> simp[Abbr‘ST’] >>
+  SELECT_ELIM_TAC >> conj_tac >>
+  DEEP_INTRO_TAC optionTheory.some_intro >> simp[]
+  >- (‘valid_send_dest (MAP (n2w o ORD) dest) st’
+        by simp[valid_send_dest_def, MAP_MAP_o, CHR_w2n_n2w_ORD] >>
+      drule strans_send_cond >> simp[MAP_MAP_o, CHR_w2n_n2w_ORD]) >>
+  metis_tac[strans_pres_pnum, strans_pres_nodes]
+QED
+
+Theorem update_state_ffi_wf[simp]:
+  ∀st dest. ffi_has_node dest st ∧ dest ≠ FST st ⇒
+            (ffi_wf (update_state st (comms_ffi_oracle conf)
+                     (send_events conf (MAP (n2w o ORD) dest) data)) =
+             ffi_wf st)
+Proof
+  simp[send_events_def] >> completeInduct_on ‘LENGTH data’ >>
+  Cases >> simp[update_state_def, Once compile_message_def] >>
+  rw[update_state_def, comms_ffi_oracle_def, ffi_send_def, pad_LENGTH] >>
+  ‘valid_send_dest (MAP (n2w o ORD) dest) st’
+    by simp[valid_send_dest_def, MAP_MAP_o, CHR_w2n_n2w_ORD] >>
+  simp[AllCaseEqs(), MAP_MAP_o, CHR_w2n_n2w_ORD]
+  >- (SELECT_ELIM_TAC >> conj_tac >> DEEP_INTRO_TAC optionTheory.some_intro >>
+      simp[]
+      >- (drule strans_send_cond >> simp[MAP_MAP_o, CHR_w2n_n2w_ORD]) >>
+      metis_tac[strans_pres_wf])
+  >- (SELECT_ELIM_TAC >> conj_tac >> DEEP_INTRO_TAC optionTheory.some_intro >>
+      simp[]
+      >- (drule strans_send_cond >> simp[MAP_MAP_o, CHR_w2n_n2w_ORD]) >>
+      metis_tac[strans_pres_wf]) >>
+  gs[PULL_FORALL] >>
+  qmatch_abbrev_tac ‘ffi_wf (update_state ST _ _) = _’ >>
+  first_x_assum $
+    qspecl_then [‘DROP (conf.payload_size - 1) t’, ‘ST’, ‘dest’] mp_tac >>
+  simp[] >> impl_tac
+  >- (simp[Abbr‘ST’] >>
+      SELECT_ELIM_TAC >> conj_tac >> DEEP_INTRO_TAC optionTheory.some_intro >>
+      simp[]
+      >- (drule strans_send_cond >> simp[MAP_MAP_o, CHR_w2n_n2w_ORD]) >>
+      metis_tac[strans_pres_nodes, strans_pres_pnum]) >>
+  disch_then SUBST_ALL_TAC >> simp[Abbr‘ST’] >>
+  SELECT_ELIM_TAC >> conj_tac >> DEEP_INTRO_TAC optionTheory.some_intro >>
+  simp[]
+  >- (drule strans_send_cond >> simp[MAP_MAP_o, CHR_w2n_n2w_ORD]) >>
+  metis_tac[strans_pres_wf]
+QED
+
+Theorem ffi_eq_simulationL:
+  ffi_eq conf (pn,Q0a,N0a) (pn,Q0b,N0b) ∧
+  strans conf (pn,Q0a,N0a) L (pn,Qa,Na) ⇒
+  ∃Qb Nb. strans conf (pn,Q0b,N0b) L (pn,Qb,Nb) ∧
+          ffi_eq conf (pn,Qa,Na) (pn,Qb,Nb)
+Proof
+  simp[ffi_eq_def] >> strip_tac >>
+  drule_all (bisimulationTheory.BISIM_REL_cases |> iffLR |> cj 1) >>
+  simp[EXISTS_PROD] >> metis_tac[strans_pres_pnum, FST]
+QED
+
+Theorem update_state_send_ffi_state_cor:
+  ∀ffst dest. ffi_has_node dest ffst ∧ dest ≠ FST ffst ∧
+              ffi_state_cor conf src pSt ffst ⇒
+              ffi_state_cor conf src pSt
+               (update_state ffst (comms_ffi_oracle conf)
+                (send_events conf (MAP (n2w o ORD) dest) data))
+Proof
+  simp[send_events_def] >> completeInduct_on ‘LENGTH data’ >>
+  Cases >> simp[update_state_def, Once compile_message_def] >>
+  rw[update_state_def, comms_ffi_oracle_def, ffi_send_def, pad_LENGTH] >>
+  ‘valid_send_dest (MAP (n2w o ORD) dest) ffst’
+    by simp[valid_send_dest_def, MAP_MAP_o, CHR_w2n_n2w_ORD] >>
+  simp[AllCaseEqs(), MAP_MAP_o, CHR_w2n_n2w_ORD]
+  >- (SELECT_ELIM_TAC >> conj_tac >> DEEP_INTRO_TAC optionTheory.some_intro >>
+      simp[]
+      >- (drule strans_send_cond >> simp[MAP_MAP_o, CHR_w2n_n2w_ORD]) >>
+      simp[FORALL_PROD] >> PairCases_on ‘ffst’ >>
+      gvs[ffi_state_cor_def] >> rpt strip_tac >>
+      drule strans_pres_pnum >> simp[] >> rw[] >>
+      rename [‘strans conf (pn, q0, N0) _ (pn, q, N)’,
+              ‘ffi_eq conf (pn,q0,N0) (pn,q0',N0')’] >>
+      drule_all_then strip_assume_tac ffi_eq_simulationL >>
+      drule_then assume_tac strans_queue_pres >>
+      drule_all_then assume_tac strans_pres_wf >> gs[] >>
+      pop_assum (irule_at Any) >> simp[] >> metis_tac[IS_PREFIX_TRANS])
+  >- (SELECT_ELIM_TAC >> conj_tac >> DEEP_INTRO_TAC optionTheory.some_intro >>
+      simp[]
+      >- (drule strans_send_cond >> simp[MAP_MAP_o, CHR_w2n_n2w_ORD]) >>
+      simp[FORALL_PROD] >> PairCases_on ‘ffst’ >>
+      gvs[ffi_state_cor_def] >> rpt strip_tac >>
+      drule strans_pres_pnum >> simp[] >> rw[] >>
+      rename [‘strans conf (pn, q0, N0) _ (pn, q, N)’,
+              ‘ffi_eq conf (pn,q0,N0) (pn,q0',N0')’] >>
+      drule_all_then strip_assume_tac ffi_eq_simulationL >>
+      drule_then assume_tac strans_queue_pres >>
+      drule_all_then assume_tac strans_pres_wf >> gs[] >>
+      pop_assum (irule_at Any) >> simp[] >> metis_tac[IS_PREFIX_TRANS]) >>
+  gs[PULL_FORALL] >>
+  first_x_assum irule >> simp[] >>
+  SELECT_ELIM_TAC >> conj_tac >> DEEP_INTRO_TAC optionTheory.some_intro >>
+  simp[]
+  >- (drule strans_send_cond >> simp[MAP_MAP_o, CHR_w2n_n2w_ORD]) >>
+  simp[FORALL_PROD] >> rw[]
+  >- metis_tac[strans_pres_pnum, FST]
+  >- metis_tac[strans_pres_nodes] >>
+  PairCases_on ‘ffst’ >> gvs[ffi_state_cor_def] >>
+  drule_then assume_tac strans_pres_pnum >> gvs[] >>
+  drule_all_then strip_assume_tac ffi_eq_simulationL >>
+  drule_then assume_tac strans_queue_pres >>
+  drule_all_then assume_tac strans_pres_wf >> gs[] >>
+  pop_assum (irule_at Any) >> simp[] >> metis_tac[IS_PREFIX_TRANS]
+QED
+
+Theorem simulation:
+  ∀p0 pSt0 EP0 L p pSt EP cEnv0 vs cSt0.
+    trans conf (NEndpoint p0 pSt0 EP0) L (NEndpoint p pSt EP) ∧
+    cpEval_valid conf p0 cEnv0 pSt0 EP0 vs cSt0 ∧
+    (∀nd. nd ∈ EP_nodenames EP0 ⇒ ffi_has_node nd cSt0.ffi.ffi_state)
+    ⇒
+    ∃cEnv cSt.
+      stepr꙳ (cEnv0, smSt cSt0, Exp (compile_endpoint conf vs EP0), [])
+             (cEnv, smSt cSt, Exp (compile_endpoint conf vs EP), []) ∧
+      cpEval_valid conf p cEnv pSt EP vs cSt ∧
+      (∀nd. nd ∈ EP_nodenames EP ⇒ ffi_has_node nd cSt.ffi.ffi_state)
+Proof
+  Induct_on ‘trans’ >> simp[compile_endpoint_def] >> rpt strip_tac (* 11 *)
+  >- (gs[cpEval_valid_Send] >>
+      irule_at (Pos hd) break_smallstep_LetNONE >>
+      strip_assume_tac
+               (small_eval_def |> cj 1 |> iffLR |> GEN_ALL
+                |> SIMP_RULE bool_ss [GSYM RIGHT_EXISTS_IMP_THM, SKOLEM_THM]
+                |> INST_TYPE [“:'ffi” |-> “:plffi”]) >>
+      pop_assum (irule_at (Pos hd)) >>
+      irule_at (Pos hd) (small_big_exp_equiv |> iffRL |> cj 1) >>
+      irule_at (Pos hd) (iffRL bigClockTheory.big_clocked_unclocked_equiv) >>
+      simp[funBigStepEquivTheory.functional_evaluate] >>
+      simp[find_evalform‘Letrec _ _’, Excl "evaluate_var",
+           Excl "evaluate_opapp"] >>
+      qmatch_goalsub_abbrev_tac ‘evaluate _ cEnv [App Opapp [_; aexp]]’ >>
+      ‘ck_equiv_hol cEnv DATUM aexp (flip DROP d n)’
+        by (qunabbrev_tac ‘aexp’ >> irule ck_equiv_hol_App >>
+            qexists_tac ‘NUM’ >> simp[] >> conj_tac
+            >- (irule ck_equiv_hol_Lit >> simp[NUM_def, INT_def]) >>
+            irule ck_equiv_hol_App >>
+            irule_at (Pos last) ck_equiv_hol_Var >>
+            drule_then (qspec_then ‘p2’ strip_assume_tac)
+                       nsLookup_build_rec_env_drop >>
+            first_assum (irule_at Any) >> simp[Abbr‘cEnv’] >>
+            irule ck_equiv_hol_Var >> simp[] >>
+            irule cpEval_nsLookup_PLbindings >> metis_tac[]) >>
+      dxrule_at Any (INST_TYPE [“:α” |-> “:plffi”] sendloop_correct) >>
+      disch_then $ qspecl_then [‘conf’, ‘cEnv0’, ‘cSt0’] mp_tac >>
+      ‘cSt0.ffi.oracle = comms_ffi_oracle conf’ by gs[cpEval_valid_def] >>
+      pop_assum SUBST1_TAC >>
+      disch_then (resolve_then Any mp_tac send_invariant) >>
+      simp[Abbr‘cEnv’, nsLookup_build_rec_env_sendloop,
+           Excl "evaluate_opapp"] >>
+      disch_then $ qspec_then ‘(MAP (n2w o ORD) p2)’ mp_tac >>
+      simp[MAP_MAP_o, Excl "evaluate_opapp", CHR_w2n_n2w_ORD] >>
+      impl_tac
+      >- (gs[cpEval_valid_def, valid_send_dest_def, MAP_MAP_o,
+             CHR_w2n_n2w_ORD, ffi_state_cor_def] >>
+          Cases_on ‘cSt0.ffi.ffi_state’ >>
+          rename [‘_.ffi.ffi_state = (ep,X)’] >> Cases_on ‘X’ >>
+          gs[ffi_state_cor_def]) >>
+      disch_then $ qx_choosel_then [‘ck1’, ‘ck2’, ‘refs’] strip_assume_tac >>
+      drule_then (qspec_then ‘0’
+                  (mp_tac o SIMP_RULE (srw_ss()) [Excl "evaluate_opapp"]))
+                 (cj 1 evaluate_choose_final_clock) >>
+      disch_then (irule_at Any) >> simp[] >> pop_assum kall_tac >>
+      gvs[cpEval_valid_def] >>
+      reverse (rpt conj_tac)
+      >- (Cases_on ‘cSt0.ffi.ffi_state’ >>
+          rename [‘cSt0.ffi.ffi_state = (pn,X)’] >> Cases_on ‘X’ >>
+          gs[ffi_state_cor_def])
+      >- (Cases_on ‘cSt0.ffi.ffi_state’ >>
+          rename [‘cSt0.ffi.ffi_state = (pn,X)’] >> Cases_on ‘X’ >>
+          gs[ffi_state_cor_def]) >>
+      irule update_state_send_ffi_state_cor >> simp[] >>
+      Cases_on ‘cSt0.ffi.ffi_state’ >>
+      rename [‘cSt0.ffi.ffi_state = (pn,X)’] >> Cases_on ‘X’ >>
+      gs[ffi_state_cor_def])
+  >- ((* second SEND case *) cheat) >> cheat
+QED
+
+
+(*
 (* Irrelevance of extra time/fuel to equivalence *)
 Theorem clock_irrel:
   ∀ conf cSt1 cSt2 cEnv1 cExps1 cEnv2 cExps2.
@@ -4117,23 +4520,10 @@ Proof
   metis_tac[ffi_irrel]
 QED
 
-Theorem ALL_DISTINCT_sendloop_names[simp]:
-  ALL_DISTINCT (MAP (λ(x,y,z). x) (sendloop conf data))
-Proof
-  simp[sendloop_def]
-QED
-
 Theorem ALL_DISTINCT_receiveloop_names[simp]:
   ALL_DISTINCT (MAP (λ(x,y,z). x) (receiveloop c d))
 Proof
   simp[receiveloop_def]
-QED
-
-Theorem nsLookup_sendloop[simp]:
-  nsLookup (build_rec_env (sendloop conf data) env envv) (Short (ps2cs v)) =
-  nsLookup envv (Short (ps2cs v))
-Proof
-  simp[build_rec_env_def, ps2cs_def, nsLookup_def, sendloop_def]
 QED
 
 Theorem nsLookup_cpEval_valid:
@@ -4141,18 +4531,6 @@ Theorem nsLookup_cpEval_valid:
   ∃cv. nsLookup cE.v (Short (ps2cs v)) = SOME cv ∧ LIST_TYPE WORD d cv
 Proof
   csimp[cpEval_valid_def, sem_env_cor_def] >>  metis_tac[]
-QED
-
-Theorem nsLookup_build_rec_env_drop:
-  cpEval_valid conf p env pSt pCd vs cSt ⇒
-  ∃dv. nsLookup (build_rec_env (sendloop conf data) env env.v) conf.drop =
-       SOME dv ∧
-       (LIST_TYPE (WORD : word8 -> v -> bool) --> NUM --> LIST_TYPE WORD)
-       (combin$C DROP) dv
-Proof
-  simp[build_rec_env_def, sendloop_def, nsLookup_def, nsBind_def,
-       cpEval_valid_def, env_asm_def, has_v_def, in_module_def, PULL_EXISTS] >>
-  rw[]
 QED
 
 Theorem dec_clock_with_clock:
@@ -4163,13 +4541,6 @@ QED
 
 
 
-
-Theorem nsLookup_sendloop_exists:
-  ∃slv. nsLookup (build_rec_env(sendloop conf data) cE cEv) (Short "sendloop") =
-        SOME slv
-Proof
-  simp[build_rec_env_def, sendloop_def]
-QED
 
 val cp_type =
   strip_fun (type_of “cpEval_valid”) |> #1 |> last |> dest_type |> #2 |> hd
@@ -6331,4 +6702,5 @@ Proof
   \\ rw []
 QED
 
+*)
 val _ = export_theory ();
