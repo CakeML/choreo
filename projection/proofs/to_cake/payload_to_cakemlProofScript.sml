@@ -21,6 +21,7 @@ open evaluateTheory terminationTheory ml_translatorTheory
      semanticPrimitivesTheory ffiTheory;
 
 open bigSmallEquivTheory smallStepHelpTheory smallStepTheory
+     abstractCompilationTheory
 
 val _ = new_theory "payload_to_cakemlProof";
 
@@ -2537,13 +2538,15 @@ Theorem simulation:
     (∀nd. nd ∈ EP_nodenames EP0 ⇒ ffi_has_node nd cSt0.ffi.ffi_state)
     ⇒
     ∃cEnv cSt.
-      stepr꙳ (cEnv0, smSt cSt0, Exp (compile_endpoint conf vs EP0), [])
-             (cEnv, smSt cSt, Exp (compile_endpoint conf vs EP), []) ∧
+      triR stepr
+        (cEnv0, smSt cSt0, Exp (compile_endpoint conf vs EP0), [])
+        (cEnv, smSt cSt, Exp (compile_endpoint conf vs EP), []) ∧
       cpEval_valid conf p cEnv pSt EP vs cSt ∧
       (∀nd. nd ∈ EP_nodenames EP ⇒ ffi_has_node nd cSt.ffi.ffi_state)
 Proof
   Induct_on ‘trans’ >> simp[compile_endpoint_def] >> rpt strip_tac (* 11 *)
   >- (gs[cpEval_valid_Send] >>
+      irule_at (Pos hd) RTC_triR >>
       irule_at (Pos hd) break_smallstep_LetNONE >>
       strip_assume_tac
                (small_eval_def |> cj 1 |> iffLR |> GEN_ALL
@@ -2599,7 +2602,64 @@ Proof
       Cases_on ‘cSt0.ffi.ffi_state’ >>
       rename [‘cSt0.ffi.ffi_state = (pn,X)’] >> Cases_on ‘X’ >>
       gs[ffi_state_cor_def])
-  >- ((* second SEND case *) cheat) >> cheat
+  >- ((* second SEND case *) gs[cpEval_valid_Send] >>
+      ntac 6 (irule_at (Pos hd) triR_one_step_each >> simp[e_step_reln_def] >>
+              simp[e_step_def, push_def, return_def, continue_def]) >>
+      irule_at (Pos hd) triR_RTC_each >>
+      irule_at (Pos hd) smallstep_drop_conts >>
+      strip_assume_tac
+               (small_eval_def |> cj 1 |> iffLR |> GEN_ALL
+                |> SIMP_RULE bool_ss [GSYM RIGHT_EXISTS_IMP_THM, SKOLEM_THM]
+                |> INST_TYPE [“:'ffi” |-> “:plffi”]) >>
+      pop_assum (irule_at (Pos hd)) >>
+      irule_at (Pos hd) (small_big_exp_equiv |> iffRL |> cj 1) >>
+      irule_at (Pos hd) (iffRL bigClockTheory.big_clocked_unclocked_equiv) >>
+      simp[funBigStepEquivTheory.functional_evaluate, Excl "evaluate_opapp"] >>
+      qmatch_goalsub_abbrev_tac ‘evaluate _ cEnv [dropv]’ >>
+      ‘ck_equiv_hol cEnv (NUM --> DATUM) dropv (flip DROP d)’
+        by (qunabbrev_tac ‘dropv’ >> irule ck_equiv_hol_App >>
+            qexists_tac ‘DATUM’ >> simp[] >> conj_tac
+            >- (irule ck_equiv_hol_Lit >> simp[NUM_def, INT_def]) >>
+            irule ck_equiv_hol_App >>
+            irule_at (Pos last) ck_equiv_hol_Var >>
+            drule_then (qspec_then ‘p2’ strip_assume_tac)
+                       nsLookup_build_rec_env_drop >>
+            first_assum (irule_at Any) >> simp[Abbr‘cEnv’] >>
+            irule ck_equiv_hol_Var >> simp[] >>
+            irule cpEval_nsLookup_PLbindings >> metis_tac[]) >>
+      dxrule_at Any (INST_TYPE [“:α” |-> “:plffi”] sendloop_correct) >>
+      disch_then $ qspecl_then [‘conf’, ‘cEnv0’, ‘cSt0’] mp_tac >>
+      ‘cSt0.ffi.oracle = comms_ffi_oracle conf’ by gs[cpEval_valid_def] >>
+      pop_assum SUBST1_TAC >>
+      disch_then (resolve_then Any mp_tac send_invariant) >>
+      simp[Abbr‘cEnv’, nsLookup_build_rec_env_sendloop,
+           Excl "evaluate_opapp"] >>
+      disch_then $ qspec_then ‘(MAP (n2w o ORD) p2)’ mp_tac >>
+      simp[MAP_MAP_o, Excl "evaluate_opapp", CHR_w2n_n2w_ORD] >>
+      impl_tac
+      >- (gs[cpEval_valid_def, valid_send_dest_def, MAP_MAP_o,
+             CHR_w2n_n2w_ORD, ffi_state_cor_def] >>
+          Cases_on ‘cSt0.ffi.ffi_state’ >>
+          rename [‘_.ffi.ffi_state = (ep,X)’] >> Cases_on ‘X’ >>
+          gs[ffi_state_cor_def]) >>
+      disch_then $ qx_choosel_then [‘ck1’, ‘ck2’, ‘refs’] strip_assume_tac >>
+      drule_then (qspec_then ‘0’
+                  (mp_tac o SIMP_RULE (srw_ss()) [Excl "evaluate_opapp"]))
+                 (cj 1 evaluate_choose_final_clock) >>
+      disch_then (irule_at Any) >> simp[] >> pop_assum kall_tac >>
+      gvs[cpEval_valid_def] >>
+      reverse (rpt conj_tac)
+      >- (Cases_on ‘cSt0.ffi.ffi_state’ >>
+          rename [‘cSt0.ffi.ffi_state = (pn,X)’] >> Cases_on ‘X’ >>
+          gs[ffi_state_cor_def])
+      >- (Cases_on ‘cSt0.ffi.ffi_state’ >>
+          rename [‘cSt0.ffi.ffi_state = (pn,X)’] >> Cases_on ‘X’ >>
+          gs[ffi_state_cor_def]) >>
+      irule update_state_send_ffi_state_cor >> simp[] >>
+      Cases_on ‘cSt0.ffi.ffi_state’ >>
+      rename [‘cSt0.ffi.ffi_state = (pn,X)’] >> Cases_on ‘X’ >>
+      gs[ffi_state_cor_def])
+
 QED
 
 
