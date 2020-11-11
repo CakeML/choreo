@@ -79,6 +79,13 @@ Proof
   simp[stepr_augment_conts]
 QED
 
+Theorem smallstep_drop_conts:
+  stepr꙳ (env0, st0, ev0, []) (env, st, ev, []) ⇒
+  stepr꙳ (env0, st0, ev0, cs) (env, st, ev, cs)
+Proof
+  strip_tac >> drule_then assume_tac smallstep_augment_conts >> gs[]
+QED
+
 (* converse is not true; imagine an e2 that loops to itself after an initial
    evaluation of e1.  Then being able to get an e2,st pair by starting at
    (e1;;e2) doesn't guarantee you can get there by just evaluating e1 on its
@@ -95,5 +102,12 @@ Proof
   irule (cj 2 RTC_RULES_RIGHT1) >> first_assum (irule_at Any) >>
   simp[e_step_reln_def, e_step_def, continue_def]
 QED
+
+Theorem smEv_RTC_stepr:
+  smEv env0 s0 e [] (s,Rval v) ⇒ stepr꙳ (env0,s0,Exp e,[]) (env0,s,Val v,[])
+Proof
+  simp[small_eval_def]
+
+small_big_exp_equiv
 
 val _ = export_theory();

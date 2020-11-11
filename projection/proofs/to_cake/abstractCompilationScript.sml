@@ -62,4 +62,48 @@ Proof
   simp[simulates_def] >> metis_tac[forward_implies_back]
 QED
 
+Definition triR_def:
+  triR R e1 e2 ⇔ ∃e. R꙳ e1 e ∧ R꙳ e2 e
+End
+
+Theorem RTC_triR:
+  R꙳ a b ⇒ triR R a b
+Proof
+  simp[triR_def] >> metis_tac[RTC_REFL]
+QED
+
+Theorem triR_one_step_each:
+  R a0 a ∧ R b0 b ∧ triR R a b ⇒ triR R a0 b0
+Proof
+  simp[triR_def] >> metis_tac[RTC_RULES]
+QED
+
+Theorem triR_RTC_each:
+  R꙳ a0 a ∧ R꙳ b0 b ∧ triR R a b ⇒ triR R a0 b0
+Proof
+ metis_tac[triR_def, RTC_CASES_RTC_TWICE]
+QED
+
+Theorem triR_forward_simulation_has_all_terminations:
+  simulates simR sR (triR tR) ∧ CR tR ∧
+  (∀s t. nf sR s ∧ simR s t ⇒ ∃tt. nf tR tt ∧ tR꙳ t tt ∧ simR s tt) ⇒
+  ∀s0 s t0.
+    sR꙳ s0 s ∧ nf sR s ∧ simR s0 t0 ⇒
+    ∃t.
+      tR꙳ t0 t ∧ nf tR t ∧ simR s t
+Proof
+  strip_tac >> Induct_on ‘RTC’ >> rpt strip_tac
+  >- metis_tac[] >>
+  gs[simulates_def, triR_def] >> rename [‘nf sR s’, ‘sR s0 s0'’] >>
+  ‘∃t tT. tR꙳ t0 tT ∧ simR s0' t ∧ tR꙳ t tT’ by metis_tac[] >>
+  ‘∃tt. tR꙳ t tt ∧ simR s tt ∧ nf tR tt’ by metis_tac[] >>
+  ‘∃d. tR꙳ tT d ∧ tR꙳ tt d’ by metis_tac[CR_def, diamond_def] >>
+  qexists_tac ‘tt’ >> simp[] >>
+  ‘tt = d’ by metis_tac[RTC_CASES1, nf_def] >>
+  metis_tac[RTC_CASES_RTC_TWICE]
+QED
+
+
+
+
 val _ = export_theory();
