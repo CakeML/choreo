@@ -28,13 +28,13 @@ val _ = new_theory "payload_to_cakemlProof";
 val _ = temp_delsimps ["NORMEQ_CONV"];
 
 val _ = set_grammar_ancestry
-  ["option","rich_list","endpoint_to_payload",
+  ["endpoint_to_payload",
    "payloadCong","payloadLang","payloadSem","payloadProps",
    "payload_to_cakeml","comms_ffi_model","comms_ffi_props",
    "comms_ffi_eq","comms_ffi_rec_charac","comms_ffi_cons",
-   "evaluate_tools", "ckExp_Equiv","evaluate", "termination",
+   "evaluate_tools", "ckExp_Equiv","termination",
    "ml_translator", "ml_prog", "evaluateProps", "namespace",
-   "semanticPrimitives","ffi"];
+   "semanticPrimitives", "abstractCompilation"];
 
 val WORD8 = “WORD:word8 -> v -> bool”;
 Overload WORD8 = “WORD:word8 -> v -> bool”;
@@ -776,17 +776,6 @@ Proof
   simp[build_rec_env_def, ps2cs_def, nsLookup_def, sendloop_def]
 QED
 
-Theorem nsLookup_build_rec_env_drop:
-  cpEval_valid conf p env pSt pCd vs cSt ⇒
-  ∃dv. nsLookup (build_rec_env (sendloop conf data) env env.v) conf.drop =
-       SOME dv ∧
-       (LIST_TYPE (WORD : word8 -> v -> bool) --> NUM --> LIST_TYPE WORD)
-       (combin$C DROP) dv
-Proof
-  simp[build_rec_env_def, sendloop_def, nsLookup_def, nsBind_def,
-       cpEval_valid_def, env_asm_def, has_v_def, in_module_def, PULL_EXISTS] >>
-  rw[]
-QED
 
 (* ---- Past this point this file is entirely my contribution *)
 
@@ -2156,6 +2145,19 @@ Definition cpEval_valid_def:
     cSt.ffi.oracle = comms_ffi_oracle conf
 End
 
+Theorem nsLookup_build_rec_env_drop:
+  cpEval_valid conf p env pSt pCd vs cSt ⇒
+  ∃dv. nsLookup (build_rec_env (sendloop conf data) env env.v) conf.drop =
+       SOME dv ∧
+       (LIST_TYPE (WORD : word8 -> v -> bool) --> NUM --> LIST_TYPE WORD)
+       (combin$C DROP) dv
+Proof
+  simp[build_rec_env_def, sendloop_def, nsLookup_def, nsBind_def,
+       cpEval_valid_def, env_asm_def, has_v_def, in_module_def, PULL_EXISTS] >>
+  rw[]
+QED
+
+
 (* VALIDITY *)
 (* Check that Payload States with label transition and
    two corresponding FFI states are all valid to produce
@@ -2531,6 +2533,17 @@ Proof
   pop_assum (irule_at Any) >> simp[] >> metis_tac[IS_PREFIX_TRANS]
 QED
 
+Overload sendloop_code[local] =
+  (list_mk_abs([“conf : config”, “dest : string”],
+               sendloop_def |> concl |> strip_forall |> #2 |> rhs |> rator
+                 |> rand |> pairSyntax.strip_pair |> last))
+Theorem find_recfun_sendloop[simp]:
+  find_recfun "sendloop" (sendloop conf dest) =
+  SOME ("x", sendloop_code conf dest)
+Proof
+  simp[sendloop_def, Once find_recfun_def]
+QED
+
 Theorem simulation:
   ∀p0 pSt0 EP0 L p pSt EP cEnv0 vs cSt0.
     trans conf (NEndpoint p0 pSt0 EP0) L (NEndpoint p pSt EP) ∧
@@ -2603,7 +2616,8 @@ Proof
       rename [‘cSt0.ffi.ffi_state = (pn,X)’] >> Cases_on ‘X’ >>
       gs[ffi_state_cor_def])
   >- ((* second SEND case *) gs[cpEval_valid_Send] >>
-      ntac 6 (irule_at (Pos hd) triR_one_step_each >> simp[e_step_reln_def] >>
+      qexists_tac ‘cEnv0’ >>
+      ntac 3 (irule_at (Pos hd) triR_one_step_each >> simp[e_step_reln_def] >>
               simp[e_step_def, push_def, return_def, continue_def]) >>
       irule_at (Pos hd) triR_RTC_each >>
       irule_at (Pos hd) smallstep_drop_conts >>
@@ -2611,14 +2625,18 @@ Proof
                (small_eval_def |> cj 1 |> iffLR |> GEN_ALL
                 |> SIMP_RULE bool_ss [GSYM RIGHT_EXISTS_IMP_THM, SKOLEM_THM]
                 |> INST_TYPE [“:'ffi” |-> “:plffi”]) >>
+      first_assum (irule_at (Pos hd)) >>
+      irule_at (Pos (el 2)) smallstep_drop_conts >>
       pop_assum (irule_at (Pos hd)) >>
-      irule_at (Pos hd) (small_big_exp_equiv |> iffRL |> cj 1) >>
-      irule_at (Pos hd) (iffRL bigClockTheory.big_clocked_unclocked_equiv) >>
+      irule_at (Pos (el 3)) triR_one_step_each >>
+      simp[e_step_reln_def, e_step_def, push_def, return_def, continue_def] >>
+      irule_at (Pos (el 3)) (small_big_exp_equiv |> iffRL |> cj 1) >>
+      irule_at Any (iffRL bigClockTheory.big_clocked_unclocked_equiv) >>
       simp[funBigStepEquivTheory.functional_evaluate, Excl "evaluate_opapp"] >>
       qmatch_goalsub_abbrev_tac ‘evaluate _ cEnv [dropv]’ >>
-      ‘ck_equiv_hol cEnv (NUM --> DATUM) dropv (flip DROP d)’
+      ‘ck_equiv_hol cEnv DATUM dropv (flip DROP d n)’
         by (qunabbrev_tac ‘dropv’ >> irule ck_equiv_hol_App >>
-            qexists_tac ‘DATUM’ >> simp[] >> conj_tac
+            qexists_tac ‘NUM’ >> simp[] >> conj_tac
             >- (irule ck_equiv_hol_Lit >> simp[NUM_def, INT_def]) >>
             irule ck_equiv_hol_App >>
             irule_at (Pos last) ck_equiv_hol_Var >>
@@ -2627,38 +2645,61 @@ Proof
             first_assum (irule_at Any) >> simp[Abbr‘cEnv’] >>
             irule ck_equiv_hol_Var >> simp[] >>
             irule cpEval_nsLookup_PLbindings >> metis_tac[]) >>
-      dxrule_at Any (INST_TYPE [“:α” |-> “:plffi”] sendloop_correct) >>
-      disch_then $ qspecl_then [‘conf’, ‘cEnv0’, ‘cSt0’] mp_tac >>
-      ‘cSt0.ffi.oracle = comms_ffi_oracle conf’ by gs[cpEval_valid_def] >>
-      pop_assum SUBST1_TAC >>
-      disch_then (resolve_then Any mp_tac send_invariant) >>
-      simp[Abbr‘cEnv’, nsLookup_build_rec_env_sendloop,
-           Excl "evaluate_opapp"] >>
-      disch_then $ qspec_then ‘(MAP (n2w o ORD) p2)’ mp_tac >>
-      simp[MAP_MAP_o, Excl "evaluate_opapp", CHR_w2n_n2w_ORD] >>
-      impl_tac
-      >- (gs[cpEval_valid_def, valid_send_dest_def, MAP_MAP_o,
-             CHR_w2n_n2w_ORD, ffi_state_cor_def] >>
-          Cases_on ‘cSt0.ffi.ffi_state’ >>
-          rename [‘_.ffi.ffi_state = (ep,X)’] >> Cases_on ‘X’ >>
-          gs[ffi_state_cor_def]) >>
-      disch_then $ qx_choosel_then [‘ck1’, ‘ck2’, ‘refs’] strip_assume_tac >>
-      drule_then (qspec_then ‘0’
-                  (mp_tac o SIMP_RULE (srw_ss()) [Excl "evaluate_opapp"]))
-                 (cj 1 evaluate_choose_final_clock) >>
-      disch_then (irule_at Any) >> simp[] >> pop_assum kall_tac >>
-      gvs[cpEval_valid_def] >>
-      reverse (rpt conj_tac)
-      >- (Cases_on ‘cSt0.ffi.ffi_state’ >>
-          rename [‘cSt0.ffi.ffi_state = (pn,X)’] >> Cases_on ‘X’ >>
-          gs[ffi_state_cor_def])
-      >- (Cases_on ‘cSt0.ffi.ffi_state’ >>
-          rename [‘cSt0.ffi.ffi_state = (pn,X)’] >> Cases_on ‘X’ >>
-          gs[ffi_state_cor_def]) >>
-      irule update_state_send_ffi_state_cor >> simp[] >>
-      Cases_on ‘cSt0.ffi.ffi_state’ >>
-      rename [‘cSt0.ffi.ffi_state = (pn,X)’] >> Cases_on ‘X’ >>
-      gs[ffi_state_cor_def])
+      drule_then (qspec_then ‘cSt0’ strip_assume_tac) ck_equiv_hol_apply >>
+      pop_assum (C (resolve_then (Pos hd) assume_tac) evaluate_set_clock) >>
+      gs[SKOLEM_THM] >> pop_assum (irule_at (Pos hd)) >> simp[] >>
+      RM_ABBREV_TAC "dropv" >>
+
+      irule_at (Pos (el 2)) (small_big_exp_equiv |> iffRL |> cj 1) >>
+      irule_at Any (iffRL bigClockTheory.big_clocked_unclocked_equiv) >>
+      simp[funBigStepEquivTheory.functional_evaluate, Excl "evaluate_opapp"] >>
+      qpat_x_assum ‘ck_equiv_hol _ _ _ _ ’ kall_tac >>
+      qmatch_goalsub_abbrev_tac ‘evaluate _ cEnv [dropv]’ >>
+      ‘ck_equiv_hol cEnv DATUM dropv (flip DROP d (n + conf.payload_size))’
+        by (qunabbrev_tac ‘dropv’ >> irule ck_equiv_hol_App >>
+            qexists_tac ‘NUM’ >> simp[] >> conj_tac
+            >- (irule ck_equiv_hol_Lit >> simp[NUM_def, INT_def]) >>
+            irule ck_equiv_hol_App >>
+            irule_at (Pos last) ck_equiv_hol_Var >>
+            drule_then (qspec_then ‘p2’ strip_assume_tac)
+                       nsLookup_build_rec_env_drop >>
+            first_assum (irule_at Any) >> simp[Abbr‘cEnv’] >>
+            irule ck_equiv_hol_Var >> simp[] >>
+            irule cpEval_nsLookup_PLbindings >> metis_tac[]) >>
+      dxrule_then assume_tac
+                  (ck_equiv_hol_apply |> INST_TYPE [beta |-> “:plffi”]) >>
+      gs[] >> gs[SKOLEM_THM, FORALL_AND_THM] >>
+      first_x_assum (C (resolve_then (Pos hd) assume_tac) evaluate_set_clock) >>
+      gs[SKOLEM_THM] >> pop_assum (irule_at (Pos hd)) >> simp[] >>
+      (* now ready to step through evaluation of first argument *)
+      irule_at Any triR_step1 >> simp[e_step_def, e_step_reln_def] >>
+      ‘nsLookup cEnv.v (Short "sendloop") =
+       SOME (Recclosure cEnv0 (sendloop conf p2) "sendloop")’
+        by simp[Abbr‘cEnv’, nsLookup_build_rec_env_sendloop] >>
+      simp[return_def] >> irule_at Any triR_step1 >>
+      simp[continue_def, e_step_def, e_step_reln_def, application_def,
+           do_opapp_def] >>
+      irule_at Any triR_step1 >> simp[e_step_def, e_step_reln_def, push_def] >>
+      irule_at Any triR_steps1 >>
+      irule_at (Pos hd) smallstep_drop_conts >>
+      strip_assume_tac
+               (small_eval_def |> cj 1 |> iffLR |> GEN_ALL
+                |> SIMP_RULE bool_ss [GSYM RIGHT_EXISTS_IMP_THM, SKOLEM_THM]
+                |> INST_TYPE [“:'ffi” |-> “:plffi”]) >>
+      pop_assum (irule_at (Pos hd)) >>
+      irule_at Any triR_step1 >>
+      simp[e_step_def, e_step_reln_def, continue_def] >>
+      irule_at Any (small_big_exp_equiv |> iffRL |> cj 1) >>
+      irule_at Any (iffRL bigClockTheory.big_clocked_unclocked_equiv) >>
+      simp[funBigStepEquivTheory.functional_evaluate, Excl "evaluate_opapp"] >>
+      strip_assume_tac (padv_correct
+                        |> SIMP_RULE (srw_ss()) [SKOLEM_THM,
+                                                 GSYM RIGHT_EXISTS_IMP_THM,
+                                                 Excl "evaluate_opapp"]
+                        |> INST_TYPE [alpha |-> “:plffi”]) >>
+      fs[IMP_CONJ_THM, FORALL_AND_THM, Excl "evaluate_opapp"] >>
+      cheat) >> cheat
+
 
 QED
 
