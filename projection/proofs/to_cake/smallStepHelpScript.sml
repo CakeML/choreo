@@ -103,11 +103,4 @@ Proof
   simp[e_step_reln_def, e_step_def, continue_def]
 QED
 
-Theorem smEv_RTC_stepr:
-  smEv env0 s0 e [] (s,Rval v) ⇒ stepr꙳ (env0,s0,Exp e,[]) (env0,s,Val v,[])
-Proof
-  simp[small_eval_def]
-
-small_big_exp_equiv
-
 val _ = export_theory();

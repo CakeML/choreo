@@ -78,6 +78,18 @@ Proof
   simp[triR_def] >> metis_tac[RTC_RULES]
 QED
 
+Theorem triR_step1:
+  R a0 a ∧ triR R a b ⇒ triR R a0 b
+Proof
+  simp[triR_def] >> metis_tac[RTC_RULES]
+QED
+
+Theorem triR_steps1:
+  R꙳ a0 a ∧ triR R a b ⇒ triR R a0 b
+Proof
+  simp[triR_def] >> metis_tac[RTC_CASES_RTC_TWICE]
+QED
+
 Theorem triR_RTC_each:
   R꙳ a0 a ∧ R꙳ b0 b ∧ triR R a b ⇒ triR R a0 b0
 Proof
