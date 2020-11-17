@@ -62,6 +62,37 @@ Definition in_module_def:
   ∀x y (env:(modN,varN,v) namespace). nsLookup (nsBind x y env) name = nsLookup env name
 End
 
+Definition reffree_AppReturns_def:
+  reffree_AppReturns P cl Q ⇔
+    ∀v. P v ⇒ ∃env exp.
+                do_opapp [cl;v] = SOME (env,exp) ∧
+                ∀refs. ∃u.
+                         eval_rel (empty_state with refs := refs) env exp
+                                  (empty_state with refs := refs) u ∧
+                         Q u
+End
+
+Definition reffree_Arrow_def:
+  reffree_Arrow a b = λf v. ∀x. reffree_AppReturns (a x) v (b (f x))
+End
+
+val _ = set_mapped_fixity {term_name = "reffree_Arrow", tok = "~~>",
+                           fixity = Infixr 750}
+
+Theorem reffree_normal1:
+  (Dm ~~> Rg) f v ⇒ (Dm --> Rg) f v
+Proof
+  simp[reffree_Arrow_def, reffree_AppReturns_def, Arrow_def, AppReturns_def] >>
+  metis_tac[APPEND_NIL]
+QED
+
+Theorem reffree_normal2:
+  (Dm1 ~~> Dm2 ~~> Rg) f v ⇒ (Dm1 --> Dm2 --> Rg) f v
+Proof
+  simp[reffree_Arrow_def, reffree_AppReturns_def, Arrow_def, AppReturns_def] >>
+  metis_tac[APPEND_NIL]
+QED
+
 (* All constructors in conf are defined correctly and cannot be
    overwritten easily *)
 Definition env_asm_def:
@@ -71,10 +102,10 @@ Definition env_asm_def:
     has_v env.v conf.append (DATUM --> DATUM --> DATUM) $++ ∧
     has_v env.v conf.append (LIST_TYPE (DATUM) --> LIST_TYPE (DATUM) --> LIST_TYPE (DATUM)) $++ ∧
     has_v env.v conf.concat (LIST_TYPE (DATUM) --> DATUM) FLAT ∧
-    has_v env.v conf.length (DATUM --> NUM) LENGTH ∧
+    has_v env.v conf.length (DATUM ~~> NUM) LENGTH ∧
     has_v env.v conf.null (DATUM --> BOOL) NULL ∧
     has_v env.v conf.take (DATUM --> NUM --> DATUM) (combin$C TAKE) ∧
-    has_v env.v conf.drop (DATUM --> NUM --> DATUM) (combin$C DROP) ∧
+    has_v env.v conf.drop (DATUM ~~> NUM ~~> DATUM) (combin$C DROP) ∧
     (∃v. nsLookup env.v conf.toList = SOME v ∧
          (∀s1:unit semanticPrimitives$state l ll.
            store_lookup ll s1.refs = SOME (W8array l)
@@ -203,6 +234,13 @@ Proof
 QED
 
 val _ = augment_srw_ss [rewrites [o_UNCURRY_R, o_ABS_R, C_UNCURRY_L, C_ABS_L]]
+
+Theorem bind_eq_Rval:
+  result_bind x f = (s, Rval rvs) ⇔
+  ∃s0 rvs0. x = (s0,Rval rvs0) ∧ f (s0, rvs0) = (s, Rval rvs)
+Proof
+  Cases_on ‘x’ >> Cases_on ‘r’ >> simp[]
+QED
 
 Definition check_option_def[simp]:
   check_option NONE e (s:α state) = (s, Rerr e) ∧
@@ -340,6 +378,771 @@ Theorem padv_correct:
   store_lookup num (APPEND s1.refs refs') = SOME(W8array(pad conf l))
 Proof
   rpt strip_tac >>
+  drule_then assume_tac evaluate_add_to_clock >> gvs[] >>
+  Q.REFINE_EXISTS_TAC ‘ck1 + s1.clock’ >>
+  simp[padv_def,buffer_size_def,payload_size_def,find_evalform ‘Fun _ _’,
+       do_opapp_def] >>
+  qabbrev_tac ‘LA1 = App Opapp [Var conf.length; Var (Short "x")]’ >>
+  qabbrev_tac ‘LA2 = App Opapp [App Opapp [Var conf.take;
+                                           Var (Short "x")];
+                                Lit (IntLit (&conf.payload_size))]’ >>
+  qabbrev_tac ‘LA3 = App Opapp [Var conf.fromList; LA2]’ >>
+  qabbrev_tac ‘LA4 = App Opapp [Var conf.fromList; Var (Short "x")]’ >>
+  Q.REFINE_EXISTS_TAC ‘ck1 + 1’ >>
+  simp [dec_clock_def, find_evalform ‘Let _ _ _’, find_evalform ‘App _ _’,
+        do_app_def, store_alloc_def, find_evalform ‘If _ _ _ ’,
+        option_bind] >>
+  Q.REFINE_EXISTS_TAC ‘ck1 + 1’ >>
+  qmatch_goalsub_abbrev_tac ‘evaluate (stLA1 with clock := _) envLA1 [LA1]’ >>
+  ‘ck_equiv_hol envLA1 NUM LA1 (LENGTH l)’
+    by (qunabbrev_tac ‘LA1’ >>
+        irule ck_equiv_hol_App >>
+        qexists_tac ‘DATUM’ >>
+        rw[] >> irule ck_equiv_hol_Var
+        >- simp (Abbr ‘envLA1’::eval_sl) >>
+        fs[in_module_def,env_asm_def,
+           has_v_def] >>
+        qunabbrev_tac ‘envLA1’ >>
+        rw[reffree_normal1]) >>
+  drule_then (qspec_then ‘stLA1’ (strip_assume_tac o SIMP_RULE (srw_ss()) []))
+             ck_equiv_hol_apply_alt >>
+  rename [‘∀dc. evaluate (stLA1 with clock := bc1_1 + dc) _ _ =
+                (stLA1 with <|clock := dc + bc2_1;
+                              refs := stLA1.refs ++ drefs1|>,
+                 Rval [cV1])’] >> gvs[] >>
+  Q.REFINE_EXISTS_TAC ‘ck1 + bc1_1’ >>
+  simp[] >>
+  qpat_x_assum ‘∀dc. _’ (K ALL_TAC) >>
+  Cases_on ‘cV1’ >> gvs[NUM_def,INT_def] >>
+  simp[cj 1 terminationTheory.do_eq_def, lit_same_type_def, AllCaseEqs(),
+       do_if_def] >>
+  Cases_on ‘LENGTH l = conf.payload_size’ >> simp[]
+  >- (simp[evaluate_letNONE, Abbr‘envLA1’, find_evalform ‘App _ _’,
+           do_app_def, store_lookup_def, Abbr‘stLA1’, EL_APPEND1, EL_APPEND2,
+           store_assign_def, store_v_same_type_def] >>
+      simp[LUPDATE_REPLICATE, LUPDATE_APPEND, LUPDATE_def] >>
+      simp[find_evalform ‘Let _ _ _’] >>
+      qunabbrev_tac ‘LA3’ >> simp[] >>
+      qmatch_goalsub_abbrev_tac
+        ‘evaluate (stLA2 with clock := _) envLA2 [LA2]’ >>
+      ‘ck_equiv_hol envLA2 (DATUM) LA2 ((combin$C TAKE) l conf.payload_size)’
+        by (qunabbrev_tac ‘LA2’ >>
+            irule ck_equiv_hol_App >>
+            qexists_tac ‘NUM’ >> rw[]
+            >- (irule ck_equiv_hol_Lit >> rw trans_sl) >>
+            irule ck_equiv_hol_App >>
+            qexists_tac ‘DATUM’ >> rw[] >>
+            irule ck_equiv_hol_Var
+            >- simp (Abbr ‘envLA2’::eval_sl) >>
+            fs[in_module_def,env_asm_def,
+               has_v_def] >>
+            qunabbrev_tac ‘envLA2’ >>
+            rw[]) >>
+      dxrule_then (qspec_then ‘stLA2’ strip_assume_tac)
+                  ck_equiv_hol_apply_alt >>
+      rename1
+        ‘∀dc. evaluate (stLA2 with clock := bc1_2 + dc) _ _ =
+              (stLA2 with <|clock := dc + bc2_2; refs := stLA2.refs ++ drefs2|>,
+               Rval [cV2])’ >>
+      Q.REFINE_EXISTS_TAC ‘ck1 + bc1_2’ >>
+      simp[] >> pop_assum (K ALL_TAC) >>
+      MAP_EVERY qunabbrev_tac [‘stLA2’,‘envLA2’,‘LA2’] >>
+      qmatch_goalsub_abbrev_tac ‘nsLookup LENV conf.fromList’ >>
+      ‘∃v. nsLookup LENV conf.fromList = SOME v ∧
+           ∀l lv.
+             DATUM l lv ⇒
+             ∀s1: α semanticPrimitives$state.
+               ∃env' exp ck1 ck2.
+                 do_opapp [v; lv] = SOME(env',exp) ∧
+                 ∀mc.
+                   evaluate (s1 with clock := ck1 + mc) env' [exp] =
+                   (s1 with <|clock := ck2 + mc;
+                              refs := s1.refs ++ [W8array l]|>,
+                    Rval [Loc(LENGTH s1.refs)])’
+        by (qunabbrev_tac ‘LENV’ >>
+            fs[env_asm_def,in_module_def,evaluate_generalise] >>
+            rw[] >> rename1 ‘LIST_TYPE WORD l1 l2’ >>
+            qpat_x_assum ‘∀a b. _’ (qspecl_then [‘l1’,‘l2’] assume_tac) >>
+            qmatch_goalsub_rename_tac ‘evaluate (sg with clock := _) _ _ = _’ >>
+            rfs[] >> pop_assum (qspec_then ‘empty_state with refs := sg.refs’ strip_assume_tac) >>
+            fs[] >>
+            rename1 ‘evaluate (empty_state with <|clock:= ck1; refs := _ |>) envE [expE]
+                     = (empty_state with <|clock := ck2; refs := _|>,_)’ >>
+            MAP_EVERY qexists_tac [‘ck1’,‘ck2’] >>
+            metis_tac[evaluate_generalise]) >>
+      simp[dec_clock_def,ADD1] >>
+      qmatch_goalsub_abbrev_tac ‘evaluate (stLA3 with clock := _) _ _’ >>
+      first_x_assum (drule_then $ qspec_then ‘stLA3’ strip_assume_tac) >>
+      simp[] >>
+      rename1 ‘∀mc. evaluate (stLA3 with clock := bc1_3 + mc) _ _ =
+                    (stLA3 with <|clock := bc2_3 + mc; refs := _|>,
+                     _)’ >>
+      Q.REFINE_EXISTS_TAC ‘ck1 + bc1_3’ >> simp[] >>
+      pop_assum kall_tac >>
+      simp[find_evalform ‘App _ _’, Abbr‘LENV’, do_app_def,
+           store_lookup_def, EL_APPEND1, EL_APPEND2, Abbr‘stLA3’,
+           copy_array_def, integerTheory.INT_ADD, store_assign_def,
+           store_v_same_type_def] >>
+      qexists_tac ‘0’ >> simp[state_component_equality] >>
+      simp[EL_APPEND1, EL_APPEND2, LUPDATE_APPEND, LUPDATE_def] >>
+      rw[pad_def] >>
+      rw[TAKE_LENGTH_TOO_LONG])
+  >- (simp[find_evalform ‘If _ _ _’, find_evalform ‘App _ _’] >>
+      simp[Abbr‘stLA1’] >>
+      qmatch_goalsub_abbrev_tac
+        ‘evaluate (stLA1 with clock := _ ) envLA1 [LA1]’ >>
+      dxrule_then (qspec_then ‘stLA1’ strip_assume_tac o
+                   SIMP_RULE (srw_ss()) []) ck_equiv_hol_apply_alt >>
+      rename1 ‘∀dc. evaluate (stLA1 with clock := bc1_1a + dc) _ _ =
+                    (stLA1 with <|clock := dc + bc2_1a;
+                                  refs := stLA1.refs ++ drefs1a|>,
+                     Rval [cV1a])’ >>
+      Q.REFINE_EXISTS_TAC ‘ck1 + bc1_1a’ >> simp[] >>
+      simp[do_app_def] >>
+      Cases_on ‘cV1a’ >>
+      gvs[NUM_def,INT_def,AllCaseEqs(), do_if_def, opb_lookup_def] >>
+      Cases_on ‘LENGTH l < conf.payload_size’ >>
+      simp[Abbr‘envLA1’, Abbr‘stLA1’]
+      >- (simp[evaluate_letNONE, find_evalform ‘App _ _’,
+               do_app_def, store_lookup_def, EL_APPEND1, EL_APPEND2,
+               store_assign_def, LUPDATE_REPLICATE, LUPDATE_APPEND,
+               store_v_same_type_def, LUPDATE_def] >>
+          simp [find_evalform ‘Let _ _ _’, Abbr‘LA4’] >>
+          qmatch_goalsub_abbrev_tac ‘nsLookup LENV conf.fromList’ >>
+          ‘∃v. nsLookup LENV conf.fromList = SOME v ∧
+               ∀l lv. DATUM l lv ⇒
+                       ∀s1: α semanticPrimitives$state.
+                         ∃env' exp ck1 ck2.
+                           do_opapp [v; lv] = SOME(env',exp) ∧
+                           ∀mc.
+                             evaluate (s1 with clock := ck1 + mc) env' [exp] =
+                             (s1 with <|clock := ck2 + mc;
+                                        refs := s1.refs ++ [W8array l]|>,
+                              Rval [Loc(LENGTH s1.refs)])’
+            by (qunabbrev_tac ‘LENV’ >>
+                fs[env_asm_def,in_module_def,evaluate_generalise] >>
+                rw[] >> rename1 ‘LIST_TYPE WORD l1 l2’ >>
+                qpat_x_assum ‘∀a b. _’ (qspecl_then [‘l1’,‘l2’] assume_tac) >>
+                qmatch_goalsub_rename_tac
+                  ‘evaluate (sg with clock := _) _ _ = _’ >>
+                rfs[] >>
+                pop_assum (qspec_then ‘empty_state with refs := sg.refs’
+                           strip_assume_tac) >>
+                fs[] >>
+                rename1
+                  ‘evaluate (empty_state with <|clock:= ck1; refs := _ |>)
+                         envE [expE] =
+                   (empty_state with <|clock := ck2; refs := _|>,_)’ >>
+                MAP_EVERY qexists_tac [‘ck1’,‘ck2’] >>
+                metis_tac[evaluate_generalise]) >>
+          simp[dec_clock_def,ADD1] >>
+          qmatch_goalsub_abbrev_tac ‘evaluate (stLA4 with clock := _) _ _’ >>
+          first_x_assum (drule_then $ qspec_then ‘stLA4’ strip_assume_tac) >>
+          simp[] >>
+          rename1 ‘∀mc. evaluate (stLA4 with clock := bc1_4 + mc) _ _ =
+                        (stLA4 with <|clock := bc2_4 + mc; refs := _|>,
+                         _)’ >>
+          Q.REFINE_EXISTS_TAC ‘ck1 + bc1_4’ >> simp[Abbr ‘stLA4’] >>
+          pop_assum kall_tac >>
+          simp[find_evalform ‘App _ _ ’, do_app_thm, store_lookup_def,
+               EL_APPEND1, EL_APPEND2, Abbr‘LENV’, opn_lookup_def,
+               intLib.ARITH_PROVE “x:int - y < 0 <=> x < y”,
+               intLib.ARITH_PROVE “0 <= x:int - y <=> y <= x”,
+               integerTheory.INT_SUB, store_assign_def, store_v_same_type_def,
+               iffRL integerTheory.INT_ABS_EQ_ID, LUPDATE_APPEND, LUPDATE_def,
+               copy_array_def, integerTheory.INT_ADD] >>
+          qexists_tac ‘0’ >>
+          simp[state_component_equality,pad_def, EL_APPEND1, EL_APPEND2] >>
+          simp[DROP_LENGTH_TOO_LONG, LENGTH_LUPDATE] >>
+          simp[GSYM ADD1, SUB, LUPDATE_def] >>
+          ‘∃m. conf.payload_size - LENGTH l = SUC m’
+            by (Cases_on ‘conf.payload_size - LENGTH l’ >> simp[]) >>
+          ‘conf.payload_size = LENGTH l + SUC m’ by simp[] >>
+          simp[LUPDATE_def, LUPDATE_REPLICATE, TAKE_APPEND1, TAKE_APPEND2] >>
+          simp[ADD1]) >>
+      simp[evaluate_letNONE, find_evalform ‘App _ _’, do_app_thm,
+           store_lookup_def, EL_APPEND1, EL_APPEND2, store_assign_def,
+           store_v_same_type_def, LUPDATE_REPLICATE, LUPDATE_def,
+           LUPDATE_APPEND] >> first_x_assum $ qspec_then ‘0’ kall_tac >>
+      simp[find_evalform ‘Let _ _ _ ’, Abbr‘LA3’] >>
+      qmatch_goalsub_abbrev_tac
+        ‘evaluate (stLA2 with clock := _) envLA2 [LA2]’ >>
+      ‘ck_equiv_hol envLA2 (DATUM) LA2 ((combin$C TAKE) l conf.payload_size)’
+        by (qunabbrev_tac ‘LA2’ >> irule ck_equiv_hol_App >>
+            qexists_tac ‘NUM’ >> rw[]
+            >- (irule ck_equiv_hol_Lit >> rw trans_sl) >>
+            irule ck_equiv_hol_App >>
+            qexists_tac ‘DATUM’ >> rw[] >>
+            irule ck_equiv_hol_Var
+            >- simp (Abbr ‘envLA2’::eval_sl) >>
+            fs[in_module_def,env_asm_def, has_v_def] >>
+            qunabbrev_tac ‘envLA2’ >>
+            rw[]) >>
+      dxrule_then (qspec_then ‘stLA2’ strip_assume_tac) ck_equiv_hol_apply_alt>>
+      rename1 ‘∀dc. evaluate (stLA2 with clock := bc1_2 + dc) _ _ =
+                    (stLA2 with <|clock := dc + bc2_2;
+                                  refs := stLA2.refs ++ drefs2|>,
+                                               Rval [cV2])’ >>
+      Q.REFINE_EXISTS_TAC ‘ck1 + bc1_2’ >> simp[] >>
+      MAP_EVERY qunabbrev_tac [‘stLA2’,‘envLA2’,‘LA2’] >>
+      qmatch_goalsub_abbrev_tac ‘nsLookup LENV conf.fromList’ >>
+      ‘∃v. nsLookup LENV conf.fromList = SOME v ∧
+           ∀l lv.
+             DATUM l lv ⇒
+             ∀s1: α semanticPrimitives$state.
+               ∃env' exp ck1 ck2.
+                 do_opapp [v; lv] = SOME(env',exp) ∧
+                 ∀mc.
+                   evaluate (s1 with clock := ck1 + mc) env' [exp] =
+                   (s1 with <|clock := ck2 + mc;
+                              refs := s1.refs ++ [W8array l]|>,
+                    Rval [Loc(LENGTH s1.refs)])’
+        by (qunabbrev_tac ‘LENV’ >>
+            fs[env_asm_def,in_module_def,evaluate_generalise] >>
+            rw[] >> rename1 ‘LIST_TYPE WORD l1 l2’ >>
+            qpat_x_assum ‘∀a b. _’ (qspecl_then [‘l1’,‘l2’] assume_tac) >>
+            qmatch_goalsub_rename_tac ‘evaluate (sg with clock := _) _ _ = _’ >>
+            rfs[] >> pop_assum (qspec_then ‘empty_state with refs := sg.refs’ strip_assume_tac) >>
+            fs[] >>
+            rename1 ‘evaluate (empty_state with <|clock:= ck1; refs := _ |>) envE [expE]
+                         = (empty_state with <|clock := ck2; refs := _|>,_)’ >>
+            MAP_EVERY qexists_tac [‘ck1’,‘ck2’] >>
+            metis_tac[evaluate_generalise]) >>
+      simp[dec_clock_def, ADD1] >>
+      qmatch_goalsub_abbrev_tac ‘evaluate (stLA3 with clock := _) _ _’ >>
+      first_x_assum (drule_then $ qspec_then ‘stLA3’ strip_assume_tac) >>
+      simp[] >>
+      rename1 ‘∀mc. evaluate (stLA3 with clock := bc1_3 + mc) _ _ =
+                    (stLA3 with <|clock := bc2_3 + mc; refs := _|>, _)’ >>
+      Q.REFINE_EXISTS_TAC ‘ck1 + bc1_3’ >> simp[] >>
+      simp[find_evalform ‘App _ _’, Abbr‘stLA3’, Abbr‘LENV’, do_app_thm,
+           store_lookup_def, EL_APPEND1, EL_APPEND2, copy_array_def,
+           integerTheory.INT_ADD, store_assign_def, store_v_same_type_def] >>
+      qexists_tac ‘0’ >>
+      simp[state_component_equality, LUPDATE_APPEND, EL_APPEND1, EL_APPEND2,
+           LUPDATE_def, pad_def, TAKE_TAKE_T])
+QED
+Theorem evaluate_choose_final_clock:
+  (∀(s0:α state) env es s res ck.
+     evaluate s0 env es = (s,res) ∧ ck ≤ s.clock ⇒
+     evaluate (s0 with clock := s0.clock + ck - s.clock) env es =
+     (s with clock := ck, res)) ∧
+  (∀(s0:α state) (env:v sem_env) (v1:v) (ms:(pat#exp)list) (v2:v) s res ck.
+     evaluate_match s0 env v1 ms v2 = (s,res) ∧ ck ≤ s.clock ⇒
+     evaluate_match (s0 with clock := s0.clock + ck - s.clock) env v1 ms v2 =
+     (s with clock := ck, res))
+Proof
+  ho_match_mp_tac evaluate_ind >> rpt strip_tac
+  >- (* nil *) gs[]
+  >- ((* cons *) simp[] >>
+      qpat_x_assum ‘evaluate _ _ _ = _’ mp_tac >> simp[] >>
+      Cases_on ‘evaluate s0 env [e1]’ >> gs[] >>
+      rename [‘evaluate _ _ [_] = (s00,res00)’] >> Cases_on ‘res00’ >> gs[]
+      >- (Cases_on ‘evaluate s00 env (e2::es)’ >>
+          rename1 ‘evaluate s00 env (e2::es) = (s01,r01)’ >>
+          Cases_on ‘r01’ >> gs[] >>
+          qabbrev_tac ‘d2 = s00.clock - s01.clock’ >>
+          qabbrev_tac ‘d1 = s0.clock - s00.clock’ >>
+          ‘s01.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
+          rw[] >> rename [‘s01.clock ≤ s00.clock’] >>
+          ‘ck + d2 ≤ s00.clock’ by simp[Abbr‘d2’] >>
+          first_x_assum drule >> simp[Abbr‘d2’]) >>
+      rw[] >> gs[])
+  >- ((* lit *) gs[])
+  >- ((* raise *) gs[find_evalform ‘Raise _’] >>
+      rename [‘evaluate s0 env [e] = _’] >> rw[] >>
+      Cases_on ‘evaluate s0 env [e]’ >>
+      rename [‘evaluate s0 env [e] = (s,r0)’] >>
+      Cases_on ‘r0’ >> gvs[])
+  >- ((* handle *)
+      gvs[find_evalform ‘Handle _ _’, AllCaseEqs()] >>
+      rename [‘evaluate s0 env [e] = (s00,Rerr (Rraise exn))’,
+              ‘evaluate_match s00 _ _ _ _ = (s, res)’] >>
+      qabbrev_tac ‘d2 = s00.clock - s.clock’ >>
+      qabbrev_tac ‘d1 = s0.clock - s00.clock’ >>
+      ‘s.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
+      ‘ck + d2 ≤ s00.clock’ by simp[Abbr‘d2’] >>
+      first_x_assum drule >> simp[Abbr‘d2’])
+  >- ((* Con *) gs[find_evalform ‘Con _ _’, AllCaseEqs()] >>
+      rename [‘evaluate s0 env (REVERSE es) = _’] >>
+      Cases_on ‘evaluate s0 env (REVERSE es)’ >> gvs[] >>
+      rename [‘evaluate s0 env (REVERSE es) = (s',res')’] >>
+      Cases_on ‘res'’ >> gvs[AllCaseEqs()])
+  >- (* Var *) gs[AllCaseEqs()]
+  >- (* Fun *) gs[AllCaseEqs(), find_evalform ‘Fun _ _’]
+  >- ((* App *) gvs[AllCaseEqs(), find_evalform ‘App _ _’] >>
+      rename [‘evaluate s0 env (REVERSE es) = _’] >>
+      Cases_on ‘evaluate s0 env (REVERSE es)’ >>
+      rename [‘evaluate s0 env (REVERSE es) = (s00,res00)’] >>
+      Cases_on ‘res00’ >> gvs[AllCaseEqs(), dec_clock_def] >>
+      qabbrev_tac ‘d2 = s00.clock - 1 - s.clock’ >>
+      ‘(s00 with clock := s00.clock - 1).clock = s00.clock - 1’ by simp[] >>
+      ‘s.clock ≤ s00.clock - 1’ by metis_tac[evaluate_clock] >>
+      ‘s00.clock = s.clock + d2 + 1’ by simp[Abbr‘d2’] >> gs[] >>
+      first_x_assum (qspec_then ‘ck + d2 + 1’ mp_tac) >> simp[])
+  >- ((* Log *) gvs[AllCaseEqs(), find_evalform ‘Log _ _ _’] >>
+      rename [‘evaluate s0 env [e1] = _’] >>
+      Cases_on ‘evaluate s0 env [e1]’ >>
+      rename [‘evaluate s0 env [e1] = (s00,res00)’] >>
+      Cases_on ‘res00’ >> gvs[AllCaseEqs()] >>
+      ‘s.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
+      first_x_assum (qspec_then ‘ck + (s00.clock - s.clock)’ mp_tac) >>
+      simp[])
+  >- ((* If *) gvs[AllCaseEqs(), find_evalform ‘If _ _ _ ’] >>
+      rename [‘evaluate s0 env [e1] = _’] >>
+      Cases_on ‘evaluate s0 env [e1]’ >>
+      rename [‘evaluate s0 env [e1] = (s00,res00)’] >>
+      Cases_on ‘res00’ >> gvs[AllCaseEqs()] >>
+      ‘s.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
+      first_x_assum (qspec_then ‘ck + (s00.clock - s.clock)’ mp_tac) >>
+      simp[])
+  >- ((* Mat *) gvs[AllCaseEqs(), find_evalform ‘Mat _ _ ’] >>
+      rename [‘evaluate s0 env [e1] = _’] >>
+      Cases_on ‘evaluate s0 env [e1]’ >>
+      rename [‘evaluate s0 env [e1] = (s00,res00)’] >>
+      Cases_on ‘res00’ >> gvs[AllCaseEqs()] >>
+      ‘s.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
+      first_x_assum (qspec_then ‘ck + (s00.clock - s.clock)’ mp_tac) >>
+      simp[])
+  >- ((* Let *) gvs[AllCaseEqs(), find_evalform ‘Let _ _ _’] >>
+      rename [‘evaluate s0 env [e1] = _’] >>
+      Cases_on ‘evaluate s0 env [e1]’ >>
+      rename [‘evaluate s0 env [e1] = (s00,res00)’] >>
+      Cases_on ‘res00’ >> gvs[AllCaseEqs()] >>
+      ‘s.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
+      first_x_assum (qspec_then ‘ck + (s00.clock - s.clock)’ mp_tac) >>
+      simp[])
+  >- ((* Letrec *) gvs[AllCaseEqs(), find_evalform ‘Letrec _ _ ’])
+  >- ((* Tannot *) gvs[AllCaseEqs(), find_evalform ‘Tannot _ _ ’])
+  >- ((* Lannot *) gvs[AllCaseEqs(), find_evalform ‘Lannot _ _ ’])
+  >- ((* match [] *) gs[evaluate_def]) >>
+  (* match (cons) *)
+  gvs[evaluate_def,AllCaseEqs()]
+QED
+
+Theorem evaluate_choose_final_clock':
+  (∀(s0:α state) env es s res ck.
+     evaluate s0 env es = (s,res) ∧ res ≠ Rerr (Rabort Rtimeout_error) ⇒
+     evaluate (s0 with clock := s0.clock + ck - s.clock) env es =
+     (s with clock := ck, res)) ∧
+  (∀(s0:α state) (env:v sem_env) (v1:v) (ms:(pat#exp)list) (v2:v) s res ck.
+     evaluate_match s0 env v1 ms v2 = (s,res) ∧
+     res ≠ Rerr (Rabort Rtimeout_error) ⇒
+     evaluate_match (s0 with clock := s0.clock + ck - s.clock) env v1 ms v2 =
+     (s with clock := ck, res))
+Proof
+  ho_match_mp_tac evaluate_ind >> rpt strip_tac
+  >- (* nil *) gs[]
+  >- ((* cons *) simp[] >>
+      qpat_x_assum ‘evaluate _ _ _ = _’ mp_tac >> simp[] >>
+      Cases_on ‘evaluate s0 env [e1]’ >> gs[] >>
+      rename [‘evaluate _ _ [_] = (s00,res00)’] >> Cases_on ‘res00’ >> gs[]
+      >- (Cases_on ‘evaluate s00 env (e2::es)’ >>
+          rename1 ‘evaluate s00 env (e2::es) = (s01,r01)’ >>
+          Cases_on ‘r01’ >> gs[] >>
+          qabbrev_tac ‘d2 = s00.clock - s01.clock’ >>
+          qabbrev_tac ‘d1 = s0.clock - s00.clock’ >>
+          ‘s01.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
+          rw[] >> rename [‘s01.clock ≤ s00.clock’] >>
+          first_x_assum (qspec_then ‘ck + d2’ mp_tac) >> simp[Abbr‘d2’]) >>
+      rw[] >> gs[])
+  >- ((* lit *) gs[])
+  >- ((* raise *) gs[find_evalform ‘Raise _’] >>
+      rename [‘evaluate s0 env [e] = _’] >> rw[] >>
+      Cases_on ‘evaluate s0 env [e]’ >>
+      rename [‘evaluate s0 env [e] = (s,r0)’] >>
+      Cases_on ‘r0’ >> gvs[])
+  >- ((* handle *)
+      gvs[find_evalform ‘Handle _ _’, AllCaseEqs()] >>
+      rename [‘evaluate s0 env [e] = (s00,Rerr (Rraise exn))’,
+              ‘evaluate_match s00 _ _ _ _ = (s, res)’] >>
+      qabbrev_tac ‘d2 = s00.clock - s.clock’ >>
+      qabbrev_tac ‘d1 = s0.clock - s00.clock’ >>
+      ‘s.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
+      first_x_assum $ qspec_then ‘ck + d2’ mp_tac >> simp[Abbr‘d2’])
+  >- ((* Con *) gs[find_evalform ‘Con _ _’, AllCaseEqs()] >>
+      rename [‘evaluate s0 env (REVERSE es) = _’] >>
+      Cases_on ‘evaluate s0 env (REVERSE es)’ >> gvs[] >>
+      rename [‘evaluate s0 env (REVERSE es) = (s',res')’] >>
+      Cases_on ‘res'’ >> gvs[AllCaseEqs()])
+  >- (* Var *) gs[AllCaseEqs()]
+  >- (* Fun *) gs[AllCaseEqs(), find_evalform ‘Fun _ _’]
+  >- ((* App *) gvs[AllCaseEqs(), find_evalform ‘App _ _’] >>
+      rename [‘evaluate s0 env (REVERSE es) = _’] >>
+      Cases_on ‘evaluate s0 env (REVERSE es)’ >>
+      rename [‘evaluate s0 env (REVERSE es) = (s00,res00)’] >>
+      Cases_on ‘res00’ >> gvs[AllCaseEqs(), dec_clock_def] >>
+      qabbrev_tac ‘d2 = s00.clock - 1 - s.clock’ >>
+      ‘(s00 with clock := s00.clock - 1).clock = s00.clock - 1’ by simp[] >>
+      ‘s.clock ≤ s00.clock - 1’ by metis_tac[evaluate_clock] >>
+      ‘s00.clock = s.clock + d2 + 1’ by simp[Abbr‘d2’] >> gs[] >>
+      first_x_assum (qspec_then ‘ck + d2 + 1’ mp_tac) >> simp[])
+  >- ((* Log *) gvs[AllCaseEqs(), find_evalform ‘Log _ _ _’] >>
+      rename [‘evaluate s0 env [e1] = _’] >>
+      Cases_on ‘evaluate s0 env [e1]’ >>
+      rename [‘evaluate s0 env [e1] = (s00,res00)’] >>
+      Cases_on ‘res00’ >> gvs[AllCaseEqs()] >>
+      ‘s.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
+      first_x_assum (qspec_then ‘ck + (s00.clock - s.clock)’ mp_tac) >>
+      simp[])
+  >- ((* If *) gvs[AllCaseEqs(), find_evalform ‘If _ _ _ ’] >>
+      rename [‘evaluate s0 env [e1] = _’] >>
+      Cases_on ‘evaluate s0 env [e1]’ >>
+      rename [‘evaluate s0 env [e1] = (s00,res00)’] >>
+      Cases_on ‘res00’ >> gvs[AllCaseEqs()] >>
+      ‘s.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
+      first_x_assum (qspec_then ‘ck + (s00.clock - s.clock)’ mp_tac) >>
+      simp[])
+  >- ((* Mat *) gvs[AllCaseEqs(), find_evalform ‘Mat _ _ ’] >>
+      rename [‘evaluate s0 env [e1] = _’] >>
+      Cases_on ‘evaluate s0 env [e1]’ >>
+      rename [‘evaluate s0 env [e1] = (s00,res00)’] >>
+      Cases_on ‘res00’ >> gvs[AllCaseEqs()] >>
+      ‘s.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
+      first_x_assum (qspec_then ‘ck + (s00.clock - s.clock)’ mp_tac) >>
+      simp[])
+  >- ((* Let *) gvs[AllCaseEqs(), find_evalform ‘Let _ _ _’] >>
+      rename [‘evaluate s0 env [e1] = _’] >>
+      Cases_on ‘evaluate s0 env [e1]’ >>
+      rename [‘evaluate s0 env [e1] = (s00,res00)’] >>
+      Cases_on ‘res00’ >> gvs[AllCaseEqs()] >>
+      ‘s.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
+      first_x_assum (qspec_then ‘ck + (s00.clock - s.clock)’ mp_tac) >>
+      simp[])
+  >- ((* Letrec *) gvs[AllCaseEqs(), find_evalform ‘Letrec _ _ ’])
+  >- ((* Tannot *) gvs[AllCaseEqs(), find_evalform ‘Tannot _ _ ’])
+  >- ((* Lannot *) gvs[AllCaseEqs(), find_evalform ‘Lannot _ _ ’])
+  >- ((* match [] *) gs[evaluate_def]) >>
+  (* match (cons) *)
+  gvs[evaluate_def,AllCaseEqs()]
+QED
+
+Theorem evaluate_induce_timeout:
+  (∀(s0:α state) env es s res ck.
+     evaluate s0 env es = (s,res) ∧ res ≠ Rerr (Rabort Rtimeout_error) ⇒
+     (ck < s0.clock - s.clock ⇔
+        ∃s'. evaluate (s0 with clock := ck) env es =
+             (s', Rerr (Rabort Rtimeout_error))) ∧
+     (s0.clock - s.clock ≤ ck ⇔
+        evaluate (s0 with clock := ck) env es =
+        (s with clock := ck + s.clock - s0.clock, res))) ∧
+  (∀(s0:α state) (env:v sem_env) (v1:v) (ms:(pat#exp)list) (v2:v) s res ck.
+     evaluate_match s0 env v1 ms v2 = (s,res) ∧
+     res ≠ Rerr (Rabort Rtimeout_error) ⇒
+     (ck < s0.clock - s.clock ⇔
+        ∃s'.
+          evaluate_match (s0 with clock := ck) env v1 ms v2 =
+          (s', Rerr (Rabort Rtimeout_error))) ∧
+     (s0.clock - s.clock ≤ ck ⇔
+        evaluate_match (s0 with clock := ck) env v1 ms v2 =
+        (s with clock := ck + s.clock - s0.clock, res)))
+Proof
+  ho_match_mp_tac evaluate_ind >> rpt conj_tac
+  >- (* nil *) simp[]
+  >- ((* cons *) simp[] >>
+      rpt gen_tac >> strip_tac >> rpt gen_tac >>
+      rename [‘evaluate s0 env [e1]’] >> Cases_on ‘evaluate s0 env [e1]’ >>
+      rename [‘evaluate s0 env [e1] = (s1, res)’] >>
+      reverse (Cases_on ‘res’ >> simp[])
+      >- (strip_tac >> gvs[] >> first_x_assum $ qspec_then ‘ck’ mp_tac >>
+          rename [‘evaluate s0 env [e1] = (s,Rerr e)’] >>
+          Cases_on ‘ck < s0.clock - s.clock’ >> simp[PULL_EXISTS]) >>
+      gs[] >>
+      ‘s1.clock ≤ s0.clock’ by metis_tac[evaluate_clock] >>
+      first_x_assum $ qspec_then ‘ck’ mp_tac >>
+      Cases_on ‘ck < s0.clock - s1.clock’ >> simp[PULL_EXISTS]
+      >- (rename [‘evaluate s0 env [e1] = (s1,Rval v)’,
+                  ‘evaluate s1 env (e2::es)’] >>
+          Cases_on ‘evaluate s1 env (e2::es)’ >> simp[] >>
+          rename [‘evaluate s1 env (e2::es) = (s2,res)’] >> Cases_on ‘res’ >>
+          simp[] >> ntac 3 strip_tac >> gvs[] >>
+          rpt (dxrule_then assume_tac (cj 1 evaluate_clock)) >> simp[]) >>
+      strip_tac >> gvs[] >>
+      qpat_x_assum ‘evaluate (s0 with clock := ck) _ _ = _ ’ kall_tac >>
+      rename1 ‘evaluate s1 env (e2::es)’ >>
+      Cases_on ‘evaluate s1 env (e2::es)’ >>
+      rename1‘ evaluate s1 env (e2::es) = (s2,res2)’ >>
+      Cases_on ‘res2’ >> gvs[] >> strip_tac >> gvs[] >>
+      qabbrev_tac ‘ck1 = ck + s1.clock - s0.clock’ >>
+      first_x_assum $ qspec_then ‘ck1’ mp_tac >>
+      Cases_on ‘ck1 < s1.clock - s.clock’ >> simp[PULL_EXISTS]
+      >- (drule (cj 1 evaluate_clock) >> simp[Abbr‘ck1’]) >>
+      rw[Abbr‘ck1’])
+  >- (* Lit *) simp[]
+  >- ((* Raise *) simp[find_evalform ‘Raise _’] >>
+      rpt gen_tac >> strip_tac >> rpt gen_tac >>
+      rename [‘evaluate s0 env [e]’] >>
+      Cases_on ‘evaluate s0 env [e]’ >>
+      rename [‘evaluate s0 env [e] = (s1, res)’] >>
+      Cases_on ‘res’ >> simp[] >> strip_tac >> gvs[] >>
+      drule_then assume_tac (cj 1 evaluate_clock) >>
+      first_x_assum $ qspec_then ‘ck’ mp_tac >>
+      Cases_on ‘ck < s0.clock - s.clock’ >> simp[PULL_EXISTS])
+  >- ((* handle *)
+      simp[find_evalform ‘Handle _ _ ’, AllCaseEqs(), PULL_EXISTS] >>
+      rpt gen_tac >> strip_tac >> rpt gen_tac >>
+      rename [‘evaluate s0 env [e] = (s1, res)’] >>
+      Cases_on ‘res’ >> gvs[] >> strip_tac >> gvs[]
+      >- (drule_then assume_tac (cj 1 evaluate_clock) >>
+          first_x_assum $ qspec_then ‘ck’ mp_tac >>
+          rename [‘evaluate s0 env [e] = (s1,Rval v)’] >>
+          Cases_on ‘ck < s0.clock - s1.clock’ >> simp[PULL_EXISTS])
+      >- (drule_then assume_tac (cj 1 evaluate_clock) >>
+          drule_then assume_tac (cj 2 evaluate_clock) >>
+          first_x_assum $ qspec_then ‘ck’ mp_tac >>
+          Cases_on ‘ck < s0.clock - s1.clock’ >> simp[PULL_EXISTS] >>
+          strip_tac >> qabbrev_tac ‘ck1 = ck + s1.clock - s0.clock’ >>
+          first_x_assum $ qspec_then ‘ck1’ mp_tac >>
+          Cases_on ‘ck1 < s1.clock - s.clock’ >> simp[PULL_EXISTS, Abbr‘ck1’])
+      >- (drule_then assume_tac (cj 1 evaluate_clock) >>
+          first_x_assum $ qspec_then ‘ck’ mp_tac >>
+          rename [‘evaluate s0 env [e] = (s1,Rerr (Rraise exn))’] >>
+          Cases_on ‘ck < s0.clock - s1.clock’ >> simp[PULL_EXISTS]) >>
+      drule_then assume_tac (cj 1 evaluate_clock) >>
+      first_x_assum $ qspec_then ‘ck’ mp_tac >>
+      rename [‘evaluate s0 env [e] = (s1,Rerr (Rabort abt))’] >>
+      Cases_on ‘ck < s0.clock - s1.clock’ >> simp[PULL_EXISTS])
+  >- ((* Con *) simp[find_evalform ‘Con _ _’, AllCaseEqs()] >> rpt gen_tac >>
+      strip_tac >> rpt gen_tac >> strip_tac >> gvs[] >>
+      rename [‘evaluate s0 env (REVERSE es) = _ ’] >>
+      Cases_on ‘evaluate s0 env (REVERSE es)’ >> gvs[] >>
+      rename [‘evaluate s0 env (REVERSE es) = (s1,res0) ’] >> Cases_on ‘res0’ >>
+      gvs[] >> rename [‘evaluate s0 env (REVERSE es) = (s1,_) ’] >>
+      drule_then assume_tac (cj 1 evaluate_clock) >>
+      first_x_assum $ qspec_then ‘ck’ mp_tac >>
+      Cases_on ‘ck < s0.clock - s1.clock’ >> simp[PULL_EXISTS] >>
+      gvs[AllCaseEqs()])
+  >- ((* Var *) simp[AllCaseEqs()] >> rw[] >> simp[])
+  >- ((* Fun *) simp[find_evalform ‘Fun _ _’])
+  >- ((* App *) simp[find_evalform ‘App _ _’] >> rpt gen_tac >> strip_tac >>
+      rpt gen_tac  >>
+      rename [‘evaluate s0 env (REVERSE es) = _ ’] >>
+      Cases_on ‘evaluate s0 env (REVERSE es)’ >> gvs[] >>
+      rename [‘evaluate s0 env (REVERSE es) = (s1,res0) ’] >> Cases_on ‘res0’ >>
+      gvs[] >> rename [‘evaluate s0 env (REVERSE es) = (s1,_) ’]
+      >- (reverse (Cases_on ‘op = Opapp’) >> simp[] >>
+          drule_then assume_tac (cj 1 evaluate_clock) >>
+          strip_tac
+          >- (first_x_assum $ qspec_then ‘ck’ mp_tac >>
+              Cases_on ‘ck < s0.clock - s1.clock’ >> simp[PULL_EXISTS] >>
+              gvs[AllCaseEqs()]) >>
+          gvs[AllCaseEqs()]
+          >- (first_x_assum $ qspec_then ‘ck’ mp_tac >>
+              rename [‘evaluate s0 env (REVERSE es) = (s1,_)’] >>
+              Cases_on ‘ck < s0.clock - s1.clock’ >> simp[PULL_EXISTS] >>
+              gvs[AllCaseEqs()]) >>
+          gvs[dec_clock_def] >>
+          first_x_assum $ qspec_then ‘ck’ mp_tac >>
+          rename [‘evaluate s0 env (REVERSE es) = (s1,_)’] >>
+          Cases_on ‘ck < s0.clock - s1.clock’ >> simp[PULL_EXISTS] >>
+          gvs[AllCaseEqs()]
+          >- (drule_then assume_tac (cj 1 evaluate_clock) >> gs[]) >>
+          drule_then assume_tac (cj 1 evaluate_clock) >> gs[] >>
+          strip_tac >>
+          qabbrev_tac ‘ck1 = ck + s1.clock - s0.clock’ >>
+          first_x_assum $ qspec_then ‘ck1 - 1’ mp_tac >>
+          Cases_on ‘ck1 - 1 < s1.clock - (s.clock + 1)’ >>
+          simp[PULL_EXISTS, Abbr‘ck1’] >> dsimp[]) >>
+      strip_tac >> gvs[] >> drule_then assume_tac (cj 1 evaluate_clock) >>
+      rename [‘s1.clock ≤ s0.clock’] >> first_x_assum $ qspec_then ‘ck’ mp_tac>>
+      Cases_on ‘ck < s0.clock - s1.clock’ >> simp[PULL_EXISTS])
+  >- ((* Log *) simp[find_evalform ‘Log _ _ _’, AllCaseEqs()] >>
+      rpt gen_tac >> strip_tac >> rpt gen_tac >>
+      rename [‘evaluate s0 env [e1] = (_, Rval _)’] >>
+      Cases_on ‘evaluate s0 env [e1]’ >>
+      rename [‘evaluate s0 env [e1] = (s1, res)’] >>
+      reverse (Cases_on ‘res’ >> gs[AllCaseEqs()])
+      >- (drule_then assume_tac (cj 1 evaluate_clock) >>
+          strip_tac >>
+          first_x_assum $ qspec_then ‘ck’ mp_tac >>
+          Cases_on ‘ck < s0.clock - s1.clock’ >> gvs[PULL_EXISTS]) >>
+      strip_tac >> gvs[]
+      >- (rename [‘evaluate s0 env [e1] = (s1, Rval v)’,
+                  ‘do_log _ _ _ = NONE’]>>
+          drule_then assume_tac (cj 1 evaluate_clock) >>
+          first_x_assum $ qspec_then ‘ck’ mp_tac >>
+          Cases_on ‘ck < s0.clock - s1.clock’ >> simp[PULL_EXISTS])
+      >- (rename [‘evaluate s0 env [e1] = (s1, Rval v)’,
+                  ‘evaluate s1 env [e2] = (s, _)’]>>
+          ‘s.clock ≤ s1.clock ∧ s1.clock ≤ s0.clock’
+            by metis_tac[evaluate_clock] >>
+          first_x_assum $ qspec_then ‘ck’ mp_tac >>
+          Cases_on ‘ck < s0.clock - s1.clock’ >>simp[PULL_EXISTS] >>
+          first_x_assum $ qspec_then ‘ck + s1.clock - s0.clock’ mp_tac >>
+          Cases_on ‘ck + s1.clock - s0.clock < s1.clock - s.clock’ >>
+          simp[PULL_EXISTS])
+      >- (rename [‘evaluate s0 env [e1] = (s1, Rval v)’,
+                  ‘do_log _ _ _ = SOME (Val v')’]>>
+          drule_then assume_tac (cj 1 evaluate_clock) >>
+          first_x_assum $ qspec_then ‘ck’ mp_tac >>
+          Cases_on ‘ck < s0.clock - s1.clock’ >> simp[PULL_EXISTS]))
+  >- ((* If *) simp[find_evalform ‘If _ _ _’, AllCaseEqs()] >> rpt gen_tac >>
+      strip_tac >> rpt gen_tac >>
+      rename [‘evaluate s0 env [e1] = (_, Rval _)’] >>
+      Cases_on ‘evaluate s0 env [e1]’ >>
+      rename [‘evaluate s0 env [e1] = (s1, res)’] >>
+      reverse (Cases_on ‘res’ >> gs[AllCaseEqs()])
+      >- (drule_then assume_tac (cj 1 evaluate_clock) >>
+          strip_tac >>
+          first_x_assum $ qspec_then ‘ck’ mp_tac >>
+          Cases_on ‘ck < s0.clock - s1.clock’ >> gvs[PULL_EXISTS]) >>
+      drule_then assume_tac (cj 1 evaluate_clock) >> strip_tac
+      >- (drule_then assume_tac (cj 1 evaluate_clock) >>
+          strip_tac >>
+          first_x_assum $ qspec_then ‘ck’ mp_tac >>
+          Cases_on ‘ck < s0.clock - s1.clock’ >> gvs[PULL_EXISTS]) >>
+      drule_then assume_tac (cj 1 evaluate_clock) >>
+      first_x_assum $ qspec_then ‘ck’ mp_tac >>
+      Cases_on ‘ck < s0.clock - s1.clock’ >> gvs[PULL_EXISTS] >> strip_tac >>
+      rename [‘s.clock ≤ s1.clock’, ‘s1.clock ≤ s0.clock’] >>
+      first_x_assum $ qspec_then ‘ck + s1.clock - s0.clock’ mp_tac >>
+      Cases_on‘ck + s1.clock - s0.clock < s1.clock - s.clock’ >>
+      gvs[PULL_EXISTS])
+  >- ((* Mat *) simp[find_evalform ‘Mat _ _’, AllCaseEqs()] >>
+      rpt gen_tac >>
+      strip_tac >> rpt gen_tac >>
+      rename [‘evaluate s0 env [e1] = (_, Rval _)’] >>
+      Cases_on ‘evaluate s0 env [e1]’ >>
+      rename [‘evaluate s0 env [e1] = (s1, res)’] >>
+      reverse (Cases_on ‘res’ >> gs[AllCaseEqs()])
+      >- (drule_then assume_tac (cj 1 evaluate_clock) >>
+          strip_tac >>
+          first_x_assum $ qspec_then ‘ck’ mp_tac >>
+          Cases_on ‘ck < s0.clock - s1.clock’ >> gvs[PULL_EXISTS]) >>
+      reverse strip_tac
+      >- (drule_then assume_tac (cj 1 evaluate_clock) >>
+          first_x_assum $ qspec_then ‘ck’ mp_tac >>
+          Cases_on ‘ck < s0.clock - s1.clock’ >> gvs[PULL_EXISTS]) >>
+      drule_then assume_tac (cj 1 evaluate_clock) >>
+      drule_then assume_tac (cj 2 evaluate_clock) >>
+      first_x_assum $ qspec_then ‘ck’ mp_tac >>
+      Cases_on ‘ck < s0.clock - s1.clock’ >> gvs[PULL_EXISTS] >> strip_tac >>
+      rename [‘s.clock ≤ s1.clock’, ‘s1.clock ≤ s0.clock’] >>
+      first_x_assum $ qspec_then ‘ck + s1.clock - s0.clock’ mp_tac >>
+      Cases_on‘ck + s1.clock - s0.clock < s1.clock - s.clock’ >>
+      gvs[PULL_EXISTS])
+  >- ((* Let *) simp [find_evalform ‘Let _ _ _’, AllCaseEqs()] >>
+      rpt gen_tac >>
+      strip_tac >> rpt gen_tac >>
+      rename [‘evaluate s0 env [e1] = (_, Rval _)’] >>
+      Cases_on ‘evaluate s0 env [e1]’ >>
+      rename [‘evaluate s0 env [e1] = (s1, res)’] >>
+      reverse (Cases_on ‘res’ >> gs[AllCaseEqs()]) >>
+      drule_then assume_tac (cj 1 evaluate_clock)
+      >- (strip_tac >>
+          first_x_assum $ qspec_then ‘ck’ mp_tac >>
+          Cases_on ‘ck < s0.clock - s1.clock’ >> gvs[PULL_EXISTS]) >>
+      drule_then assume_tac (cj 1 evaluate_clock) >> strip_tac >>
+      drule_then assume_tac (cj 1 evaluate_clock) >>
+      first_x_assum $ qspec_then ‘ck’ mp_tac >>
+      Cases_on ‘ck < s0.clock - s1.clock’ >> gvs[PULL_EXISTS] >> strip_tac >>
+      rename [‘s.clock ≤ s1.clock’, ‘s1.clock ≤ s0.clock’] >>
+      first_x_assum $ qspec_then ‘ck + s1.clock - s0.clock’ mp_tac >>
+      Cases_on‘ck + s1.clock - s0.clock < s1.clock - s.clock’ >>
+      gvs[PULL_EXISTS])
+  >- ((* Letrec *) simp[find_evalform ‘Letrec _ _’, AllCaseEqs()] >>
+      rpt gen_tac >> strip_tac >> rpt gen_tac >>
+      rename [‘evaluate s0 env [e1] = (_, _)’] >>
+      Cases_on ‘evaluate s0 env [e1]’ >>
+      rename [‘evaluate s0 env [e1] = (s1, res)’] >>
+      reverse (Cases_on ‘res’ >> gs[AllCaseEqs()]) >>
+      drule_then assume_tac (cj 1 evaluate_clock)
+      >- (strip_tac >> gs[] >>
+          first_x_assum $ qspec_then ‘ck’ mp_tac >>
+          Cases_on ‘ck < s0.clock - s1.clock’ >> gvs[PULL_EXISTS]) >>
+      reverse strip_tac >> simp[] >> gs[])
+  >- ((* Tannot *) simp[find_evalform ‘Tannot _ _’, AllCaseEqs()])
+  >- ((* Lannot *) simp[find_evalform ‘Lannot _ _’, AllCaseEqs()])
+  >- ((* match [] *) simp[evaluate_def]) >>
+  (* match cons *) simp[evaluate_def,AllCaseEqs()] >> rpt gen_tac  >>
+  strip_tac >> rpt gen_tac >>
+  rename [‘evaluate_match s0 env v1 ms v2 = (s1, res)’] >>
+  reverse (Cases_on ‘res’ >> gs[AllCaseEqs()]) >> strip_tac >> gs[]
+QED
+
+Theorem evaluate_generalise':
+  ∀env exp ck1 ck2 refs refs' u.
+      evaluate (empty_state with <|clock := ck1; refs := refs|>) env [exp] =
+      (empty_state with <|clock := ck2; refs := refs'|>, Rval [u])
+      ⇒
+      ∀st : 'a semanticPrimitives$state s nc1 vs.
+        evaluate (st with <| clock := nc1; refs := refs|>) env [exp] =
+        (s, Rval vs) ⇔
+          s = st with <| clock := nc1 + ck2 - ck1; refs := refs' |> ∧
+          vs = [u] ∧ ck1 - ck2 ≤ nc1
+Proof
+  rpt strip_tac >>
+  drule_then assume_tac (cj 1 evaluate_clock) >> gs[] >>
+  dxrule (evaluate_ffi_intro |> cj 1
+           |> INST_TYPE [beta |-> alpha, alpha |-> “:unit”]) >> simp[] >>
+  strip_tac >>
+  pop_assum (C(resolve_then (Pos hd) mp_tac)
+             (cj 1 evaluate_choose_final_clock')) >> simp[] >>
+  strip_tac >> reverse eq_tac >> strip_tac
+  >- (first_x_assum $
+        qspecl_then [‘st with <| clock := ck1; refs := refs|>’,
+                     ‘ck2 + nc1 - ck1’] mp_tac >>
+      simp[]) >>
+  drule_then assume_tac (cj 1 evaluate_clock) >> gs[] >>
+  first_x_assum $
+    qspecl_then [‘st with <| clock := ck1; refs := refs|>’,
+                 ‘ck2’] mp_tac >> simp[] >> strip_tac >>
+  drule (cj 1 evaluate_induce_timeout) >> simp[] >>
+  disch_then $ qspec_then ‘nc1’ mp_tac >> simp[] >>
+  rpt strip_tac >> gvs[]
+QED
+
+        (*
+Theorem padv_correct':
+ ∀l lv env conf.
+  DATUM l lv ∧ env_asm env conf ⇒
+  ∃clv env' e refs .
+    ∀(s:plffi semanticPrimitives$state).
+      ∃ck1 ck2 n.
+        evaluate (s with clock:= ck1) env [padv conf] =
+        (s with clock := ck1, Rval [clv]) ∧
+        do_opapp [clv; lv] = SOME (env',e) ∧
+        evaluate (s with clock:= ck1) env' [e] =
+        (s with <|clock := ck2; refs := s.refs ++ refs|>,
+         Rval [Loc n]) ∧
+        store_lookup n (s.refs ++ refs) = SOME (W8array (pad conf l))
+Proof
+  rpt strip_tac >>
+  ‘∃lenv. ∀yv.
+            nsLookup (nsBind "y" yv (nsBind "x" lv env.v)) conf.length =
+            SOME lenv ∧ (DATUM ~~> NUM) LENGTH lenv’
+    by gs[env_asm_def, in_module_def, has_v_def] >>
+  gs[FORALL_AND_THM] >>
+  fs[reffree_Arrow_def, reffree_AppReturns_def, PULL_FORALL] >>
+  first_x_assum (drule_at_then (Pos hd) strip_assume_tac) >>
+  gs[eval_rel_def, NUM_def, INT_def, FORALL_AND_THM] >>
+  RULE_ASSUM_TAC (SIMP_RULE (srw_ss()) [SKOLEM_THM]) >> gs[] >>
+  first_x_assum (C (resolve_then (Pos hd) assume_tac)
+                 (INST_TYPE [alpha |-> “:plffi”] evaluate_generalise')) >>
+  simp[find_evalform ‘Fun _ _’, padv_def, do_opapp_def] >>
+  qpat_abbrev_tac ‘clv = Closure env "x" _’ >> qexists_tac ‘clv’ >> simp[] >>
+  simp[Abbr‘clv’] >>
+  qpat_abbrev_tac ‘E = Let (SOME "y") _ _’ >>
+  CONV_TAC (pull_namedexvar_conv"e") >>
+  qexists_tac ‘E’ >> simp[Abbr‘E’] >>
+  qexists_tac ‘env with v := nsBind "x" lv env.v’ >> simp[] >>
+  simp[find_evalform ‘Let _ _ _’, bind_eq_Rval, PULL_EXISTS] >>
+  simp[find_evalform ‘App _ _’, buffer_size_def, do_app_thm, store_alloc_def] >>
+  simp[find_evalform ‘If _ _ _’, bind_eq_Rval, AllCaseEqs()] >>
+  simp[find_evalform ‘App _ _’, payload_size_def, bind_eq_Rval,
+       AllCaseEqs(), PULL_EXISTS] >>
+  simp[dec_clock_def]
+  simp[do_app_thm, terminationTheory.do_eq_def, lit_same_type_def, do_if_def]>>
+  Cases_on ‘LENGTH l = conf.payload_size’  >> simp[]
+  >- (simp[evaluate_letNONE] >>
+      simp[find_evalform ‘App _ _ ’, do_app_thm, store_lookup_def, EL_APPEND2,
+           store_assign_def, store_v_same_type_def] >>
+      simp[find_evalform ‘Let _ _ _’]
+  fs[IMP_CONJ_THM, FORALL_AND_THM] >> simp[]
+  ‘
+
+
+
   drule_then assume_tac evaluate_add_to_clock >> gvs[] >>
   Q.REFINE_EXISTS_TAC ‘ck1 + s1.clock’ >>
   simp[padv_def,buffer_size_def,payload_size_def,find_evalform ‘Fun _ _’,
@@ -584,14 +1387,7 @@ Proof
       simp[state_component_equality, LUPDATE_APPEND, EL_APPEND1, EL_APPEND2,
            LUPDATE_def, pad_def, TAKE_TAKE_T])
 QED
-
-Theorem bind_eq_Rval:
-  result_bind x f = (s, Rval rvs) ⇔
-  ∃s0 rvs0. x = (s0,Rval rvs0) ∧ f (s0, rvs0) = (s, Rval rvs)
-Proof
-  Cases_on ‘x’ >> Cases_on ‘r’ >> simp[]
-QED
-
+*)
 
 Theorem sendloop_correct:
   ∀conf l env env' aexp s stpred dest.
@@ -611,6 +1407,168 @@ Theorem sendloop_correct:
                                       send_events conf dest l;
                          ffi_state := update_state s.ffi.ffi_state s.ffi.oracle
                                                    (send_events conf dest l)
+                       |>
+              |> , Rval [Conv NONE []])
+Proof
+  ho_match_mp_tac compile_message_ind>> rpt strip_tac >> simp[] >>
+  drule_then (qspec_then ‘s’ strip_assume_tac) ck_equiv_hol_apply >>
+  Q.REFINE_EXISTS_TAC ‘bc1 + ck1’ >> simp[do_opapp_def] >>
+  ntac 2 (simp[Once sendloop_def]) >>
+  simp[find_recfun_def] >>
+  Q.REFINE_EXISTS_TAC ‘extra + 1’ >> simp[dec_clock_def] >>
+  simp[Once evaluate_def, Excl "evaluate_opapp"] >>
+  qmatch_goalsub_abbrev_tac ‘evaluate _ env1 ’ >>
+  ‘env_asm env1 conf’
+    by (fs[Abbr ‘env1’,env_asm_def,build_rec_env_def,sendloop_def,has_v_def,
+           in_module_def] >>
+        rfs[] >> metis_tac [EQ_SYM_EQ]) >>
+  drule_then (drule_then $
+              qspecl_then [‘𝕍 "x"’, ‘s with refs := s.refs ++ drefs’,‘s’,‘[]’]
+              mp_tac) padv_correct >>
+  impl_tac
+  >- simp[evaluate_def,Abbr ‘env1’,
+          semanticPrimitivesTheory.state_component_equality] >>
+  strip_tac >>
+  qmatch_asmsub_abbrev_tac ‘clock_fupd (K ack1)’ >>
+  Q.REFINE_EXISTS_TAC ‘extra + ack1’ >>
+  dxrule evaluate_add_to_clock >>
+  simp[Excl "evaluate_opapp"] >>
+  disch_then kall_tac >>
+  (* unite_nums "dc" >> *)
+  simp[evaluate_letNONE, find_evalform ‘App _ _’, do_app_thm] >>
+  qabbrev_tac ‘SNDf = λe. App Opapp [𝕍"sendloop"; e]’ >>
+  fs[Excl "evaluate_opapp"] >>
+  simp[ffiTheory.call_FFI_def] >>
+  qhdtm_assum ‘ffi_accepts_rel’
+              (mp_tac o REWRITE_RULE [valid_send_call_format_def,
+                                      ffi_accepts_rel_def]) >>
+  disch_then drule >> simp[] >>
+  disch_then(qspec_then ‘pad conf l’ mp_tac) >>
+  impl_keep_tac >- rw[pad_def] >>
+  strip_tac >>
+  simp[IMPLODE_EXPLODE_I,MAP_MAP_o,o_DEF,
+       SIMP_RULE std_ss [o_DEF] n2w_ORD_CHR_w2n] >>
+  fs[store_assign_def,store_lookup_def,store_v_same_type_def,
+     LUPDATE_SAME'] >>
+  simp[payload_size_def] >>
+  qabbrev_tac ‘LEN_EXP = App Opapp [Var conf.length; Var (Short "x")]’ >>
+  qabbrev_tac ‘DRP_EXP = App Opapp [App Opapp [Var conf.drop; 𝕍 "x"];
+                                    CN (&conf.payload_size)]’ >>
+  simp[find_evalform ‘If _ _ _’, find_evalform ‘App _ _’] >>
+  qmatch_goalsub_abbrev_tac ‘evaluate _ env2’ >>
+  qmatch_goalsub_abbrev_tac ‘evaluate (s2 with clock := _) _’ >>
+  ‘env_asm env2 conf’
+    by (fs[Abbr ‘env2’,env_asm_def,build_rec_env_def,sendloop_def,has_v_def,
+           in_module_def] >>
+        rfs[] >> rw[]) >>
+  ‘ck_equiv_hol env2 NUM LEN_EXP (LENGTH l)’
+    by (qunabbrev_tac ‘LEN_EXP’ >> irule ck_equiv_hol_App >>
+        qexists_tac ‘DATUM’ >> strip_tac
+        >- (irule ck_equiv_hol_Var >> qexists_tac ‘cV’ >>
+            simp[Abbr ‘env2’,ml_progTheory.nsLookup_nsBind_compute])
+        >- (irule ck_equiv_hol_Var >>
+            fs[env_asm_def,in_module_def,has_v_def,reffree_normal1])) >>
+  drule_then (qspec_then ‘s2’ strip_assume_tac) ck_equiv_hol_apply >>
+  rename [‘∀dc. evaluate (s2 with clock := bc1 + dc) _ _ =
+               (s2 with <|clock:= dc + bc2; refs := s2.refs ++ drefsL|>,
+                Rval [cVL])’] >>
+  Q.REFINE_EXISTS_TAC ‘bc1 + extra’ >> simp[] >>
+  first_x_assum (K ALL_TAC) >>
+  fs trans_sl >>
+  ntac 2 (first_x_assum (K ALL_TAC)) >>
+  qpat_x_assum ‘Abbrev (LEN_EXP = _)’ (K ALL_TAC) >>
+  simp[do_app_thm, do_if_def, opb_lookup_def] >>
+  Cases_on ‘LENGTH l ≤ conf.payload_size’ >> simp[]
+  >- (simp[Abbr ‘s2’,state_component_equality,find_evalform ‘Con _ _’,
+           do_con_check_def, build_conv_def] >>
+      rw[update_state_def,send_events_def] >>
+      ‘final (pad conf l)’
+        by (rw[final_def,pad_def]) >>
+      PURE_ONCE_REWRITE_TAC [compile_message_def] >>
+      simp[] >>
+      ‘ffi = update_state s.ffi.ffi_state
+                          s.ffi.oracle
+                          [IO_event "send" dest (ZIP (pad conf l,pad conf l))]’
+        suffices_by simp[state_component_equality] >>
+      rw[update_state_def,send_events_def])
+  >- (‘LENGTH l > conf.payload_size’ by simp[] >>
+      ‘¬final (pad conf l)’ by (rw[final_def,pad_def]) >>
+      ‘ck_equiv_hol env2 (DATUM) DRP_EXP (combin$C DROP l conf.payload_size)’
+        by (qunabbrev_tac ‘DRP_EXP’ >> irule ck_equiv_hol_App >>
+            qexists_tac ‘NUM’ >> strip_tac
+            >- (irule ck_equiv_hol_Lit >> rw trans_sl)
+            >- (irule ck_equiv_hol_App >> qexists_tac ‘DATUM’ >> strip_tac
+                >- (irule ck_equiv_hol_Var >> qexists_tac ‘cV’ >>
+                    simp[Abbr ‘env2’,ml_progTheory.nsLookup_nsBind_compute])
+                >- (irule ck_equiv_hol_Var >>
+                    fs[env_asm_def,in_module_def,has_v_def,reffree_normal2])))>>
+      drule_then (qspec_then
+                 ‘s2 with refs := s2.refs ++ drefsL’
+              strip_assume_tac) ck_equiv_hol_apply >>
+      rpt (qpat_x_assum ‘ck_equiv_hol _ _ _ _’ (K ALL_TAC)) >>
+      simp[find_evalform ‘Let _ _ _ ’] >>
+      fs[] >>
+      rename [‘∀dc. evaluate (s2 with <|clock := bc1 + dc;
+                                        refs := s2.refs ++ drefsL|>) _ _ =
+               (s2 with <|clock:= bc2 + dc;
+                          refs := s2.refs ++ drefsL ++ drefsD|>,
+                Rval [cVD])’] >>
+      Q.REFINE_EXISTS_TAC ‘bc1 + extra’ >> simp[] >>
+      qmatch_goalsub_abbrev_tac ‘evaluate (s3 with clock := _) env3’ >>
+      last_x_assum (qspecl_then [‘env3’,‘env'’,‘Var (Short "x")’,‘s3’,‘stpred’,
+                                 ‘dest’] strip_assume_tac) >>
+      rfs[] >>
+      ‘nsLookup env3.v (Short "sendloop") =
+       SOME (Recclosure env' (sendloop conf (MAP (CHR ∘ w2n) dest))
+                 "sendloop")’
+        by (qunabbrev_tac ‘env3’ >> qunabbrev_tac ‘env2’ >> rw[sendloop_def] >>
+            EVAL_TAC >> rw[o_DEF]) >>
+      ‘ck_equiv_hol env3 (LIST_TYPE WORD) (𝕍"x") (DROP conf.payload_size l)’
+        by (irule ck_equiv_hol_Var >> qunabbrev_tac ‘env3’ >> EVAL_TAC >>
+            qexists_tac ‘cVD’ >> rw[]) >>
+      ‘stpred s3.ffi.ffi_state’
+        by (qunabbrev_tac ‘s3’ >> qunabbrev_tac ‘s2’ >> fs[]) >>
+      ‘ffi_accepts_rel stpred (valid_send_call_format conf dest) s3.ffi.oracle’
+        by (qunabbrev_tac ‘s3’ >> qunabbrev_tac ‘s2’ >> fs[]) >>
+      fs[] >>
+      ntac 4 (first_x_assum (K ALL_TAC)) >>
+      rename [‘evaluate (s3 with clock := bc1) env3 [SNDf _] =
+                (s3 with <|clock := bc2; refs := s3.refs ++ drefsS; ffi:= _|>,
+                 _)’] >>
+      drule_then strip_assume_tac evaluate_add_to_clock >>
+      fs[] >>
+      Q.REFINE_EXISTS_TAC ‘bc1 + extra’ >>
+      simp[state_component_equality,ffi_state_component_equality] >>
+      ntac 2 (first_x_assum (K ALL_TAC)) >>
+      rpt (qpat_x_assum ‘DATUM _ _’ (K ALL_TAC)) >>
+      rpt (qpat_x_assum ‘env_asm _ _’ (K ALL_TAC)) >>
+      qunabbrev_tac ‘s3’ >> qunabbrev_tac ‘s2’ >> rw[]
+      >- (rw [Once EQ_SYM_EQ,Once send_events_def,Once compile_message_def] >>
+          PURE_ONCE_REWRITE_TAC [update_state_def] >>
+          rw[MAP_ZIP] >>
+          PURE_ONCE_REWRITE_TAC [send_events_def] >>
+          simp[])
+      >- (rw [Once EQ_SYM_EQ,Once send_events_def,
+              Once compile_message_def,Once send_events_def]))
+QED
+
+(*
+Theorem sendloop_vcorrect:
+  ∀conf d env' s stpred dest.
+    env_asm env' conf ∧ conf.payload_size ≠ 0 ∧ DATUM d dv ∧
+    stpred s.ffi.ffi_state ∧
+    ffi_accepts_rel stpred (valid_send_call_format conf dest) s.ffi.oracle
+  ⇒
+    ∃ck1 ck2 env e.
+      do_opapp [Recclosure env' (sendloop conf (MAP (CHR o w2n) dest))
+                "sendloop"; dv] = SOME (env, e) ∧
+      evaluate$evaluate (s with clock := ck1) env [e] =
+      (s with <|clock := ck2; refs := s.refs ++ refs';
+                ffi:= s.ffi with
+                       <|io_events := s.ffi.io_events ++
+                                      send_events conf dest d;
+                         ffi_state := update_state s.ffi.ffi_state s.ffi.oracle
+                                                   (send_events conf dest d)
                        |>
               |> , Rval [Conv NONE []])
 Proof
@@ -705,7 +1663,7 @@ Proof
                 >- (irule ck_equiv_hol_Var >> qexists_tac ‘cV’ >>
                     simp[Abbr ‘env2’,ml_progTheory.nsLookup_nsBind_compute])
                 >- (irule ck_equiv_hol_Var >>
-                    fs[env_asm_def,in_module_def,has_v_def]))) >>
+                    fs[env_asm_def,in_module_def,has_v_def,reffree_normal2])))>>
       drule_then (qspec_then
                  ‘s2 with refs := s2.refs ++ drefsL’
               strip_assume_tac) ck_equiv_hol_apply >>
@@ -755,6 +1713,7 @@ Proof
       >- (rw [Once EQ_SYM_EQ,Once send_events_def,
               Once compile_message_def,Once send_events_def]))
 QED
+*)
 
 Theorem nsLookup_sendloop_exists:
   ∃slv. nsLookup (build_rec_env(sendloop conf data) cE cEv) (Short "sendloop") =
@@ -2154,7 +3113,7 @@ Theorem nsLookup_build_rec_env_drop:
 Proof
   simp[build_rec_env_def, sendloop_def, nsLookup_def, nsBind_def,
        cpEval_valid_def, env_asm_def, has_v_def, in_module_def, PULL_EXISTS] >>
-  rw[]
+  rw[reffree_normal2]
 QED
 
 
@@ -2284,103 +3243,7 @@ Theorem nsLookup_build_rec_env_sendloop =
    SIMP_CONV (srw_ss()) [GSYM sendloop_def])
   “nsLookup (build_rec_env (sendloop conf data) env v) (Short "sendloop")”;
 
-Theorem evaluate_choose_final_clock:
-  (∀(s0:α state) env es s res ck.
-     evaluate s0 env es = (s,res) ∧ ck ≤ s.clock ⇒
-     evaluate (s0 with clock := s0.clock + ck - s.clock) env es =
-     (s with clock := ck, res)) ∧
-  (∀(s0:α state) (env:v sem_env) (v1:v) (ms:(pat#exp)list) (v2:v) s res ck.
-     evaluate_match s0 env v1 ms v2 = (s,res) ∧ ck ≤ s.clock ⇒
-     evaluate_match (s0 with clock := s0.clock + ck - s.clock) env v1 ms v2 =
-     (s with clock := ck, res))
-Proof
-  ho_match_mp_tac evaluate_ind >> rpt strip_tac
-  >- (* nil *) gs[]
-  >- ((* cons *) simp[] >>
-      qpat_x_assum ‘evaluate _ _ _ = _’ mp_tac >> simp[] >>
-      Cases_on ‘evaluate s0 env [e1]’ >> gs[] >>
-      rename [‘evaluate _ _ [_] = (s00,res00)’] >> Cases_on ‘res00’ >> gs[]
-      >- (Cases_on ‘evaluate s00 env (e2::es)’ >>
-          rename1 ‘evaluate s00 env (e2::es) = (s01,r01)’ >>
-          Cases_on ‘r01’ >> gs[] >>
-          qabbrev_tac ‘d2 = s00.clock - s01.clock’ >>
-          qabbrev_tac ‘d1 = s0.clock - s00.clock’ >>
-          ‘s01.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
-          rw[] >> rename [‘s01.clock ≤ s00.clock’] >>
-          ‘ck + d2 ≤ s00.clock’ by simp[Abbr‘d2’] >>
-          first_x_assum drule >> simp[Abbr‘d2’]) >>
-      rw[] >> gs[])
-  >- ((* lit *) gs[])
-  >- ((* raise *) gs[find_evalform ‘Raise _’] >>
-      rename [‘evaluate s0 env [e] = _’] >> rw[] >>
-      Cases_on ‘evaluate s0 env [e]’ >>
-      rename [‘evaluate s0 env [e] = (s,r0)’] >>
-      Cases_on ‘r0’ >> gvs[])
-  >- ((* handle *)
-      gvs[find_evalform ‘Handle _ _’, AllCaseEqs()] >>
-      rename [‘evaluate s0 env [e] = (s00,Rerr (Rraise exn))’,
-              ‘evaluate_match s00 _ _ _ _ = (s, res)’] >>
-      qabbrev_tac ‘d2 = s00.clock - s.clock’ >>
-      qabbrev_tac ‘d1 = s0.clock - s00.clock’ >>
-      ‘s.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
-      ‘ck + d2 ≤ s00.clock’ by simp[Abbr‘d2’] >>
-      first_x_assum drule >> simp[Abbr‘d2’])
-  >- ((* Con *) gs[find_evalform ‘Con _ _’, AllCaseEqs()] >>
-      rename [‘evaluate s0 env (REVERSE es) = _’] >>
-      Cases_on ‘evaluate s0 env (REVERSE es)’ >> gvs[] >>
-      rename [‘evaluate s0 env (REVERSE es) = (s',res')’] >>
-      Cases_on ‘res'’ >> gvs[AllCaseEqs()])
-  >- (* Var *) gs[AllCaseEqs()]
-  >- (* Fun *) gs[AllCaseEqs(), find_evalform ‘Fun _ _’]
-  >- ((* App *) gvs[AllCaseEqs(), find_evalform ‘App _ _’] >>
-      rename [‘evaluate s0 env (REVERSE es) = _’] >>
-      Cases_on ‘evaluate s0 env (REVERSE es)’ >>
-      rename [‘evaluate s0 env (REVERSE es) = (s00,res00)’] >>
-      Cases_on ‘res00’ >> gvs[AllCaseEqs(), dec_clock_def] >>
-      qabbrev_tac ‘d2 = s00.clock - 1 - s.clock’ >>
-      ‘(s00 with clock := s00.clock - 1).clock = s00.clock - 1’ by simp[] >>
-      ‘s.clock ≤ s00.clock - 1’ by metis_tac[evaluate_clock] >>
-      ‘s00.clock = s.clock + d2 + 1’ by simp[Abbr‘d2’] >> gs[] >>
-      first_x_assum (qspec_then ‘ck + d2 + 1’ mp_tac) >> simp[])
-  >- ((* Log *) gvs[AllCaseEqs(), find_evalform ‘Log _ _ _’] >>
-      rename [‘evaluate s0 env [e1] = _’] >>
-      Cases_on ‘evaluate s0 env [e1]’ >>
-      rename [‘evaluate s0 env [e1] = (s00,res00)’] >>
-      Cases_on ‘res00’ >> gvs[AllCaseEqs()] >>
-      ‘s.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
-      first_x_assum (qspec_then ‘ck + (s00.clock - s.clock)’ mp_tac) >>
-      simp[])
-  >- ((* If *) gvs[AllCaseEqs(), find_evalform ‘If _ _ _ ’] >>
-      rename [‘evaluate s0 env [e1] = _’] >>
-      Cases_on ‘evaluate s0 env [e1]’ >>
-      rename [‘evaluate s0 env [e1] = (s00,res00)’] >>
-      Cases_on ‘res00’ >> gvs[AllCaseEqs()] >>
-      ‘s.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
-      first_x_assum (qspec_then ‘ck + (s00.clock - s.clock)’ mp_tac) >>
-      simp[])
-  >- ((* Mat *) gvs[AllCaseEqs(), find_evalform ‘Mat _ _ ’] >>
-      rename [‘evaluate s0 env [e1] = _’] >>
-      Cases_on ‘evaluate s0 env [e1]’ >>
-      rename [‘evaluate s0 env [e1] = (s00,res00)’] >>
-      Cases_on ‘res00’ >> gvs[AllCaseEqs()] >>
-      ‘s.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
-      first_x_assum (qspec_then ‘ck + (s00.clock - s.clock)’ mp_tac) >>
-      simp[])
-  >- ((* Let *) gvs[AllCaseEqs(), find_evalform ‘Let _ _ _’] >>
-      rename [‘evaluate s0 env [e1] = _’] >>
-      Cases_on ‘evaluate s0 env [e1]’ >>
-      rename [‘evaluate s0 env [e1] = (s00,res00)’] >>
-      Cases_on ‘res00’ >> gvs[AllCaseEqs()] >>
-      ‘s.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
-      first_x_assum (qspec_then ‘ck + (s00.clock - s.clock)’ mp_tac) >>
-      simp[])
-  >- ((* Letrec *) gvs[AllCaseEqs(), find_evalform ‘Letrec _ _ ’])
-  >- ((* Tannot *) gvs[AllCaseEqs(), find_evalform ‘Tannot _ _ ’])
-  >- ((* Lannot *) gvs[AllCaseEqs(), find_evalform ‘Lannot _ _ ’])
-  >- ((* match [] *) gs[evaluate_def]) >>
-  (* match (cons) *)
-  gvs[evaluate_def,AllCaseEqs()]
-QED
+
 
 Theorem final_padNIL[simp]:
   conf.payload_size ≠ 0 ⇒ final (pad conf [])
@@ -2544,6 +3407,74 @@ Proof
   simp[sendloop_def, Once find_recfun_def]
 QED
 
+Theorem store_v_same_type_refl[simp]:
+   store_v_same_type v v
+Proof
+  Cases_on ‘v’ >> simp[store_v_same_type_def]
+QED
+
+Theorem store_assign_lookup_nochange[simp]:
+  store_lookup loc refs = SOME v ⇒ store_assign loc v refs = SOME refs
+Proof
+  simp[store_lookup_def, store_assign_def] >> rw[]>>
+  simp[LUPDATE_SAME]
+QED
+
+Theorem nsLookup_build_rec_env_length:
+  cpEval_valid conf p env pSt pCd vs cSt ⇒
+  ∃lv. nsLookup (build_rec_env (sendloop conf data) env env.v) conf.length =
+       SOME lv ∧ (DATUM --> NUM) LENGTH lv
+Proof
+  simp[cpEval_valid_def, sendloop_def, build_rec_env_def, env_asm_def,
+       in_module_def, has_v_def] >> metis_tac[reffree_normal1]
+QED
+
+Theorem RTC_stepr_evaluateL:
+  (∀(s00:α state).
+     evaluate (s00 with clock := ckf1 s00) env [e] =
+     (s00 with <| clock := ckf2 s00; refs := s00.refs ++ rfn s00|>,
+      Rval [vfn s00])) ∧
+  smallStep$continue (smSt (s00 with refs := s00.refs ++ rfn s00))
+                     (vfn s00) cs =
+  smallStep$Estep a ∧ stepr꙳ a b ⇒
+  stepr꙳ (env,smSt s00,Exp e,cs) b
+Proof
+  strip_tac >> irule (iffRL RTC_CASES_RTC_TWICE) >>
+  irule_at (Pos hd) smallstep_drop_conts >>
+  strip_assume_tac
+           (small_eval_def |> cj 1 |> iffLR |> GEN_ALL
+            |> SIMP_RULE bool_ss [GSYM RIGHT_EXISTS_IMP_THM, SKOLEM_THM]
+            |> INST_TYPE [“:'ffi” |-> alpha]) >>
+  pop_assum (irule_at (Pos hd)) >>
+  irule_at (Pos hd) (small_big_exp_equiv |> iffRL |> cj 1) >>
+  irule_at Any (iffRL bigClockTheory.big_clocked_unclocked_equiv) >>
+  simp[funBigStepEquivTheory.functional_evaluate] >>
+  first_x_assum (C (resolve_then Any mp_tac) evaluate_set_clock) >>
+  simp[SKOLEM_THM] >>
+  disch_then (qx_choose_then ‘ckf’ (irule_at (Pos hd))) >> simp[] >>
+  irule (cj 2 RTC_RULES) >> simp[e_step_reln_def, e_step_def]
+QED
+
+Theorem ps2cs_neqxy[simp]:
+  ps2cs v ≠ "x" ∧ ps2cs v ≠ "y"
+Proof
+  simp[ps2cs_def]
+QED
+
+fun under_abs_path_unbeta_conv p t =
+  let val(v,bod) = dest_abs t
+  in
+    ABS_CONV (PATH_CONV p (UNBETA_CONV v))
+  end t
+
+fun pull_namedexvar_conv s t =
+  let val (v,bod) = dest_exists t
+      val (vnm,_) = dest_var v
+  in
+    if vnm = s then raise UNCHANGED
+    else (BINDER_CONV (pull_namedexvar_conv s) THENC SWAP_EXISTS_CONV) t
+  end
+
 Theorem simulation:
   ∀p0 pSt0 EP0 L p pSt EP cEnv0 vs cSt0.
     trans conf (NEndpoint p0 pSt0 EP0) L (NEndpoint p pSt EP) ∧
@@ -2616,23 +3547,10 @@ Proof
       rename [‘cSt0.ffi.ffi_state = (pn,X)’] >> Cases_on ‘X’ >>
       gs[ffi_state_cor_def])
   >- ((* second SEND case *) gs[cpEval_valid_Send] >>
-      qexists_tac ‘cEnv0’ >>
       ntac 3 (irule_at (Pos hd) triR_one_step_each >> simp[e_step_reln_def] >>
               simp[e_step_def, push_def, return_def, continue_def]) >>
-      irule_at (Pos hd) triR_RTC_each >>
-      irule_at (Pos hd) smallstep_drop_conts >>
-      strip_assume_tac
-               (small_eval_def |> cj 1 |> iffLR |> GEN_ALL
-                |> SIMP_RULE bool_ss [GSYM RIGHT_EXISTS_IMP_THM, SKOLEM_THM]
-                |> INST_TYPE [“:'ffi” |-> “:plffi”]) >>
-      first_assum (irule_at (Pos hd)) >>
-      irule_at (Pos (el 2)) smallstep_drop_conts >>
-      pop_assum (irule_at (Pos hd)) >>
-      irule_at (Pos (el 3)) triR_one_step_each >>
-      simp[e_step_reln_def, e_step_def, push_def, return_def, continue_def] >>
-      irule_at (Pos (el 3)) (small_big_exp_equiv |> iffRL |> cj 1) >>
-      irule_at Any (iffRL bigClockTheory.big_clocked_unclocked_equiv) >>
-      simp[funBigStepEquivTheory.functional_evaluate, Excl "evaluate_opapp"] >>
+      irule_at (Pos hd) triR_steps1 >>
+      irule_at (Pos hd) RTC_stepr_evaluateL >> irule_at Any RTC_REFL >>
       qmatch_goalsub_abbrev_tac ‘evaluate _ cEnv [dropv]’ >>
       ‘ck_equiv_hol cEnv DATUM dropv (flip DROP d n)’
         by (qunabbrev_tac ‘dropv’ >> irule ck_equiv_hol_App >>
@@ -2645,32 +3563,16 @@ Proof
             first_assum (irule_at Any) >> simp[Abbr‘cEnv’] >>
             irule ck_equiv_hol_Var >> simp[] >>
             irule cpEval_nsLookup_PLbindings >> metis_tac[]) >>
-      drule_then (qspec_then ‘cSt0’ strip_assume_tac) ck_equiv_hol_apply >>
-      pop_assum (C (resolve_then (Pos hd) assume_tac) evaluate_set_clock) >>
-      gs[SKOLEM_THM] >> pop_assum (irule_at (Pos hd)) >> simp[] >>
-      RM_ABBREV_TAC "dropv" >>
+      drule_then assume_tac (INST_TYPE [beta |-> “:plffi”]ck_equiv_hol_apply)>>
+      gs[SKOLEM_THM, FORALL_AND_THM] >>
+      first_x_assum (qspec_then ‘0’ (assume_tac o SIMP_RULE (srw_ss()) []) o
+                     CONV_RULE SWAP_FORALL_CONV) >>
+      irule_at (Pos hd) (iffLR markerTheory.Abbrev_def) >>
+      dxrule_then assume_tac (iffRL markerTheory.Abbrev_def) >>
+      pop_assum (irule_at (Pos hd)) >> simp[continue_def, push_def] >>
+      pop_assum $ qspec_then ‘cSt0’ assume_tac >>
+      rename [‘DATUM (DROP n d) dropnd_v’] >>
 
-      irule_at (Pos (el 2)) (small_big_exp_equiv |> iffRL |> cj 1) >>
-      irule_at Any (iffRL bigClockTheory.big_clocked_unclocked_equiv) >>
-      simp[funBigStepEquivTheory.functional_evaluate, Excl "evaluate_opapp"] >>
-      qpat_x_assum ‘ck_equiv_hol _ _ _ _ ’ kall_tac >>
-      qmatch_goalsub_abbrev_tac ‘evaluate _ cEnv [dropv]’ >>
-      ‘ck_equiv_hol cEnv DATUM dropv (flip DROP d (n + conf.payload_size))’
-        by (qunabbrev_tac ‘dropv’ >> irule ck_equiv_hol_App >>
-            qexists_tac ‘NUM’ >> simp[] >> conj_tac
-            >- (irule ck_equiv_hol_Lit >> simp[NUM_def, INT_def]) >>
-            irule ck_equiv_hol_App >>
-            irule_at (Pos last) ck_equiv_hol_Var >>
-            drule_then (qspec_then ‘p2’ strip_assume_tac)
-                       nsLookup_build_rec_env_drop >>
-            first_assum (irule_at Any) >> simp[Abbr‘cEnv’] >>
-            irule ck_equiv_hol_Var >> simp[] >>
-            irule cpEval_nsLookup_PLbindings >> metis_tac[]) >>
-      dxrule_then assume_tac
-                  (ck_equiv_hol_apply |> INST_TYPE [beta |-> “:plffi”]) >>
-      gs[] >> gs[SKOLEM_THM, FORALL_AND_THM] >>
-      first_x_assum (C (resolve_then (Pos hd) assume_tac) evaluate_set_clock) >>
-      gs[SKOLEM_THM] >> pop_assum (irule_at (Pos hd)) >> simp[] >>
       (* now ready to step through evaluation of first argument *)
       irule_at Any triR_step1 >> simp[e_step_def, e_step_reln_def] >>
       ‘nsLookup cEnv.v (Short "sendloop") =
@@ -2681,24 +3583,169 @@ Proof
            do_opapp_def] >>
       irule_at Any triR_step1 >> simp[e_step_def, e_step_reln_def, push_def] >>
       irule_at Any triR_steps1 >>
-      irule_at (Pos hd) smallstep_drop_conts >>
-      strip_assume_tac
-               (small_eval_def |> cj 1 |> iffLR |> GEN_ALL
-                |> SIMP_RULE bool_ss [GSYM RIGHT_EXISTS_IMP_THM, SKOLEM_THM]
-                |> INST_TYPE [“:'ffi” |-> “:plffi”]) >>
-      pop_assum (irule_at (Pos hd)) >>
-      irule_at Any triR_step1 >>
-      simp[e_step_def, e_step_reln_def, continue_def] >>
-      irule_at Any (small_big_exp_equiv |> iffRL |> cj 1) >>
-      irule_at Any (iffRL bigClockTheory.big_clocked_unclocked_equiv) >>
-      simp[funBigStepEquivTheory.functional_evaluate, Excl "evaluate_opapp"] >>
+      (* stepr꙳ (pad x) *)
+      irule_at (Pos hd) RTC_stepr_evaluateL >> irule_at Any RTC_REFL >>
       strip_assume_tac (padv_correct
                         |> SIMP_RULE (srw_ss()) [SKOLEM_THM,
                                                  GSYM RIGHT_EXISTS_IMP_THM,
                                                  Excl "evaluate_opapp"]
                         |> INST_TYPE [alpha |-> “:plffi”]) >>
-      fs[IMP_CONJ_THM, FORALL_AND_THM, Excl "evaluate_opapp"] >>
-      cheat) >> cheat
+      qpat_abbrev_tac
+        ‘cEnv00 = cEnv0 with v := nsBind "x" _ (build_rec_env _ _ _)’ >>
+      first_x_assum $
+           qspecl_then [‘cEnv00’, ‘conf’, ‘DROP n d’, ‘dropnd_v’, ‘𝕍 "x"’]
+           assume_tac >>
+      pop_assum (fn th =>
+        ‘nsLookup cEnv00.v (Short "x") = SOME dropnd_v’ by simp[Abbr‘cEnv00’] >>
+        assume_tac th) >>
+      rfs[Excl "evaluate_opapp"] >>
+      pop_assum (qspecl_then [‘s1’, ‘s1’, ‘[]’]
+                   (assume_tac o Q.GEN ‘s1’ o
+                    SIMP_RULE (srw_ss()) [Excl "evaluate_opapp"])) >>
+      ‘env_asm cEnv00 conf’ by gs[cpEval_valid_def, Abbr‘cEnv00’] >>
+      first_x_assum $ drule_then assume_tac >>
+      full_simp_tac bool_ss [FORALL_AND_THM] >>
+      rename[‘clock_fupd
+               (K (ck0f0 cEnv00 conf (DROP n d) dropnd_v _ _ _ _))’] >>
+      qabbrev_tac
+        ‘ck0f = λs. ck0f0 cEnv00 conf (DROP n d) dropnd_v (𝕍 "x") s s []’ >>
+      rename[‘clock_fupd
+               (K (ck1f0 cEnv00 conf (DROP n d) dropnd_v _ _ _ _))
+               (refs_fupd _ _)’] >>
+      qabbrev_tac
+        ‘ck1f = λs. ck1f0 cEnv00 conf (DROP n d) dropnd_v (𝕍 "x") s s []’ >>
+      fs[Excl "evaluate_opapp"] >> MAP_EVERY RM_ABBREV_TAC ["ck0f", "ck1f"] >>
+      rename [‘store_lookup (locfn _ _ _ _ _ _ _ [])
+                             (_ ++ reffn _ _ _ _ _ _ _ [])’] >>
+      map_every qabbrev_tac[
+        ‘Locfn = λs. Loc(locfn cEnv00 conf (DROP n d) dropnd_v (𝕍 "x") s s [])’,
+        ‘Reffn = λs. reffn cEnv00 conf (DROP n d) dropnd_v (𝕍 "x") s s []’
+        ] >> fs[Excl "evaluate_opapp"] >>
+      qpat_x_assum ‘∀s1 : plffi state. evaluate _ _ _ = _’ assume_tac >>
+      dxrule_then assume_tac (iffRL markerTheory.Abbrev_def) >>
+      irule_at (Pos hd) (iffLR markerTheory.Abbrev_def) >>
+      first_x_assum (irule_at (Pos hd)) >> simp[continue_def, push_def] >>
+      simp[Abbr‘Locfn’] >> RM_ABBREV_TAC "Reffn" >>
+      qmatch_goalsub_abbrev_tac ‘nsBind "y" (Loc vloc)’ >>
+      qmatch_goalsub_abbrev_tac ‘smSt (_ with refs := _ ++ drefs ++ vrefs)’ >>
+      first_x_assum (qspec_then ‘cSt0 with refs := cSt0.refs ++ drefs’
+                     (assume_tac o SIMP_RULE (srw_ss()) [])) >> rfs[] >>
+      ‘∀v. ∃ns. cSt0.ffi.oracle "send" cSt0.ffi.ffi_state
+                        (MAP (λc. n2w (ORD c)) (EXPLODE p2)) (pad conf v) =
+                 Oracle_return ns (pad conf v) ∧
+                strans conf cSt0.ffi.ffi_state (ASend p2 (pad conf v)) ns’
+        by (gs[cpEval_valid_def, ffi_state_cor_def, comms_ffi_oracle_def,
+               ffi_send_def, pad_LENGTH, AllCaseEqs()] >> gen_tac >>
+            DEEP_INTRO_TAC optionTheory.some_intro >>
+            simp[MAP_MAP_o, ORD_BOUND, CHR_ORD, IMPLODE_EXPLODE_I] >>
+            ‘valid_send_dest (MAP (n2w o ORD) p2) cSt0.ffi.ffi_state’
+              suffices_by (strip_tac >> drule strans_send_cond >>
+                           simp[MAP_MAP_o, CHR_w2n_n2w_ORD]) >>
+            simp[valid_send_dest_def, MAP_MAP_o, CHR_w2n_n2w_ORD] >>
+            Cases_on ‘cSt0.ffi.ffi_state’ >>
+            rename [‘cSt0.ffi.ffi_state = (pn,X)’] >> Cases_on ‘X’ >>
+            gs[ffi_state_cor_def]) >>
+      gs[SKOLEM_THM] >>
+      ‘in_module conf.length’ by gs[cpEval_valid_def, env_asm_def] >>
+      gs[in_module_def] >>
+      drule_then (qspec_then ‘p2’ $ qx_choose_then ‘lv’ strip_assume_tac)
+                 nsLookup_build_rec_env_length >>
+      ‘nsLookup cEnv00.v conf.length = SOME lv’ by simp[Abbr‘cEnv00’] >>
+      ntac 16 (irule_at (Pos hd) triR_step1 >>
+               simp[e_step_reln_def, e_step_def, push_def, return_def,
+                    continue_def, application_def, do_app_thm, to_small_st_def,
+                    call_FFI_def, payload_size_def]) >>
+      drule_all_then strip_assume_tac
+                     (INST_TYPE [gamma |-> “:plffi”]
+                      do_opapp_translate_general) >>
+      simp[] >> gs[NUM_def, INT_def] >> gs[SKOLEM_THM] >>
+      pop_assum (qspec_then ‘0’ (assume_tac o SIMP_RULE (srw_ss()) []) o
+                 CONV_RULE SWAP_FORALL_CONV) >>
+      irule_at (Pos hd) triR_steps1 >>
+      qmatch_goalsub_abbrev_tac ‘stepr꙳ (_,(cSt0.refs ++ drefs ++ vrefs,
+                                            F1UP (F2UP cSt0.ffi)),_,_)’ >>
+      ‘(cSt0.refs ++ drefs ++ vrefs, F1UP (F2UP cSt0.ffi)) =
+       smSt (cSt0 with <| refs := cSt0.refs ++ drefs ++ vrefs;
+                          ffi := F1UP (F2UP cSt0.ffi) |>)’
+        by simp[Abbr‘F1UP’, Abbr‘F2UP’,to_small_st_def] >> simp[] >>
+      irule_at (Pos hd) RTC_stepr_evaluateL >> irule_at Any RTC_REFL >>
+      qpat_x_assum ‘∀st:plffi state. evaluate _ _ _ = _’
+         (assume_tac o
+          CONV_RULE (RAND_CONV $ under_abs_path_unbeta_conv "rrrlr"))>>
+      dxrule_then assume_tac (iffRL markerTheory.Abbrev_def) >>
+      irule_at (Pos hd) (iffLR markerTheory.Abbrev_def) >>
+      pop_assum (irule_at (Pos hd)) >>
+      simp[continue_def, push_def, application_def, to_small_st_def,
+           do_app_thm, return_def, opb_lookup_def] >>
+      irule_at (Pos hd) triR_step1 >>
+      simp[e_step_reln_def, e_step_def, continue_def, application_def,
+           do_app_thm, to_small_st_def, do_if_def, return_def] >>
+      (* triR over
+           left = (Exp (let x = drop x psz in sendloop x), continue = [e],
+                   env binds x = drop v n & sendloop & y to padv-loc,
+                   ffi has send,
+                   st has refs for drop, pad, and length calls)
+           right = Exp (drop v (n + psz)), continue = [sendloop; e],
+                   ?env binds just sendloop
+       *)
+      irule_at (Pos hd) triR_step1 >>
+      simp[e_step_reln_def, e_step_def, continue_def, application_def,
+           return_def, push_def] >>
+      (* triR over Exp (drop x payload_size) & Exp (drop v (n + payload_size) *)
+      irule_at (Pos hd) triR_one_step_each >>
+      simp[e_step_def, e_step_reln_def, push_def] >>
+      (* Exp payload_size & Exp (n + payload_size) *)
+      ntac 2(irule_at (Pos hd) triR_one_step_each >>
+             simp[e_step_def, e_step_reln_def, push_def, return_def,
+                  continue_def]) >>
+      (* Exp (drop x) & Exp (drop v) *)
+      CONV_TAC (pull_namedexvar_conv "cEnv'") >>
+      qabbrev_tac ‘FinalEnv = cEnv00 with v := nsBind "y" (Loc vloc) cEnv00.v’>>
+      map_every RM_ABBREV_TAC ["dropv", "drefs"] >>
+      ‘∃dv. DATUM d dv ∧
+            nsLookup FinalEnv.v (Short "x") = SOME dropnd_v ∧
+            nsLookup FinalEnv.v (Short (ps2cs v)) = SOME dv’
+        by (simp[Abbr‘FinalEnv’] >> simp[Abbr‘cEnv00’] >>
+            metis_tac[cpEval_nsLookup_PLbindings]) >>
+      qexists_tac ‘FinalEnv’ >>
+      ntac 3(irule_at (Pos hd) triR_one_step_each >>
+             simp[e_step_def, e_step_reln_def, push_def, return_def,
+                  continue_def]) >>
+
+      qmatch_goalsub_abbrev_tac ‘cSt0.refs ++ drefs ++ vrefs ++ lenrefs’ >>
+      RM_ABBREV_TAC "lenrefs" >>
+(*      qmatch_goalsub_abbrev_tac ‘stepr꙳ (_, (RR,FF), _, _)’ >>
+      ‘(RR,FF) = smSt (cSt0 with <| refs := RR; ffi := FF|>)’
+        by simp[Abbr‘RR’, Abbr‘FF’, to_small_st_def] >> simp[] >>
+      irule_at (Pos hd) RTC_stepr_evaluateL >>
+      qpat_abbrev_tac ‘dropv3 = App Opapp [App Opapp [Var _; _]; _]’ >>
+      qmatch_goalsub_abbrev_tac ‘evaluate _ cEnv3 [dropv3] = _’ >>
+      ‘ck_equiv_hol cEnv3 DATUM dropv3 (flip DROP (DROP n d) conf.payload_size)’
+        by (qunabbrev_tac ‘dropv3’ >> irule ck_equiv_hol_App >>
+            qexists_tac ‘NUM’ >> simp[] >> conj_tac
+            >- (irule ck_equiv_hol_Lit >> simp[NUM_def, INT_def]) >>
+            irule ck_equiv_hol_App >>
+            irule_at (Pos last) ck_equiv_hol_Var >>
+            drule_then (qspec_then ‘p2’ strip_assume_tac)
+                       nsLookup_build_rec_env_drop >>
+            first_assum (irule_at Any) >> simp[Abbr‘cEnv3’] >>
+            ‘in_module conf.drop’ by gs[cpEval_valid_def, env_asm_def] >>
+            gs[in_module_def, Abbr‘cEnv00’] >>
+            irule ck_equiv_hol_Var >> simp[]) >>
+      drule_then assume_tac (INST_TYPE [beta |-> “:plffi”]ck_equiv_hol_apply)>>
+      gs[SKOLEM_THM, FORALL_AND_THM] >>
+      first_x_assum (qspec_then ‘0’ (assume_tac o SIMP_RULE (srw_ss()) []) o
+                     CONV_RULE SWAP_FORALL_CONV) >>
+      dxrule_then assume_tac (iffRL markerTheory.Abbrev_def) >>
+      irule_at (Pos hd) (iffLR markerTheory.Abbrev_def) >>
+      pop_assum (irule_at (Pos hd)) >>
+      simp[e_step_reln_def, e_step_def, continue_def] >>
+      irule_at Any RTC_REFL >> gs[DROP_DROP_T] >>
+      (* triR over (sendloop(x)) *)
+      ntac 3 (irule_at (Pos hd) triR_step1 >>
+              simp[e_step_def, e_step_reln_def, push_def, return_def,
+                   continue_def]) >> *)
+         cheat) >> cheat
 
 
 QED
