@@ -10,22 +10,27 @@ open chorSemTheory endpointLangTheory
 open chor_to_endpointTheory
      endpoint_to_choiceTheory
      endpoint_to_payloadTheory
+     payload_closureTheory
 open chor_to_endpointProofTheory
      endpoint_to_choiceProofTheory
      endpoint_to_payloadProofTheory
+     payload_closureProofTheory
 open bisimulationTheory
 open payload_bisimTheory
 
 val _ = new_theory "projectionProof";
 
-val to_choice_preservation =
+Triviality to_choice_preservation =
   endpoint_to_choiceProofTheory.compile_network_preservation;
 
-val to_endpoint_preservation =
+Triviality to_endpoint_preservation =
   chor_to_endpointProofTheory.compile_network_preservation;
 
-val to_payload_preservation =
+Triviality to_payload_preservation =
   endpoint_to_payloadProofTheory.compile_network_preservation;
+
+Triviality to_closure_preservation =
+  payload_closureProofTheory.compile_network_preservation_alt
 
 Theorem endpoints_compile_network_chor:
   ∀s c l. MAP FST (endpointProps$endpoints (compile_network s (c : chor) l)) = l
@@ -190,13 +195,14 @@ Theorem projection_preservation_junkcong:
    ∧ conf.payload_size > 0
    ∧ trans_s (s,c) (s'',c'')
    ∧ no_undefined_vars (s,c)
-   ⇒ ∃s''' c''' epn.
+   ∧ dvarsOf c = []
+   ⇒ ∃s''' c''' epn0 epn.
       trans_s (s'',c'') (s''',c''') ∧
       junkcong {new_fv s c}
                (project_choice (new_fv s c) s''' c''' (procsOf c))
-               epn ∧
-      (reduction conf)^* (projection conf s c (procsOf c))
-                         (compile_network conf epn)
+               epn0 ∧
+      compile_rel conf epn (compile_network_alt (compile_network conf epn0)) ∧
+      (reduction conf)^* (projection conf s c (procsOf c)) epn
 Proof
   rw []
   \\ drule to_endpoint_preservation
@@ -213,10 +219,17 @@ Proof
   \\ fs [projection_def,endpoint_to_choiceTheory.compile_network_def]
   \\ drule_then assume_tac junkcong_sym \\  asm_exists_tac
   \\ fs [projection_def,endpoint_to_choiceTheory.compile_network_def]
-  \\ qmatch_goalsub_abbrev_tac ‘compile_network conf to_choice’
-  \\ irule to_payload_preservation
-  \\ fs [Abbr‘to_choice’]
-  \\ rw [choice_free_network_compile_network_fv]
+  \\ qmatch_asmsub_abbrev_tac ‘reduction^* to_choice n3’
+  \\ drule to_payload_preservation
+  \\ disch_then drule
+  \\ impl_tac
+  >- rw [Abbr‘to_choice’,choice_free_network_compile_network_fv]
+  \\ strip_tac
+  \\ drule to_closure_preservation
+  \\ impl_tac
+  (* TODO: projections guarantees fix_network, free_fix_names_network, no_undefined_vars *)
+  >- (simp [] \\ cheat)
+  \\ rw [] \\ asm_exists_tac \\ simp []
 QED
 
 Theorem trans_s_trans:

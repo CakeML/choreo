@@ -16,7 +16,7 @@ End
 
 Definition projection_def:
   projection conf s c l =
-    payload_closure$compile_network
+    payload_closure$compile_network_alt
       (endpoint_to_payload$compile_network conf
         (endpoint_to_choice$compile_network
            (compile_network s c l)))
