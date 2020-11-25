@@ -36,7 +36,7 @@ val _ = set_grammar_ancestry
    "ml_translator", "ml_prog", "evaluateProps", "namespace",
    "semanticPrimitives", "abstractCompilation"];
 
-fun SRULE ths = SRULE ths
+fun SRULE ths = SIMP_RULE (srw_ss()) ths
 
 fun under_abs_path_unbeta_conv p t =
   let val(v,bod) = dest_abs t
@@ -60,6 +60,18 @@ fun pull_namedallvar_conv s t =
     else (BINDER_CONV (pull_namedallvar_conv s) THENC SWAP_FORALL_CONV) t
   end
 
+fun underEXs f th =
+  case total dest_exists $ concl th of
+    NONE => f th
+  | SOME (v,bod) => ASSUME bod |> underEXs f |> SIMPLE_EXISTS v |> CHOOSE(v,th)
+
+fun atcj i f th =
+ let
+   val ths0 = CONJUNCTS th
+   val ths = mapi (fn j => fn th => if i = j + 1 then f th else th) ths0
+ in
+   LIST_CONJ ths
+ end
 
 val WORD8 = “WORD:word8 -> v -> bool”;
 Overload WORD8 = “WORD:word8 -> v -> bool”;
@@ -1518,6 +1530,81 @@ Proof
        pad_def]
 QED
 
+Theorem env_asm_lenf_sem0:
+  ∃lenf.
+     (∀k v env. env_asm env conf vs ⇒ nsLookup env.v conf.length = SOME lenf) ∧
+     ((∃env. env_asm env conf vs) ⇒ (DATUM ~~> NUM) LENGTH lenf)
+Proof
+  simp[env_asm_def, in_module_def, has_v_def, at_def] >>
+  qexists_tac ‘EL 2 vs’ >> simp[] >> metis_tac[]
+QED
+
+Theorem env_asm_dropf_sem0:
+  ∃dropf.
+    (∀v env. env_asm env conf vs ⇒ nsLookup env.v conf.drop = SOME dropf) ∧
+    ((∃env. env_asm env conf vs) ⇒ (DATUM ~~> NUM ~~> DATUM) (flip DROP) dropf)
+Proof
+  simp[env_asm_def, in_module_def, has_v_def, at_def] >>
+  qexists_tac ‘EL 5 vs’ >> simp[] >> metis_tac[]
+QED
+
+Theorem env_asm_LENGTH =
+  env_asm_lenf_sem0
+      |> SRULE [reffree_AppReturns_def, reffree_Arrow_def,
+                eval_rel0_thm, NUM_def, INT_def]
+      |> underEXs (atcj 2
+                   (GENL [“l:word8 list”, “lv : v”] o DISCH “DATUM l lv” o
+                    DISCH “∃env. env_asm env conf vs” o
+                    C MATCH_MP (ASSUME “DATUM l lv”) o UNDISCH))
+      |> SRULE [SKOLEM_THM, GSYM RIGHT_EXISTS_AND_THM,
+                GSYM RIGHT_EXISTS_IMP_THM]
+      |> CONV_RULE (RENAME_VARS_CONV ["lenf", "lencl_env", "lencl_exp",
+                                      "lenclk"])
+      |> underEXs $ atcj 2 $ underAIs $ atcj 2 $
+          underAIs (MATCH_MP evaluate_generalise')
+      |> INST_TYPE [alpha |-> “:plffi”] |> SRULE[]
+
+Theorem env_asm_DROP =
+  env_asm_dropf_sem0
+      |> SRULE [reffree_AppReturns_def, reffree_Arrow_def,
+                eval_rel0_thm, NUM_def, INT_def, GSYM LEFT_EXISTS_AND_THM]
+      |> underEXs (atcj 2
+                   (GENL [“l:word8 list”, “lv : v”] o DISCH “DATUM l lv” o
+                    DISCH “∃env. env_asm env conf vs” o
+                    C MATCH_MP (ASSUME “DATUM l lv”) o UNDISCH))
+      |> SRULE [SKOLEM_THM, GSYM RIGHT_EXISTS_AND_THM,
+                GSYM RIGHT_EXISTS_IMP_THM]
+      |> CONV_RULE (RENAME_VARS_CONV ["dropf", "drop1cl_env", "drop1cl_exp",
+                                      "drop1_v", "drop1clk",
+                                      "drop2cl_env", "drop2cl_exp",
+                                      "drop2_v", "drop2clk"])
+      |> underEXs $ atcj 2 $ underAIs $ atcj 2 $
+          underAIs $ atcj 1 $ MATCH_MP evaluate_generalise'
+      |> SRULE[PULL_FORALL]
+      |> underEXs $ underAIs $ atcj 2 $ underAIs $ atcj 4 $
+          MATCH_MP evaluate_generalise'
+      |> INST_TYPE [alpha |-> “:plffi”] |> SRULE[]
+
+Theorem in_module_nsLookup_nsBind:
+  in_module id ⇒
+  nsLookup (nsBind k v ns:(string,string,v)namespace) id = nsLookup ns id
+Proof
+  simp[in_module_def]
+QED
+
+Theorem in_module_nsLookup_build_rec_env:
+  in_module id ⇒ nsLookup (build_rec_env fs e0 ns) id = nsLookup ns id
+Proof
+  simp[in_module_def] >>
+  simp[build_rec_env_def] >> qabbrev_tac ‘rc = Recclosure e0 fs’ >>
+  RM_ABBREV_TAC "rc" >> Induct_on ‘fs’ >> simp[FORALL_PROD]
+QED
+
+Overload sendloop_code[local] =
+  (list_mk_abs([“conf : config”, “dest : string”],
+               sendloop_def |> concl |> strip_forall |> #2 |> rhs |> rator
+                 |> rand |> pairSyntax.strip_pair |> last))
+
 Theorem sendloop_correct:
   ∀conf l lv vs (s:plffi state) stpred dest slv.
     DATUM l lv ∧ conf.payload_size ≠ 0 ∧ stpred s.ffi.ffi_state ∧
@@ -1527,21 +1614,21 @@ Theorem sendloop_correct:
     ⇒
     ∃ck1 ck2 refs'.
       ∀env env'.
-          env_asm env' conf vs ∧
-          nsLookup env.v (Short "sendloop") = SOME (slv env') ⇒
-          ∃env2 body.
-            do_opapp [slv env'; lv] = SOME (env2, body) ∧
-            evaluate (s with clock:= ck1) env2 [body] =
-            (s with <|
-               clock := ck2; refs := s.refs ++ refs';
-               ffi:= s.ffi with
-                      <|io_events := s.ffi.io_events ++
-                                     send_events conf dest l;
-                        ffi_state := update_state s.ffi.ffi_state
-                                                  s.ffi.oracle
-                                                  (send_events conf dest l)
-                      |>
-             |> , Rval [Conv NONE []])
+        env_asm env' conf vs ∧
+        nsLookup env.v (Short "sendloop") = SOME (slv env') ⇒
+        ∃env2 body.
+          do_opapp [slv env'; lv] = SOME (env2, body) ∧
+          evaluate (s with clock:= ck1) env2 [body] =
+          (s with <|
+             clock := ck2; refs := s.refs ++ refs';
+             ffi:= s.ffi with
+                    <|io_events := s.ffi.io_events ++
+                                   send_events conf dest l;
+                      ffi_state := update_state s.ffi.ffi_state
+                                                s.ffi.oracle
+                                                (send_events conf dest l)
+                    |>
+           |> , Rval [Conv NONE []])
 Proof
   ho_match_mp_tac compile_message_ind>> rpt strip_tac >> simp[] >>
   qabbrev_tac ‘
@@ -1575,8 +1662,8 @@ Proof
   Q.REFINE_EXISTS_TAC ‘clk1 + ck1 - ck2’ >>
   simp[DECIDE “y:num ≤ x ⇒ x + Z - y + y - x = Z”] >>
   map_every
-  (Q_TAC (fn t => rpt (first_x_assum(kall_tac o assert(free_in t o concl)))))
-  [‘pclv’, ‘pbode’] >>
+    (Q_TAC (fn t => rpt (first_x_assum(kall_tac o assert(free_in t o concl)))))
+    [‘pclv’, ‘pbode’] >>
   simp[find_evalform ‘App _ _’, do_app_thm, AllCaseEqs(), PULL_EXISTS] >>
   gs[ffi_accepts_rel_def] >>
   first_assum $
@@ -1589,34 +1676,18 @@ Proof
   qpat_abbrev_tac ‘FF = _.ffi with <| ffi_state := _; io_events := _|>’ >>
   simp[find_evalform ‘If _ _ _ ’, bind_eq_Rval, AllCaseEqs(), PULL_EXISTS,
        find_evalform ‘App _ _’, do_app_thm, payload_size_def] >>
-
-  ‘∃lenf.
-     ∀env. env_asm env conf vs ⇒
-           ∀yv xv.
-             nsLookup (nsBind "y" yv (slE xv env)) conf.length =
-             SOME lenf ∧ (DATUM ~~> NUM) LENGTH lenf’
-    by (simp[env_asm_def, in_module_def, has_v_def, PULL_EXISTS, at_def,
-             Abbr‘slE’, build_rec_env_def, Abbr‘sltriple’] >>
-        qexists_tac ‘EL 2 vs’ >> simp[]) >>
-  gs[reffree_Arrow_def, reffree_AppReturns_def, FORALL_AND_THM, IMP_CONJ_THM] >>
-  pop_assum kall_tac (* nsLookup ... conf.length = SOME lenf *) >>
-  pop_assum (drule_at_then (Pos (el 2)) assume_tac) >> gs[NUM_def, INT_def] >>
-  pop_assum (qx_choosel_then [‘len_env’, ‘len_exp’] strip_assume_tac o
-             SRULE [IMP_CONJ_THM] o
-             SRULE [GSYM RIGHT_EXISTS_IMP_THM] o
-             SRULE [LEFT_FORALL_IMP_THM]) >> simp[] >>
-  gs[eval_rel0_thm] >>
-  pop_assum (qx_choosel_then [‘lenclk’] assume_tac o
-             SRULE [SKOLEM_THM, GSYM RIGHT_EXISTS_IMP_THM])>>
-  pop_assum (C (resolve_then (Pos hd) assume_tac)
-             (INST_TYPE [alpha |-> “:plffi”] evaluate_generalise')) >>
-  Q.REFINE_EXISTS_TAC ‘clk1 + 1’ >> simp[dec_clock_def] >>
-  qpat_abbrev_tac ‘LCLK = lenclk (LUPDATE _ _ _)’ >>
+  ‘(∃env vs. env_asm env conf vs) ⇒ in_module conf.length ∧ in_module conf.drop’
+    by (simp[env_asm_def] >> metis_tac[]) >>
+  ‘∀id x e. in_module id ⇒ nsLookup (slE x e) id = nsLookup e.v id’
+    by simp[Abbr‘slE’, in_module_nsLookup_nsBind,
+            in_module_nsLookup_build_rec_env] >>
+  simp[in_module_nsLookup_nsBind] >>
+  strip_assume_tac env_asm_LENGTH >> pop_assum $ drule_then assume_tac >>
+  simp[dec_clock_def] >>
+  Q.REFINE_EXISTS_TAC ‘clk1 + 1’ >> simp[] >>
+  qpat_abbrev_tac ‘LCLK = lenclk _ _ (LUPDATE _ _ _)’ >>
   Q.REFINE_EXISTS_TAC ‘LCLK + clk1’ >>
-  simp[do_if_def, do_app_thm, opb_lookup_def] >>
-  map_every
-  (Q_TAC (fn t => rpt (first_x_assum(kall_tac o assert(free_in t o concl)))))
-  [‘lenclk’, ‘len_exp’] >>
+  simp[do_if_def, do_app_thm, opb_lookup_def] >> ntac 3 (pop_assum kall_tac) >>
   Cases_on ‘LENGTH l ≤ conf.payload_size’ >> simp[]
   >- (simp[find_evalform ‘Con _ _’, do_con_check_def, build_conv_def] >>
       simp[LEFT_FORALL_IMP_THM, RIGHT_EXISTS_IMP_THM,
@@ -1626,59 +1697,15 @@ Proof
       simp[send_events_def] >> ONCE_REWRITE_TAC [compile_message_def] >>
       simp[update_state_def]) >>
   simp[find_evalform ‘Let _ _ _’, bind_eq_Rval, PULL_EXISTS, AllCaseEqs(),
-       dec_clock_def] >> Q.REFINE_EXISTS_TAC ‘clk1 + 1’ >> simp[] >>
-  ‘∃dropf.
-     ∀env. env_asm env conf vs ⇒
-           ∀yv xv.
-             nsLookup (nsBind "y" yv (slE xv env)) conf.drop =
-             SOME dropf ∧ (DATUM ~~> NUM ~~> DATUM) (flip DROP) dropf’
-    by (simp[env_asm_def, in_module_def, has_v_def, PULL_EXISTS, at_def,
-             Abbr‘slE’, build_rec_env_def, Abbr‘sltriple’] >>
-        qexists_tac ‘EL 5 vs’ >> simp[]) >>
-  gs[reffree_Arrow_def, reffree_AppReturns_def, FORALL_AND_THM, IMP_CONJ_THM] >>
-  pop_assum kall_tac (* nsLookup ... conf.drop = SOME dropf *) >>
-  pop_assum (drule_at_then (Pos (el 2)) assume_tac) >>
-  pop_assum (qx_choosel_then [‘dr_env1’, ‘dr_exp1’] assume_tac o
-             SRULE [GSYM RIGHT_EXISTS_IMP_THM, SKOLEM_THM,
-                                   IMP_CONJ_THM] o
-             SRULE [LEFT_FORALL_IMP_THM]) >>
-  pop_assum (CONJUNCTS_THEN2 assume_tac $
-             qx_choosel_then [‘dr_val1’] assume_tac) >>
-  simp[] >>
-  qpat_x_assum ‘_ ⇒ do_opapp [dropf; _] = _’ kall_tac >>
-  pop_assum (strip_assume_tac o SRULE [FORALL_AND_THM, IMP_CONJ_THM]) >>
-  qpat_x_assum ‘_ ⇒ ∀refs. eval_rel _ _ _ _ _’ assume_tac >>
-  pop_assum (qx_choosel_then [‘dr_ck11’, ‘dr_ck12’] assume_tac o
-             SRULE [eval_rel_def, SKOLEM_THM, GSYM RIGHT_EXISTS_IMP_THM]) >>
-  first_assum (C (resolve_then (Pos hd) (assume_tac o SRULE[])) $
-               cj 1 evaluate_clock) >>
-  first_x_assum (C (resolve_then (Pos hd) (assume_tac o SRULE[])) $
-                 INST_TYPE [alpha |-> “:plffi”] evaluate_generalise') >>
-  simp[] >> pop_assum kall_tac (* evaluate .. [dr_exp1] = ... ⇔ ... *) >>
-  qmatch_goalsub_abbrev_tac ‘DCLK1 ≤ _ + DCLK2’ >>
-  Q.REFINE_EXISTS_TAC ‘DCLK1 - DCLK2 + clk1 + 1’ >> simp[] >>
-  simp[DECIDE “y:num ≤ x ⇒ x - y + Z + 1 + y - (x + 1) = Z”, Abbr‘DCLK1’,
-       Abbr‘DCLK2’] >> pop_assum kall_tac (* dr_clk12 ≤ dr_clk11 *) >>
-  pop_assum (qx_choosel_then [‘dr_env2’, ‘dr_exp2’] strip_assume_tac o
-             SRULE [FORALL_AND_THM, NUM_def, INT_def, IMP_CONJ_THM] o
-             SRULE [SKOLEM_THM, GSYM RIGHT_EXISTS_IMP_THM]) >>
-  simp[] >>
-  qpat_x_assum ‘_ ⇒ ∀refs x. do_opapp [dr_val1 refs; _] = SOME _’ kall_tac >>
-  pop_assum (qx_choosel_then [‘dr_val2’] strip_assume_tac o
-             SRULE [FORALL_AND_THM, IMP_CONJ_THM] o
-             SRULE [SKOLEM_THM, GSYM RIGHT_EXISTS_IMP_THM]) >>
-  qpat_x_assum ‘_ ⇒ ∀r1 y r2. eval_rel _ _ _ _ _’
-               (qx_choosel_then [‘dr_clk21’, ‘dr_clk22’] assume_tac o
-                SRULE [eval_rel_def, SKOLEM_THM, GSYM RIGHT_EXISTS_IMP_THM]) >>
-  first_assum (C (resolve_then (Pos hd) (assume_tac o SRULE[])) $
-               cj 1 evaluate_clock) >>
-  first_x_assum (C (resolve_then (Pos hd) (assume_tac o SRULE[])) $
-                 INST_TYPE [alpha |-> “:plffi”] evaluate_generalise') >>
-  simp[] >> pop_assum kall_tac (* evaluate ... [dr_exp2 ...] *) >>
-  qmatch_goalsub_abbrev_tac ‘DCLK1 ≤ _ + DCLK2’  >>
-  Q.REFINE_EXISTS_TAC ‘DCLK1 - DCLK2 + clk1 + 1’ >> simp[] >>
-  simp[DECIDE “y:num ≤ x ⇒ x - y + Z + 1 + y - (x + 1) = Z”, Abbr‘DCLK1’,
-       Abbr‘DCLK2’] >> pop_assum kall_tac (* dr_clk22 ≤ dr_clk21 *) >>
+       dec_clock_def] >> Q.REFINE_EXISTS_TAC ‘clk1 + 1’ >>
+  simp[in_module_nsLookup_nsBind] >>
+  strip_assume_tac env_asm_DROP >> simp[] >>
+  pop_assum (drule_then assume_tac o cj 2) >> simp[] >>
+  qpat_abbrev_tac ‘DCK1 = drop1clk _ _ _ ’ >>
+  Q.REFINE_EXISTS_TAC ‘DCK1 + clk1 + 1’ >> simp[] >>
+  qpat_abbrev_tac ‘DCK2 = drop2clk _ _ _ _ _’ >>
+  Q.REFINE_EXISTS_TAC ‘DCK2 + clk1 + 1’ >> simp[] >>
+  ntac 2 (pop_assum kall_tac) >> pop_assum (assume_tac o cj 5) >>
   ‘¬final (pad conf l)’ by rw[pad_def, final_def] >> fs[] >>
   last_x_assum (drule_at_then (Pos last) assume_tac) >>
   ‘∀E. nsLookup (slE lv E) (Short "sendloop") = SOME (slv E)’
@@ -3395,10 +3422,6 @@ Proof
   pop_assum (irule_at Any) >> simp[] >> metis_tac[IS_PREFIX_TRANS]
 QED
 
-Overload sendloop_code[local] =
-  (list_mk_abs([“conf : config”, “dest : string”],
-               sendloop_def |> concl |> strip_forall |> #2 |> rhs |> rator
-                 |> rand |> pairSyntax.strip_pair |> last))
 Theorem find_recfun_sendloop[simp]:
   find_recfun "sendloop" (sendloop conf dest) =
   SOME ("x", sendloop_code conf dest)
