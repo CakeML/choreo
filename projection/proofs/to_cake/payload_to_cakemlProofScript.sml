@@ -73,6 +73,17 @@ fun atcj i f th =
    LIST_CONJ ths
  end
 
+Definition pletrec_vars_ok_def[simp]:
+  pletrec_vars_ok Nil = T ∧
+  pletrec_vars_ok (Send dest var i e) = pletrec_vars_ok e ∧
+  pletrec_vars_ok (Receive src destvar acc e) = pletrec_vars_ok e ∧
+  pletrec_vars_ok (IfThen v e1 e2) = (pletrec_vars_ok e1 ∧ pletrec_vars_ok e2) ∧
+  pletrec_vars_ok (Let var f vars e) = pletrec_vars_ok e ∧
+  pletrec_vars_ok (Letrec fnm args e) = (pletrec_vars_ok e ∧ ALL_DISTINCT args)∧
+  pletrec_vars_ok (FCall _ _) = T ∧
+  pletrec_vars_ok (Fix _ e) = pletrec_vars_ok e
+End
+
 val WORD8 = “WORD:word8 -> v -> bool”;
 Overload WORD8 = “WORD:word8 -> v -> bool”;
 Overload DATUM[local] = “LIST_TYPE WORD8”;
@@ -3147,11 +3158,8 @@ QED
 Definition ffi_state_cor_def:
   ffi_state_cor conf cpNum pSt (fNum,fQueue,fNet) ⇔
     cpNum = fNum ∧
-    ∃fQueue1 fNet1.
-      ffi_wf (fNum,fQueue1,fNet1) ∧
-      ffi_eq conf (fNum,fQueue,fNet) (fNum,fQueue1,fNet1) ∧
-      ∀sp.
-        isPREFIX (qlk pSt.queues sp) (qlk fQueue1 sp)
+    ∃N. ffi_eq conf (fNum, fQueue, fNet) (fNum, pSt.queues, N) ∧
+        ffi_wf (fNum, pSt.queues, N)
 End
 
 Theorem ffi_state_cor_ignores_funs[simp]:
@@ -3172,24 +3180,6 @@ Definition cpEval_valid_def:
     ffi_state_cor conf cpNum pSt cSt.ffi.ffi_state ∧
     ffi_wf cSt.ffi.ffi_state ∧
     cSt.ffi.oracle = comms_ffi_oracle conf
-End
-
-(* VALIDITY *)
-(* Check that Payload States with label transition and
-   two corresponding FFI states are all valid to produce
-   coherent corresponding transitions *)
-Definition cpFFI_valid_def:
-  (cpFFI_valid conf pSt1 pSt2 ffi1 ffi2 (LSend _ d rp) ⇔
-     strans conf ffi1 (ASend rp d) ffi2) ∧
-  (cpFFI_valid conf pSt1 pSt2 ffi1 ffi2 (LReceive _ _ _) ⇔
-     ffi_eq conf ffi1 ffi2) ∧
-  (cpFFI_valid conf pSt1 pSt2 ffi1 ffi2 LTau ⇔
-     case (some (sp,d).
-             pSt1.queues = normalise_queues
-                           (pSt2.queues |+ (sp,d::qlk pSt2.queues sp)))
-     of
-       SOME (sp,d) => strans conf ffi1 (ARecv sp d) ffi2
-     | NONE        => ffi_eq conf ffi1 ffi2)
 End
 
 Theorem FDOM_normalise_queues:
@@ -3232,42 +3222,6 @@ Proof
   >- fs [FLOOKUP_DEF,ABSORPTION_RWT]
   \\ rw [FAPPLY_FUPDATE_THM]
   \\ fs [FLOOKUP_DEF]
-QED
-
-(* CAKEML EQUIVALENCE *)
-(* Basic Definition *)
-Definition result_eq_def:
-  result_eq crA crB ⇔
-    case (crA,crB) of
-    (* An ffi error can be equivalent even with different mutable inputs *)
-      (Rerr (Rabort (Rffi_error (Final_event f1 i1 m1 o1))),
-       Rerr (Rabort (Rffi_error (Final_event f2 i2 m2 o2))))
-        => (f1 = f2) ∧ (i1 = i2) ∧ (o1 = o2)
-    (* Everything else must be identical *)
-    | _ => crA = crB
-End
-
-Definition cEval_equiv_def:
-  cEval_equiv conf (csA,crA) (csB,crB) ⇔
-    ffi_eq conf csA.ffi.ffi_state csB.ffi.ffi_state ∧
-    result_eq crA crB
-End
-
-(* Transitive *)
-Theorem result_eq_trans:
-  ∀p1 p2 p3. result_eq p1 p2 ∧ result_eq p2 p3 ⇒ result_eq p1 p3
-Proof
-  rw[result_eq_def] >> EVERY_CASE_TAC >> rw[]
-QED
-
-Theorem cEval_equiv_trans:
-  ∀conf p1 p2 p3.
-    cEval_equiv conf p1 p2 ∧ cEval_equiv conf p2 p3 ⇒ cEval_equiv conf p1 p3
-Proof
-  rw [] \\ Cases_on ‘p1’ \\ Cases_on ‘p2’ \\ Cases_on ‘p3’
-  \\ fs [cEval_equiv_def] \\ qspec_then ‘conf’ assume_tac ffi_eq_equivRel
-  \\ fs [equivalence_def,transitive_def]
-  \\ metis_tac [result_eq_trans]
 QED
 
 Overload smSt[local] = “bigSmallEquiv$to_small_st”
@@ -3398,12 +3352,62 @@ Proof
   simp[EXISTS_PROD] >> metis_tac[strans_pres_pnum, FST]
 QED
 
+Theorem trans_receptive:
+  net_has_node N0 dst ∧ dst ≠ src ⇒
+  ∃N. trans conf N0 (LReceive src msg dst) N ∧
+      net_has_node N = net_has_node N0 ∧ net_wf N = net_wf N0
+Proof
+  Induct_on ‘N0’ >> simp[net_has_node_def, FUN_EQ_THM, net_wf_def] >>
+  metis_tac[trans_rules, net_has_node_def, net_wf_def]
+QED
+
+Theorem trans_receive_has_node:
+  ∀N0 N.
+    trans conf N0 (LReceive src m dst) N ⇒
+    net_has_node N0 dst ∧ net_has_node N dst
+Proof
+  Induct_on ‘trans’ >> simp[net_has_node_def]
+QED
+
+Theorem strans_send_has_node:
+  ∀q0 N0 q N.
+    strans conf (pnum,q0,N0) (ASend dest m) (pnum,q,N) ⇒
+    net_has_node N0 dest ∧ net_has_node N dest
+Proof
+  Induct_on ‘strans’ >> simp[] >>
+  metis_tac[trans_receive_has_node, trans_pres_nodes]
+QED
+
+Theorem strans_send_hold_queues_constant:
+  ∀pnum q N0 dst m.
+    net_has_node N0 dst ∧ dst ≠ pnum ⇒
+    ∃N1. strans conf (pnum,q,N0) (ASend dst m) (pnum,q,N1) ∧
+         net_has_node N1 = net_has_node N0 ∧ net_wf N1 = net_wf N0
+Proof
+  metis_tac[trans_receptive, strans_rules]
+QED
+
+Theorem match_send_hold_queues_ffi_eq:
+  ffi_eq conf (p,qA,NA) (p,qB,NB) ∧
+  ffi_wf (p,qA,NA) ∧ ffi_wf (p,qB,NB) ∧
+  strans conf (p,qA,NA) (ASend dst msg) (p,qA',NA') ⇒
+  ∃NB'. ffi_eq conf (p,qA',NA') (p,qB,NB') ∧ ffi_wf (p,qB,NB')
+Proof
+  strip_tac >> irule_at Any ffi_eq_pres >>
+  first_assum (irule_at (Pat ‘ffi_eq _ _’)) >> simp[] >>
+  first_assum (irule_at Any) >> gs[ffi_wf_def] >>
+  dxrule_all_then strip_assume_tac ffi_eq_simulationL >>
+  drule_then strip_assume_tac strans_send_has_node >>
+  metis_tac [strans_send_hold_queues_constant]
+QED
+
 Theorem update_state_send_ffi_state_cor:
-  ∀ffst dest. ffi_has_node dest ffst ∧ dest ≠ FST ffst ∧
-              ffi_state_cor conf src pSt ffst ⇒
-              ffi_state_cor conf src pSt
-               (update_state ffst (comms_ffi_oracle conf)
-                (send_events conf (MAP (n2w o ORD) dest) data))
+  ∀ffst dest.
+    ffi_has_node dest ffst ∧ dest ≠ FST ffst ∧ ffi_wf ffst ∧
+    ffi_state_cor conf src pSt ffst ⇒
+    ffi_state_cor conf src pSt
+                  (update_state ffst (comms_ffi_oracle conf)
+                   (send_events conf (MAP (n2w o ORD) dest) data))
 Proof
   simp[send_events_def] >> completeInduct_on ‘LENGTH data’ >>
   Cases >> simp[update_state_def, Once compile_message_def] >>
@@ -3417,38 +3421,26 @@ Proof
       simp[FORALL_PROD] >> PairCases_on ‘ffst’ >>
       gvs[ffi_state_cor_def] >> rpt strip_tac >>
       drule strans_pres_pnum >> simp[] >> rw[] >>
-      rename [‘strans conf (pn, q0, N0) _ (pn, q, N)’,
-              ‘ffi_eq conf (pn,q0,N0) (pn,q0',N0')’] >>
-      drule_all_then strip_assume_tac ffi_eq_simulationL >>
-      drule_then assume_tac strans_queue_pres >>
-      drule_all_then assume_tac strans_pres_wf >> gs[] >>
-      pop_assum (irule_at Any) >> simp[] >> metis_tac[IS_PREFIX_TRANS])
+      metis_tac[match_send_hold_queues_ffi_eq])
   >- (SELECT_ELIM_TAC >> conj_tac >> DEEP_INTRO_TAC optionTheory.some_intro >>
       simp[]
       >- (drule strans_send_cond >> simp[MAP_MAP_o, CHR_w2n_n2w_ORD]) >>
       simp[FORALL_PROD] >> PairCases_on ‘ffst’ >>
       gvs[ffi_state_cor_def] >> rpt strip_tac >>
       drule strans_pres_pnum >> simp[] >> rw[] >>
-      rename [‘strans conf (pn, q0, N0) _ (pn, q, N)’,
-              ‘ffi_eq conf (pn,q0,N0) (pn,q0',N0')’] >>
-      drule_all_then strip_assume_tac ffi_eq_simulationL >>
-      drule_then assume_tac strans_queue_pres >>
-      drule_all_then assume_tac strans_pres_wf >> gs[] >>
-      pop_assum (irule_at Any) >> simp[] >> metis_tac[IS_PREFIX_TRANS]) >>
+      metis_tac[match_send_hold_queues_ffi_eq]) >>
   gs[PULL_FORALL] >>
   first_x_assum irule >> simp[] >>
   SELECT_ELIM_TAC >> conj_tac >> DEEP_INTRO_TAC optionTheory.some_intro >>
   simp[]
   >- (drule strans_send_cond >> simp[MAP_MAP_o, CHR_w2n_n2w_ORD]) >>
   simp[FORALL_PROD] >> rw[]
+  >- (drule_all strans_pres_wf >> simp[ffi_wf_def])
   >- metis_tac[strans_pres_pnum, FST]
   >- metis_tac[strans_pres_nodes] >>
   PairCases_on ‘ffst’ >> gvs[ffi_state_cor_def] >>
   drule_then assume_tac strans_pres_pnum >> gvs[] >>
-  drule_all_then strip_assume_tac ffi_eq_simulationL >>
-  drule_then assume_tac strans_queue_pres >>
-  drule_all_then assume_tac strans_pres_wf >> gs[] >>
-  pop_assum (irule_at Any) >> simp[] >> metis_tac[IS_PREFIX_TRANS]
+  metis_tac[match_send_hold_queues_ffi_eq]
 QED
 
 Theorem find_recfun_sendloop[simp]:
@@ -3564,7 +3556,8 @@ Theorem simulation:
   ∀p0 pSt0 EP0 L p pSt EP cEnv0 vs cSt0.
     trans conf (NEndpoint p0 pSt0 EP0) L (NEndpoint p pSt EP) ∧
     cpEval_valid conf p0 cEnv0 pSt0 EP0 vs cvs cSt0 ∧
-    (∀nd. nd ∈ EP_nodenames EP0 ⇒ ffi_has_node nd cSt0.ffi.ffi_state)
+    (∀nd. nd ∈ EP_nodenames EP0 ⇒ ffi_has_node nd cSt0.ffi.ffi_state) ∧
+    pletrec_vars_ok EP0
     ⇒
     ∃cEnv cSt.
       triR stepr
@@ -3842,8 +3835,7 @@ Proof
               simp[e_step_def, e_step_reln_def, push_def, return_def,
                    continue_def]) *))
   >- ((* receive, pushing queue *) all_tac >>
-      qexistsl_tac [‘cEnv0’, ‘cSt0’] >> simp[triR_def, PULL_EXISTS] >>
-      irule_at (Pos hd) RTC_REFL >>
+      qexistsl_tac [‘cEnv0’, ‘cSt0’] >> simp[triR_REFL] >>
       gs[cpEval_valid_def, sem_env_cor_def, pSt_pCd_corr_def] >>
       ‘∃p x y. cSt0.ffi.ffi_state = (p,x,y)’ by metis_tac[pair_CASES] >>
       gvs[ffi_state_cor_def] >> cheat)
@@ -3880,7 +3872,7 @@ Proof
                                 (REVERSE( MAP (Var o Short o ps2cs) vars)) =
                        (s, Rval (REVERSE $ MAP VVAL vars))’
               suffices_by simp[Abbr‘E’] >>
-            RM_ABBREV_TAC "E" >>
+            RM_ABBREV_TAC "E" >> qpat_x_assum ‘ALL_DISTINCT vars’ kall_tac >>
             Induct_on ‘vars’ using SNOC_INDUCT >> simp[] >> rpt strip_tac >>
             gs[MAP_SNOC, REVERSE_SNOC, EVERY_SNOC] >>
             simp[Once evaluate_cons] >>
@@ -3913,7 +3905,8 @@ Proof
            MAP_REVERSE] >>
       csimp[pmatch_tuple_MAP_Pvar, terminationTheory.pmatch_def] >>
       irule_at Any triR_REFL >> simp[] >> rpt strip_tac
-      >- ((* vars in letrec binding all distinct *) cheat)
+      >- ((* vars in letrec binding all distinct *) all_tac >>
+          irule ALL_DISTINCT_MAP_INJ >> simp[ps2cs_def])
       >- gs[FLOOKUP_DEF, AllCaseEqs()] (* v's all bound *)
       >- (simp[nsLookup_nsAppend_Short, AllCaseEqs(),
                namespacePropsTheory.nsLookup_alist_to_ns_none,
@@ -3923,8 +3916,9 @@ Proof
                ] >>
           dsimp[] >> Cases_on ‘MEM n vars’ >> simp[]
           >- (RM_ABBREV_TAC "E" >>
-              qpat_x_assum ‘nsLookup E.v _ = SOME _’ kall_tac >>
-              qpat_x_assum ‘∀s. evaluate _ E (REVERSE _) = _’ kall_tac >>
+              map_every (C qpat_x_assum kall_tac)
+                        [‘ALL_DISTINCT vars’, ‘nsLookup E.v _ = SOME _’,
+                         ‘∀s. evaluate _ E (REVERSE _) = _’] >>
               Induct_on‘ vars’ using SNOC_INDUCT >>
               simp[EVERY_SNOC, REVERSE_SNOC, MAP_SNOC] >> rw[] >>
               gs[] >> metis_tac[]) >>
