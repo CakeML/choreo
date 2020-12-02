@@ -37,12 +37,14 @@ Proof
   rw[no_undefined_writes_def,endpoints_def]
 QED
 
+(*
 Theorem MEM_written_var_names_endpoint_until_IMP:
   MEM v (written_var_names_endpoint_until e) ⇒
   MEM v (written_var_names_endpoint e)
 Proof
   Induct_on ‘e’ >> rw[written_var_names_endpoint_def,written_var_names_endpoint_until_def] >> fs[]
 QED
+*)
 
 Theorem written_var_names_endpoint_dsubst:
   MEM x (written_var_names_endpoint (dsubst e dn e')) ⇒
@@ -58,16 +60,18 @@ Proof
   Induct_on ‘e’ >> rw[dsubst_def,written_var_names_endpoint_def] >> fs[]
 QED
 
+(*
 Theorem set_written_var_names_endpoint_until:
   set(written_var_names_endpoint_until e) ⊆ set(written_var_names_endpoint e)
 Proof
   metis_tac[SUBSET_DEF,MEM_written_var_names_endpoint_until_IMP]
 QED
+*)
 
 Theorem free_var_names_endpoint_compile_endpoint:
-  ∀x ar e.
+  ∀x uw ar e.
   set(free_fix_names_endpoint e) ⊆ set(MAP FST ar) ∧
-  MEM x (free_var_names_endpoint(compile_endpoint ar e)) ⇒
+  MEM x (free_var_names_endpoint(compile_endpoint uw ar e)) ⇒
   MEM x (FLAT(MAP SND ar)) ∨ MEM x (free_var_names_endpoint e) ∨ MEM x (written_var_names_endpoint e)
 Proof
   strip_tac >> Induct_on ‘e’ >>
@@ -77,16 +81,17 @@ Proof
   rw[] >>
   res_tac >> fs[MEM_nub'] >> fs[] >>
   rfs[]
-  >- metis_tac[]
+  >- (gvs[MEM_FLAT,MEM_FILTER,MEM_MAP,MEM_nub'] >> metis_tac[PAIR,FST,SND])
+  >- (gvs[MEM_FLAT,MEM_FILTER,MEM_MAP,MEM_nub'] >> metis_tac[PAIR,FST,SND])
   >- (PURE_FULL_CASE_TAC >> fs[free_var_names_endpoint_def] >>
       fs[MEM_FLAT,MEM_MAP] >>
       metis_tac[ALOOKUP_MEM,SND])
 QED
 
 Theorem free_var_names_endpoint_compile_endpoint_NIL:
-  ∀x e.
+  ∀x uw e.
   free_fix_names_endpoint e = [] ∧
-  MEM x (free_var_names_endpoint(compile_endpoint [] e)) ⇒
+  MEM x (free_var_names_endpoint(compile_endpoint uw [] e)) ⇒
   MEM x (free_var_names_endpoint e) ∨ MEM x (written_var_names_endpoint e)
 Proof
   rw[] >>
@@ -98,11 +103,11 @@ Theorem compile_network_preservation_send:
   ∀p1 p2 conf p3 d p4.
     conf.payload_size > 0
     ∧ trans conf p1 (LSend p3 d p4) p2
-    ⇒ trans conf (compile_network_alt p1) (LSend p3 d p4) (compile_network_alt p2)
+    ⇒ trans conf (compile_network p1) (LSend p3 d p4) (compile_network p2)
 Proof
   Induct_on ‘p1’ >>
-  rw[Once trans_cases,no_undefined_writes_NPar,compile_network_alt_def] >>
-  rw[compile_network_alt_def] >>
+  rw[Once trans_cases,no_undefined_writes_NPar,compile_network_def] >>
+  rw[compile_network_def] >>
   TRY(rename1 ‘NPar’ >> rw[Once trans_cases] >> NO_TAC) >>
   fs[no_undefined_writes_def,endpoints_def] >>
   simp[compile_endpoint_def] >>
@@ -113,61 +118,57 @@ QED
 Theorem compile_network_reflection_send:
   ∀p1 p2 conf p3 d p4.
     conf.payload_size > 0
-    ∧ trans conf (compile_network_alt p1) (LSend p3 d p4) p2
+    ∧ trans conf (compile_network p1) (LSend p3 d p4) p2
     ∧ fix_network p1
     ∧ no_undefined_vars_network p1
-    ⇒ ∃p2'. trans conf p1 (LSend p3 d p4) p2' ∧ p2 = compile_network_alt p2'
+    ⇒ ∃p2'. trans conf p1 (LSend p3 d p4) p2' ∧ p2 = compile_network p2'
 Proof
   Induct_on ‘p1’ >>
-  rw[Once trans_cases,compile_network_alt_def,fix_network_NPar,no_undefined_vars_network_NPar]
-  >- metis_tac[trans_par_l,network_11,compile_network_alt_def]
-  >- metis_tac[trans_par_r,network_11,compile_network_alt_def]
+  rw[Once trans_cases,compile_network_def,fix_network_NPar,no_undefined_vars_network_NPar]
+  >- metis_tac[trans_par_l,network_11,compile_network_def]
+  >- metis_tac[trans_par_r,network_11,compile_network_def]
   >- ((* trans_send_intermediate_payload *)
-      rename [‘compile_endpoint _ e’] >> Cases_on ‘e’ >> fs[compile_endpoint_def] >> rveq >> fs[] >>
+      rename [‘compile_endpoint _ _ e’] >> Cases_on ‘e’ >> fs[compile_endpoint_def] >> rveq >> fs[] >>
       fs[written_var_names_endpoint_def] >>
       fs[no_undefined_vars_network_def,endpoints_def,free_var_names_endpoint_def] >>
       fs[flookup_fupdate_list] >>
-      reverse(fs[CaseEq "option"])
-      >- (imp_res_tac ALOOKUP_MEM >> fs[MAP_REVERSE,MAP_ZIP,MEM_MAP,MEM_FILTER]) >>
       simp[Once trans_cases] >>
-      simp[compile_network_alt_def])
+      simp[compile_network_def])
   >- ((* trans_send_final_payload *)
-      rename [‘compile_endpoint _ e’] >> Cases_on ‘e’ >> fs[compile_endpoint_def] >> rveq >> fs[] >>
+      rename [‘compile_endpoint _ _ e’] >> Cases_on ‘e’ >> fs[compile_endpoint_def] >> rveq >> fs[] >>
       fs[written_var_names_endpoint_def] >>
       fs[no_undefined_vars_network_def,endpoints_def,free_var_names_endpoint_def] >>
       fs[flookup_fupdate_list] >>
-      reverse(fs[CaseEq "option"])
-      >- (imp_res_tac ALOOKUP_MEM >> fs[MAP_REVERSE,MAP_ZIP,MEM_MAP,MEM_FILTER]) >>
-      simp[Once trans_cases] >>
-      simp[compile_network_alt_def,compile_endpoint_def,written_var_names_endpoint_def])
+      simp[Once trans_cases] >> simp[compile_network_def] >>
+      simp[compile_endpoint_def,written_var_names_endpoint_def])
 QED
 
 Theorem compile_network_reflection_receive:
   ∀p1 p2 conf p3 d p4.
     conf.payload_size > 0
-    ∧ trans conf (compile_network_alt p1) (LReceive p3 d p4) p2
+    ∧ trans conf (compile_network p1) (LReceive p3 d p4) p2
     ∧ fix_network p1
     ∧ no_undefined_vars_network p1
-    ⇒ ∃p2'. trans conf p1 (LReceive p3 d p4) p2' ∧ p2 = compile_network_alt p2'
+    ⇒ ∃p2'. trans conf p1 (LReceive p3 d p4) p2' ∧ p2 = compile_network p2'
 Proof
   Induct_on ‘p1’ >>
-  rw[Once trans_cases,compile_network_alt_def,fix_network_NPar,no_undefined_vars_network_NPar]
-  >- metis_tac[trans_par_l,network_11,compile_network_alt_def]
-  >- metis_tac[trans_par_r,network_11,compile_network_alt_def]
+  rw[Once trans_cases,compile_network_def,fix_network_NPar,no_undefined_vars_network_NPar]
+  >- metis_tac[trans_par_l,network_11,compile_network_def]
+  >- metis_tac[trans_par_r,network_11,compile_network_def]
   >- ((* trans_enqueue *)
       simp[Once trans_cases] >>
-      simp[compile_network_alt_def])
+      simp[compile_network_def])
 QED
 
 Theorem compile_network_preservation_receive:
   ∀p1 p2 conf p3 d p4.
     conf.payload_size > 0
     ∧ trans conf p1 (LReceive p3 d p4) p2
-    ⇒ trans conf (compile_network_alt p1) (LReceive p3 d p4) (compile_network_alt p2)
+    ⇒ trans conf (compile_network p1) (LReceive p3 d p4) (compile_network p2)
 Proof
   Induct_on ‘p1’ >>
-  rw[Once trans_cases,no_undefined_writes_NPar,compile_network_alt_def] >>
-  rw[compile_network_alt_def] >>
+  rw[Once trans_cases,no_undefined_writes_NPar,compile_network_def] >>
+  rw[compile_network_def] >>
   TRY(rename1 ‘NPar’ >> rw[Once trans_cases] >> NO_TAC) >>
   fs[no_undefined_writes_def,endpoints_def] >>
   simp[compile_endpoint_def] >>
@@ -176,19 +177,19 @@ Proof
 QED
 
 Theorem compile_endpoint_ALOOKUP_eq:
-  ∀e ar ar'. (∀x. ALOOKUP ar x = ALOOKUP ar' x) ⇒ compile_endpoint ar e = compile_endpoint ar' e
+  ∀e uw ar ar'. (∀x. ALOOKUP ar x = ALOOKUP ar' x) ⇒ compile_endpoint uw ar e = compile_endpoint uw ar' e
 Proof
   Induct >> rw[compile_endpoint_def]
 QED
 
 Theorem compile_endpoint_ALOOKUP_eq_strong:
-  ∀e ar ar'. (∀x. MEM x (free_fix_names_endpoint e) ⇒ ALOOKUP ar x = ALOOKUP ar' x) ⇒ compile_endpoint ar e = compile_endpoint ar' e
+  ∀e uw ar ar'. (∀x. MEM x (free_fix_names_endpoint e) ⇒ ALOOKUP ar x = ALOOKUP ar' x) ⇒ compile_endpoint uw ar e = compile_endpoint uw ar' e
 Proof
   Induct >> rw[compile_endpoint_def,free_fix_names_endpoint_def,MEM_FILTER]
 QED
 
 Theorem compile_endpoint_free_fix_names:
-  ∀e ar. compile_endpoint ar e = compile_endpoint (FILTER (λ(dn,_). MEM dn (free_fix_names_endpoint e)) ar) e
+  ∀e ar uw. compile_endpoint uw ar e = compile_endpoint uw (FILTER (λ(dn,_). MEM dn (free_fix_names_endpoint e)) ar) e
 Proof
   Induct >> rw[]
   >- (rw[compile_endpoint_def,free_fix_names_endpoint_def])
@@ -228,10 +229,11 @@ QED
 
 Theorem compile_endpoint_free_fix_names:
   free_fix_names_endpoint e = [] ⇒
-  compile_endpoint ar e = compile_endpoint [] e
+  compile_endpoint uw ar e = compile_endpoint uw [] e
 Proof
   rw[Once compile_endpoint_free_fix_names,ELIM_UNCURRY]
 QED
+
 
 Theorem MEM_free_fix_names_endpoint_dsubst:
   ∀e dn e'.
@@ -286,10 +288,11 @@ Inductive saturates:
      saturates vars (Let v f vl e) (Let v f vl e')) ∧
   (∀vars e1 e2 dn vars' vars''.
      saturates vars e1 e2 ∧
-     ALL_DISTINCT vars' ∧
-     ALL_DISTINCT vars'' ∧
-     set vars' ⊆ set vars'' ∧
-     set vars'' ⊆ set vars ∪ set vars' ⇒
+     ALL_DISTINCT (MAP FST vars') ∧
+     ALL_DISTINCT (MAP FST vars'') ∧
+     (∀a b b'. MEM (a,b) vars' ∧ MEM (a,b') vars'' ⇒ b ⇒ b') ∧
+     set(MAP FST vars') ⊆ set(MAP FST vars'') ∧
+     set(MAP FST vars'') ⊆ set vars ∪ set(MAP FST vars') ⇒
      saturates vars (Letrec dn vars' e1) (Letrec dn vars'' e2)) ∧
   (∀vars dn vars' vars''.
      ALL_DISTINCT vars' ∧
@@ -301,15 +304,17 @@ Inductive saturates:
 End
 
 Theorem saturates_compile_endpoint_refl:
-  ∀ar e vars.
+  ∀uw ar e vars.
   (∀s x. ALOOKUP ar s = SOME x ⇒ ALL_DISTINCT x)
   ⇒
-  saturates vars (compile_endpoint ar e) (compile_endpoint ar e)
+  saturates vars (compile_endpoint uw ar e) (compile_endpoint uw ar e)
 Proof
   Induct_on ‘e’ >> rw[] >>
   simp[compile_endpoint_def] >> simp[Once saturates_cases,PULL_EXISTS,all_distinct_nub'] >>
   res_tac >> simp[] >-
-    (first_x_assum match_mp_tac >> rw[] >> fs[all_distinct_nub'] >> res_tac) >>
+    (conj_tac
+     >- (first_x_assum match_mp_tac >> rw[] >> fs[all_distinct_nub'] >> res_tac) >>
+     rw[MAP_MAP_o,o_DEF,all_distinct_nub',MEM_MAP]) >>
   TOP_CASE_TAC >> fs[] >> res_tac
 QED
 
@@ -323,24 +328,28 @@ Proof
   qhdtm_x_assum ‘saturates’ (strip_assume_tac o ONCE_REWRITE_RULE[saturates_cases]) >>
   fs[] >> rveq >> fs[] >> res_tac >>
   simp[Once saturates_cases] >>
-  fs[SUBSET_DEF,UNION_DEF,IN_DEF] >>
+  fs[SUBSET_DEF,MEM_MAP,PULL_EXISTS] >>
   rw[] >>
-  res_tac >> fs[]
+  res_tac >> fs[] >>
+  Cases_on ‘y'’ >> gvs[] >>          
+  first_x_assum drule >>
+  rw[] >>
+  res_tac
 QED
 
 Theorem saturates_compile_endpoint_ar:
-  ∀ar ar' e vars.
+  ∀ar ar' e uw vars.
   (∀s x. ALOOKUP ar s = SOME x ⇒ ALL_DISTINCT x) ∧
   (∀s x. ALOOKUP ar' s = SOME x ⇒ ALL_DISTINCT x) ∧
   LIST_REL (λ(s,vs) (s',vs'). s = s' ∧ set vs ⊆ set vs' ∧ set vs' ⊆ set vs ∪ set vars) ar ar'
   ⇒
-  saturates vars (compile_endpoint ar e) (compile_endpoint ar' e)
+  saturates vars (compile_endpoint uw ar e) (compile_endpoint uw ar' e)
 Proof
   Induct_on ‘e’ >> rw[compile_endpoint_def] >>
   simp[Once saturates_cases] >>
-  TRY(res_tac >> NO_TAC)
+  TRY(first_x_assum match_mp_tac >> rpt conj_tac >> first_x_assum MATCH_ACCEPT_TAC)
   >- metis_tac[]
-  >- (simp[all_distinct_nub'] >>
+  >- (simp[all_distinct_nub',MAP_MAP_o,o_DEF,MEM_MAP] >>
       first_x_assum match_mp_tac >>
       rw[] >> simp[all_distinct_nub'] >>
       res_tac) >>
@@ -372,8 +381,8 @@ QED
 
 Theorem compile_endpoint_swap_init_ar:
   s ≠ s' ⇒
-  compile_endpoint ((s,vars)::(s',vars')::ar) e =
-  compile_endpoint ((s',vars')::(s,vars)::ar) e
+  compile_endpoint uw ((s,vars)::(s',vars')::ar) e =
+  compile_endpoint uw ((s',vars')::(s,vars)::ar) e
 Proof
   rw[] >>
   match_mp_tac compile_endpoint_ALOOKUP_eq_strong >>
@@ -457,7 +466,7 @@ Definition consistent_arities_def:
 End
 
 Theorem MEM_arities_compile_endpoint_IMP:
-  ∀dn n ar e. MEM (dn,n) (arities(compile_endpoint ar e)) ⇒
+  ∀dn n ar uw e. MEM (dn,n) (arities(compile_endpoint uw ar e)) ⇒
     ∃vars. ALOOKUP ar dn = SOME vars ∧ LENGTH vars = n
 Proof
   ntac 2 strip_tac >>
@@ -471,7 +480,7 @@ Proof
 QED
 
 Theorem compile_endpoint_consistent_arities:
-  ∀ar e. consistent_arities (compile_endpoint ar e)
+  ∀ar uw e. consistent_arities (compile_endpoint ar uw e)
 Proof
   Induct_on ‘e’ >>
   rw[compile_endpoint_def,consistent_arities_def,arities_def] >>
@@ -481,17 +490,18 @@ Proof
 QED
 
 Theorem compile_endpoint_dsubst:
-  ∀dn e' e ar.
+  ∀dn e' e ar uw.
   free_fix_names_endpoint (Fix dn e) = [] ∧
   set(written_var_names_endpoint e') ⊆ set(written_var_names_endpoint e) ∧
   fix_endpoint e' ∧
   (∀s x. ALOOKUP ar s = SOME x ⇒ ALL_DISTINCT x) ⇒
-  ∃e''.
-    compile_endpoint ar (dsubst e' dn (Fix dn e)) =
-    fsubst e'' dn (compile_endpoint [] (Fix dn e)) ∧
+  ∃e'' uw'.
+    compile_endpoint uw ar (dsubst e' dn (Fix dn e)) =
+    fsubst e'' dn (compile_endpoint uw' [] (Fix dn e)) ∧
     saturates (written_var_names_endpoint e)
-              (compile_endpoint ((dn,nub'(written_var_names_endpoint e))::ar) e')
+              (compile_endpoint uw ((dn,nub'(written_var_names_endpoint e))::ar) e')
               e'' ∧
+    set uw' ⊆ set uw ∧
     arsof dn e'' ⊆ {LENGTH(nub'(written_var_names_endpoint e))}
 Proof
   strip_tac >> Induct >> rpt strip_tac
@@ -506,7 +516,16 @@ Proof
   >- ((* Receive *)
      fs[dsubst_def,fix_endpoint_def,fsubst_def,compile_endpoint_def] >>
      simp[Once saturates_cases,PULL_EXISTS,fsubst_def] >>
-     fs[written_var_names_endpoint_def,free_fix_names_endpoint_def] >> metis_tac[])
+     fs[written_var_names_endpoint_def,free_fix_names_endpoint_def] >>
+     first_x_assum(drule_all) >>
+
+     disch_then(qspec_then ‘FILTER (λy. s ≠ y) uw’ mp_tac) >>
+     strip_tac >>
+     
+     
+     
+     di
+     metis_tac[])
   >- ((* If *)
      fs[dsubst_def,fix_endpoint_def,fsubst_def,compile_endpoint_def] >>
      simp[Once saturates_cases,PULL_EXISTS,fsubst_def] >>
@@ -632,10 +651,10 @@ Proof
   TOP_CASE_TAC >> rw[letrec_endpoint_def]
 QED
 
-Theorem letrec_network_compile_network_alt:
-  ∀n. fix_network n ⇒ letrec_network(compile_network_alt n)
+Theorem letrec_network_compile_network:
+  ∀n. fix_network n ⇒ letrec_network(compile_network n)
 Proof
-  Induct >> rw[compile_network_alt_def,letrec_network_def,endpoints_def,fix_network_def] >>
+  Induct >> rw[compile_network_def,letrec_network_def,endpoints_def,fix_network_def] >>
   fs[letrec_network_def,letrec_endpoint_compile_endpoint,fix_network_def]
 QED
 
@@ -2985,8 +3004,8 @@ Theorem compile_network_preservation_trans_alt:
     ∧ free_fix_names_network p1 = []
     ∧ no_undefined_vars_network p1
     ∧ reduction conf p1 p2
-    ⇒ ∃p3. reduction conf (compile_network_alt p1) p3 ∧
-           compile_rel conf p3 (compile_network_alt p2)
+    ⇒ ∃p3. reduction conf (compile_network p1) p3 ∧
+           compile_rel conf p3 (compile_network p2)
 Proof
   rpt strip_tac
   >> qhdtm_x_assum ‘reduction’ (fn thm => rpt(pop_assum mp_tac) >> assume_tac  thm)
@@ -3002,26 +3021,26 @@ Proof
       >> MAP_EVERY (drule_all_then strip_assume_tac)
                    [compile_network_preservation_send,
                     compile_network_preservation_receive]
-      >> simp[compile_network_alt_def]
+      >> simp[compile_network_def]
       >> drule_all_then strip_assume_tac trans_com_l
       >> fs[GSYM reduction_def]
       >> goal_assum drule
-      >> metis_tac[compile_rel_refl,fix_network_NPar,letrec_network_compile_network_alt,
+      >> metis_tac[compile_rel_refl,fix_network_NPar,letrec_network_compile_network,
                    letrec_network_trans_pres,letrec_network_NPar])
   >- ((* trans_com_r *)
       fs[no_undefined_writes_NPar]
       >> MAP_EVERY (drule_all_then strip_assume_tac)
                    [compile_network_preservation_send,
                     compile_network_preservation_receive]
-      >> simp[compile_network_alt_def]
+      >> simp[compile_network_def]
       >> drule_all_then strip_assume_tac trans_com_r
       >> fs[GSYM reduction_def]
       >> goal_assum drule
-      >> metis_tac[compile_rel_refl,fix_network_NPar,letrec_network_compile_network_alt,
+      >> metis_tac[compile_rel_refl,fix_network_NPar,letrec_network_compile_network,
                    letrec_network_trans_pres,letrec_network_NPar])
   >- ((* trans_dequeue_last_payload *)
       simp[reduction_def] >>
-      simp[compile_network_alt_def,compile_endpoint_def] >>
+      simp[compile_network_def,compile_endpoint_def] >>
       simp[Once trans_cases,RIGHT_AND_OVER_OR,PULL_EXISTS,EXISTS_OR_THM] >>
       CONSEQ_CONV_TAC(
         DEPTH_CONSEQ_CONV(
@@ -3036,7 +3055,7 @@ Proof
       )
   >- ((* trans_dequeue_intermediate_payload *)
       simp[reduction_def] >>
-      simp[compile_network_alt_def,compile_endpoint_def] >>
+      simp[compile_network_def,compile_endpoint_def] >>
       simp[Once trans_cases,RIGHT_AND_OVER_OR,PULL_EXISTS,EXISTS_OR_THM] >>
       CONSEQ_CONV_TAC(
         DEPTH_CONSEQ_CONV(
@@ -3051,7 +3070,7 @@ Proof
   >- ((* trans_if_true *)
       ‘v ∈ FDOM s.bindings’ by simp[FDOM_FLOOKUP] >>
       simp[reduction_def] >>
-      simp[compile_network_alt_def,compile_endpoint_def] >>
+      simp[compile_network_def,compile_endpoint_def] >>
       simp[Once trans_cases,RIGHT_AND_OVER_OR,PULL_EXISTS,EXISTS_OR_THM] >>
       disj1_tac >>
       simp[flookup_fupdate_list] >>
@@ -3076,7 +3095,7 @@ Proof
   >- ((* trans_if_false *)
       ‘v ∈ FDOM s.bindings’ by simp[FDOM_FLOOKUP] >>
       simp[reduction_def] >>
-      simp[compile_network_alt_def,compile_endpoint_def] >>
+      simp[compile_network_def,compile_endpoint_def] >>
       simp[Once trans_cases,RIGHT_AND_OVER_OR,PULL_EXISTS,EXISTS_OR_THM] >>
       disj2_tac >>
       simp[flookup_fupdate_list] >>
@@ -3118,7 +3137,7 @@ Proof
       metis_tac[])
   >- ((* trans_let *)
       simp[reduction_def] >>
-      simp[compile_network_alt_def,compile_endpoint_def] >>
+      simp[compile_network_def,compile_endpoint_def] >>
       simp[Once trans_cases,RIGHT_AND_OVER_OR,PULL_EXISTS,EXISTS_OR_THM] >>
       CONSEQ_CONV_TAC(
         DEPTH_CONSEQ_CONV(
@@ -3139,18 +3158,18 @@ Proof
       res_tac >>
       fs[FDOM_FLOOKUP])
   >- ((* trans_par_l *)
-      fs[compile_network_alt_def,fix_network_NPar,free_fix_names_network_def,no_undefined_vars_network_NPar] >>
+      fs[compile_network_def,fix_network_NPar,free_fix_names_network_def,no_undefined_vars_network_NPar] >>
       drule_then (fn thm => goal_assum(resolve_then (Pos hd) mp_tac thm)) trans_par_l >>
-      fs[compile_rel_def,letrec_network_NPar,letrec_network_compile_network_alt] >>
+      fs[compile_rel_def,letrec_network_NPar,letrec_network_compile_network] >>
       drule_then MATCH_ACCEPT_TAC bisim_par_left)
   >- ((* trans_par_r *)
-      fs[compile_network_alt_def,fix_network_NPar,free_fix_names_network_def,no_undefined_vars_network_NPar] >>
+      fs[compile_network_def,fix_network_NPar,free_fix_names_network_def,no_undefined_vars_network_NPar] >>
       drule_then (fn thm => goal_assum(resolve_then (Pos hd) mp_tac thm)) trans_par_r >>
-      fs[compile_rel_def,letrec_network_NPar,letrec_network_compile_network_alt] >>
+      fs[compile_rel_def,letrec_network_NPar,letrec_network_compile_network] >>
       drule_then MATCH_ACCEPT_TAC bisim_par_right)
   >- ((* trans_fix *)
       rename1 ‘Fix dn e’ >>
-      simp[reduction_def,compile_network_alt_def,compile_endpoint_def] >>
+      simp[reduction_def,compile_network_def,compile_endpoint_def] >>
       simp[Once trans_cases] >>
       conj_asm1_tac >-
         (rw[EVERY_MEM,IS_SOME_EXISTS,flookup_update_list_some,
@@ -3158,7 +3177,7 @@ Proof
             FILTER_ALL_DISTINCT,ALOOKUP_MAP_CONST_EQ,MEM_FILTER,MEM_nub',EXISTS_OR_THM,
             written_var_names_endpoint_def] >>
          metis_tac[FDOM_FLOOKUP,MEM_written_var_names_endpoint_until_IMP]) >>
-      simp[compile_network_alt_def,compile_endpoint_def] >>
+      simp[compile_network_def,compile_endpoint_def] >>
       fs[free_fix_names_network_def] >>
       drule compile_endpoint_dsubst >>
       disch_then(resolve_then (Pos hd) mp_tac SUBSET_REFL) >>
@@ -3276,12 +3295,12 @@ Proof
       fs[fix_network_def,endpoints_def,fix_endpoint_def])
 QED
 
-Theorem no_undefined_writes_compile_network_alt:
+Theorem no_undefined_writes_compile_network:
   ∀n1.
     no_undefined_writes n1 ⇒
-    compile_network_alt n1 = compile_network n1
+    compile_network n1 = compile_network n1
 Proof
-  Induct >> rw[compile_network_alt_def,compile_network_def,no_undefined_writes_NPar] >>
+  Induct >> rw[compile_network_def,compile_network_def,no_undefined_writes_NPar] >>
   fs[no_undefined_writes_def,endpoints_def] >>
   dep_rewrite.DEP_ONCE_REWRITE_TAC[FILTER_EQ_NIL |> SPEC_ALL |> REWRITE_RULE[EQ_IMP_THM] |> CONJUNCT2 |> GEN_ALL] >>
   simp[state_component_equality,FUPDATE_LIST_THM] >>
@@ -3289,10 +3308,10 @@ Proof
 QED
 
 Theorem compile_network_reduction_alt:
-  ∀conf n1. (reduction conf)^* (compile_network n1) (compile_network_alt n1)
+  ∀conf n1. (reduction conf)^* (compile_network n1) (compile_network n1)
 Proof
   strip_tac >> Induct >>
-  rw[compile_network_def,compile_network_alt_def]
+  rw[compile_network_def,compile_network_def]
   >- (metis_tac [RTC_RTC,reduction_par_l,reduction_par_r])
   >- (qmatch_goalsub_abbrev_tac ‘FOLDL _ _ l’ >>
       Q.SUBGOAL_THEN ‘ALL_DISTINCT l’ mp_tac >- rw[Abbr ‘l’,FILTER_ALL_DISTINCT,all_distinct_nub'] >>
@@ -3323,7 +3342,7 @@ Proof
   rw[compile_rel_def] >> metis_tac[bisim_trans]
 QED
 
-(* TODO: having compile_network instead of compile_network_alt in the conclusion would be
+(* TODO: having compile_network instead of compile_network in the conclusion would be
          nicer, but that requires using a different notion of bismulation in the theorem statement *)
 Theorem compile_network_preservation_trans:
   ∀p1 p2 conf.
@@ -3333,7 +3352,7 @@ Theorem compile_network_preservation_trans:
     ∧ no_undefined_vars_network p1
     ∧ reduction conf p1 p2
     ⇒ ∃p3. (reduction conf)^* (compile_network p1) p3 ∧
-           compile_rel conf p3 (compile_network_alt p2)
+           compile_rel conf p3 (compile_network p2)
 Proof
   rpt strip_tac >>
   drule_all_then strip_assume_tac compile_network_preservation_trans_alt >>
@@ -3398,8 +3417,8 @@ Theorem compile_network_preservation_alt:
     ∧ fix_network p1
     ∧ free_fix_names_network p1 = []
     ∧ no_undefined_vars_network p1
-    ⇒ ∃p3. (reduction conf)^* (compile_network_alt p1) p3 ∧
-           compile_rel conf p3 (compile_network_alt p2)
+    ⇒ ∃p3. (reduction conf)^* (compile_network p1) p3 ∧
+           compile_rel conf p3 (compile_network p2)
 Proof
   strip_tac >>
   simp[GSYM AND_IMP_INTRO] >>
@@ -3407,7 +3426,7 @@ Proof
   rw[] >-
     (goal_assum(resolve_then (Pos hd) mp_tac RTC_REFL) >>
      match_mp_tac compile_rel_refl >>
-     simp[letrec_network_compile_network_alt]) >>
+     simp[letrec_network_compile_network]) >>
   fs[] >>
   ‘fix_network p1'’ by metis_tac[fix_network_trans_pres,reduction_def] >>
   first_x_assum drule >>
@@ -3437,18 +3456,18 @@ Theorem compile_network_reflection_single:
     ∧ fix_network p1
     ∧ free_fix_names_network p1 = []
     ∧ no_undefined_vars_network p1
-    ∧ (reduction conf) (compile_network_alt p1) p2
+    ∧ (reduction conf) (compile_network p1) p2
     ⇒ ∃p3 p4. reduction conf p1 p3 ∧
-              compile_rel conf p2 (compile_network_alt p3)
+              compile_rel conf p2 (compile_network p3)
 Proof
   rpt GEN_TAC >>
   qid_spec_tac ‘p2’ >>
   Induct_on ‘p1’
   >-  ((* Nil *)
-       rw[reduction_def,compile_network_alt_def,Once trans_cases])
+       rw[reduction_def,compile_network_def,Once trans_cases])
   >-  ((* NPar *)
        rw[fix_network_NPar,free_fix_names_network_def,no_undefined_vars_network_NPar,
-          reduction_def,compile_network_alt_def] >>
+          reduction_def,compile_network_def] >>
        qhdtm_x_assum ‘trans’ (strip_assume_tac o PURE_REWRITE_RULE[Once trans_cases]) >>
        fs[] >> rveq
        >- ((* trans_com_l *)
@@ -3456,46 +3475,46 @@ Proof
            drule_all compile_network_reflection_send >> strip_tac >> rveq >>
            goal_assum(resolve_then (Pos hd) mp_tac trans_com_l) >>
            rpt(goal_assum drule) >>
-           simp[compile_network_alt_def] >>
+           simp[compile_network_def] >>
            match_mp_tac compile_rel_refl >>
            simp[letrec_network_NPar] >>
-           conj_tac >> match_mp_tac letrec_network_compile_network_alt >>
+           conj_tac >> match_mp_tac letrec_network_compile_network >>
            drule_then match_mp_tac fix_network_trans_pres >> simp[])
        >- ((* trans_com_l *)
            drule_all compile_network_reflection_receive >> strip_tac >> rveq >>
            drule_all compile_network_reflection_send >> strip_tac >> rveq >>
            goal_assum(resolve_then (Pos hd) mp_tac trans_com_r) >>
            rpt(goal_assum drule) >>
-           simp[compile_network_alt_def] >>
+           simp[compile_network_def] >>
            match_mp_tac compile_rel_refl >>
            simp[letrec_network_NPar] >>
-           conj_tac >> match_mp_tac letrec_network_compile_network_alt >>
+           conj_tac >> match_mp_tac letrec_network_compile_network >>
            drule_then match_mp_tac fix_network_trans_pres >> simp[])
        >- ((* trans_par_l *)
            fs[reduction_def] >>
            first_x_assum drule_all >> strip_tac >>
            goal_assum(resolve_then (Pos hd) mp_tac trans_par_l) >>
            goal_assum drule >>
-           simp[compile_network_alt_def] >>
-           fs[compile_rel_def,letrec_network_NPar,letrec_network_compile_network_alt] >>
+           simp[compile_network_def] >>
+           fs[compile_rel_def,letrec_network_NPar,letrec_network_compile_network] >>
            drule_then MATCH_ACCEPT_TAC bisim_par_left)
        >- ((* trans_par_r *)
            fs[reduction_def] >>
            first_x_assum drule_all >> strip_tac >>
            goal_assum(resolve_then (Pos hd) mp_tac trans_par_r) >>
            goal_assum drule >>
-           simp[compile_network_alt_def] >>
-           fs[compile_rel_def,letrec_network_NPar,letrec_network_compile_network_alt] >>
+           simp[compile_network_def] >>
+           fs[compile_rel_def,letrec_network_NPar,letrec_network_compile_network] >>
            drule_then MATCH_ACCEPT_TAC bisim_par_right))
   >-  ((* NEndpoint *)
        rw[fix_network_def,free_fix_names_network_def,no_undefined_vars_network_def,endpoints_def,
-          reduction_def,compile_network_alt_def] >>
+          reduction_def,compile_network_def] >>
        Cases_on ‘e’ >> fs[compile_endpoint_def] >>
        qhdtm_x_assum ‘trans’ (strip_assume_tac o ONCE_REWRITE_RULE[trans_cases]) >>
        fs[] >> rveq >> fs[]
        >- ((* trans_dequeue_last_payload *)
            goal_assum(resolve_then (Pos hd) mp_tac trans_dequeue_last_payload) >>
-           simp[compile_network_alt_def,written_var_names_endpoint_def] >>
+           simp[compile_network_def,written_var_names_endpoint_def] >>
            match_mp_tac compile_rel_reflI >>
            conj_tac >- fs[letrec_network_def,endpoints_def,letrec_endpoint_compile_endpoint] >>
            simp[state_component_equality] >>
@@ -3510,7 +3529,7 @@ Proof
            metis_tac[FST,SND,PAIR])
        >- ((* trans_dequeue_intermediate_payload *)
            goal_assum(resolve_then (Pos hd) mp_tac trans_dequeue_intermediate_payload) >>
-           simp[compile_network_alt_def,written_var_names_endpoint_def,compile_endpoint_def] >>
+           simp[compile_network_def,written_var_names_endpoint_def,compile_endpoint_def] >>
            match_mp_tac compile_rel_reflI >>
            conj_tac >- fs[letrec_network_def,endpoints_def,letrec_endpoint_compile_endpoint,letrec_endpoint_def] >>
            simp[state_component_equality] >>
@@ -3528,7 +3547,7 @@ Proof
            conj_tac
            >- (fs[flookup_fupdate_list,CaseEq "option"] >>
                imp_res_tac ALOOKUP_MEM >> fs[MEM_MAP]) >>
-           simp[compile_network_alt_def] >>
+           simp[compile_network_def] >>
            fs[written_var_names_endpoint_def,nub'_APPEND,FILTER_APPEND] >>
            fs[compile_rel_def,letrec_network_def,endpoints_def,fix_network_def,letrec_endpoint_compile_endpoint] >>
            fs[FUPDATE_LIST_APPEND] >>
@@ -3549,7 +3568,7 @@ Proof
            conj_tac
            >- (fs[flookup_fupdate_list,CaseEq "option"] >>
                imp_res_tac ALOOKUP_MEM >> fs[MEM_MAP,MEM_FILTER,free_var_names_endpoint_def]) >>
-           simp[compile_network_alt_def,written_var_names_endpoint_def] >>
+           simp[compile_network_def,written_var_names_endpoint_def] >>
            fs[compile_rel_def,letrec_network_def,endpoints_def,fix_network_def,letrec_endpoint_compile_endpoint] >>
            simp[nub'_APPEND,FILTER_APPEND,FUPDATE_LIST_APPEND] >>
            match_mp_tac junkcong_bisim >>
@@ -3585,7 +3604,7 @@ Proof
        >- ((* trans_let *)
            goal_assum(resolve_then (Pos hd) mp_tac trans_let) >>
            fs[free_fix_names_endpoint_def,free_var_names_endpoint_def] >>
-           simp[compile_network_alt_def,compile_endpoint_def] >>
+           simp[compile_network_def,compile_endpoint_def] >>
            conj_tac >-
              (fs[EVERY_MEM,MEM_MAP,PULL_EXISTS] >>
               rpt strip_tac >>
@@ -3611,9 +3630,9 @@ Proof
            fs[FDOM_FLOOKUP] >> fs[])
        >- ((* trans_fix *)
            rename1 ‘Fix dn e’ >>
-           simp[reduction_def,compile_network_alt_def,compile_endpoint_def] >>
+           simp[reduction_def,compile_network_def,compile_endpoint_def] >>
            simp[Once trans_cases] >>
-           simp[compile_network_alt_def,compile_endpoint_def] >>
+           simp[compile_network_def,compile_endpoint_def] >>
            fs[free_fix_names_network_def] >>
            drule compile_endpoint_dsubst >>
            disch_then(resolve_then (Pos hd) mp_tac SUBSET_REFL) >>
@@ -3769,9 +3788,9 @@ Theorem compile_network_reflection_alt:
     ∧ free_fix_names_network p1 = []
     ∧ no_undefined_vars_network p1
     ∧ ALL_DISTINCT (MAP FST (endpoints p1))
-    ∧ (reduction conf)^* (compile_network_alt p1) p2
+    ∧ (reduction conf)^* (compile_network p1) p2
     ⇒ ∃p3. (reduction conf)^* p1 p3 ∧
-           compile_rel conf p2 (compile_network_alt p3)
+           compile_rel conf p2 (compile_network p3)
 Proof
   simp[reduction_list_trans,PULL_EXISTS] >>
   CONV_TAC(RESORT_FORALL_CONV rev) >>
@@ -3780,7 +3799,7 @@ Proof
   >- (rw[list_trans_def] >>
       CONV_TAC(RESORT_EXISTS_CONV rev) >>
       qexists_tac ‘0’ >> rw[list_trans_def] >>
-      metis_tac[RTC_REFL,compile_rel_refl,letrec_network_compile_network_alt])
+      metis_tac[RTC_REFL,compile_rel_refl,letrec_network_compile_network])
   >- (rw[list_trans_def,GSYM reduction_def] >>
       CONV_TAC(RESORT_EXISTS_CONV rev) >>
       Q.REFINE_EXISTS_TAC ‘SUC _’ >>
@@ -3816,7 +3835,7 @@ Theorem compile_network_reflection:
     ⇒ ∃p3 p4.
            (reduction conf)^* p1 p3 ∧
            (reduction conf)^* p2 p4 ∧
-           compile_rel conf p4 (compile_network_alt p3)
+           compile_rel conf p4 (compile_network p3)
 Proof
   rpt strip_tac >>
   qspecl_then [‘conf’,‘p1’] assume_tac compile_network_reduction_alt >>
