@@ -118,11 +118,14 @@ Inductive trans:
 
   (* Recursion, letrec style *)
 ∧ (∀conf p s dn vars e.
-    EVERY (IS_SOME o FLOOKUP s.bindings) vars ⇒
+    EVERY (IS_SOME o FLOOKUP s.bindings o FST) (FILTER SND vars) ⇒
     trans conf
           (NEndpoint p s (Letrec dn vars e))
           LTau
-          (NEndpoint p (s with funs := (dn,Closure vars (s.funs,s.bindings) e)::s.funs) e))
+          (NEndpoint p (s with
+                          <|bindings := s.bindings |++ MAP (λ(x,_). (x,[])) (FILTER ($¬ o SND) vars);
+                            funs := (dn,Closure (MAP FST vars) (s.funs,s.bindings) e)::s.funs
+                          |>) e))
 
 ∧ (∀conf p s dn args params funs bindings e.
     ALOOKUP s.funs dn = SOME(Closure params (funs,bindings) e) ∧

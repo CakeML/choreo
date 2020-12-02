@@ -196,7 +196,9 @@ Proof
          rw[] >>
          imp_res_tac MEM_free_fun_names_endpoint_dsubst >>
          fs[free_fun_names_endpoint_def])
-     >- (goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL) >>
+     >- (
+         Q.REFINE_EXISTS_TAC ‘_ with bindings := _’ >> simp[] >>
+         goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL) >>
          goal_assum(resolve_then (Pos hd) mp_tac EQ_REFL) >>
          fs[FILTER_APPEND,MEM_FILTER] >> rveq >> fs[LEFT_AND_OVER_OR,DISJ_IMP_THM,FORALL_AND_THM] >>
          rw[] >>
@@ -421,6 +423,7 @@ Proof
   metis_tac[tausim_trans,tausim_par_left,tausim_par_right]
 QED
 
+(* not used
 Theorem tausim_reduction_pres:
   ∀conf n1 n2 p1 s1 dn1 vars1 params1 funs1 bindings1 e1 s2 dn2 vars2 params2 funs2 bindings2 e2.
         n1 = NEndpoint p1 s1 (FCall dn1 vars1) ∧
@@ -472,5 +475,5 @@ Proof
        goal_assum(resolve_then (Pos hd) mp_tac RC_SUBSET) >>
        simp[reduction_def,Once trans_cases])
 QED
-
+*)
 val _ = export_theory ();

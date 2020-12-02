@@ -1071,11 +1071,11 @@ Proof
       metis_tac[trans_cases])
   (* LReceive/LTau (Letrec) *)
   >- (qmatch_goalsub_abbrev_tac ‘s with queues := QN’ >>
-      qmatch_goalsub_abbrev_tac ‘s with funs := FN’ >>
-      rename1 ‘NEndpoint c (s with funs := FN) e’ >>
-      qexists_tac ‘NEndpoint c (s with <|queues := QN; funs := FN|>) e’ >>
+      qmatch_goalsub_abbrev_tac ‘s with <|bindings := BND; funs := FN|>’ >>
+      rename1 ‘NEndpoint c (s with <|bindings := BND; funs := FN|>) e’ >>
+      qexists_tac ‘NEndpoint c (s with <|bindings := BND; queues := QN; funs := FN|>) e’ >>
       rw[]
-      >- (qunabbrev_tac ‘FN’ >> rw[Once trans_cases] >> metis_tac[])
+      >- (qunabbrev_tac ‘BND’ >> rw[Once trans_cases] >> metis_tac[])
       >- (qunabbrev_tac ‘QN’ >> rw[Once trans_cases] >> metis_tac[]))
   (* LReceive/LTau (FCall) *)
   >- (qmatch_goalsub_abbrev_tac ‘s with queues := QN’ >>
@@ -1524,9 +1524,9 @@ Proof
       metis_tac[trans_cases])
   (* LTau (Letrec)/LReceive *)
   >- (qmatch_goalsub_abbrev_tac ‘s with queues := QN’ >>
-      qmatch_goalsub_abbrev_tac ‘s with funs := FN’ >>
-      rename1 ‘NEndpoint c (s with funs := FN) e’ >>
-      qexists_tac ‘NEndpoint c (s with <|queues := QN; funs := FN|>) e’ >>
+      qmatch_goalsub_abbrev_tac ‘s with <|bindings := BND; funs := FN|>’ >>
+      rename1 ‘NEndpoint c (s with <|bindings := BND; funs := FN|>) e’ >>
+      qexists_tac ‘NEndpoint c (s with <|bindings := BND; queues := QN; funs := FN|>) e’ >>
       rw[]
       >- (qunabbrev_tac ‘FN’ >> rw[Once trans_cases] >> metis_tac[])
       >- (qunabbrev_tac ‘QN’ >> rw[Once trans_cases] >> metis_tac[]))
@@ -2506,7 +2506,7 @@ Proof
 QED
 
 Theorem junkcong_closure''':
-  ∀p s e fvs dn vars fs bds fs' bds' e1 funs1 funs2 b.
+  ∀funs1 funs2 p s e fvs dn vars fs bds fs' bds' e1 b.
     junkcong fvs
              (NEndpoint p (s with <|bindings := bds; funs := fs|>) e1)
              (NEndpoint p (s with <|bindings := bds'; funs := fs'|>) e1)
@@ -2653,6 +2653,21 @@ Theorem junkcong_fun_cons':
 Proof
   rw[] >>
   drule junkcong_fun_cons >> simp[]
+QED
+
+Theorem junkcong_fun_cons'':
+  ∀fvs p s e p' s' e' dnf funs1 funs2.
+    junkcong fvs
+             (NEndpoint p (s with <|bindings := b; funs := funs1|>) e)
+             (NEndpoint p' (s' with <|bindings := b'; funs := funs2|>) e') ⇒
+    junkcong fvs
+             (NEndpoint p (s with<|bindings := b; funs := (dnf::funs1) |>) e)
+             (NEndpoint p' (s' with <|bindings := b'; funs := (dnf::funs2) |>) e')
+Proof
+  rw[] >>
+  PURE_REWRITE_TAC[GSYM state_fupdcanon] >>
+  match_mp_tac junkcong_fun_cons' >>
+  rw[]
 QED
 
 Theorem junkcong_bind_list:
@@ -2811,14 +2826,24 @@ val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
       >> TRY(rename1 ‘Letrec’ >>
              simp[Once trans_cases,PULL_EXISTS] >>
              conj_tac >- (fs[EVERY_MEM,IS_SOME_EXISTS,FLOOKUP_UPDATE] >> rw[]) >>
-             match_mp_tac junkcong_trans >>
-             goal_assum(resolve_then (Pos hd) mp_tac junkcong_add_junk) >>
-             goal_assum drule >> simp[GSYM PULL_EXISTS] >>
-             conj_tac >- fs[free_var_names_endpoint_def] >>
-             goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_hd') >>
-             match_mp_tac junkcong_add_junk' >>
-             fs[free_var_names_endpoint_def] >>
-             NO_TAC)
+             reverse(Cases_on ‘MEM v (MAP FST vars)’)
+             >- (match_mp_tac junkcong_trans >>
+                 goal_assum(resolve_then (Pos hd) mp_tac junkcong_add_junk) >>
+                 goal_assum drule >> simp[GSYM PULL_EXISTS] >>
+                 conj_tac >- (fs[free_var_names_endpoint_def,MEM_FILTER,MEM_MAP] >> metis_tac[FST,SND,PAIR]) >>
+                 dep_rewrite.DEP_ONCE_REWRITE_TAC[FUPDATE_FUPDATE_LIST_COMMUTES] >>
+                 conj_tac >- (gvs[MEM_FILTER,MEM_MAP,ELIM_UNCURRY] >> metis_tac[FST,SND,PAIR]) >>
+                 goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_hd') >>
+                 match_mp_tac junkcong_add_junk' >>
+                 fs[free_var_names_endpoint_def] >>
+                 gvs[MEM_FILTER,MEM_MAP] >> metis_tac[FST,SND,PAIR]) >>
+             ‘MEM v (MAP FST (FILTER ($¬ ∘ SND) vars))’
+               by(gvs[MEM_FILTER,MEM_MAP,free_var_names_endpoint_def] >> metis_tac[FST,SND,PAIR]) >>
+             dep_rewrite.DEP_ONCE_REWRITE_TAC[FUPDATE_FUPDATE_LIST_MEM] >>
+             conj_tac
+             >- (gvs[MEM_FILTER,MEM_MAP,ELIM_UNCURRY,free_var_names_endpoint_def] >>
+                 metis_tac[FST,SND,PAIR]) >>
+             match_mp_tac junkcong_closure_add_junk_hd' >> simp[] >> NO_TAC)
       >> TRY(rename1 ‘FCall’ >>
              simp[Once trans_cases] >>
              fs[free_var_names_endpoint_def] >>
@@ -2892,17 +2917,28 @@ val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
              fs[free_var_names_endpoint_def] >> NO_TAC)
       >> TRY(rename1 ‘Letrec’ >>
              simp[Once trans_cases,PULL_EXISTS] >>
-             conj_tac >- (fs[EVERY_MEM,IS_SOME_EXISTS,FLOOKUP_UPDATE] >> rfs[free_var_names_endpoint_def] >>
-                          rw[] >> res_tac >> fs[CaseEq "bool"] >> rveq >> fs[]) >>
+             conj_tac
+             >- (gvs[EVERY_MEM,MEM_FILTER,MEM_MAP,IS_SOME_EXISTS,FLOOKUP_UPDATE,free_var_names_endpoint_def] >>
+                 metis_tac[PAIR,FST,SND]) >>
              match_mp_tac junkcong_sym >>
-             match_mp_tac junkcong_trans >>
-             goal_assum(resolve_then (Pos hd) mp_tac junkcong_add_junk) >>
-             goal_assum drule >> simp[GSYM PULL_EXISTS] >>
-             conj_tac >- fs[free_var_names_endpoint_def] >>
-             goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_hd') >>
-             match_mp_tac junkcong_add_junk' >>
-             fs[free_var_names_endpoint_def] >>
-             NO_TAC)
+             reverse(Cases_on ‘MEM v (MAP FST vars)’)
+             >- (match_mp_tac junkcong_trans >>
+                 goal_assum(resolve_then (Pos hd) mp_tac junkcong_add_junk) >>
+                 goal_assum drule >> simp[GSYM PULL_EXISTS] >>
+                 conj_tac >- (fs[free_var_names_endpoint_def,MEM_FILTER,MEM_MAP] >> metis_tac[FST,SND,PAIR]) >>
+                 dep_rewrite.DEP_ONCE_REWRITE_TAC[FUPDATE_FUPDATE_LIST_COMMUTES] >>
+                 conj_tac >- (gvs[MEM_FILTER,MEM_MAP,ELIM_UNCURRY] >> metis_tac[FST,SND,PAIR]) >>
+                 goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_hd') >>
+                 match_mp_tac junkcong_add_junk' >>
+                 fs[free_var_names_endpoint_def] >>
+                 gvs[MEM_FILTER,MEM_MAP] >> metis_tac[FST,SND,PAIR]) >>
+             ‘MEM v (MAP FST (FILTER ($¬ ∘ SND) vars))’
+               by(gvs[MEM_FILTER,MEM_MAP,free_var_names_endpoint_def] >> metis_tac[FST,SND,PAIR]) >>
+             dep_rewrite.DEP_ONCE_REWRITE_TAC[FUPDATE_FUPDATE_LIST_MEM] >>
+             conj_tac
+             >- (gvs[MEM_FILTER,MEM_MAP,ELIM_UNCURRY,free_var_names_endpoint_def] >>
+                 metis_tac[FST,SND,PAIR]) >>
+             match_mp_tac junkcong_closure_add_junk_hd' >> simp[] >> NO_TAC)
       >> TRY(rename1 ‘FCall’ >>
              simp[Once trans_cases] >>
              fs[free_var_names_endpoint_def] >>
@@ -2926,12 +2962,12 @@ val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
              simp[] >> NO_TAC)
       >> TRY(simp[Once trans_cases,intermediate_final_simps] >>
              match_mp_tac junkcong_trans >>
-             goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_hd) >>
+             goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_hd') >>
              goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure''') >>
              goal_assum drule >>
              simp[] >>
              REWRITE_TAC[GSYM APPEND_ASSOC,APPEND] >>
-             match_mp_tac(junkcong_closure'''' |> Q.SPEC ‘f::funs1’ |>
+             match_mp_tac(junkcong_closure''' |> Q.SPEC ‘f::funs1’ |>
                           GEN_ALL |> REWRITE_RULE[GSYM APPEND_ASSOC,APPEND] |> SIMP_RULE (srw_ss()) []) >>
              simp[] >> NO_TAC)
       >> TRY(rename1 ‘FCall’ >>
@@ -2956,12 +2992,12 @@ val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
              simp[] >> NO_TAC)
       >> TRY(simp[Once trans_cases,intermediate_final_simps] >>
              match_mp_tac junkcong_trans >>
-             goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_hd) >>
+             goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_hd') >>
              goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure''') >>
              goal_assum drule >>
              simp[] >>
              REWRITE_TAC[GSYM APPEND_ASSOC,APPEND] >>
-             match_mp_tac(junkcong_closure'''' |> Q.SPEC ‘f::funs1’ |>
+             match_mp_tac(junkcong_closure''' |> Q.SPEC ‘f::funs1’ |>
                           GEN_ALL |> REWRITE_RULE[GSYM APPEND_ASSOC,APPEND] |> SIMP_RULE (srw_ss()) []) >>
              simp[] >> NO_TAC)
       >> TRY(rename1 ‘FCall’ >>
@@ -2990,12 +3026,12 @@ val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
           simp[Once junkcong_cases,PULL_EXISTS] >> metis_tac[])
       >- (simp[Once trans_cases,intermediate_final_simps] >>
           match_mp_tac junkcong_trans >>
-          goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_hd) >>
+          goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_hd') >>
           PURE_REWRITE_TAC[GSYM APPEND_ASSOC,APPEND] >>
           goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_add_junk') >>
           goal_assum drule >>
-          goal_assum(resolve_then (Pos hd) mp_tac junkcong_fun_cons') >>
-          match_mp_tac junkcong_closure_add_junk'' >>
+          goal_assum(resolve_then (Pos hd) mp_tac junkcong_fun_cons'') >>
+          match_mp_tac junkcong_closure_add_junk' >>
           simp[])
       >- (simp[Once trans_cases,intermediate_final_simps,PULL_EXISTS] >>
           rfs[] >>
@@ -3020,12 +3056,12 @@ val junkcong_trans_eq = Q.store_thm("junkcong_trans_eq",
           simp[Once junkcong_cases,PULL_EXISTS] >> metis_tac[])
       >- (simp[Once trans_cases,intermediate_final_simps] >>
           match_mp_tac junkcong_trans >>
-          goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_hd) >>
+          goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_hd') >>
           PURE_REWRITE_TAC[GSYM APPEND_ASSOC,APPEND] >>
           goal_assum(resolve_then (Pos hd) mp_tac junkcong_closure_add_junk') >>
           goal_assum drule >>
-          goal_assum(resolve_then (Pos hd) mp_tac junkcong_fun_cons') >>
-          match_mp_tac junkcong_closure_add_junk'' >>
+          goal_assum(resolve_then (Pos hd) mp_tac junkcong_fun_cons'') >>
+          match_mp_tac junkcong_closure_add_junk' >>
           simp[])
       >- (simp[Once trans_cases,intermediate_final_simps,PULL_EXISTS] >>
           rfs[] >>
@@ -3466,8 +3502,8 @@ Proof
   >- (fs[SUBSET_DEF] >> metis_tac[])
   >- (rw[SUBSET_DEF] >> imp_res_tac MEM_free_var_names_endpoint_dsubst >>
       fs[free_var_names_endpoint_def,SUBSET_DEF])
-  >- (fs[no_undefined_vars_closure_def] >>
-      fs[SUBSET_DEF] >> metis_tac[])
+  >- (fs[no_undefined_vars_closure_def,FDOM_FUPDATE_LIST] >>
+      fs[SUBSET_DEF,MEM_MAP,MEM_FILTER,ELIM_UNCURRY,PULL_EXISTS] >> metis_tac[PAIR,FST,SND])
   >- (imp_res_tac ALOOKUP_MEM >> fs[EVERY_MEM] >> res_tac >>
       fs[] >>
       fs[no_undefined_vars_closure_def] >>

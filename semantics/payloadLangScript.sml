@@ -20,7 +20,7 @@ Datatype:
            | Let varN (datum list -> datum) (varN list) endpoint
            | Fix dvarN endpoint
            | Call dvarN
-           | Letrec dvarN (varN list) endpoint
+           | Letrec dvarN ((varN # bool) list) endpoint
            | FCall dvarN (varN list)
 End
 
@@ -58,7 +58,7 @@ Definition var_names_endpoint_def:
 ∧ (var_names_endpoint (Let v f vl e) = v::vl ++ var_names_endpoint e)
 ∧ (var_names_endpoint (Fix dv e) = var_names_endpoint e)
 ∧ (var_names_endpoint (Call dv) = [])
-∧ (var_names_endpoint (Letrec dv vars e1) = vars ++ var_names_endpoint e1)
+∧ (var_names_endpoint (Letrec dv vars e1) = MAP FST vars ++ var_names_endpoint e1)
 ∧ (var_names_endpoint (FCall dv vars) = vars)
 End
 
@@ -70,7 +70,9 @@ Definition free_var_names_endpoint_def:
 ∧ (free_var_names_endpoint (Let v f vl e) = vl ++ FILTER ($≠ v) (free_var_names_endpoint e))
 ∧ (free_var_names_endpoint (Fix dv e) = free_var_names_endpoint e)
 ∧ (free_var_names_endpoint (Call dv) = [])
-∧ (free_var_names_endpoint (Letrec dv vars e1) = vars ++ free_var_names_endpoint e1)
+∧ (free_var_names_endpoint (Letrec dv vars e1) =
+   MAP FST (FILTER SND vars) ++
+   FILTER (λx. ¬MEM x (MAP FST (FILTER ($¬ o SND) vars))) (free_var_names_endpoint e1))
 ∧ (free_var_names_endpoint (FCall dv vars) = vars)
 End
 
