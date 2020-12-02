@@ -96,6 +96,13 @@ Proof
  metis_tac[triR_def, RTC_CASES_RTC_TWICE]
 QED
 
+Theorem triR_REFL[simp]:
+  ∀x. triR R x x
+Proof
+  gen_tac >> simp[triR_def] >> irule_at Any RTC_REFL
+QED
+
+
 Theorem triR_forward_simulation_has_all_terminations:
   simulates simR sR (triR tR) ∧ CR tR ∧
   (∀s t. nf sR s ∧ simR s t ⇒ ∃tt. nf tR tt ∧ tR꙳ t tt ∧ simR s tt) ⇒
