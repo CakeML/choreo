@@ -189,6 +189,65 @@ Proof
       metis_tac[free_var_names_var_names])
 QED
 
+Theorem fix_network_compile_network:
+  ∀epn conf. fix_network (compile_network conf epn)
+Proof
+  Induct \\ rw [endpoint_to_payloadTheory.compile_network_def,fix_network_def,payloadLangTheory.endpoints_def]
+  \\ fs [fix_network_def,endpoint_to_payloadTheory.compile_state_def]
+  \\ Induct_on ‘e’ \\ rw [endpoint_to_payloadTheory.compile_endpoint_def,fix_endpoint_def]
+QED
+
+Theorem split_sel_dvarsOf:
+  ∀c r h p b.
+    split_sel h p c = SOME (b,r)
+    ⇒ dvarsOf r = dvarsOf c
+Proof
+  Induct \\ rw [split_sel_def,dvarsOf_def,nub'_dvarsOf]
+  \\ metis_tac []
+QED
+
+Triviality dvarsOf_imp_free_fix_names_endpoint_aux:
+  ∀h l c x.
+    MEM x (free_fix_names_endpoint
+           (compile_endpoint (compile_endpoint fv (project' h l c))))
+    ⇒ MEM x (dvarsOf c)
+Proof
+  ho_match_mp_tac project_ind \\ rw [] \\ pop_assum mp_tac
+  \\ EVAL_TAC \\ gs [dvarsOf_def,nub'_nil,nub'_dvarsOf,procsOf_def,MEM_nub']
+  \\ EVERY_CASE_TAC \\ gs [nub'_dvarsOf,project_def,procsOf_def,MEM_nub']
+  \\ EVAL_TAC \\ simp []
+  \\ TRY (rw [] \\ metis_tac [split_sel_dvarsOf] \\ NO_TAC)
+  \\ rw [MEM_FILTER]
+QED
+
+Theorem dvarsOf_imp_free_fix_names_endpoint:
+  ∀h l c x.
+    dvarsOf c = []
+    ⇒ free_fix_names_endpoint
+        (compile_endpoint (compile_endpoint fv (project' h l c))) = []
+Proof
+  rw []
+  \\ qspecl_then [‘h’,‘l’,‘c’] assume_tac dvarsOf_imp_free_fix_names_endpoint_aux
+  \\ gs [] \\ qmatch_goalsub_abbrev_tac ‘ ll = []’
+  \\ pop_assum kall_tac
+  \\ CCONTR_TAC \\ Cases_on ‘ll’
+  \\ gs [] \\ metis_tac []
+QED
+
+Theorem dvarsOf_imp_free_fix_names_network:
+  ∀c s conf fv.
+    dvarsOf c = []
+    ⇒ free_fix_names_network
+        (endpoint_to_payload$compile_network conf
+           (compile_network_fv fv
+              (compile_network s c (procsOf c)))) = []
+Proof
+  rw [] \\ qmatch_goalsub_abbrev_tac ‘compile_network _ _ l’
+  \\ pop_assum kall_tac
+  \\ induct_on ‘l’ \\ EVAL_TAC \\ rw [] \\ gs []
+  \\ simp [dvarsOf_imp_free_fix_names_endpoint]
+QED
+
 Theorem projection_preservation_junkcong:
   ∀s c s'' c'' conf.
    compile_network_ok s c (procsOf c)
@@ -228,7 +287,10 @@ Proof
   \\ drule to_closure_preservation
   \\ impl_tac
   (* TODO: projections guarantees fix_network, free_fix_names_network, no_undefined_vars *)
-  >- (simp [] \\ cheat)
+  >- (simp [fix_network_compile_network]
+      conj_tac
+      >- (UNABBREV_ALL_TAC \\ simp [dvarsOf_imp_free_fix_names_network])
+      \\ cheat)
   \\ rw [] \\ asm_exists_tac \\ simp []
 QED
 
