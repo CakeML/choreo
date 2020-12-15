@@ -248,6 +248,116 @@ Proof
   \\ simp [dvarsOf_imp_free_fix_names_endpoint]
 QED
 
+Triviality DELETE_eq_INTER:
+∀s x.  (s DELETE x) = ({y | x ≠ y} ∩ s)
+Proof
+  rw [FUN_EQ_THM] \\ metis_tac []
+QED
+
+Theorem split_sel_free_variables:
+  split_sel p1 p2 c = SOME(b,c') ⇒
+  free_variables c' = free_variables c
+Proof
+  Induct_on ‘c’ >> rw[split_sel_def,free_variables_def]
+QED
+
+Theorem no_undefined_vars_chor_to_network:
+  ∀s c conf fv.
+    no_undefined_vars (s,c)
+    ⇒ no_undefined_vars_network
+        (endpoint_to_payload$compile_network conf
+             (compile_network_fv fv
+                (compile_network s c (procsOf c))))
+Proof
+  rw [] \\ qmatch_goalsub_abbrev_tac ‘compile_network _ _ l’
+  \\ pop_assum kall_tac
+  \\ induct_on ‘l’ \\ EVAL_TAC \\ rw [] \\ gs []
+  >- (pop_assum kall_tac \\ pop_assum mp_tac
+      \\ qmatch_goalsub_abbrev_tac ‘project' h l c’
+      (* \\ ‘l = []’ by simp [Abbr‘l’] *)
+      (* \\ pop_assum mp_tac *) \\ pop_assum kall_tac
+      \\ MAP_EVERY (W(curry Q.SPEC_TAC)) (rev [‘h’,‘l’,‘c’,‘s’])
+      \\ ho_match_mp_tac project_ind
+      \\ rw []
+      >- (pop_assum mp_tac \\ EVAL_TAC \\ simp [])
+      >- (EVAL_TAC \\ gs []
+          \\ EVERY_CASE_TAC
+          \\ gs [nub'_dvarsOf,project_def,procsOf_def,MEM_nub',no_undefined_vars_def,free_variables_def]
+          \\ EVAL_TAC \\ gs []
+          >- (gs [DELETE_SUBSET_INSERT]
+              \\ first_x_assum (qspec_then ‘s |+ ((c,p2),ARB)’ assume_tac)
+              \\ gs [FDOM_FLOOKUP]
+              \\ dxrule_then (qspec_then ‘c’ assume_tac) SUBSET_DELETE_BOTH
+              \\ simp [LIST_TO_SET_FILTER]
+              \\ ho_match_mp_tac SUBSET_TRANS
+              \\ qmatch_asmsub_abbrev_tac ‘_ ⊆ tt’
+              \\ gs [DELETE_eq_INTER]
+              \\ first_x_assum (irule_at Any)
+              \\ UNABBREV_ALL_TAC
+              \\ simp [MAP_KEYS_def]
+              \\ qmatch_goalsub_abbrev_tac ‘_ INSERT tt’
+              \\ rw [SUBSET_DEF])
+          \\ gs [DELETE_SUBSET_INSERT]
+          \\ first_x_assum (qspec_then ‘s |+ ((c,p2),ARB)’ assume_tac)
+          \\ gs [MAP_KEYS_def]
+          \\ simp [FDOM_DRESTRICT]
+          \\ first_x_assum (irule_at Any)
+          \\ simp [])
+      >- (EVAL_TAC \\ gs []
+          \\ EVERY_CASE_TAC
+          \\ gs [nub'_dvarsOf,project_def,procsOf_def,MEM_nub',no_undefined_vars_def,free_variables_def]
+          \\ EVAL_TAC \\ gs []
+          >- (gs [DELETE_SUBSET_INSERT]
+              \\ first_x_assum (qspec_then ‘s |+ ((h',p1),ARB)’ assume_tac)
+              \\ conj_tac
+              >- (gs [MAP_KEYS_def,SUBSET_DEF]
+                  \\ simp [FDOM_DRESTRICT]
+                  \\ rw [] \\ gs [MEM_MAP]
+                  \\ qexists_tac ‘(x,h)’ \\ simp [])
+              \\ gs []
+              \\ dxrule_then (qspec_then ‘h'’ assume_tac) SUBSET_DELETE_BOTH
+              \\ simp [LIST_TO_SET_FILTER]
+              \\ ho_match_mp_tac SUBSET_TRANS
+              \\ qmatch_asmsub_abbrev_tac ‘_ ⊆ tt’
+              \\ gs [DELETE_eq_INTER]
+              \\ first_x_assum (irule_at Any)
+              \\ UNABBREV_ALL_TAC
+              \\ simp [MAP_KEYS_def]
+              \\ qmatch_goalsub_abbrev_tac ‘_ INSERT tt’
+              \\ rw [SUBSET_DEF])
+          \\ gs [DELETE_SUBSET_INSERT]
+          \\ first_x_assum (qspec_then ‘s |+ ((h',p1),ARB)’ assume_tac)
+          \\ gs [])
+      >- (EVAL_TAC \\ gs []
+          \\ EVERY_CASE_TAC
+          \\ gs [nub'_dvarsOf,project_def,procsOf_def,MEM_nub',no_undefined_vars_def,free_variables_def]
+          \\ EVAL_TAC \\ gs []
+          \\ TRY (gs [MAP_KEYS_def,SUBSET_DEF]
+                  \\ simp [FDOM_DRESTRICT]
+                  \\ rw [] \\ gs [MEM_MAP]
+                  \\ qexists_tac ‘(h',h)’ \\ simp [] \\ NO_TAC)
+          \\ rw [LIST_TO_SET_APPEND,FILTER_APPEND,LIST_TO_SET_FILTER]
+          \\ irule SUBSET_TRANS \\ irule_at Any (CONJUNCT2 INTER_SUBSET)
+          \\ rw [] \\ first_x_assum irule
+          \\ IMP_RES_TAC split_sel_free_variables
+          \\ rw [])
+      >- (EVAL_TAC \\ gs []
+          \\ EVERY_CASE_TAC
+          \\ gs [nub'_dvarsOf,project_def,procsOf_def,MEM_nub',no_undefined_vars_def,free_variables_def]
+          \\ EVAL_TAC \\ gs []
+          \\ first_x_assum drule
+          \\ rw [LIST_TO_SET_FILTER]
+          \\ irule SUBSET_TRANS \\ irule_at Any (CONJUNCT2 INTER_SUBSET)
+          \\ simp [])
+      \\ EVAL_TAC \\ gs []
+      \\ EVERY_CASE_TAC
+      \\ gs [nub'_dvarsOf,project_def,procsOf_def,MEM_nub',no_undefined_vars_def,free_variables_def]
+      \\ EVAL_TAC \\ gs [])
+  \\ gs [no_undefined_vars_network_def]
+  \\ pop_assum mp_tac
+  \\ EVAL_TAC \\ simp []
+QED
+
 Theorem projection_preservation_junkcong:
   ∀s c s'' c'' conf.
    compile_network_ok s c (procsOf c)
@@ -286,11 +396,9 @@ Proof
   \\ strip_tac
   \\ drule to_closure_preservation
   \\ impl_tac
-  (* TODO: projections guarantees fix_network, free_fix_names_network, no_undefined_vars *)
   >- (simp [fix_network_compile_network]
-      conj_tac
-      >- (UNABBREV_ALL_TAC \\ simp [dvarsOf_imp_free_fix_names_network])
-      \\ cheat)
+      \\ UNABBREV_ALL_TAC
+      \\ simp [dvarsOf_imp_free_fix_names_network,no_undefined_vars_chor_to_network])
   \\ rw [] \\ asm_exists_tac \\ simp []
 QED
 
@@ -348,13 +456,6 @@ Theorem free_variables_variables:
   free_variables c ⊆ variables c
 Proof
   Induct_on ‘c’ >> rw[free_variables_def,variables_def] >> fs[SUBSET_DEF] >> rw[] >> res_tac
-QED
-
-Theorem split_sel_free_variables:
-  split_sel p1 p2 c = SOME(b,c') ⇒
-  free_variables c' = free_variables c
-Proof
-  Induct_on ‘c’ >> rw[split_sel_def,free_variables_def]
 QED
 
 Theorem project'_variables_eq:
