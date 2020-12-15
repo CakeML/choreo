@@ -409,53 +409,11 @@ Proof
   rw[trans_s_def] >> imp_res_tac RTC_RTC
 QED
 
-(* TODO: move *)
-Definition variables_def:
-  (variables (chorLang$Nil) = {}) /\
-  (variables (IfThen v p c1 c2) = {(v,p)} ∪ (variables c1 ∪ variables c2)) /\
-  (variables (Com p1 v1 p2 v2 c) = {(v1,p1);(v2,p2)} ∪ (variables c)) /\
-  (variables (Let v p f vl c) = set(MAP (λv. (v,p)) vl) ∪ {(v,p)} ∪ variables c) /\
-  (variables (Sel p b q c) = variables c)
-End
-
-Theorem trans_variables_mono:
-  ∀s c a l s' c'.
-  trans (s,c) (a,l) (s',c') ⇒
-  variables c' ⊆ variables c
-Proof
-  ho_match_mp_tac trans_pairind >>
-  rw[variables_def] >>
-  fs[SUBSET_DEF]
-QED
-
-Theorem trans_s_variables_mono:
-  ∀s c s' c'.
-  trans_s (s,c) (s',c') ⇒
-  variables c' ⊆ variables c
-Proof
-  rpt strip_tac >>
-  ‘(∀sc sc'. (λp q. ∃s. chorSem$trans p s q) sc sc' ⇒ combin$C pred_set$SUBSET ((λ(s,c). variables c) sc) ((λ(s,c). variables c) sc'))’
-    by(Cases >> Cases >> rw[] >> rename1 ‘trans _ a _’ >> Cases_on ‘a’ >> metis_tac[trans_variables_mono]) >>
-  dxrule RTC_lifts_reflexive_transitive_relations >>
-  disch_then(qspecl_then [‘(s,c)’,‘(s',c')’] mp_tac) >>
-  simp[] >>
-  disch_then match_mp_tac >>
-  fs[trans_s_def] >>
-  fs[reflexive_def,transitive_def] >>
-  metis_tac[SUBSET_TRANS]
-QED
-
 Theorem split_sel_variables:
   split_sel p1 p2 c = SOME(b,c') ⇒
   variables c' = variables c
 Proof
   Induct_on ‘c’ >> rw[split_sel_def,variables_def]
-QED
-
-Theorem free_variables_variables:
-  free_variables c ⊆ variables c
-Proof
-  Induct_on ‘c’ >> rw[free_variables_def,variables_def] >> fs[SUBSET_DEF] >> rw[] >> res_tac
 QED
 
 Theorem project'_variables_eq:

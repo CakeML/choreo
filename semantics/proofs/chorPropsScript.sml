@@ -915,4 +915,89 @@ Proof
   rw[SET_EQ_SUBSET,SUBSET_DEF,MEM_FILTER,MEM_nub'] >> fs[]
 QED
 
+Definition variables_def:
+  (variables (chorLang$Nil) = {}) /\
+  (variables (Call x) = {}) /\
+  (variables (Fix x c) = variables c) /\
+  (variables (IfThen v p c1 c2) = {(v,p)} ∪ (variables c1 ∪ variables c2)) /\
+  (variables (Com p1 v1 p2 v2 c) = {(v1,p1);(v2,p2)} ∪ (variables c)) /\
+  (variables (Let v p f vl c) = set(MAP (λv. (v,p)) vl) ∪ {(v,p)} ∪ variables c) /\
+  (variables (Sel p b q c) = variables c)
+End
+
+Theorem dsubst_subset_variables:
+  ∀c c' dn.
+    variables (dsubst c dn c') ⊆ variables c ∪ variables c'
+Proof
+  rw []
+  \\ Induct_on ‘c’ \\ rw [variables_def,dsubst_def]
+  \\ fs [variables_def,dsubst_def]
+  >- (irule SUBSET_TRANS \\ asm_exists_tac \\ fs []
+      \\ fs [SUBSET_DEF])
+  >- (irule SUBSET_TRANS \\ asm_exists_tac \\ fs []
+      \\ fs [SUBSET_DEF] \\ rw [] \\ metis_tac [])
+  \\ fs [SUBSET_DEF] \\ rw [] \\ metis_tac []
+QED
+
+Theorem variables_subset_dsubst:
+  ∀c c' dn.
+    variables c ⊆ variables (dsubst c dn c')
+Proof
+  rw []
+  \\ Induct_on ‘c’ \\ rw [variables_def,dsubst_def]
+  \\ fs [SUBSET_DEF]
+QED
+
+Theorem variables_dsubst_eq:
+  ∀c dn. variables (dsubst c dn c) = variables c
+Proof
+  rw [] \\ irule SUBSET_ANTISYM
+  \\ metis_tac [variables_subset_dsubst,
+                dsubst_subset_variables,
+                UNION_IDEMPOT]
+QED
+
+Theorem variables_dsubst_eq_Fix:
+  ∀c x y. variables (dsubst c x (Fix y c)) = variables c
+Proof
+  rw [] \\ irule SUBSET_ANTISYM
+  \\ metis_tac [variables_subset_dsubst,
+                dsubst_subset_variables,
+                variables_def,
+                UNION_IDEMPOT]
+QED
+
+Theorem trans_variables_mono:
+  ∀s c a l s' c'.
+  trans (s,c) (a,l) (s',c') ⇒
+  variables c' ⊆ variables c
+Proof
+  ho_match_mp_tac trans_pairind >>
+  rw[variables_def,variables_dsubst_eq_Fix] >>
+  fs[SUBSET_DEF]
+QED
+
+Theorem trans_s_variables_mono:
+  ∀s c s' c'.
+  trans_s (s,c) (s',c') ⇒
+  variables c' ⊆ variables c
+Proof
+  rpt strip_tac >>
+  ‘(∀sc sc'. (λp q. ∃s. chorSem$trans p s q) sc sc' ⇒ combin$C pred_set$SUBSET ((λ(s,c). variables c) sc) ((λ(s,c). variables c) sc'))’
+    by(Cases >> Cases >> rw[] >> rename1 ‘trans _ a _’ >> Cases_on ‘a’ >> metis_tac[trans_variables_mono]) >>
+  dxrule RTC_lifts_reflexive_transitive_relations >>
+  disch_then(qspecl_then [‘(s,c)’,‘(s',c')’] mp_tac) >>
+  simp[] >>
+  disch_then match_mp_tac >>
+  fs[trans_s_def] >>
+  fs[reflexive_def,transitive_def] >>
+  metis_tac[SUBSET_TRANS]
+QED
+
+Theorem free_variables_variables:
+  free_variables c ⊆ variables c
+Proof
+  Induct_on ‘c’ >> rw[free_variables_def,variables_def] >> fs[SUBSET_DEF] >> rw[] >> res_tac
+QED
+
 val _ = export_theory ()
