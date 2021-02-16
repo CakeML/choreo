@@ -77,19 +77,19 @@ val map_the_flookup_update_lemma2 = Q.prove(
   `!vl s p p' v' d. ¬MEM (v',p') (MAP (λv. (v,p)) vl) ==>
   (MAP (THE ∘ FLOOKUP (s |+ ((v',p'),d))) (MAP (λv. (v,p)) vl)
    = MAP (THE ∘ FLOOKUP s) (MAP (λv. (v,p)) vl))`,
-  Induct >> rpt strip_tac >> fs[FLOOKUP_UPDATE]);
+  Induct >> rpt strip_tac >> fs[FLOOKUP_UPDATE] >> rw[]);
 
 val every_flookup_update_lemma = Q.prove(
   `!vl s p p' v' d. p' ≠ p ==>
   (EVERY IS_SOME (MAP (FLOOKUP (s |+ ((v',p'),d))) (MAP (λv. (v,p)) vl))
    = EVERY IS_SOME (MAP (FLOOKUP s) (MAP (λv. (v,p)) vl)))`,
-  Induct >> fs[FLOOKUP_UPDATE]);
+  Induct >> fs[FLOOKUP_UPDATE] >> rw[]);
 
 val every_flookup_update_lemma2 = Q.prove(
   `!vl s p p' v' d. ¬MEM (v',p') (MAP (λv. (v,p)) vl) ==>
   (EVERY IS_SOME (MAP (FLOOKUP (s |+ ((v',p'),d))) (MAP (λv. (v,p)) vl))
    = EVERY IS_SOME (MAP (FLOOKUP s) (MAP (λv. (v,p)) vl)))`,
-  Induct >> rpt strip_tac >> fs[FLOOKUP_UPDATE]);
+  Induct >> rpt strip_tac >> fs[FLOOKUP_UPDATE] >> rw[]);
 
 val semantics_add_irrelevant_state = Q.store_thm("semantics_add_irrelevant_state",
   `!s c alpha s' c' p v d. trans (s,c) alpha (s',c') /\ p ∉ freeprocs(FST alpha) ==>
@@ -172,7 +172,7 @@ val semantics_add_irrelevant_state2 = Q.store_thm("semantics_add_irrelevant_stat
   >> fs[] >> rveq
   >- (* Com *)
     (fs[written_def,read_def] >> fs[FUPDATE_COMMUTES]
-     >> match_mp_tac trans_com >> fs[FLOOKUP_UPDATE])
+     >> match_mp_tac trans_com >> fs[FLOOKUP_UPDATE] >> rw[])
   >- (* Sel *)
      (match_mp_tac trans_sel >> last_x_assum MATCH_ACCEPT_TAC)
   >- (* Let *)
@@ -181,10 +181,10 @@ val semantics_add_irrelevant_state2 = Q.store_thm("semantics_add_irrelevant_stat
                    map_the_flookup_update_lemma2,every_flookup_update_lemma2])
   >- (* If *)
      (fs[written_def,read_def] >> fs[FUPDATE_COMMUTES]
-      >> match_mp_tac trans_if_true >> fs[FLOOKUP_UPDATE])
+      >> match_mp_tac trans_if_true >> fs[FLOOKUP_UPDATE] >> rw[])
   >- (* Else *)
      (fs[written_def,read_def] >> fs[FUPDATE_COMMUTES]
-      >> match_mp_tac trans_if_false >> fs[FLOOKUP_UPDATE])
+      >> match_mp_tac trans_if_false >> fs[FLOOKUP_UPDATE] >> rw[])
   >- (* If-swap *)
     (fs[written_def,read_def] >> fs[FUPDATE_COMMUTES]
      >> metis_tac[trans_if_swap])
@@ -227,7 +227,7 @@ val semantics_add_irrelevant_state3 = Q.store_thm("semantics_add_irrelevant_stat
   >> fs[] >> rveq
   >- (* Com *)
     (fs[written_def,read_def] >> fs[FUPDATE_COMMUTES]
-     >> rveq >> `FLOOKUP (s |+ ((v,p),d')) (v1,p1) = SOME d` by (fs[FLOOKUP_UPDATE])
+     >> rveq >> `FLOOKUP (s |+ ((v,p),d')) (v1,p1) = SOME d` by (fs[FLOOKUP_UPDATE] >> rw[])
      >> drule trans_com >> disch_then(qspecl_then [`v`,`p`,`c`] assume_tac)
      >> fs[FUPDATE_EQ]
     )
@@ -327,7 +327,7 @@ val lookup_unwritten_after_trans = Q.store_thm("lookup_unwritten_after_trans",
   >> MAP_EVERY (W(curry Q.SPEC_TAC)) (rev [`sc`,`alpha`,`sc'`])
   >> ho_match_mp_tac trans_strongind
   >> rpt strip_tac
-  >> fs[] >> rveq >> fs[FLOOKUP_UPDATE,written_def]);
+  >> fs[] >> rveq >> fs[FLOOKUP_UPDATE,written_def] >> rw []);
 
 val lookup_unwritten_after_trans_tup = Q.store_thm("lookup_unwritten_after_trans_tup",
   `!s c alpha l s' c' p v. trans (s,c) (alpha,l) (s',c') /\ written alpha ≠ SOME(v,p) ==>
