@@ -937,31 +937,6 @@ Proof
               ‘ns = os with queues := qpush os.queues sp2 d2’
                 by rw[Abbr ‘ns’,Abbr ‘os’] >>
               metis_tac[trans_rules])))
-  (* LReceive/LReceive *)
-  >- (rename [‘LReceive sp1 d1 c’,‘sp1 = sp2 ⇒ d2 = d1’] >>
-      Cases_on ‘sp1 = sp2’
-      >- fs[]
-      >- (qexists_tac ‘NEndpoint c (s with queues := qpush (qpush s.queues sp1 d1) sp2 d2) e’ >>
-          rw[]
-          >- (qspecl_then [‘s.queues’,‘sp1’,‘d1’,‘sp2’,‘d2’] assume_tac
-                          qpush_commutes >>
-              rfs[] >> first_x_assum SUBST1_TAC >>
-              qmatch_goalsub_abbrev_tac ‘trans conf (NEndpoint c os e) _ _’ >>
-              ‘qpush s.queues sp2 d2 = os.queues’
-                by rw[Abbr ‘os’] >>
-              first_x_assum SUBST1_TAC >>
-              qmatch_goalsub_abbrev_tac ‘trans _ _ _ (NEndpoint _ ns _)’ >>
-              ‘ns = os with queues := qpush os.queues sp1 d1’
-                by rw[Abbr ‘ns’,Abbr ‘os’] >>
-              metis_tac[trans_rules])
-          >- (qmatch_goalsub_abbrev_tac ‘trans conf (NEndpoint c os e) _ _’ >>
-              ‘qpush s.queues sp1 d1 = os.queues’
-                by rw[Abbr ‘os’] >>
-              first_x_assum SUBST1_TAC >>
-              qmatch_goalsub_abbrev_tac ‘trans _ _ _ (NEndpoint _ ns _)’ >>
-              ‘ns = os with queues := qpush os.queues sp2 d2’
-                by rw[Abbr ‘ns’,Abbr ‘os’] >>
-              metis_tac[trans_rules])))
   (* LReceive/LTau (Receive Final) *)
   >- (rename [‘NEndpoint c (s with queues := _) (Receive sp2 sv2 ds2 e)’,‘LReceive sp d c’] >>
       qmatch_goalsub_abbrev_tac ‘s with <|bindings := fb; queues := bfq |>’ >>
@@ -1378,7 +1353,7 @@ Proof
             rename [‘¬net_has_node (NPar N1a N1b) nint’,
                     ‘trans conf N1a (LReceive sp d rp) N2Aa’,
                     ‘trans conf N1b (LSend sp d rp) N2Ab’] >>
-            DISJ1_TAC >> CCONTR_TAC >> fs[] >>
+            CCONTR_TAC >> fs[] >>
             ‘net_has_node (NPar N1a N1b) nint’
               by (‘net_has_node N1b nint’
                     suffices_by fs[net_has_node_def] >>
@@ -1435,7 +1410,6 @@ Proof
       ‘∀ds. LReceive sp ds rp ≠ LA’
         by (Cases_on ‘LA’ >> fs[wf_label_def] >>
             rename [‘¬net_has_node (NPar N1a N1b) nint’] >>
-            DISJ1_TAC >>
             CCONTR_TAC >>
             fs[] >>
             ‘net_has_node (NPar N1a N1b) nint’
@@ -1623,7 +1597,7 @@ Proof
       qpat_x_assum ‘trans _ (NPar _ _) _ _’
                   (fn x => strip_assume_tac(REWRITE_RULE [Once trans_cases] x)) >>
       fs[] >> rw[] >> fs[]
-      (* (FIRST DIFF) Internal Comms (TO RIGHT) / Internal Comms (TO RIGHT) *)
+      (* Internal Comms (TO RIGHT) / Internal Comms (TO RIGHT) *)
       >- (rename [‘trans conf (NPar N2Aa N2Ab) LTau _ ∧
                      trans conf (NPar N2Ba N2Bb) LTau _’,
                     ‘net_wf (NPar N1a N1b)’,
@@ -1634,13 +1608,8 @@ Proof
             trans conf N2Ba (LSend spA dA rpA) N3a’
             by (irule trans_diff_diamond >>
                 rw[compat_labels_def]
-                >- (CCONTR_TAC >>
-                    ‘N2Aa = N2Ba’
-                      suffices_by rw[] >>
-                    irule trans_notau_functional >>
-                    MAP_EVERY qexists_tac [‘LSend spB dB rpB’,
-                                            ‘N1a’,‘conf’] >>
-                    fs[net_wf_def])
+                >- (CCONTR_TAC >> gvs [net_wf_def] >>
+                    imp_res_tac trans_notau_functional >> rw [])
                 >- (qexists_tac ‘N1a’ >>
                     fs[net_wf_def,wf_label_def,compat_labels_def] >>
                     ‘net_has_node N1b rpA ∧ net_has_node N1b rpB’
@@ -1653,13 +1622,8 @@ Proof
             trans conf N2Bb (LReceive spA dA rpA) N3b’
             by (irule trans_diff_diamond >>
                 rw[]
-                >- (CCONTR_TAC >>
-                    ‘N2Aa = N2Ba’
-                      suffices_by rw[] >>
-                    irule trans_notau_functional >>
-                    MAP_EVERY qexists_tac [‘LSend spB dB rpB’,
-                                            ‘N1a’,‘conf’] >>
-                    fs[net_wf_def])
+                >- (CCONTR_TAC >> gvs [net_wf_def] >>
+                    imp_res_tac trans_notau_functional >> rw [])
                 >- metis_tac[send_gen_compat,net_wf_def]
                 >- (qexists_tac ‘N1b’ >>
                     fs[net_wf_def,wf_label_def,compat_labels_def] >>
@@ -1670,54 +1634,7 @@ Proof
                     metis_tac[trans_send_cond])) >>
           qexists_tac ‘NPar N3a N3b’ >>
           metis_tac[trans_rules])
-      (* (SECOND DIFF) Internal Comms (TO RIGHT) / Internal Comms (TO RIGHT) *)
-      >- (rename [‘trans conf (NPar N2Aa N2Ab) LTau _ ∧
-                   trans conf (NPar N2Ba N2Bb) LTau _’,
-                  ‘net_wf (NPar N1a N1b)’,
-                  ‘trans conf N1a (LSend spA dA rpA) N2Aa’,
-                  ‘trans conf N1a (LSend spB dB rpB) N2Ba’] >>
-          ‘∃N3a.
-            trans conf N2Aa (LSend spB dB rpB) N3a ∧
-            trans conf N2Ba (LSend spA dA rpA) N3a’
-            by (irule trans_diff_diamond >>
-                rw[compat_labels_def]
-                >- (CCONTR_TAC >>
-                    ‘N2Ab = N2Bb’
-                      suffices_by rw[] >>
-                    irule trans_notau_functional >>
-                    MAP_EVERY qexists_tac [‘LReceive spB dB rpB’,
-                                            ‘N1b’,‘conf’] >>
-                    fs[net_wf_def])
-                >- (qexists_tac ‘N1a’ >>
-                    fs[net_wf_def,wf_label_def,compat_labels_def] >>
-                    ‘net_has_node N1b rpA ∧ net_has_node N1b rpB’
-                      suffices_by metis_tac[DISJOINT_SYM,
-                                            DISJOINT_ALT,
-                                            IN_APP] >>
-                    metis_tac[trans_receive_cond])) >>
-          ‘∃N3b.
-            trans conf N2Ab (LReceive spB dB rpB) N3b ∧
-            trans conf N2Bb (LReceive spA dA rpA) N3b’
-            by (irule trans_diff_diamond >>
-                rw[]
-                >- (CCONTR_TAC >>
-                    ‘N2Ab = N2Bb’
-                      suffices_by rw[] >>
-                    irule trans_notau_functional >>
-                    MAP_EVERY qexists_tac [‘LReceive spB dB rpB’,
-                                            ‘N1b’,‘conf’] >>
-                    fs[net_wf_def])
-                >- metis_tac[send_gen_compat,net_wf_def]
-                >- (qexists_tac ‘N1b’ >>
-                    fs[net_wf_def,wf_label_def,compat_labels_def] >>
-                    ‘net_has_node N1a spA ∧ net_has_node N1a spB’
-                      suffices_by metis_tac[DISJOINT_SYM,
-                                            DISJOINT_ALT,
-                                            IN_APP] >>
-                    metis_tac[trans_send_cond])) >>
-          qexists_tac ‘NPar N3a N3b’ >>
-          metis_tac[trans_rules])
-      (* (FIRST DIFF) Internal Comms (TO RIGHT) / Internal Comms (TO LEFT) *)
+      (* Internal Comms (TO RIGHT) / Internal Comms (TO LEFT) *)
       >- (rename [‘trans conf (NPar N2Aa N2Ab) LTau _ ∧
                    trans conf (NPar N2Ba N2Bb) LTau _’,
                   ‘net_wf (NPar N1a N1b)’,
@@ -1749,39 +1666,7 @@ Proof
                 metis_tac[trans_send_cond,trans_receive_cond]) >>
           qexists_tac ‘NPar N3a N3b’ >>
           metis_tac[trans_rules])
-      (* (SECOND DIFF) Internal Comms (TO RIGHT) / Internal Comms (TO LEFT) *)
-      >- (rename [‘trans conf (NPar N2Aa N2Ab) LTau _ ∧
-                   trans conf (NPar N2Ba N2Bb) LTau _’,
-                  ‘net_wf (NPar N1a N1b)’,
-                  ‘trans conf N1a (LSend spA dA rpA) N2Aa’,
-                  ‘trans conf N1b (LSend spB dB rpB) N2Bb’] >>
-          ‘∃N3a.
-            trans conf N2Aa (LReceive spB dB rpB) N3a ∧
-            trans conf N2Ba (LSend spA dA rpA) N3a’
-            by (irule trans_diff_diamond >>
-                rw[compat_labels_def] >>
-                qexists_tac ‘N1a’ >>
-                fs[net_wf_def,wf_label_def,compat_labels_def] >>
-                ‘net_has_node N1b rpA ∧ net_has_node N1b spB’
-                      suffices_by metis_tac[DISJOINT_SYM,
-                                            DISJOINT_ALT,
-                                            IN_APP] >>
-                metis_tac[trans_send_cond,trans_receive_cond]) >>
-          ‘∃N3b.
-            trans conf N2Ab (LSend spB dB rpB) N3b ∧
-            trans conf N2Bb (LReceive spA dA rpA) N3b’
-            by (irule trans_diff_diamond >>
-                rw[compat_labels_def] >>
-                qexists_tac ‘N1b’ >>
-                fs[net_wf_def,wf_label_def] >>
-                ‘net_has_node N1a spA ∧ net_has_node N1a rpB’
-                  suffices_by metis_tac[DISJOINT_SYM,
-                                        DISJOINT_ALT,
-                                        IN_APP] >>
-                metis_tac[trans_send_cond,trans_receive_cond]) >>
-          qexists_tac ‘NPar N3a N3b’ >>
-          metis_tac[trans_rules])
-      (* (FIRST DIFF) Internal Comms (TO RIGHT) / Parallel Embedded Behaviour (LEFT) *)
+      (* Internal Comms (TO RIGHT) / Parallel Embedded Behaviour (LEFT) *)
       >- (rename [‘trans conf (NPar N2Aa N2Ab) LTau _ ∧
                    trans conf (NPar N2Ba N1b) LTau _’,
                   ‘net_wf (NPar N1a N1b)’,
@@ -1800,26 +1685,7 @@ Proof
                 metis_tac[trans_receive_cond]) >>
           qexists_tac ‘NPar N3a N2Ab’ >>
           metis_tac[trans_rules])
-      (* (SECOND DIFF) Internal Comms (TO RIGHT) / Parallel Embedded Behaviour (LEFT) *)
-      >- (rename [‘trans conf (NPar N2Aa N2Ab) LTau _ ∧
-                   trans conf (NPar N2Ba N1b) LTau _’,
-                  ‘net_wf (NPar N1a N1b)’,
-                  ‘trans conf N1a (LSend sp d rp) N2Aa’] >>
-          ‘∃N3a.
-            trans conf N2Aa LTau N3a ∧
-            trans conf N2Ba (LSend sp d rp) N3a’
-            by (irule trans_diff_diamond >>
-                rw[compat_labels_def] >>
-                qexists_tac ‘N1a’ >>
-                fs[net_wf_def,wf_label_def,compat_labels_def] >>
-                ‘net_has_node N1b rp’
-                      suffices_by metis_tac[DISJOINT_SYM,
-                                            DISJOINT_ALT,
-                                            IN_APP] >>
-                metis_tac[trans_receive_cond]) >>
-          qexists_tac ‘NPar N3a N2Ab’ >>
-          metis_tac[trans_rules])
-      (* (FIRST DIFF) Internal Comms (TO RIGHT) / Parallel Embedded Behaviour (RIGHT) *)
+      (* Internal Comms (TO RIGHT) / Parallel Embedded Behaviour (RIGHT) *)
       >- (rename [‘trans conf (NPar N2Aa N2Ab) LTau _ ∧
                    trans conf (NPar N1a N2Bb) LTau _’,
                   ‘net_wf (NPar N1a N1b)’,
@@ -1838,26 +1704,7 @@ Proof
                 metis_tac[trans_send_cond]) >>
           qexists_tac ‘NPar N2Aa N3b’ >>
           metis_tac[trans_rules])
-      (* (SECOND DIFF) Internal Comms (TO RIGHT) / Parallel Embedded Behaviour (LEFT) *)
-      >- (rename [‘trans conf (NPar N2Aa N2Ab) LTau _ ∧
-                   trans conf (NPar N1a N2Bb) LTau _’,
-                  ‘net_wf (NPar N1a N1b)’,
-                  ‘trans conf N1a (LSend sp d rp) N2Aa’] >>
-          ‘∃N3b.
-            trans conf N2Ab LTau N3b ∧
-            trans conf N2Bb (LReceive sp d rp) N3b’
-            by (irule trans_diff_diamond >>
-                rw[compat_labels_def] >>
-                qexists_tac ‘N1b’ >>
-                fs[net_wf_def,wf_label_def,compat_labels_def] >>
-                ‘net_has_node N1a sp’
-                      suffices_by metis_tac[DISJOINT_SYM,
-                                            DISJOINT_ALT,
-                                            IN_APP] >>
-                metis_tac[trans_send_cond]) >>
-          qexists_tac ‘NPar N2Aa N3b’ >>
-          metis_tac[trans_rules])
-      (* (FIRST DIFF) Internal Comms (TO LEFT) / Internal Comms (TO RIGHT) *)
+      (* Internal Comms (TO LEFT) / Internal Comms (TO RIGHT) *)
       >- (rename [‘trans conf (NPar N2Aa N2Ab) LTau _ ∧
                    trans conf (NPar N2Ba N2Bb) LTau _’,
                   ‘net_wf (NPar N1a N1b)’,
@@ -1889,39 +1736,7 @@ Proof
                 metis_tac[trans_send_cond,trans_receive_cond]) >>
           qexists_tac ‘NPar N3a N3b’ >>
           metis_tac[trans_rules])
-      (* (SECOND DIFF) Internal Comms (TO LEFT) / Internal Comms (TO RIGHT) *)
-      >- (rename [‘trans conf (NPar N2Aa N2Ab) LTau _ ∧
-                   trans conf (NPar N2Ba N2Bb) LTau _’,
-                  ‘net_wf (NPar N1a N1b)’,
-                  ‘trans conf N1a (LReceive spA dA rpA) N2Aa’,
-                  ‘trans conf N1a (LSend spB dB rpB) N2Ba’] >>
-          ‘∃N3a.
-            trans conf N2Aa (LSend spB dB rpB) N3a ∧
-            trans conf N2Ba (LReceive spA dA rpA) N3a’
-            by (irule trans_diff_diamond >>
-                rw[compat_labels_def] >>
-                qexists_tac ‘N1a’ >>
-                fs[net_wf_def,wf_label_def,compat_labels_def] >>
-                ‘net_has_node N1b spA ∧ net_has_node N1b rpB’
-                  suffices_by metis_tac[DISJOINT_SYM,
-                                        DISJOINT_ALT,
-                                        IN_APP] >>
-                metis_tac[trans_send_cond,trans_receive_cond]) >>
-          ‘∃N3b.
-            trans conf N2Ab (LReceive spB dB rpB) N3b ∧
-            trans conf N2Bb (LSend spA dA rpA) N3b’
-            by (irule trans_diff_diamond >>
-                rw[compat_labels_def] >>
-                qexists_tac ‘N1b’ >>
-                fs[net_wf_def,wf_label_def] >>
-                ‘net_has_node N1a rpA ∧ net_has_node N1a spB’
-                  suffices_by metis_tac[DISJOINT_SYM,
-                                        DISJOINT_ALT,
-                                        IN_APP] >>
-                metis_tac[trans_send_cond,trans_receive_cond]) >>
-          qexists_tac ‘NPar N3a N3b’ >>
-          metis_tac[trans_rules])
-      (* (FIRST DIFF) Internal Comms (TO LEFT) / Internal Comms (TO LEFT) *)
+      (* Internal Comms (TO LEFT) / Internal Comms (TO LEFT) *)
       >- (rename [‘trans conf (NPar N2Aa N2Ab) LTau _ ∧
                    trans conf (NPar N2Ba N2Bb) LTau _’,
                   ‘net_wf (NPar N1a N1b)’,
@@ -1932,13 +1747,8 @@ Proof
             trans conf N2Ba (LReceive spA dA rpA) N3a’
             by (irule trans_diff_diamond >>
                 rw[]
-                >- (CCONTR_TAC >>
-                    ‘N2Aa = N2Ba’
-                      suffices_by rw[] >>
-                    irule trans_notau_functional >>
-                    MAP_EVERY qexists_tac [‘LReceive spB dB rpB’,
-                                            ‘N1a’,‘conf’] >>
-                    fs[net_wf_def])
+                >- (CCONTR_TAC >> gvs [net_wf_def] >>
+                    imp_res_tac trans_notau_functional >> rw [])
                 >- metis_tac[send_gen_compat,net_wf_def]
                 >- (qexists_tac ‘N1a’ >>
                     fs[net_wf_def,wf_label_def] >>
@@ -1952,13 +1762,8 @@ Proof
             trans conf N2Bb (LSend spA dA rpA) N3b’
             by (irule trans_diff_diamond >>
                 rw[compat_labels_def]
-                >- (CCONTR_TAC >>
-                    ‘N2Aa = N2Ba’
-                      suffices_by rw[] >>
-                    irule trans_notau_functional >>
-                    MAP_EVERY qexists_tac [‘LReceive spB dB rpB’,
-                                            ‘N1a’,‘conf’] >>
-                    fs[net_wf_def])
+                >- (CCONTR_TAC >> gvs [net_wf_def] >>
+                    imp_res_tac trans_notau_functional >> rw [])
                 >- (qexists_tac ‘N1b’ >>
                     fs[net_wf_def,wf_label_def,compat_labels_def] >>
                     ‘net_has_node N1a rpA ∧ net_has_node N1a rpB’
@@ -1968,54 +1773,7 @@ Proof
                     metis_tac[trans_receive_cond])) >>
           qexists_tac ‘NPar N3a N3b’ >>
           metis_tac[trans_rules])
-      (* (SECOND DIFF) Internal Comms (TO LEFT) / Internal Comms (TO LEFT) *)
-      >- (rename [‘trans conf (NPar N2Aa N2Ab) LTau _ ∧
-                   trans conf (NPar N2Ba N2Bb) LTau _’,
-                  ‘net_wf (NPar N1a N1b)’,
-                  ‘trans conf N1a (LReceive spA dA rpA) N2Aa’,
-                  ‘trans conf N1a (LReceive spB dB rpB) N2Ba’] >>
-          ‘∃N3a.
-            trans conf N2Aa (LReceive spB dB rpB) N3a ∧
-            trans conf N2Ba (LReceive spA dA rpA) N3a’
-            by (irule trans_diff_diamond >>
-                rw[]
-                >- (CCONTR_TAC >>
-                    ‘N2Ab = N2Bb’
-                      suffices_by rw[] >>
-                    irule trans_notau_functional >>
-                    MAP_EVERY qexists_tac [‘LSend spB dB rpB’,
-                                            ‘N1b’,‘conf’] >>
-                    fs[net_wf_def])
-                >- metis_tac[send_gen_compat,net_wf_def]
-                >- (qexists_tac ‘N1a’ >>
-                    fs[net_wf_def,wf_label_def] >>
-                    ‘net_has_node N1b spA ∧ net_has_node N1b spB’
-                      suffices_by metis_tac[DISJOINT_SYM,
-                                            DISJOINT_ALT,
-                                            IN_APP] >>
-                    metis_tac[trans_send_cond])) >>
-          ‘∃N3b.
-            trans conf N2Ab (LSend spB dB rpB) N3b ∧
-            trans conf N2Bb (LSend spA dA rpA) N3b’
-            by (irule trans_diff_diamond >>
-                rw[compat_labels_def]
-                >- (CCONTR_TAC >>
-                    ‘N2Ab = N2Bb’
-                      suffices_by rw[] >>
-                    irule trans_notau_functional >>
-                    MAP_EVERY qexists_tac [‘LSend spB dB rpB’,
-                                            ‘N1b’,‘conf’] >>
-                    fs[net_wf_def])
-                >- (qexists_tac ‘N1b’ >>
-                    fs[net_wf_def,wf_label_def,compat_labels_def] >>
-                    ‘net_has_node N1a rpA ∧ net_has_node N1a rpB’
-                      suffices_by metis_tac[DISJOINT_SYM,
-                                            DISJOINT_ALT,
-                                            IN_APP] >>
-                    metis_tac[trans_receive_cond])) >>
-          qexists_tac ‘NPar N3a N3b’ >>
-          metis_tac[trans_rules])
-      (* (FIRST DIFF) Internal Comms (TO LEFT) / Parallel Embedded Behaviour (LEFT) *)
+      (* Internal Comms (TO LEFT) / Parallel Embedded Behaviour (LEFT) *)
       >- (rename [‘trans conf (NPar N2Aa N2Ab) LTau _ ∧
                    trans conf (NPar N2Ba N1b) LTau _’,
                   ‘net_wf (NPar N1a N1b)’,
@@ -2034,26 +1792,7 @@ Proof
                 metis_tac[trans_send_cond]) >>
           qexists_tac ‘NPar N3a N2Ab’ >>
           metis_tac[trans_rules])
-      (* (SECOND DIFF) Internal Comms (TO LEFT) / Parallel Embedded Behaviour (LEFT) *)
-      >- (rename [‘trans conf (NPar N2Aa N2Ab) LTau _ ∧
-                   trans conf (NPar N2Ba N1b) LTau _’,
-                  ‘net_wf (NPar N1a N1b)’,
-                  ‘trans conf N1a (LReceive sp d rp) N2Aa’] >>
-          ‘∃N3a.
-            trans conf N2Aa LTau N3a ∧
-            trans conf N2Ba (LReceive sp d rp) N3a’
-            by (irule trans_diff_diamond >>
-                rw[compat_labels_def] >>
-                qexists_tac ‘N1a’ >>
-                fs[net_wf_def,wf_label_def,compat_labels_def] >>
-                ‘net_has_node N1b sp’
-                      suffices_by metis_tac[DISJOINT_SYM,
-                                            DISJOINT_ALT,
-                                            IN_APP] >>
-                metis_tac[trans_send_cond]) >>
-          qexists_tac ‘NPar N3a N2Ab’ >>
-          metis_tac[trans_rules])
-      (* (FIRST DIFF) Internal Comms (TO LEFT) / Parallel Embedded Behaviour (RIGHT) *)
+      (* Internal Comms (TO LEFT) / Parallel Embedded Behaviour (RIGHT) *)
       >- (rename [‘trans conf (NPar N2Aa N2Ab) LTau _ ∧
                    trans conf (NPar N1a N2Bb) LTau _’,
                   ‘net_wf (NPar N1a N1b)’,
@@ -2072,26 +1811,7 @@ Proof
                 metis_tac[trans_receive_cond]) >>
           qexists_tac ‘NPar N2Aa N3b’ >>
           metis_tac[trans_rules])
-      (* (SECOND DIFF) Internal Comms (TO LEFT) / Parallel Embedded Behaviour (RIGHT) *)
-      >- (rename [‘trans conf (NPar N2Aa N2Ab) LTau _ ∧
-                   trans conf (NPar N1a N2Bb) LTau _’,
-                  ‘net_wf (NPar N1a N1b)’,
-                  ‘trans conf N1a (LReceive sp d rp) N2Aa’] >>
-          ‘∃N3b.
-            trans conf N2Ab LTau N3b ∧
-            trans conf N2Bb (LSend sp d rp) N3b’
-            by (irule trans_diff_diamond >>
-                rw[compat_labels_def] >>
-                qexists_tac ‘N1b’ >>
-                fs[net_wf_def,wf_label_def,compat_labels_def] >>
-                ‘net_has_node N1a rp’
-                      suffices_by metis_tac[DISJOINT_SYM,
-                                            DISJOINT_ALT,
-                                            IN_APP] >>
-                metis_tac[trans_receive_cond]) >>
-          qexists_tac ‘NPar N2Aa N3b’ >>
-          metis_tac[trans_rules])
-      (* (FIRST DIFF) Parallel Embedded Behaviour (LEFT) / Internal Comms (TO RIGHT) *)
+      (* Parallel Embedded Behaviour (LEFT) / Internal Comms (TO RIGHT) *)
       >- (rename [‘trans conf (NPar N2Ba N1b) LTau _ ∧
                    trans conf (NPar N2Aa N2Ab) LTau _’,
                   ‘net_wf (NPar N1a N1b)’,
@@ -2110,26 +1830,7 @@ Proof
                 metis_tac[trans_receive_cond]) >>
           qexists_tac ‘NPar N3a N2Ab’ >>
           metis_tac[trans_rules])
-      (* (SECOND DIFF) Parallel Embedded Behaviour (LEFT) / Internal Comms (TO RIGHT) *)
-      >- (rename [‘trans conf (NPar N2Ba N1b) LTau _ ∧
-                   trans conf (NPar N2Aa N2Ab) LTau _’,
-                  ‘net_wf (NPar N1a N1b)’,
-                  ‘trans conf N1a (LSend sp d rp) N2Aa’] >>
-          ‘∃N3a.
-            trans conf N2Aa LTau N3a ∧
-            trans conf N2Ba (LSend sp d rp) N3a’
-            by (irule trans_diff_diamond >>
-                rw[compat_labels_def] >>
-                qexists_tac ‘N1a’ >>
-                fs[net_wf_def,wf_label_def,compat_labels_def] >>
-                ‘net_has_node N1b rp’
-                      suffices_by metis_tac[DISJOINT_SYM,
-                                            DISJOINT_ALT,
-                                            IN_APP] >>
-                metis_tac[trans_receive_cond]) >>
-          qexists_tac ‘NPar N3a N2Ab’ >>
-          metis_tac[trans_rules])
-      (* (FIRST DIFF) Parallel Embedded Behaviour (LEFT) / Internal Comms (TO LEFT) *)
+      (* Parallel Embedded Behaviour (LEFT) / Internal Comms (TO LEFT) *)
       >- (rename [‘trans conf (NPar N2Ba N1b) LTau _ ∧
                    trans conf (NPar N2Aa N2Ab) LTau _’,
                   ‘net_wf (NPar N1a N1b)’,
@@ -2148,26 +1849,7 @@ Proof
                 metis_tac[trans_send_cond]) >>
           qexists_tac ‘NPar N3a N2Ab’ >>
           metis_tac[trans_rules])
-      (* (SECOND DIFF) Parallel Embedded Behaviour (LEFT) / Internal Comms (TO LEFT) *)
-      >- (rename [‘trans conf (NPar N2Ba N1b) LTau _ ∧
-                   trans conf (NPar N2Aa N2Ab) LTau _’,
-                  ‘net_wf (NPar N1a N1b)’,
-                  ‘trans conf N1a (LReceive sp d rp) N2Aa’] >>
-          ‘∃N3a.
-            trans conf N2Aa LTau N3a ∧
-            trans conf N2Ba (LReceive sp d rp) N3a’
-            by (irule trans_diff_diamond >>
-                rw[compat_labels_def] >>
-                qexists_tac ‘N1a’ >>
-                fs[net_wf_def,wf_label_def,compat_labels_def] >>
-                ‘net_has_node N1b sp’
-                      suffices_by metis_tac[DISJOINT_SYM,
-                                            DISJOINT_ALT,
-                                            IN_APP] >>
-                metis_tac[trans_send_cond]) >>
-          qexists_tac ‘NPar N3a N2Ab’ >>
-          metis_tac[trans_rules])
-      (* (FIRST DIFF) Parallel Embedded Behaviour (LEFT) / Parallel Embedded Behaviour (LEFT) *)
+      (* Parallel Embedded Behaviour (LEFT) / Parallel Embedded Behaviour (LEFT) *)
       >- (rename [‘trans conf (NPar N2Aa N1b) LTau _ ∧
                    trans conf (NPar N2Ba N1b) LTau _’,
                   ‘net_wf (NPar N1a N1b)’] >>
@@ -2177,18 +1859,12 @@ Proof
             by metis_tac[net_wf_def] >>
           qexists_tac ‘NPar N3a N1b’ >>
           metis_tac[trans_rules])
-      (* Note: SECOND DIFF of dual parallel embedded left behaviour not possible! *)
-      (* (FIRST DIFF) Parallel Embedded Behaviour (LEFT) / Parallel Embedded Behaviour (RIGHT) *)
+      (* Parallel Embedded Behaviour (LEFT) / Parallel Embedded Behaviour (RIGHT) *)
       >- (rename [‘trans conf (NPar N2Aa N1b) LTau _ ∧
                    trans conf (NPar N1a N2Bb) LTau _’,
                   ‘net_wf (NPar N1a N1b)’] >>
           metis_tac[trans_rules])
-      (* (SECOND DIFF) Parallel Embedded Behaviour (LEFT) / Parallel Embedded Behaviour (RIGHT) *)
-      >- (rename [‘trans conf (NPar N2Aa N1b) LTau _ ∧
-                   trans conf (NPar N1a N2Bb) LTau _’,
-                  ‘net_wf (NPar N1a N1b)’] >>
-          metis_tac[trans_rules])
-      (* (FIRST DIFF) Parallel Embedded Behaviour (RIGHT) / Internal Comms (TO RIGHT) *)
+      (* Parallel Embedded Behaviour (RIGHT) / Internal Comms (TO RIGHT) *)
       >- (rename [‘trans conf (NPar N1a N2Bb) LTau _ ∧
                    trans conf (NPar N2Aa N2Ab) LTau _’,
                   ‘net_wf (NPar N1a N1b)’,
@@ -2207,26 +1883,7 @@ Proof
                 metis_tac[trans_send_cond]) >>
           qexists_tac ‘NPar N2Aa N3b’ >>
           metis_tac[trans_rules])
-      (* (SECOND DIFF) Parallel Embedded Behaviour (RIGHT) / Internal Comms (TO RIGHT) *)
-      >- (rename [‘trans conf (NPar N1a N2Bb) LTau _ ∧
-                   trans conf (NPar N2Aa N2Ab) LTau _ ’,
-                  ‘net_wf (NPar N1a N1b)’,
-                  ‘trans conf N1a (LSend sp d rp) N2Aa’] >>
-          ‘∃N3b.
-            trans conf N2Ab LTau N3b ∧
-            trans conf N2Bb (LReceive sp d rp) N3b’
-            by (irule trans_diff_diamond >>
-                rw[compat_labels_def] >>
-                qexists_tac ‘N1b’ >>
-                fs[net_wf_def,wf_label_def,compat_labels_def] >>
-                ‘net_has_node N1a sp’
-                      suffices_by metis_tac[DISJOINT_SYM,
-                                            DISJOINT_ALT,
-                                            IN_APP] >>
-                metis_tac[trans_send_cond]) >>
-          qexists_tac ‘NPar N2Aa N3b’ >>
-          metis_tac[trans_rules])
-      (* (FIRST DIFF) Parallel Embedded Behaviour (RIGHT) / Internal Comms (TO LEFT) *)
+      (* Parallel Embedded Behaviour (RIGHT) / Internal Comms (TO LEFT) *)
       >- (rename [‘trans conf (NPar N1a N2Bb) LTau _ ∧
                    trans conf (NPar N2Aa N2Ab) LTau _ ’,
                   ‘net_wf (NPar N1a N1b)’,
@@ -2245,36 +1902,12 @@ Proof
                 metis_tac[trans_receive_cond]) >>
           qexists_tac ‘NPar N2Aa N3b’ >>
           metis_tac[trans_rules])
-      (* (SECOND DIFF) Parallel Embedded Behaviour (RIGHT) / Internal Comms (TO LEFT) *)
-      >- (rename [‘trans conf (NPar N1a N2Bb) LTau _ ∧
-                   trans conf (NPar N2Aa N2Ab) LTau _ ’,
-                  ‘net_wf (NPar N1a N1b)’,
-                  ‘trans conf N1a (LReceive sp d rp) N2Aa’] >>
-          ‘∃N3b.
-            trans conf N2Ab LTau N3b ∧
-            trans conf N2Bb (LSend sp d rp) N3b’
-            by (irule trans_diff_diamond >>
-                rw[compat_labels_def] >>
-                qexists_tac ‘N1b’ >>
-                fs[net_wf_def,wf_label_def,compat_labels_def] >>
-                ‘net_has_node N1a rp’
-                      suffices_by metis_tac[DISJOINT_SYM,
-                                            DISJOINT_ALT,
-                                            IN_APP] >>
-                metis_tac[trans_receive_cond]) >>
-          qexists_tac ‘NPar N2Aa N3b’ >>
-          metis_tac[trans_rules])
-      (* (FIRST DIFF) Parallel Embedded Behaviour (RIGHT) / Parallel Embedded Behaviour (LEFT) *)
+      (* Parallel Embedded Behaviour (RIGHT) / Parallel Embedded Behaviour (LEFT) *)
       >- (rename [‘trans conf (NPar N1a N2Bb) LTau _ ∧
                    trans conf (NPar N2Aa N1b) LTau _’,
                   ‘net_wf (NPar N1a N1b)’] >>
           metis_tac[trans_rules])
-      (* (SECOND DIFF) Parallel Embedded Behaviour (LEFT) / Parallel Embedded Behaviour (RIGHT) *)
-      >- (rename [‘trans conf (NPar N1a N2Bb) LTau _ ∧
-                   trans conf (NPar N2Aa N1b) LTau _’,
-                  ‘net_wf (NPar N1a N1b)’] >>
-          metis_tac[trans_rules])
-      (* (FIRST DIFF) Parallel Embedded Behaviour (RIGHT) / Parallel Embedded Behaviour (RIGHT) *)
+      (* Parallel Embedded Behaviour (RIGHT) / Parallel Embedded Behaviour (RIGHT) *)
       >- (rename [‘trans conf (NPar N1a N2Ab) LTau _ ∧
                    trans conf (NPar N1a N2Bb) LTau _’,
                   ‘net_wf (NPar N1a N1b)’] >>
@@ -2284,7 +1917,6 @@ Proof
             by metis_tac[net_wf_def] >>
           qexists_tac ‘NPar N1a N3b’ >>
           metis_tac[trans_rules])
-      (* Note: SECOND DIFF of dual parallel embedded right behaviour not possible! *)
       )
   (* NEndpoint case *)
   >- (rw[] >>
