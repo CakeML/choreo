@@ -299,7 +299,7 @@ Proof
                          chorSemTheory.freeprocs_def,
                          chorSemTheory.written_def,
                          FLOOKUP_UPDATE]
-                  \\ rfs [])
+                  \\ rfs [] \\ rw [])
       \\ ho_match_mp_tac trans_sync_step
       \\ asm_exists_tac \\ fs []
       \\ first_x_assum irule

@@ -1947,6 +1947,9 @@ Proof
   Induct_on `e1` >> rw[join_endpoint_def]
 QED
 
+val _ = temp_delsimps ["lift_disj_eq","lift_imp_disj"]
+
+(* TODO: Fix this proof to avoid using temp_delsimps *)
 Theorem join_endpoint_trans:
   !e1 e2 e3.
   join_endpoint e1 e2 = SOME e2 /\ join_endpoint e2 e3 = SOME e3
@@ -1966,6 +1969,7 @@ Proof
   res_tac \\ fs[]
 QED
 
+(* TODO: Fix this proof to avoid using temp_delsimps *)
 Theorem join_network_trans:
   !n1 n2 n3.
   join_network n1 n2 = SOME n2 /\ join_network n2 n3 = SOME n3
