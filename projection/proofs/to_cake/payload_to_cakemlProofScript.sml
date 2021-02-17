@@ -1892,7 +1892,37 @@ Proof
   >- (Cases_on ‘LENGTH l ≤ n’ >> fs eval_sl)
 QED
 
+Theorem findi_EL_DROP:
+  ∀p l. p < LENGTH l ⇒ findi (EL p l) (DROP p l) = 0
+Proof
+  Induct_on ‘p’ >> Cases_on ‘l’ >> simp[findi_def]
+QED
+
+Theorem findi_splitp:
+  findi x l = LENGTH (FST (SPLITP ((=) x) l))
+Proof
+  Induct_on ‘l’ >> simp[findi_def, SPLITP] >> rw[]
+QED
+
 (* -- Model, and thus CakeML code also, correctly simulates SPLITP  *)
+Theorem hfind_one_findi:
+  ∀n l. hfind_one n l = MIN n (LENGTH l) + findi 1w (DROP n l)
+Proof
+  rpt gen_tac >> Induct_on ‘LENGTH l - n’ >>
+  simp[findi_def, Once hfind_one_def, DROP_LENGTH_TOO_LONG]
+  >- simp[MIN_DEF] >>
+  Cases_on ‘l’ >> simp[] >> rpt strip_tac >>
+  rename [‘SUC m = SUC (LENGTH ll) - n’] >>
+  Cases_on ‘n’ >> simp[]
+  >- (Cases_on ‘h = 1w’ >> simp[findi_def, MIN_DEF]) >>
+  rename [‘1w = EL p ll’]>> ‘p < LENGTH ll’ by simp[] >>
+  ‘m + p + 1 = LENGTH ll’ by simp[]  >>
+  ‘MIN (SUC p) (SUC (LENGTH ll)) = SUC p ∧
+   MIN (SUC (SUC p)) (SUC (LENGTH ll)) = SUC (SUC p)’ by simp[MIN_DEF] >>
+  rw[ADD_CLAUSES, DECIDE “x:num = x + y ⇔ y = 0”, findi_EL_DROP] >>
+  simp[DROP_CONS_EL, findi_def]
+QED
+
 Theorem find_one_correct:
   ∀env lnum s1 h l.
     nsLookup     env.v (Short "x") = SOME (Loc lnum) ∧
@@ -1909,31 +1939,7 @@ Proof
   rw[] >>
   ‘1 + LENGTH (FST (SPLITP ($=1w) l)) = hfind_one 1 (h::l)’
     suffices_by (rw[] >> metis_tac[find_one_equiv]) >>
-  Cases_on ‘LENGTH l = 0’
-  >- (Cases_on ‘l’ >> fs[LENGTH_NIL,SPLITP,Once hfind_one_def]) >>
-  ‘0 < LENGTH l’
-    by simp[] >>
-  qpat_x_assum ‘LENGTH l ≠ 0’ (K ALL_TAC) >>
-  ‘∀n (l : word8 list). n < LENGTH l ⇒ hfind_one n l = n + LENGTH (FST (SPLITP ($=1w) (DROP n l)))’
-    suffices_by (rw[] >> first_x_assum (assume_tac o REWRITE_RULE [Once EQ_SYM_EQ]) >>
-                 first_x_assum (qspecl_then [‘1’,‘h::l’] assume_tac)) >>
-  rpt (first_x_assum (K ALL_TAC)) >>
-  rw[] >>
-  Induct_on ‘LENGTH l - n’
-  >- rw[Once hfind_one_def,DROP_LENGTH_TOO_LONG,SPLITP,FST]
-  >- (rw[Once hfind_one_def] >>
-      ‘DROP n l = (EL n l)::(DROP (SUC n) l)’
-        by (irule DROP_CONS_EL >> fs[])
-      >- rw[Once SPLITP]
-      >- (first_x_assum (qspecl_then [‘l’,‘SUC n’] assume_tac) >>
-          rfs[] >>
-          Cases_on ‘SUC n < LENGTH l’
-          >- (fs[] >> rw[Once SPLITP])
-          >- (rw[Once SPLITP] >>
-              ‘DROP (SUC n) l = []’
-                by (irule DROP_LENGTH_TOO_LONG >> fs[]) >>
-              fs[SPLITP,FST,LENGTH_NIL] >>
-              rw[Once hfind_one_def])))
+  simp[hfind_one_findi, GSYM findi_splitp, MIN_DEF]
 QED
 
 (* unpadv matches unpad  *)
@@ -3550,7 +3556,6 @@ Proof
   qpat_abbrev_tac ‘X = Recclosure E' cls’ >> RM_ABBREV_TAC "X" >>
   Induct_on ‘cls’ >> simp[FORALL_PROD]
 QED
-
 
 Theorem simulation:
   ∀p0 pSt0 EP0 L p pSt EP cEnv0 vs cSt0.
