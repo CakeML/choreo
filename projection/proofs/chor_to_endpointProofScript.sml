@@ -8,7 +8,7 @@ open preamble choreoUtilsTheory
 val _ = new_theory "chor_to_endpointProof";
 
 val _ = set_grammar_ancestry
-  ["endpointProps","endpointLang","endpointConfluence",
+  ["endpointProps","endpointLang","endpointConfluence","chor_to_endpoint","chorProps","chorSyncProps",
    "chor_to_endpointProof","chorSem","chorLang"];
 
 Theorem split_sel_dvars:
@@ -1901,9 +1901,7 @@ Theorem not_trans_LFix_if_l:
 Proof
   Induct \\ rw []
   \\ ONCE_REWRITE_TAC [trans_cases] \\ rw []
-  \\ disj1_tac \\ disj2_tac \\ disj2_tac \\ disj2_tac
-  \\ CCONTR_TAC \\ fs []
-  \\ pop_assum (assume_tac o Q.AP_TERM ‘chor_size’)
+  \\ pop_assum (assume_tac o Q.AP_TERM ‘chorLang$chor_size’)
   \\ fs [chorLangTheory.chor_size_def]
 QED
 
@@ -1916,9 +1914,7 @@ Proof
   >- (CCONTR_TAC \\ fs []
      \\ drule trans_LFix_async \\ strip_tac
       \\ rveq \\ gs [])
-  \\ CCONTR_TAC \\ fs []
-  \\ pop_assum kall_tac
-  \\ pop_assum (assume_tac o Q.AP_TERM ‘chor_size’)
+  \\ pop_assum (assume_tac o Q.AP_TERM ‘chorLang$chor_size’)
   \\ fs [chorLangTheory.chor_size_def]
 QED
 
@@ -2586,17 +2582,17 @@ Proof
       \\ fs []  \\ rveq
       \\ fs [not_trans_LFix_if_l,not_trans_LFix_if_r]
       \\ pop_assum kall_tac
-      \\ pop_assum (assume_tac o Q.AP_TERM ‘chor_size’)
+      \\ pop_assum (assume_tac o Q.AP_TERM ‘chorLang$chor_size’)
       \\ fs [chorLangTheory.chor_size_def])
-  >- (qpat_x_assum ‘_ = _’ (mp_tac o AP_TERM “chor_size”)
+  >- (qpat_x_assum ‘_ = _’ (mp_tac o AP_TERM “chorLang$chor_size”)
       \\ EVAL_TAC \\ fs [])
-  >- (qpat_x_assum ‘_ = _’ (mp_tac o AP_TERM “chor_size”)
+  >- (qpat_x_assum ‘_ = _’ (mp_tac o AP_TERM “chorLang$chor_size”)
       \\ EVAL_TAC \\ fs [])
   \\ qpat_x_assum ‘trans _ _ _’ (assume_tac o ONCE_REWRITE_RULE [trans_cases])
   \\ fs []  \\ rveq
   \\ gs [not_trans_LFix_if_l,not_trans_LFix_if_r,lcong_nil_simp]
   \\ pop_assum kall_tac
-  \\ pop_assum (assume_tac o Q.AP_TERM ‘chor_size’)
+  \\ pop_assum (assume_tac o Q.AP_TERM ‘chorLang$chor_size’)
   \\ fs [chorLangTheory.chor_size_def]
 QED
 
