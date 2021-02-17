@@ -23,13 +23,13 @@ End
 Theorem INT_UNCT:
   UNCT INT
 Proof
-  rw[UNCT_def,INT_def] 
+  rw[UNCT_def,INT_def]
 QED
 
 Theorem NUM_UNCT:
   UNCT NUM
 Proof
-  rw[UNCT_def,NUM_def,INT_def] 
+  rw[UNCT_def,NUM_def,INT_def]
 QED
 
 Theorem BOOL_UNCT:
@@ -81,7 +81,7 @@ Definition ck_equiv_hol_def:
     ∀arefs.
       ∃bc1 bc2 drefs cVal.
         hT hVal cVal ∧
-        evaluate (empty_state with <|clock := bc1; refs := arefs|>) cEnv [cExp] = 
+        evaluate (empty_state with <|clock := bc1; refs := arefs|>) cEnv [cExp] =
           (empty_state with <|clock := bc2; refs := arefs ++ drefs|>,
           Rval [cVal])
 End
@@ -194,7 +194,7 @@ Proof
   rename1 ‘∀dc.
             evaluate (_ with clock := AC2 + dc) cEnv [fExp] = (_ with clock := dc + BC2,Rval [cVf])’ >>
   Q.REFINE_EXISTS_TAC ‘bc1 + AC2’ >>
-  simp[] >> 
+  simp[] >>
   Q.REFINE_EXISTS_TAC ‘SUC bc1’ >> rw[dec_clock_def,arithmeticTheory.ADD1] >>
   pop_assum kall_tac >>
   qpat_x_assum ‘ck_equiv_hol _ _ _ _’ kall_tac >>
