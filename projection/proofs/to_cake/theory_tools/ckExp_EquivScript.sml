@@ -321,7 +321,6 @@ Proof
   rpt strip_tac >>
   rw [ck_equiv_hol_def] >>
   CONV_TAC (RESORT_EXISTS_CONV rev) >>
-  MAP_EVERY qexists_tac [‘Boolv (hA = hB)’] >>
   simp trans_sl >>
   CONV_TAC (RESORT_EXISTS_CONV rev) >>
   qmatch_goalsub_abbrev_tac ‘evaluate (cSt with clock := _) _ _’ >>
@@ -345,21 +344,22 @@ Proof
       fs[] >>
       first_x_assum (K ALL_TAC) >>
       ‘∀hL cL. LIST_TYPE ^WORD8 hL cL ⇒ (do_eq cL cL = Eq_val T)’
-        suffices_by (qunabbrev_tac ‘cSt’ >> rw[] >> ‘do_eq cV cV = Eq_val T’ by metis_tac[] >>
-                     simp[] >> MAP_EVERY qexists_tac [‘0’,‘bc2 + bc2'’,‘drefs ++ drefs'’] >>
-                     simp[state_component_equality]) >>
+        suffices_by
+        (qunabbrev_tac ‘cSt’ >> rw[] >>
+         ‘do_eq cV cV = Eq_val T’ by metis_tac[] >>
+         simp[] >> MAP_EVERY qexists_tac [‘0’,‘bc2 + bc2'’,‘drefs ++ drefs'’] >>
+         simp[state_component_equality]) >>
       Induct_on ‘hL’
       >- (rw trans_sl >> EVAL_TAC)
       >- (Cases_on ‘cL’ >> rw [do_eq_def,LIST_TYPE_def] >>
           rw [do_eq_def] >> Cases_on ‘v2_1’ >> fs[do_eq_def,WORD_def]))
   >- (‘∀hAt cAt hBt cBt.
-        LIST_TYPE ^WORD8 hAt cAt ∧
-        LIST_TYPE ^WORD8 hBt cBt ∧
-        hAt ≠ hBt ⇒
-        (do_eq cAt cBt = Eq_val F)’
-        suffices_by (qunabbrev_tac ‘cSt’ >> rw[] >> ‘do_eq cV' cV = Eq_val F’ by metis_tac[] >>
-                     simp[] >> MAP_EVERY qexists_tac [‘0’,‘bc2 + bc2'’,‘drefs ++ drefs'’] >>
-                     simp[state_component_equality]) >>
+         LIST_TYPE ^WORD8 hAt cAt ∧ LIST_TYPE ^WORD8 hBt cBt ∧ hAt ≠ hBt ⇒
+         do_eq cAt cBt = Eq_val F’ suffices_by
+        (qunabbrev_tac ‘cSt’ >> rw[] >>
+         ‘do_eq cV' cV = Eq_val F’ by metis_tac[] >>
+         simp[] >> MAP_EVERY qexists_tac [‘0’,‘bc2 + bc2'’,‘drefs ++ drefs'’] >>
+         simp[state_component_equality]) >>
       Induct_on ‘hAt’
       >- (rw[LIST_TYPE_def] >> Cases_on ‘hBt’ >> fs [] >>
           fs[LIST_TYPE_def] >> rw[do_eq_def] >>
@@ -368,9 +368,7 @@ Proof
           rw[do_eq_def] >> fs[ctor_same_type_def,same_type_def] >>
           Cases_on ‘v2_1’ >> Cases_on ‘v2_1'’ >> fs trans_sl >>
           rw[do_eq_def] >> fs[lit_same_type_def,same_type_def] >>
-          ‘do_eq v2_2 v2_2' = Eq_val F’
-            by metis_tac[] >>
-          Cases_on ‘h = h'’ >> simp[]))
+          simp[AllCaseEqs()] >> metis_tac[]))
 QED
 
 val _ = export_theory()
