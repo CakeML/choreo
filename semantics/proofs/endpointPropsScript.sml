@@ -1805,7 +1805,7 @@ Proof
   metis_tac[trans_selfloop_LTau]
 QED
 
-val join_endpoint_def = Define `
+Definition join_endpoint_def:
   (join_endpoint Nil Nil = SOME Nil) /\
   (join_endpoint (Send p1 v1 e1) (Send p2 v2 e2) =
    if p1 = p2 /\ v1 = v2 then
@@ -1863,9 +1863,16 @@ val join_endpoint_def = Define `
      | _ => NONE
     else NONE)) /\
   (join_endpoint _ _ = NONE)
-`
+End
 
-val join_network_def = Define `
+Theorem join_endpoint_NilNONE[simp]:
+  (join_endpoint Nil e = NONE ⇔ e ≠ Nil) ∧
+  (join_endpoint e Nil = NONE ⇔ e ≠ Nil)
+Proof
+  Cases_on ‘e’ >> simp[join_endpoint_def]
+QED
+
+Definition join_network_def:
  (join_network (NPar n1 n2) (NPar n3 n4) =
    (case (join_network n1 n3, join_network n2 n4) of
       (SOME n5, SOME n6) => SOME(NPar n5 n6)
@@ -1876,19 +1883,30 @@ val join_network_def = Define `
    if p1 = p2 /\ s1 = s2 then
      OPTION_BIND (join_endpoint e1 e2) (SOME o NEndpoint p1 s1)
    else NONE) /\
-  (join_network _ _ = NONE)`
+  (join_network _ _ = NONE)
+End
+
+Theorem join_endpoint_nilSOME[simp]:
+  (join_endpoint e Nil = SOME x ⇔ e = Nil ∧ x = Nil) ∧
+  (join_endpoint Nil e = SOME x ⇔ e = Nil ∧ x = Nil) ∧
+  (join_endpoint e1 e2 = SOME Nil ⇔ e1 = Nil ∧ e2 = Nil)
+Proof
+  rpt strip_tac >~ [‘join_endpoint _ _ = SOME Nil’]
+  >- (map_every Cases_on [‘e1’,‘e2’] >> simp[join_endpoint_def, AllCaseEqs()])>>
+  Cases_on ‘e’ >> simp[join_endpoint_def, EQ_SYM_EQ]
+QED
 
 Theorem join_endpoint_nil:
   join_endpoint e Nil = SOME Nil ==> e = Nil
 Proof
-  Induct_on `e` >> rw[join_endpoint_def]
+  simp[]
 QED
 
 Theorem join_endpoint_nil_not_nil:
   e <> Nil ==>
   join_endpoint e Nil = NONE /\ join_endpoint Nil e = NONE
 Proof
-  Induct_on `e` >> rw[join_endpoint_def]
+  simp[]
 QED
 
 Theorem join_endpoint_sym:
@@ -1923,13 +1941,27 @@ Proof
   metis_tac[join_endpoint_nil,join_endpoint_sym]
 QED
 
+Theorem join_network_nilSOME[simp]:
+  (join_network n NNil = SOME n' ⇔ n = NNil ∧ n' = NNil) ∧
+  (join_network NNil n = SOME n' ⇔ n = NNil ∧ n' = NNil)
+Proof
+  Cases_on ‘n’ >> simp[join_network_def, EQ_SYM_EQ]
+QED
+
 Theorem join_network_nil:
   join_network n NNil = SOME NNil ==> n = NNil
 Proof
-  Induct_on `n` >> rw[join_network_def,join_endpoint_nil]
+  simp[]
 QED
 
-Theorem join_endpoint_idem:
+Theorem join_network_nilNONE[simp]:
+  (join_network n NNil = NONE ⇔ n ≠ NNil) ∧
+  (join_network NNil n = NONE ⇔ n ≠ NNil)
+Proof
+  Cases_on ‘n’ >> simp[join_network_def]
+QED
+
+Theorem join_endpoint_idem[simp]:
   join_endpoint e e = SOME e
 Proof
   Induct_on `e` >> rw[join_endpoint_def]
@@ -1938,69 +1970,54 @@ QED
 Theorem join_endpoint_nil_eq_nil_right:
   !e1 e2. join_endpoint e1 Nil = SOME e2 ==> e1 = Nil /\ e2 = Nil
 Proof
-  Induct_on `e1` >> rw[join_endpoint_def]
+  simp[]
 QED
 
 Theorem join_endpoint_nil_eq_nil_left:
   !e1 e2. join_endpoint Nil e1 = SOME e2 ==> e1 = Nil /\ e2 = Nil
 Proof
-  Induct_on `e1` >> rw[join_endpoint_def]
+  simp[]
 QED
 
-val _ = temp_delsimps ["lift_disj_eq","lift_imp_disj"]
-
-(* TODO: Fix this proof to avoid using temp_delsimps *)
 Theorem join_endpoint_trans:
   !e1 e2 e3.
-  join_endpoint e1 e2 = SOME e2 /\ join_endpoint e2 e3 = SOME e3
-  ==> join_endpoint e1 e3 = SOME e3
+    join_endpoint e1 e2 = SOME e2 /\ join_endpoint e2 e3 = SOME e3
+    ==> join_endpoint e1 e3 = SOME e3
 Proof
-  Ho_Rewrite.PURE_REWRITE_TAC[GSYM AND_IMP_INTRO, RIGHT_FORALL_IMP_THM] \\
-  recInduct(fetch "-" "join_endpoint_ind") \\
+  recInduct join_endpoint_ind \\
   rpt strip_tac \\
   rename1 `join_endpoint _ ee` \\
   Cases_on `ee` \\
-  fs[join_endpoint_def]
-  >-
-    (rpt(PURE_FULL_CASE_TAC \\ fs[] \\ rveq) \\ fs[join_endpoint_def,join_endpoint_nil] \\
-     res_tac \\ fs[]) \\
-  rpt(PURE_FULL_CASE_TAC \\ fs[] \\ rveq) \\ fs[join_endpoint_def,join_endpoint_nil] \\
-  MAP_EVERY imp_res_tac [join_endpoint_nil_eq_nil_right,join_endpoint_nil_eq_nil_left] \\ fs[] \\
-  res_tac \\ fs[]
+  gvs[join_endpoint_def, AllCaseEqs()]
 QED
 
-(* TODO: Fix this proof to avoid using temp_delsimps *)
 Theorem join_network_trans:
   !n1 n2 n3.
-  join_network n1 n2 = SOME n2 /\ join_network n2 n3 = SOME n3
-  ==> join_network n1 n3 = SOME n3
+    join_network n1 n2 = SOME n2 /\ join_network n2 n3 = SOME n3
+    ==> join_network n1 n3 = SOME n3
 Proof
-  Ho_Rewrite.PURE_REWRITE_TAC[GSYM AND_IMP_INTRO, RIGHT_FORALL_IMP_THM] \\
-  recInduct(fetch "-" "join_network_ind") \\
+  recInduct join_network_ind \\
   rpt strip_tac \\
   rename1 `join_network _ ee` \\
   Cases_on `ee` \\
-  fs[join_network_def]
-  >-
-    (rpt(PURE_FULL_CASE_TAC \\ fs[] \\ rveq) \\ fs[join_network_def] \\
-     res_tac \\ fs[]) \\
+  gvs[join_network_def, AllCaseEqs()] \\
   metis_tac[join_endpoint_trans]
 QED
 
-Theorem join_network_idem:
+Theorem join_network_idem[simp]:
   join_network n n = SOME n
 Proof
   Induct_on `n` >> rw[join_network_def,join_endpoint_idem]
 QED
 
-val (prunes_rules,prunes_coind,prunes_cases) = Hol_coreln `
+CoInductive prunes:
   join_network n1 n2 = SOME n2 /\
   (!n2'. (reduction n2 n2' ==> ?n1'. reduction n1 n1' /\ prunes n1' n2'))
   ==>
   prunes n1 n2
-  `
+End
 
-Theorem prunes_refl:
+Theorem prunes_refl[simp]:
   prunes n1 n1
 Proof
   ho_match_mp_tac(MP_CANON prunes_coind) \\
