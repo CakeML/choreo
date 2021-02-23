@@ -2069,17 +2069,16 @@ Proof
 QED
 
 val junkcong_add_junk'' = Q.store_thm("junkcong_add_junk''",
- `∀p b q e v fvs d.
+ `∀p b q f e v fvs d.
     v ∈ fvs ∧ ¬MEM v (free_var_names_endpoint e)
-    ⇒ junkcong fvs (NEndpoint p <|bindings := b; queues := q|> e)
-                    (NEndpoint p <|bindings := b |+ (v,d); queues := q|> e)`,
+    ⇒ junkcong fvs (NEndpoint p <|bindings := b; funs := f; queues := q|> e)
+                    (NEndpoint p <|bindings := b |+ (v,d); funs := f; queues := q|> e)`,
  rpt strip_tac
  >> qmatch_goalsub_abbrev_tac `junkcong _ (NEndpoint _ a1 _) (NEndpoint _ a2 _)`
  >> `a2 = a1 with bindings := a1.bindings |+ (v,d)`
      by(unabbrev_all_tac >> simp[])
  >> rveq
  >> match_mp_tac junkcong_add_junk >> simp[]);
-
 
 val junkcong_add_junk''' = Q.store_thm("junkcong_add_junk'''",
   `∀p s q e v fvs d.

@@ -416,10 +416,16 @@ Proof
   Induct_on ‘c’ >> rw[split_sel_def,variables_def]
 QED
 
+Theorem variables_IN_procsOF:
+  x ∈ variables c ⇒ MEM (SND x) (procsOf c)
+Proof
+  Induct_on ‘c’ >> rw[procsOf_def,variables_def,MEM_nub',MEM_MAP] >> rw[]
+QED
+
 Theorem project'_variables_eq:
-  ∀proc c.
-  project_ok proc c ⇒
-  set (var_names_endpoint (project' proc c)) = IMAGE FST (variables c ∩ {(a,v) | a=a ∧ v = proc})
+  ∀proc dvars c.
+  project_ok proc dvars c ⇒
+  set (var_names_endpoint (project' proc dvars c)) = IMAGE FST (variables c ∩ {(a,v) | a=a ∧ v = proc})
 Proof
   ho_match_mp_tac project_ind >> rw[project_def,var_names_endpoint_def,variables_def] >>
   res_tac >> fs[SUBSET_DEF,INTER_DEF,IMAGE_DEF,FUN_EQ_THM,PULL_EXISTS,MEM_MAP] >-
@@ -428,7 +434,12 @@ Proof
   rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
   fs[var_names_endpoint_def] >>
   rw[] >> res_tac >>
-  rveq >> metis_tac[split_sel_variables,IN_DEF]
+  rveq >-
+   metis_tac[split_sel_variables,IN_DEF] >-
+   metis_tac[split_sel_variables,IN_DEF] >>
+  CCONTR_TAC >> gs [] >> dxrule variables_IN_procsOF >>
+  strip_tac >> dxrule procsOf_dprocsOf_MEM >>
+  gs [] >> metis_tac []
 QED
 
 Theorem projection_variables_eq_lemma:
@@ -443,12 +454,6 @@ Proof
   rveq >> metis_tac[]
 QED
 
-Theorem variables_IN_procsOF:
-  x ∈ variables c ⇒ MEM (SND x) (procsOf c)
-Proof
-  Induct_on ‘c’ >> rw[procsOf_def,variables_def,MEM_nub',MEM_MAP] >> rw[]
-QED
-
 Theorem projection_variables_eq:
   ∀s c.
   compile_network_ok s c (procsOf c) ⇒
@@ -461,8 +466,8 @@ Proof
 QED
 
 Theorem project'_variables_SUBSET:
-  ∀proc c.
-  set (var_names_endpoint (project' proc c)) ⊆ IMAGE FST (variables c)
+  ∀proc dvars c.
+  set (var_names_endpoint (project' proc dvars c)) ⊆ IMAGE FST (variables c)
 Proof
   ho_match_mp_tac project_ind >> rw[project_def,var_names_endpoint_def,variables_def] >>
   res_tac >> fs[SUBSET_DEF] >-
@@ -474,8 +479,8 @@ Proof
 QED
 
 Theorem project'_free_variables_SUBSET:
-  ∀proc c.
-  set (free_var_names_endpoint (project' proc c)) ⊆ IMAGE FST (free_variables c ∩ {(a,proc) | a=a})
+  ∀proc dvars c.
+  set (free_var_names_endpoint (project' proc dvars c)) ⊆ IMAGE FST (free_variables c ∩ {(a,proc) | a=a})
 Proof
   ho_match_mp_tac project_ind >> rw[project_def,free_var_names_endpoint_def,free_variables_def] >>
   res_tac >> fs[SUBSET_DEF] >>
@@ -522,11 +527,10 @@ Proof
   >- metis_tac[payloadPropsTheory.junkcong_sym]
   >- metis_tac[payloadPropsTheory.junkcong_trans]
   >- (simp[endpoint_to_payloadTheory.compile_network_def,compile_state_def] >>
-      match_mp_tac payloadPropsTheory.junkcong_add_junk'' >> rw[] >>
+      irule payloadPropsTheory.junkcong_add_junk'' >> rw[] >>
       metis_tac[endpoint_to_payload_free_var_names])
   >- (rw[endpoint_to_payloadTheory.compile_network_def] >> metis_tac[payloadPropsTheory.junkcong_par])
 QED
-
 
 Definition perm1_def:
   perm1 v1 v2 v = if v = v1 then v2 else if v = v2 then v1 else v
@@ -536,6 +540,10 @@ Definition perm_endpoint_def:
   (perm_endpoint v1 v2 (payloadLang$Nil) = Nil)
   ∧ (perm_endpoint v1 v2 (Send p v n e) = Send p (perm1 v1 v2 v) n (perm_endpoint v1 v2 e))
   ∧ (perm_endpoint v1 v2 (Receive p v d e) = Receive p (perm1 v1 v2 v) d (perm_endpoint v1 v2 e))
+  ∧ (perm_endpoint v1 v2 (Fix d e) = Fix d (perm_endpoint v1 v2 e))
+  ∧ (perm_endpoint v1 v2 (Call d) = Call d)
+  ∧ (perm_endpoint v1 v2 (Letrec d vl e) = Letrec d (MAP (perm1 v1 v2) vl) (perm_endpoint v1 v2 e))
+  ∧ (perm_endpoint v1 v2 (FCall d vl) = FCall d (MAP (perm1 v1 v2) vl))
   ∧ (perm_endpoint v1 v2 (IfThen v e1 e2) =
         IfThen (perm1 v1 v2 v)
                (perm_endpoint v1 v2 e1)
@@ -548,15 +556,34 @@ Definition perm_endpoint_def:
      )
 End
 
+Definition perm_bindings_def:
+  perm_bindings v1 v2 vs =
+  if v1 ∈ FDOM vs ∧ v2 ∈ FDOM vs then
+    vs |+ (v1,THE(FLOOKUP vs v2)) |+ (v2,THE(FLOOKUP vs v1))
+  else if v1 ∈ FDOM vs then
+    DRESTRICT vs (λx. x ≠ v1) |+ (v2,THE(FLOOKUP vs v1))
+  else if v2 ∈ FDOM vs then
+    DRESTRICT vs (λx. x ≠ v2) |+ (v1,THE(FLOOKUP vs v2))
+  else vs
+End
+
+
+Definition perm_closure_def:
+  perm_closure v1 v2 (Closure vars (funs,bind) e) =
+  Closure (MAP (perm1 v1 v2) vars)
+          (* Had to use lambda since (I ##) gives termination errors *)
+          (MAP (λ(d,f). (d,perm_closure v1 v2 f)) funs, perm_bindings v1 v2 bind) e
+Termination
+  WF_REL_TAC ‘inv_image $< (closure_size o SND o SND)’ >>
+  rw[payloadLangTheory.closure_size_def] >> imp_res_tac ALOOKUP_MEM >>
+  imp_res_tac closure_size_MEM >>
+  DECIDE_TAC
+End
+
 Definition perm_state_def:
-  perm_state v1 v2 (s:'a payloadLang$state) =
-  if v1 ∈ FDOM s.bindings ∧ v2 ∈ FDOM s.bindings then
-    s with bindings := s.bindings |+ (v1,THE(FLOOKUP s.bindings v2)) |+ (v2,THE(FLOOKUP s.bindings v1))
-  else if v1 ∈ FDOM s.bindings then
-    s with bindings := DRESTRICT s.bindings (λx. x ≠ v1) |+ (v2,THE(FLOOKUP s.bindings v1))
-  else if v2 ∈ FDOM s.bindings then
-    s with bindings := DRESTRICT s.bindings (λx. x ≠ v2) |+ (v1,THE(FLOOKUP s.bindings v2))
-  else s
+  perm_state v1 v2 s  =
+    s with <| bindings := perm_bindings v1 v2 s.bindings;
+              funs := MAP (I ## perm_closure v1 v2) s.funs |>
 End
 
 Definition perm_network_def:
@@ -567,13 +594,19 @@ Definition perm_network_def:
   )
 End
 
+Theorem perm_bindings_FLOOKUP:
+  FLOOKUP (perm_bindings v1 v2 vs) v = FLOOKUP vs (perm1 v1 v2 v)
+Proof
+  rw[perm1_def,perm_bindings_def,FLOOKUP_UPDATE,FDOM_FLOOKUP,FLOOKUP_DRESTRICT] >> rw[] >> fs[] >>
+  Cases_on ‘FLOOKUP vs v1’ >> fs[] >>
+  Cases_on ‘FLOOKUP vs v2’ >> fs[] >>
+  Cases_on ‘FLOOKUP vs v’ >> fs[]
+QED
+
 Theorem perm_state_FLOOKUP:
   FLOOKUP (perm_state v1 v2 s).bindings v = FLOOKUP s.bindings (perm1 v1 v2 v)
 Proof
-  rw[perm1_def,perm_state_def,FLOOKUP_UPDATE,FDOM_FLOOKUP,FLOOKUP_DRESTRICT] >> rw[] >> fs[] >>
-  Cases_on ‘FLOOKUP s.bindings v1’ >> fs[] >>
-  Cases_on ‘FLOOKUP s.bindings v2’ >> fs[] >>
-  Cases_on ‘FLOOKUP s.bindings v’ >> fs[]
+  rw[perm_state_def,perm_bindings_FLOOKUP]
 QED
 
 Theorem perm1_cancel[simp]:
@@ -582,11 +615,26 @@ Proof
   rw[perm1_def] >> fs[CaseEq "bool"] >> fs[]
 QED
 
+Theorem perm_bindings_cancel[simp]:
+  perm_bindings v1 v2 (perm_bindings v1 v2 x) = x
+Proof
+  rw[fmap_eq_flookup,perm_bindings_FLOOKUP,perm1_def]
+QED
+
+Theorem perm_closure_cancel[simp]:
+  ∀v1 v2 cf. perm_closure v1 v2 (perm_closure v1 v2 cf) = cf
+Proof
+  ho_match_mp_tac perm_closure_ind \\ rw[perm_closure_def]
+  >- (Induct_on ‘vars’ \\ rw[])
+  >- (Induct_on ‘funs’ \\ rw[] \\ rpt (gs[] \\ pairarg_tac) \\ rveq \\ gs[] \\ metis_tac [])
+QED
+
 Theorem perm_state_cancel[simp]:
   perm_state v1 v2 (perm_state v1 v2 x) = x
 Proof
-  rw[perm_network_def,payloadLangTheory.state_component_equality,fmap_eq_flookup,perm_state_FLOOKUP] >>
-  rw[perm_state_def]
+  rw[payloadLangTheory.state_component_equality,perm_state_def,perm1_def,PAIR_MAP_app]
+  \\ qmatch_goalsub_abbrev_tac ‘_ = xs’ \\ pop_assum kall_tac
+  \\ Induct_on ‘xs’ \\ rw[] \\ Cases_on ‘h’ \\ simp [perm_closure_cancel]
 QED
 
 Theorem perm_endpoint_cancel[simp]:
@@ -610,7 +658,7 @@ Theorem MEM_perm_endpoint:
 Proof
   Induct >> rw[perm_endpoint_def,payloadLangTheory.free_var_names_endpoint_def,EQ_IMP_THM,MEM_FILTER,perm1_cancel,MEM_MAP] >> rw[perm1_cancel] >>
   TRY(fs[perm1_def] >> every_case_tac >> fs[] >> NO_TAC) >>
-  disj1_tac >>
+  TRY disj1_tac >>
   qexists_tac ‘perm1 fv2 fv3 fv1’ >>
   rw[perm1_cancel]
 QED
@@ -658,11 +706,22 @@ QED
 
 Theorem perm_state_bupd[simp]:
   (perm_state v1 v2 (s with bindings := x.bindings |+ (v, d))) =
-  s with bindings := ((perm_state v1 v2 x).bindings |+ (perm1 v1 v2 v, d))
+  s with <| bindings := ((perm_state v1 v2 x).bindings |+ (perm1 v1 v2 v, d));
+            funs := MAP (I ## perm_closure v1 v2) s.funs |>
 Proof
-  rw[payloadLangTheory.state_component_equality,fmap_eq_flookup,perm_state_FLOOKUP] >>
-  rw[FLOOKUP_UPDATE] >> fs[] >>
-  simp[perm_state_FLOOKUP]
+  rw[payloadLangTheory.state_component_equality,fmap_eq_flookup,perm_state_FLOOKUP] >-
+    (rw[FLOOKUP_UPDATE] >> fs[] >> simp[perm_state_FLOOKUP]) >-
+    (rw[PAIR_MAP_app,perm_state_def])
+QED
+
+Theorem perm_endpoint_dsubst:
+  ∀v1 v2 e e' d.
+    perm_endpoint v1 v2 (dsubst e d e') =
+      dsubst (perm_endpoint v1 v2 e) d
+             (perm_endpoint v1 v2 e')
+Proof
+  rw [] \\ induct_on ‘e’
+  \\ rw [payloadLangTheory.dsubst_def,perm_endpoint_def]
 QED
 
 Theorem perm_network_bisim:
@@ -682,8 +741,13 @@ Proof
      disch_then(qspecl_then [‘conf’,‘perm_state v1 v2 s’,‘d’,‘perm_endpoint v1 v2 e’] mp_tac) >>
      simp[]) >-
     (drule payloadSemTheory.trans_dequeue_last_payload >>
-     disch_then(qspecl_then [‘conf’,‘perm_state v1 v2 s’,‘perm1 v1 v2 v’,‘perm_endpoint v1 v2 e’] mp_tac) >>
-     simp[]) >-
+     disch_then(qspecl_then [‘conf’,‘perm_state v1 v2 s’,
+                             ‘perm1 v1 v2 v’,
+                             ‘perm_endpoint v1 v2 e’,
+                             ‘d’,‘tl’,‘ds’] mp_tac) >>
+     simp[] >> qmatch_goalsub_abbrev_tac ‘trans _ _ _ ep1 ⇒ trans _ _ _ ep2’ >>
+     ‘ep1 = ep2’ suffices_by (rveq >> simp[]) >>
+     UNABBREV_ALL_TAC >> simp[payloadLangTheory.state_component_equality]) >-
     (drule payloadSemTheory.trans_dequeue_intermediate_payload >>
      disch_then(qspecl_then [‘conf’,‘perm_state v1 v2 s’,‘perm1 v1 v2 v’,‘perm_endpoint v1 v2 e’] mp_tac) >>
      simp[]) >-
@@ -697,7 +761,9 @@ Proof
      AP_TERM_TAC >>
      AP_THM_TAC >>
      AP_TERM_TAC >>
-     simp[payloadLangTheory.state_component_equality])
+     simp[payloadLangTheory.state_component_equality]) >-
+   (rw[perm_endpoint_dsubst,payloadSemTheory.trans_fix,perm_endpoint_def]) >-
+
 QED
 
 Theorem perm_endpoint:
