@@ -572,7 +572,8 @@ Definition perm_closure_def:
   perm_closure v1 v2 (Closure vars (funs,bind) e) =
   Closure (MAP (perm1 v1 v2) vars)
           (* Had to use lambda since (I ##) gives termination errors *)
-          (MAP (λ(d,f). (d,perm_closure v1 v2 f)) funs, perm_bindings v1 v2 bind) e
+          (MAP (λ(d,f). (d,perm_closure v1 v2 f)) funs, perm_bindings v1 v2 bind)
+          (perm_endpoint v1 v2 e)
 Termination
   WF_REL_TAC ‘inv_image $< (closure_size o SND o SND)’ >>
   rw[payloadLangTheory.closure_size_def] >> imp_res_tac ALOOKUP_MEM >>
@@ -609,10 +610,25 @@ Proof
   rw[perm_state_def,perm_bindings_FLOOKUP]
 QED
 
+Theorem perm_state_ALOOKUP:
+  ALOOKUP (perm_state v1 v2 s).funs d = OPTION_MAP (perm_closure v1 v2) (ALOOKUP s.funs d)
+Proof
+   qspecl_then [‘perm_closure v1 v2’] assume_tac ETA_THM >>
+   rw[perm_state_def,perm_closure_def,PAIR_MAP_app,ALOOKUP_MAP]
+QED
+
 Theorem perm1_cancel[simp]:
   perm1 v1 v2 (perm1 v1 v2 x) = x
 Proof
   rw[perm1_def] >> fs[CaseEq "bool"] >> fs[]
+QED
+
+Theorem perm_endpoint_cancel[simp]:
+  perm_endpoint v1 v2 (perm_endpoint v1 v2 e) = e
+Proof
+  Induct_on ‘e’ >>
+  rw[perm_endpoint_def] >>
+  rw[MAP_MAP_o,o_DEF]
 QED
 
 Theorem perm_bindings_cancel[simp]:
@@ -635,14 +651,6 @@ Proof
   rw[payloadLangTheory.state_component_equality,perm_state_def,perm1_def,PAIR_MAP_app]
   \\ qmatch_goalsub_abbrev_tac ‘_ = xs’ \\ pop_assum kall_tac
   \\ Induct_on ‘xs’ \\ rw[] \\ Cases_on ‘h’ \\ simp [perm_closure_cancel]
-QED
-
-Theorem perm_endpoint_cancel[simp]:
-  perm_endpoint v1 v2 (perm_endpoint v1 v2 e) = e
-Proof
-  Induct_on ‘e’ >>
-  rw[perm_endpoint_def] >>
-  rw[MAP_MAP_o,o_DEF]
 QED
 
 Theorem perm_network_cancel[simp]:
@@ -724,6 +732,53 @@ Proof
   \\ rw [payloadLangTheory.dsubst_def,perm_endpoint_def]
 QED
 
+Theorem perm1_MEM:
+  MEM v l ⇔ MEM (perm1 v1 v2 v) (MAP (perm1 v1 v2) l)
+Proof
+  Induct_on ‘l’ \\ rw[] \\ rw[perm1_def] \\ simp[]
+QED
+
+Theorem MAP_FST_MAP:
+  MAP FST (MAP (f ## I) l) = MAP f (MAP FST l)
+Proof
+  Induct_on ‘l’ \\ simp[]
+QED
+
+Theorem MAP_SND_MAP:
+  MAP SND (MAP (I ## f) l) = MAP f (MAP SND l)
+Proof
+  Induct_on ‘l’ \\ simp[]
+QED
+
+Theorem perm_bindings_update_list:
+  perm_bindings v1 v2 (v |++ l) = perm_bindings v1 v2 v |++ MAP (perm1 v1 v2 ## I) l
+Proof
+  Induct_on ‘l’ \\ rw [FUPDATE_LIST_THM]
+  \\ Cases_on ‘h’ \\ Cases_on ‘MEM q (MAP FST l)’
+  >- (simp[FUPDATE_FUPDATE_LIST_MEM]
+      \\ mp_tac (GEN_ALL FUPDATE_FUPDATE_LIST_MEM)
+      \\ disch_then(qspecl_then[‘r’,‘MAP (perm1 v1 v2 ## I) l’,
+                                ‘perm1 v1 v2 q’,
+                                ‘perm_bindings v1 v2 v’] mp_tac)
+      \\ impl_tac
+      >- (simp[MAP_FST_MAP]
+          \\ irule ((fst o EQ_IMP_RULE) perm1_MEM) \\ simp[])
+      \\ rw [])
+  >- (simp[FUPDATE_FUPDATE_LIST_COMMUTES]
+      \\ mp_tac (GEN_ALL FUPDATE_FUPDATE_LIST_COMMUTES)
+      \\ disch_then(qspecl_then[‘r’,‘MAP (perm1 v1 v2 ## I) l’,
+                                ‘perm1 v1 v2 q’,
+                                ‘perm_bindings v1 v2 v’] mp_tac)
+      \\ impl_tac
+      >- (simp[MAP_FST_MAP] \\ CCONTR_TAC \\ fs[]
+          \\ drule ((snd o EQ_IMP_RULE) perm1_MEM)
+          \\ simp[])
+      \\ rw[] \\ pop_assum kall_tac
+      \\ rw[fmap_eq_flookup,perm_bindings_FLOOKUP]
+      \\ rw[FLOOKUP_UPDATE]
+      \\ fs[perm1_cancel,perm_bindings_FLOOKUP,fmap_eq_flookup])
+QED
+
 Theorem perm_network_bisim:
   BISIM_REL (trans conf) (perm_network v1 v2 n) n
 Proof
@@ -747,7 +802,7 @@ Proof
                              ‘d’,‘tl’,‘ds’] mp_tac) >>
      simp[] >> qmatch_goalsub_abbrev_tac ‘trans _ _ _ ep1 ⇒ trans _ _ _ ep2’ >>
      ‘ep1 = ep2’ suffices_by (rveq >> simp[]) >>
-     UNABBREV_ALL_TAC >> simp[payloadLangTheory.state_component_equality]) >-
+     UNABBREV_ALL_TAC >> simp[payloadLangTheory.state_component_equality,perm_state_def,PAIR_MAP_app]) >-
     (drule payloadSemTheory.trans_dequeue_intermediate_payload >>
      disch_then(qspecl_then [‘conf’,‘perm_state v1 v2 s’,‘perm1 v1 v2 v’,‘perm_endpoint v1 v2 e’] mp_tac) >>
      simp[]) >-
@@ -761,9 +816,32 @@ Proof
      AP_TERM_TAC >>
      AP_THM_TAC >>
      AP_TERM_TAC >>
-     simp[payloadLangTheory.state_component_equality]) >-
+     simp[payloadLangTheory.state_component_equality,perm_state_def,PAIR_MAP_app]) >-
    (rw[perm_endpoint_dsubst,payloadSemTheory.trans_fix,perm_endpoint_def]) >-
-
+   (‘EVERY (IS_SOME o FLOOKUP (perm_state v1 v2 s).bindings) (MAP (perm1 v1 v2) vars)’
+       by(fs[EVERY_MEM,MEM_MAP,PULL_EXISTS,perm_state_FLOOKUP]) >>
+    drule payloadSemTheory.trans_letrec >>
+    disch_then(qspecl_then [‘conf’,‘p’,‘dn’,‘perm_endpoint v1 v2 e’] mp_tac) >>
+    simp[perm_state_def,perm_closure_def,PAIR_MAP_app]) >-
+   (‘EVERY (IS_SOME o FLOOKUP (perm_state v1 v2 s).bindings) (MAP (perm1 v1 v2) args)’
+       by(fs[EVERY_MEM,MEM_MAP,PULL_EXISTS,perm_state_FLOOKUP]) >>
+    pop_assum (mp_then Any mp_tac payloadSemTheory.trans_call) >>
+    disch_then(qspecl_then [‘conf’,‘p’,‘dn’,
+                            ‘MAP (perm1 v1 v2) params’,
+                            ‘MAP (I ## perm_closure v1 v2) funs’,
+                            ‘perm_bindings v1 v2 bindings’,
+                            ‘perm_endpoint v1 v2 e’] mp_tac) >>
+    impl_tac >-
+     (simp[perm_state_ALOOKUP,perm_closure_def,PAIR_MAP_app]) >>
+    simp[perm_state_def,perm_closure_def,PAIR_MAP_app] >>
+    qmatch_goalsub_abbrev_tac ‘trans _ _ _ (NEndpoint _ s1 _) ⇒ trans _ _ _ (NEndpoint _ s2 _)’ >>
+    ‘s1 = s2’ suffices_by simp[] >>
+    UNABBREV_ALL_TAC >> simp[payloadLangTheory.state_component_equality] >>
+    simp[perm_bindings_update_list,perm_bindings_FLOOKUP] >>
+    AP_TERM_TAC >> simp[ZIP_MAP,MAP_ZIP,PAIR_MAP_app] >>
+    qabbrev_tac ‘ll = ZIP (params,args)’ >>
+    pop_assum kall_tac >>
+    induct_on ‘ll’ >> simp[] >> rw[] >> Cases_on ‘h’ >> simp[perm_bindings_FLOOKUP])
 QED
 
 Theorem perm_endpoint:
