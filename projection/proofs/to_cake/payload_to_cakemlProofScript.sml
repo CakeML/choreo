@@ -3188,6 +3188,22 @@ Definition cpEval_valid_def:
     cSt.ffi.oracle = comms_ffi_oracle conf
 End
 
+(* VALIDITY *)
+(* Check that Payload States with label transition and
+   two corresponding FFI states are all valid to produce
+   coherent corresponding transitions *)
+Definition cpFFI_valid_def:
+  (cpFFI_valid conf pSt1 pSt2 ffi1 ffi2 (payloadSem$LSend _ d rp)
+    ⇔ strans conf ffi1 (ASend rp d) ffi2) ∧
+  (cpFFI_valid conf pSt1 pSt2 ffi1 ffi2 (LReceive _ _ _)
+    ⇔ ffi_eq conf ffi1 ffi2) ∧
+  (cpFFI_valid conf pSt1 pSt2 ffi1 ffi2 LTau
+    ⇔ case (some (sp,d).
+              pSt1.queues = normalise_queues (pSt2.queues |+ (sp,d::qlk pSt2.queues sp))) of
+        SOME (sp,d) => strans conf ffi1 (ARecv sp d) ffi2
+      | NONE        => ffi_eq conf ffi1 ffi2)
+End
+
 Theorem FDOM_normalise_queues:
   FDOM (normalise_queues fm) = FDOM fm DIFF { k | k ∈ FDOM fm ∧ fm ' k = []}
 Proof
@@ -3931,6 +3947,23 @@ Proof
   >- ((* FCall *) cheat)
 QED
 
+Theorem simulation:
+  ∀p0 pSt0 EP0 L p pSt EP cEnv0 vs cSt0.
+    trans conf (NEndpoint p0 pSt0 EP0) L (NEndpoint p pSt EP) ∧
+    cpEval_valid conf p0 cEnv0 pSt0 EP0 vs cvs cSt0 ∧
+    (∀nd. nd ∈ EP_nodenames EP0 ⇒ ffi_has_node nd cSt0.ffi.ffi_state) ∧
+    pletrec_vars_ok EP0
+    ⇒
+    ∃cEnv cSt.
+      triR stepr
+        (cEnv0, smSt cSt0, Exp (compile_endpoint conf vs EP0), [])
+        (cEnv, smSt cSt, Exp (compile_endpoint conf vs EP), []) ∧
+      cpEval_valid conf p cEnv pSt EP vs cvs cSt ∧
+      cpFFI_valid conf pSt0 pSt cSt0.ffi.ffi_state cSt.ffi.ffi_state L ∧
+      (∀nd. nd ∈ EP_nodenames EP ⇒ ffi_has_node nd cSt.ffi.ffi_state)
+Proof
+  cheat
+QED
 
 (*
 (* Irrelevance of extra time/fuel to equivalence *)
@@ -5882,6 +5915,8 @@ Proof
   simp[pSt_pCd_corr_def, DISJ_IMP_THM, FORALL_AND_THM, CONJ_COMM]
 QED
 
+*)
+
 Theorem ffi_eq_REFL[simp]:
   ffi_eq c s s
 Proof
@@ -5902,6 +5937,8 @@ Proof
   ‘equivalence (ffi_eq c)’ by simp[ffi_eq_equivRel] >>
   fs[equivalence_def, transitive_def] >> metis_tac[]
 QED
+
+(*
 
 Theorem ffi_eq_bisimulation_L:
   ffi_eq conf s1 s2 ∧ strans conf s1 L s1' ⇒
@@ -7351,6 +7388,8 @@ Proof
   *)
 QED
 
+*)
+
 Theorem NPar_trans_l_cases_full:
   ∀p s c s' c' conf n n'.
    trans conf (NPar (NEndpoint p s c) n) LTau (NPar (NEndpoint p s' c') n')
@@ -7394,23 +7433,20 @@ Proof
 QED
 
 Theorem trans_not_same:
-  ∀conf n1 l n2 . trans conf n1 l n2 ∧ conf.payload_size > 0 ⇒ n1 ≠ n2
+  ∀conf n1 l n2 . trans conf n1 l n2 ∧ conf.payload_size > 0 ∧ l ≠ LTau ⇒ n1 ≠ n2
 Proof
   rpt gen_tac \\ strip_tac
   \\ rpt (pop_assum mp_tac)
   \\ MAP_EVERY (W(curry Q.SPEC_TAC)) [‘n2’,‘l’,‘n1’,‘conf’]
   \\ ho_match_mp_tac trans_strongind \\ rw []
-  >- (Induct_on ‘e’ \\ rw [] \\ metis_tac [])
+  >- (spose_not_then (strip_assume_tac o AP_TERM “endpoint_size”) >>
+      gvs[endpoint_size_def])
   >- rw [payloadLangTheory.state_component_equality]
-  >- (disj2_tac \\ Induct_on ‘e’ \\ rw [] \\ metis_tac [])
-  >- (Induct_on ‘e1’ \\ rw [] \\ metis_tac [])
-  >- (Induct_on ‘e2’ \\ rw [] \\ metis_tac [])
-  \\  disj2_tac \\ Induct_on ‘e’ \\ rw [] \\ metis_tac []
 QED
 
 Theorem trans_ffi_eq_same:
   ∀p s c l conf n n'.
-   ffi_wf (p,s,n) ∧
+   ffi_wf (p,s.queues,n) ∧
    conf.payload_size > 0 ∧
    trans conf (NPar (NEndpoint p s c) n ) LTau
               (NPar (NEndpoint p s c) n')
@@ -7419,10 +7455,10 @@ Proof
   rw []
   \\ irule internal_trans_equiv_irrel
   \\ fs [ffi_wf_def]
+  \\ pop_assum (assume_tac o ONCE_REWRITE_RULE [trans_cases]) \\ fs []
   \\ irule RTC_SINGLE
   \\ fs [internal_trans_def]
   \\ ntac 2 (last_x_assum (K ALL_TAC))
-  \\ pop_assum (assume_tac o ONCE_REWRITE_RULE [trans_cases]) \\ fs []
   \\ IMP_RES_TAC trans_not_same \\ rw [] \\ fs []
 QED
 
@@ -7433,12 +7469,114 @@ Proof
  \\ goal_assum (first_assum o mp_then Any mp_tac)
 QED
 
-Theorem network_NPar_forward_correctness:
-  ∀conf s c n p s' c' n' st1 vs1 env1 st2.
-  trans conf (NPar (NEndpoint p s c) n) LTau (NPar (NEndpoint p s' c') n') ∧
+Theorem endpoint_trans_tau_IMP_strans:
+  trans conf (NEndpoint p s c) LTau (NEndpoint p s' c') ⇒
+  ((p,s.queues,n) = (p,s'.queues,n)) ∨
+  ∃L. strans conf (p,s.queues,n) L (p,s'.queues,n)
+Proof
+  rw[Once trans_cases] >> rw[] >>
+  disj2_tac >>
+  irule_at Any (cj 1 strans_rules) >>
+  metis_tac[]
+QED
 
+Theorem normalise_queues_add_same:
+  normalise_queues (q |+ (p,qlk q p)) =
+  normalise_queues q
+Proof
+  rw[fmap_eq_flookup,FLOOKUP_normalise_queues_FUPDATE] >> rw[] >>
+  gvs[qlk_def,fget_def,AllCaseEqs(),FLOOKUP_normalise_queues] >>
+  Cases_on ‘FLOOKUP q p’ >> gvs[]
+QED
+
+Theorem ffi_eq_cpFFI_valid_pres:
+  trans conf (NEndpoint p s c) LTau (NEndpoint p s' c') ∧
+  normalised s.queues ∧
+  ffi_wf (p,s.queues,n) ∧
+  cpFFI_valid conf s s' (p,s.queues,n) st1 LTau ⇒
+  ffi_eq conf st1 (p,s'.queues,n)
+Proof
+  simp[cpFFI_valid_def,some_def] >>
+  reverse IF_CASES_TAC
+  >- (simp[] >>
+      strip_tac >>
+      ‘s'.queues = s.queues’
+        suffices_by metis_tac[ffi_eq_equivRel,equivalence_def,symmetric_def] >>
+      gvs[EXISTS_PROD,FORALL_PROD] >>
+      gvs[Once trans_cases] >>
+      spose_not_then kall_tac >>
+      last_x_assum(qspecl_then [‘p1’,‘d’] mp_tac) >>
+      simp[] >>
+      gvs[normalised_def,normalise_queues_FUPDATE_NONEMPTY] >>
+      rw[fmap_eq_flookup,FLOOKUP_UPDATE] >> rw[] >>
+      gvs[qlk_def,fget_def,AllCaseEqs()])
+  >- (SELECT_ELIM_TAC >>
+      conj_tac >- metis_tac[] >>
+      pop_assum kall_tac >>
+      simp[FORALL_PROD] >>
+      rw[] >>
+      gvs[Once trans_cases,payloadLangTheory.state_component_equality]
+      >- (PairCases_on ‘st1’ >>
+          imp_res_tac strans_pres_pnum >>
+          gvs[] >>
+          match_mp_tac ffi_eq_pres >>
+          irule_at Any ffi_eq_REFL >>
+          qhdtm_x_assum ‘strans’ (irule_at Any) >>
+          simp[] >>
+          rename1 ‘ARecv pp1 dd’ >>
+          ‘pp1 = p1 ∧ dd = d’
+            by(gvs[fmap_eq_flookup] >>
+               qpat_x_assum ‘∀x. FLOOKUP (normalise_queues _) _ = _’ (qspec_then ‘p1’ mp_tac) >>
+               simp[FLOOKUP_normalise_queues,FLOOKUP_UPDATE] >>
+               rw[] >>
+               gvs[qlk_def,fget_def,AllCaseEqs()]) >>
+          rveq >>
+          match_mp_tac (cj 1 strans_rules) >>
+          simp[])
+      >- (PairCases_on ‘st1’ >>
+          imp_res_tac strans_pres_pnum >>
+          gvs[] >>
+          match_mp_tac ffi_eq_pres >>
+          irule_at Any ffi_eq_REFL >>
+          qhdtm_x_assum ‘strans’ (irule_at Any) >>
+          simp[] >>
+          rename1 ‘ARecv pp1 dd’ >>
+          ‘pp1 = p1 ∧ dd = d’
+            by(gvs[fmap_eq_flookup] >>
+               qpat_x_assum ‘∀x. FLOOKUP (normalise_queues _) _ = _’ (qspec_then ‘p1’ mp_tac) >>
+               simp[FLOOKUP_normalise_queues,FLOOKUP_UPDATE] >>
+               rw[] >>
+               gvs[qlk_def,fget_def,AllCaseEqs()]) >>
+          rveq >>
+          match_mp_tac (cj 1 strans_rules) >>
+          simp[]) >>
+      gvs[fmap_eq_flookup] >>
+      rename1 ‘ARecv pp1 dd’ >>
+      qpat_x_assum ‘∀x. FLOOKUP (normalise_queues _) _ = _’ (qspec_then ‘pp1’ mp_tac) >>
+      gvs[FLOOKUP_normalise_queues,FLOOKUP_UPDATE,qlk_def,fget_def] >>
+      PURE_TOP_CASE_TAC >> simp[])
+QED
+
+Theorem network_NPar_forward_correctness:
+  ∀conf s c n p s' c' n' cSt0 vs cvs env0.
+  trans conf (NPar (NEndpoint p s c) n) LTau (NPar (NEndpoint p s' c') n') ∧
+  (∀nd. nd ∈ EP_nodenames c ⇒ ffi_has_node nd cSt0.ffi.ffi_state) ∧
+  cpEval_valid conf p env0 s c vs cvs cSt0 ∧
+  cSt0.ffi.ffi_state = (p,s.queues,n) ∧
+  pletrec_vars_ok c ∧
+  normalised s.queues
+  ⇒
+  ∃env cSt.
+    triR stepr
+         (env0, smSt cSt0, Exp (compile_endpoint conf vs c), [])
+         (env, smSt cSt, Exp (compile_endpoint conf vs c'), []) ∧
+    cpEval_valid conf p env s' c' vs cvs cSt ∧
+    ffi_eq conf cSt.ffi.ffi_state (p,s'.queues,n') ∧
+    (∀nd. nd ∈ EP_nodenames c' ⇒ ffi_has_node nd cSt.ffi.ffi_state)
+
+(*
   (* These assumptions should be dischargable by the static part of the compiler *)
-  net_wf n ∧ (* equivalent to ALL_DISTINCT(MAP FST(endpoints n)) *)
+(*  net_wf n ∧ (* equivalent to ALL_DISTINCT(MAP FST(endpoints n)) *)
   ~net_has_node n p ∧
   normalised s.queues ∧
   padded_queues conf s.queues ∧
@@ -7451,7 +7589,7 @@ Theorem network_NPar_forward_correctness:
 
   (* These assumptions can only be discharged by the dynamic part of the compiler *)
   sem_env_cor conf s env1 ∧
-  enc_ok conf env1 (letfuns c) vs1
+  enc_ok conf env1 (letfuns c) vs1*)
   ⇒
   ∃mc env2 vs2.
     sem_env_cor conf s' env2 ∧
@@ -7461,31 +7599,20 @@ Theorem network_NPar_forward_correctness:
                       [compile_endpoint conf vs1 c])
       (evaluate (st2 with clock := mc) env2
                       [compile_endpoint conf vs2 c'])
+  *)
 Proof
   rw []
   \\ drule_then assume_tac NPar_trans_l_cases_full
   \\ fs [] \\ rveq
   (* p is not involved at all *)
-  >- (CONV_TAC SWAP_EXISTS_CONV
-      \\ asm_exists_tac \\ fs []
-      \\ asm_exists_tac \\ fs []
-      \\ irule ffi_irrel_weak \\ fs []
-      \\ conj_tac
-      >- metis_tac [ffi_wf_def,trans_ffi_eq_same]
-      \\ ‘ffi_wf(p,s.queues,n')’
-        by (irule internal_trans_pres_wf
-            \\ MAP_EVERY qexists_tac [‘n’,‘conf’,‘s.queues’]
-            \\ rw [ffi_wf_def] \\ irule RTC_SINGLE
-            \\ rw [comms_ffi_consTheory.internal_trans_def]
-            \\ last_x_assum (assume_tac o ONCE_REWRITE_RULE [trans_cases]) \\ fs []
-            \\ IMP_RES_TAC trans_not_same \\ rw [] \\ fs [])
-      \\ MAP_EVERY qexists_tac [‘p’,‘s’]
-      \\ rw [cpEval_valid_def,ffi_state_cor_def]
-      \\ fs [sem_env_cor_def,ffi_wf_def]
-      >- (MAP_EVERY qexists_tac [‘s.queues’,‘n’] \\ rw [ffi_wf_def])
-      \\ MAP_EVERY qexists_tac [‘s.queues’,‘n'’] \\ rw [ffi_wf_def])
+  >- (first_assum(irule_at (Pat ‘cpEval_valid _ _ _ _ _ _ _ _’))
+      \\ simp[]
+      \\ match_mp_tac trans_ffi_eq_same
+      \\ first_assum(irule_at (Pos last))
+      \\ gvs[cpEval_valid_def])
   (* LTau (only p does something) *)
-  >- (‘∃vs2 env2. cpEval_valid conf p env2 s' c' vs2 st2’
+  >- ((*
+      ‘∃vs2 env2. cpEval_valid conf p env2 s' c' vs2 st2’
        by (pop_assum (ASSUME_TAC o ONCE_REWRITE_RULE [trans_cases])
            \\ rw []
            >- (qspec_then ‘FLAT ds ++ unpad d’ assume_tac LIST_TYPE_WORD_EXISTS
@@ -7536,56 +7663,51 @@ Proof
                \\ MAP_EVERY qexists_tac [‘q’,‘n’]
                \\ UNABBREV_ALL_TAC \\ rw [qlk_normalise_queues,ffi_wf_def])
            \\ rw [ffi_wf_def])
-      \\ drule_then (qspecl_then [‘vs1’,‘vs2’,‘env1’,‘env2’,‘st1’,‘st2’] mp_tac)
-                    endpoint_forward_correctness
-      \\ simp []
-      \\ impl_tac
-      >- (rw [cpEval_valid_def,ffi_wf_def,
-              ffi_state_cor_def,
-              cpFFI_valid_def,some_def]
-          \\ fs [] >- fs [sem_env_cor_def]
-          >- (MAP_EVERY qexists_tac [‘s.queues’,‘n’] \\ rw [ffi_wf_def])
-          >- (drule payload_trans_normalised
-              \\ rw [normalised_network_def,normalised_def]
-              \\ SELECT_ELIM_TAC \\ rw []
-              >- metis_tac[]
-              \\ qpat_x_assum ‘_ x’ (K ALL_TAC)
-              \\ Cases_on ‘x'’ \\ fs []
-              \\ irule strans_receive_construct
-              \\ qmatch_goalsub_abbrev_tac ‘RTC (active_trans conf _) (q1,n)’
-              \\ qmatch_goalsub_abbrev_tac ‘RTC (internal_trans conf _) _ (q2,n)’
-              \\ qexistsl_tac [‘n’,‘q1’,‘q2’]
-              \\ MAP_EVERY qunabbrev_tac [‘q1’,‘q2’]
-              \\ rw[output_trans_def,RTC_REFL])
-          \\ qpat_assum `trans _ (NEndpoint _ _ _) _ _`
-                          (mp_tac o PURE_ONCE_REWRITE_RULE [trans_cases])
-          \\ fs [] \\ rw []
-          \\ fs [state_component_equality] \\ rveq \\ rfs [state_component_equality]
-          >- (first_x_assum (qspec_then ‘(p1,d)’ assume_tac) \\ fs []
-              \\ fs [normalise_queues_FUPDATE_NONEMPTY]
-              \\ first_assum (fn t => reverse (sg ‘¬ ^(concl t)’))
-              \\ pop_assum (K ALL_TAC)
-              \\ fs [normalised_def]
-              \\ ONCE_REWRITE_TAC [GSYM fmap_EQ_THM]
-              \\ fs [qlk_def,fget_def]
-              \\ EVERY_CASE_TAC
-              \\ fs [] \\ rveq \\ rw [FAPPLY_FUPDATE_THM]
-              \\ fs [FLOOKUP_DEF,ABSORPTION_RWT])
-          \\ first_x_assum (qspec_then ‘(p1,d)’ assume_tac) \\ fs []
-          \\ fs [normalise_queues_FUPDATE_NONEMPTY]
-          \\ first_assum (fn t => reverse (sg ‘¬ ^(concl t)’))
-          \\ pop_assum (K ALL_TAC)
-          \\ fs [normalised_def]
-          \\ ONCE_REWRITE_TAC [GSYM fmap_EQ_THM]
-          \\ fs [qlk_def,fget_def]
-          \\ EVERY_CASE_TAC
-          \\ fs [] \\ rveq \\ rw [FAPPLY_FUPDATE_THM]
-          \\ fs [FLOOKUP_DEF,ABSORPTION_RWT])
-       \\ rw []
-       \\ MAP_EVERY qexists_tac [‘mc’,‘env2’,‘vs2’]
-       \\ fs [cpFFI_valid_def,cpEval_valid_def,ffi_state_cor_def])
+      *)
+      drule simulation
+      \\ disch_then drule
+      \\ impl_tac >- simp[]
+      \\ rpt strip_tac
+      \\ goal_assum drule
+      \\ simp[]
+      \\ match_mp_tac ffi_eq_cpFFI_valid_pres
+      \\ gvs[cpEval_valid_def])
    (* LSend *)
-  >- (drule_then (qspecl_then [‘p’,‘s.queues’,‘s'.queues’] mp_tac) trans_pres_ffi_wf
+  >- (drule simulation
+      \\ disch_then drule
+      \\ impl_tac >- simp[]
+      \\ rpt strip_tac
+      \\ goal_assum drule
+      \\ simp[]
+      \\ gvs[cpFFI_valid_def]
+      \\ drule (strans_rules |> CONJUNCTS |> last)
+      \\ disch_then (qspec_then ‘s.queues’ mp_tac)
+      \\ strip_tac
+      \\ ‘s'.queues = s.queues’ by cheat
+      \\ gvs[]
+      \\ match_mp_tac ffi_eq_pres
+      \\ first_x_assum(irule_at (Pos last))
+      \\ first_x_assum(irule_at (Pos last))
+      \\ simp[]
+      \\ gvs[cpEval_valid_def])
+   (* LReceive *)
+  >- (drule simulation
+      \\ disch_then drule
+      \\ impl_tac >- simp[]
+      \\ rpt strip_tac
+      \\ goal_assum drule
+      \\ simp[]
+      \\ gvs[cpFFI_valid_def]
+      \\ qpat_x_assum ‘trans _ _ (LReceive _ _ _) _’ (strip_assume_tac o ONCE_REWRITE_RULE[trans_cases])
+      \\ gvs[]
+      \\ dxrule_then assume_tac ffi_eq_sym
+      \\ drule_then match_mp_tac ffi_eq_trans
+      \\ match_mp_tac active_trans_equiv_irrel
+      \\ conj_tac >- gvs[cpEval_valid_def]
+      \\ match_mp_tac RTC_SUBSET
+      \\ simp[active_trans_def,emit_trans_def])
+  (*
+      drule_then (qspecl_then [‘p’,‘s.queues’,‘s'.queues’] mp_tac) trans_pres_ffi_wf
       \\ impl_tac >- fs [ffi_wf_def]
       \\ strip_tac
       \\ ‘∃vs2 env2. cpEval_valid conf p env2 s' c' vs2 st2’
@@ -7615,7 +7737,7 @@ Proof
           \\ metis_tac [strans_rules])
       \\ rw []
       \\ MAP_EVERY qexists_tac [‘mc’,‘env2’,‘vs2’]
-      \\ fs [cpFFI_valid_def,cpEval_valid_def,ffi_state_cor_def])
+      \\ fs [cpFFI_valid_def,cpEval_valid_def,ffi_state_cor_def] )
   \\ drule_then (qspecl_then [‘p’,‘s.queues’,‘s'.queues’] mp_tac) trans_pres_ffi_wf
   \\ impl_tac >- fs [ffi_wf_def]
   \\ strip_tac
@@ -7649,7 +7771,10 @@ Proof
   \\ rw []
   \\ MAP_EVERY qexists_tac [‘mc’,‘env2’,‘vs2’]
   \\ fs [cpFFI_valid_def,cpEval_valid_def,ffi_state_cor_def]
+  *)
 QED
+
+(*
 
 Theorem network_NPar_forward_correctness':
   ∀conf s c n p s' c' n' st1 vs1 env1.
