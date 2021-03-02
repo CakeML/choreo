@@ -857,7 +857,7 @@ Proof
 QED
 
 Theorem compile_endpoint_support':
-  !e fv fv1. MEM fv1 (free_var_names_endpoint (compile_endpoint fv e))
+  !e fv fv1. MEM fv1 (free_var_names_endpoint (endpoint_to_choice$compile_endpoint fv e))
    ==> MEM fv1 (free_var_names_endpoint e)
 Proof
   Induct >> rpt strip_tac
@@ -874,7 +874,8 @@ Proof
 QED
 
 Theorem perm_state_bindings[simp]:
-  (perm_state fv1 fv2 ss) with bindings := x = ss with bindings := x
+  (perm_state fv1 fv2 ss) with bindings := x =
+    ss with <| bindings := x; funs := MAP (I ## perm_closure fv1 fv2) ss.funs |>
 Proof
   rw[perm_state_def]
 QED
@@ -886,11 +887,16 @@ Theorem perm_network:
     (perm_network fv1 fv2 (compile_network conf (compile_network_fv fv1 n)))
     (compile_network conf (compile_network_fv fv2 n))
 Proof
-  Induct_on ‘n’ >> rw[compile_network_fv_def,compile_network_def,perm_network_def,var_names_network_def,payloadPropsTheory.junkcong_refl,perm_endpoint] >-
-    metis_tac[payloadPropsTheory.junkcong_par] >>
-  rename1 ‘NEndpoint s (perm_state _ _ ss)’ >>
+  Induct_on ‘n’ >>
+  rw[compile_network_fv_def,endpoint_to_payloadTheory.compile_network_def,
+     perm_network_def,var_names_network_def,
+     payloadPropsTheory.junkcong_refl,perm_endpoint] >-
+   metis_tac[payloadPropsTheory.junkcong_par] >>
+  qmatch_goalsub_abbrev_tac ‘NEndpoint s (perm_state _ _ ss)’ >>
   match_mp_tac payloadPropsTheory.junkcong_trans >>
-  qexists_tac ‘NEndpoint s ((perm_state fv1 fv2 ss) with bindings := ((perm_state fv1 fv2 ss).bindings \\ fv1)) (compile_endpoint (compile_endpoint fv2 e))’ >>
+  qexists_tac ‘NEndpoint s ((perm_state fv1 fv2 ss)
+                               with bindings := ((perm_state fv1 fv2 ss).bindings \\ fv1))
+                 (compile_endpoint (compile_endpoint fv2 e))’ >>
   conj_tac >- (match_mp_tac payloadPropsTheory.junkcong_remove_junk >> simp[] >>
                spose_not_then strip_assume_tac >>
                drule_then assume_tac endpoint_to_payload_free_var_names >>
@@ -924,7 +930,10 @@ Proof
                drule_then assume_tac endpoint_to_payload_free_var_names >>
                drule_then assume_tac compile_endpoint_support' >>
                drule free_var_names_var_names >> fs[]) >>
-  simp[payloadPropsTheory.junkcong_refl]
+  qmatch_goalsub_abbrev_tac ‘junkcong _ (NEndpoint _ ss1 _) (NEndpoint _ ss2 _)’ >>
+  ‘ss1 = ss2’ suffices_by simp[payloadPropsTheory.junkcong_refl] >>
+  fs[Abbr‘ss1’,Abbr‘ss2’,payloadLangTheory.state_component_equality] >>
+  simp[Abbr‘ss’,compile_state_def]
 QED
 
 Definition restrict_network_def:
@@ -942,9 +951,13 @@ Theorem perm_network':
   (restrict_network (λx. x ≠ fv1 ∧ x ≠ fv2)
     (compile_network conf (compile_network_fv fv2 n)))
 Proof
-  Induct_on ‘n’ >> rw[compile_network_fv_def,compile_network_def,perm_network_def,var_names_network_def,payloadPropsTheory.junkcong_refl,perm_endpoint,restrict_network_def] >>
+  Induct_on ‘n’ >>
+  rw[compile_network_fv_def,endpoint_to_payloadTheory.compile_network_def,
+     perm_network_def,var_names_network_def,
+     payloadPropsTheory.junkcong_refl,perm_endpoint,
+     restrict_network_def] >>
   rw[payloadLangTheory.state_component_equality,fmap_eq_flookup,FLOOKUP_DRESTRICT] >>
-  rw[perm_state_FLOOKUP,perm1_def]
+  rw[perm_state_FLOOKUP,perm1_def,compile_state_def]
 QED
 
 Theorem restrict_network_bisim:
@@ -973,12 +986,21 @@ Proof
   simp[payloadPropsTheory.junkcong_refl]
 QED
 
+Theorem compile_network_alt_BISIM:
+  ∀p q conf.
+    BISIM_REL (trans conf) p q ⇒
+    BISIM_REL (trans conf) (compile_network_alt p) (compile_network_alt q)
+Proof
+ cheat
+QED
+
 Theorem projection_preservation:
   ∀s c s'' c'' conf.
    compile_network_ok s c (procsOf c)
    ∧ conf.payload_size > 0
    ∧ trans_s (s,c) (s'',c'')
    ∧ no_undefined_vars (s,c)
+   ∧ dvarsOf c = []
    ⇒ ∃s''' c''' epn.
       trans_s (s'',c'') (s''',c''') ∧
       (reduction conf)^* (projection conf s c (procsOf c))
@@ -990,13 +1012,16 @@ Proof
   goal_assum drule >>
   goal_assum drule >>
   fs[projection_def,endpoint_to_choiceTheory.compile_network_def] >>
-  fs[project_choice_def] >>
+  fs[project_choice_def,compile_rel_def] >>
   drule junkcong_compile_to_payload >>
   disch_then(qspec_then ‘conf’ strip_assume_tac) >>
   match_mp_tac BISIM_SYM >>
   drule_then(qspec_then ‘conf’ assume_tac) junkcong_bisim >>
   match_mp_tac BISIM_TRANS >>
   dxrule_then assume_tac BISIM_SYM >>
+  goal_assum drule >>
+  irule compile_network_alt_BISIM >>
+  match_mp_tac BISIM_TRANS >>
   goal_assum drule >>
   qpat_abbrev_tac ‘fv1 = gen_fresh_name _’ >>
   qpat_abbrev_tac ‘fv2 = gen_fresh_name _’ >>
