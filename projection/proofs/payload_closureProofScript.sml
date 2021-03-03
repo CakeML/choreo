@@ -3828,4 +3828,91 @@ Proof
   rpt(goal_assum drule)
 QED
 
+Theorem compile_network_alt_fully_abstract:
+  ∀conf p1 p2.
+    conf.payload_size > 0
+    ∧ fix_network p1
+    ∧ free_fix_names_network p1 = []
+    ∧ no_undefined_vars_network p1
+    ∧ fix_network p2
+    ∧ free_fix_names_network p2 = []
+    ∧ no_undefined_vars_network p2
+    ∧ BISIM_REL (trans conf) p1 p2 ⇒
+    BISIM_REL (trans conf) (compile_network_alt p1) (compile_network_alt p2)
+Proof
+  rpt strip_tac >>
+  qpat_abbrev_tac ‘q1 = compile_network_alt p1’ >>
+  qpat_abbrev_tac ‘q2 = compile_network_alt p2’ >>
+  ntac 2 (pop_assum (mp_tac o PURE_REWRITE_RULE[markerTheory.Abbrev_def])) >>
+  rpt(pop_assum mp_tac) >>
+  MAP_EVERY qid_spec_tac [‘p1’,‘p2’,‘q2’,‘q1’] >>
+  Ho_Rewrite.PURE_REWRITE_TAC[AND_IMP_INTRO,LEFT_FORALL_IMP_THM,GSYM PULL_FORALL] >>
+  ho_match_mp_tac BISIM_REL_trans_sym_coind >>
+  rw[]
+  >- metis_tac[bisim_sym] >>
+  rename1 ‘trans _ _ α’ >>
+  Cases_on ‘α’
+  >- (drule_all_then strip_assume_tac compile_network_reflection_send >>
+      rveq >>
+      qhdtm_assum ‘BISIM_REL’ (strip_assume_tac o SIMP_RULE std_ss [FORALL_AND_THM,Once bisimulationTheory.BISIM_REL_cases]) >>
+      first_x_assum drule >>
+      strip_tac >>
+      drule_all compile_network_preservation_send >>
+      strip_tac >>
+      goal_assum drule >>
+      irule_at (Pos hd) bisim_refl >>
+      irule_at (Pos last) bisim_refl >>
+      simp[] >>
+      irule_at (Pos last) EQ_REFL >>
+      irule_at (Pos last) EQ_REFL >>
+      simp[] >>
+      imp_res_tac fix_network_trans_pres >>
+      imp_res_tac no_undefined_vars_network_trans_pres >>
+      simp[] >>
+      imp_res_tac free_fix_names_network_trans_pres >>
+      gvs[])
+  >- (drule_all_then strip_assume_tac compile_network_reflection_receive >>
+      rveq >>
+      qhdtm_assum ‘BISIM_REL’ (strip_assume_tac o SIMP_RULE std_ss [FORALL_AND_THM,Once bisimulationTheory.BISIM_REL_cases]) >>
+      first_x_assum drule >>
+      strip_tac >>
+      drule_all compile_network_preservation_receive >>
+      strip_tac >>
+      goal_assum drule >>
+      irule_at (Pos hd) bisim_refl >>
+      irule_at (Pos last) bisim_refl >>
+      simp[] >>
+      irule_at (Pos last) EQ_REFL >>
+      irule_at (Pos last) EQ_REFL >>
+      simp[] >>
+      imp_res_tac fix_network_trans_pres >>
+      imp_res_tac no_undefined_vars_network_trans_pres >>
+      simp[] >>
+      imp_res_tac free_fix_names_network_trans_pres >>
+      gvs[])
+  >- (gvs[GSYM reduction_def] >>
+      drule_all_then strip_assume_tac compile_network_reflection_single >>
+      qhdtm_assum ‘BISIM_REL’ (strip_assume_tac o SIMP_RULE std_ss [FORALL_AND_THM,Once bisimulationTheory.BISIM_REL_cases]) >>
+      gvs[reduction_def] >>
+      first_x_assum drule >>
+      strip_tac >>
+      gvs[GSYM reduction_def] >>
+      drule_all compile_network_preservation_trans_alt >>
+      strip_tac >>
+      goal_assum drule >>
+      gvs[compile_rel_def] >>
+      goal_assum drule >>
+      irule_at (Pos last) bisim_sym >>
+      goal_assum drule >>
+      irule_at (Pos last) EQ_REFL >>
+      irule_at (Pos last) EQ_REFL >>
+      simp[] >>
+      gvs[reduction_def] >>
+      imp_res_tac fix_network_trans_pres >>
+      imp_res_tac no_undefined_vars_network_trans_pres >>
+      simp[] >>
+      imp_res_tac free_fix_names_network_trans_pres >>
+      gvs[])
+QED
+
 val _ = export_theory ();

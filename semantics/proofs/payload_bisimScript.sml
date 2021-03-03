@@ -130,6 +130,89 @@ Proof
   metis_tac[bisim_trans,bisim_par_left,bisim_par_right]
 QED
 
+Theorem BISIM_REL_trans_coind:
+  ∀ts R.
+    (∀p q.
+       R p q ⇒
+       ∀l.
+         (∀p'. ts p l p' ⇒ ∃q' q'' q'''. ts q l q' ∧ (BISIM_REL ts p' q'' ∧ R q'' q''' ∧ BISIM_REL ts q''' q')) ∧
+         ∀q'. ts q l q' ⇒ ∃p' p'' p'''. ts p l p' ∧ (BISIM_REL ts p' p'' ∧ R p'' p''' ∧ BISIM_REL ts p''' q')) ⇒
+    ∀p q. R p q ⇒ BISIM_REL ts p q
+Proof
+  ntac 3 strip_tac >>
+  ‘∀p q q' q''. BISIM_REL ts p q' ∧ R q' q'' ∧ BISIM_REL ts q'' q ⇒ BISIM_REL ts p q’
+    suffices_by metis_tac[bisim_refl] >>
+  simp[LEFT_FORALL_IMP_THM] >>
+  ho_match_mp_tac bisimulationTheory.BISIM_REL_coind >>
+  rw[] >>
+  ntac 2 (qhdtm_assum ‘BISIM_REL’ (strip_assume_tac o SIMP_RULE std_ss [FORALL_AND_THM,Once bisimulationTheory.BISIM_REL_cases]) >>
+          qhdtm_x_assum ‘BISIM_REL’ mp_tac)
+  >- (rpt strip_tac >>
+      first_x_assum drule >>
+      strip_tac >>
+      last_x_assum drule >>
+      rw[FORALL_AND_THM] >>
+      first_x_assum drule >>
+      strip_tac >>
+      last_x_assum drule >>
+      strip_tac >>
+      goal_assum drule >>
+      metis_tac[bisim_trans])
+  >- (rpt strip_tac >>
+      first_x_assum drule >>
+      strip_tac >>
+      last_x_assum drule >>
+      rw[FORALL_AND_THM] >>
+      first_x_assum drule >>
+      strip_tac >>
+      ntac 2(last_x_assum drule) >>
+      rpt strip_tac >>
+      goal_assum drule >>
+      metis_tac[bisim_trans])
+QED
+
+Theorem BISIM_REL_trans_sym_coind:
+  ∀ts R.
+    (∀p q.
+       R p q ⇒
+       R q p ∧
+       ∀l.
+         (∀p'. ts p l p' ⇒ ∃q' q'' q'''. ts q l q' ∧ (BISIM_REL ts p' q'' ∧ R q'' q''' ∧ BISIM_REL ts q''' q'))) ⇒
+    ∀p q. R p q ⇒ BISIM_REL ts p q
+Proof
+  ntac 3 strip_tac >>
+  ‘∀p q q' q''. BISIM_REL ts p q' ∧ R q' q'' ∧ BISIM_REL ts q'' q ⇒ BISIM_REL ts p q’
+    suffices_by metis_tac[bisim_refl] >>
+  simp[LEFT_FORALL_IMP_THM] >>
+  ho_match_mp_tac bisimulationTheory.BISIM_REL_coind >>
+  rw[] >>
+  ntac 2 (qhdtm_assum ‘BISIM_REL’ (strip_assume_tac o SIMP_RULE std_ss [FORALL_AND_THM,Once bisimulationTheory.BISIM_REL_cases]) >>
+          qhdtm_x_assum ‘BISIM_REL’ mp_tac)
+  >- (rpt strip_tac >>
+      first_x_assum drule >>
+      strip_tac >>
+      last_x_assum drule >>
+      rw[FORALL_AND_THM] >>
+      first_x_assum drule >>
+      strip_tac >>
+      last_x_assum drule >>
+      strip_tac >>
+      goal_assum drule >>
+      metis_tac[bisim_trans])
+  >- (‘R q'' q'’ by metis_tac[] >>
+      rpt strip_tac >>
+      first_x_assum drule >>
+      strip_tac >>
+      last_assum drule >>
+      rw[FORALL_AND_THM] >>
+      first_x_assum drule >>
+      strip_tac >>
+      ntac 3(last_x_assum drule) >>
+      rpt strip_tac >>
+      goal_assum drule >>
+      metis_tac[bisim_trans,bisim_sym])
+QED
+
 Definition used_closures_rel_def:
   used_closures_rel s (Closure vars1 (fs1,bds1) e1) (Closure vars2 (fs2,bds2) e2) ⇔
   e1 = e2 ∧ bds1 = bds2 ∧ vars1 = vars2 ∧
