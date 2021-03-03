@@ -3585,6 +3585,7 @@ Theorem simulation:
         (cEnv0, smSt cSt0, Exp (compile_endpoint conf vs EP0), [])
         (cEnv, smSt cSt, Exp (compile_endpoint conf vs EP), []) ∧
       cpEval_valid conf p cEnv pSt EP vs cvs cSt ∧
+      cpFFI_valid conf pSt0 pSt cSt0.ffi.ffi_state cSt.ffi.ffi_state L ∧
       (∀nd. nd ∈ EP_nodenames EP ⇒ ffi_has_node nd cSt.ffi.ffi_state)
 Proof
   Induct_on ‘trans’ >> simp[compile_endpoint_def] >> rpt strip_tac (* 11 *)
@@ -3649,6 +3650,22 @@ Proof
       >- (Cases_on ‘cSt0.ffi.ffi_state’ >>
           rename [‘cSt0.ffi.ffi_state = (pn,X)’] >> Cases_on ‘X’ >>
           gs[ffi_state_cor_def])
+      >- (simp[cpFFI_valid_def] >>
+          Cases_on ‘cSt0.ffi.ffi_state’ >>
+          rename [‘cSt0.ffi.ffi_state = (pn,X)’] >> Cases_on ‘X’ >>
+          ‘final (pad conf (DROP n d))’
+            by rw[final_def, pad_def] >>
+          simp[update_state_def, send_events_def, Once compile_message_def,
+               comms_ffi_oracle_def, ffi_send_def, pad_LENGTH,
+               CHR_w2n_n2w_ORD, MAP_MAP_o] >>
+          SELECT_ELIM_TAC >> conj_tac
+          >- (simp[AllCaseEqs()] >> DEEP_INTRO_TAC some_intro >> simp[] >>
+              ‘valid_send_dest (MAP (n2w o ORD) dest_s) (pn,q,r)’
+                by (simp[valid_send_dest_def, MAP_MAP_o, CHR_w2n_n2w_ORD] >>
+                    gs[ffi_state_cor_def]) >>
+              drule strans_send_cond >> simp[MAP_MAP_o, CHR_w2n_n2w_ORD]) >>
+          simp[AllCaseEqs()] >> qx_gen_tac ‘st'’ >>
+          DEEP_INTRO_TAC some_intro >> simp[])
       >- (Cases_on ‘cSt0.ffi.ffi_state’ >>
           rename [‘cSt0.ffi.ffi_state = (pn,X)’] >> Cases_on ‘X’ >>
           gs[ffi_state_cor_def]) >>
