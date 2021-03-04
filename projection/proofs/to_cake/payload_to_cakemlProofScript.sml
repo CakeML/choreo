@@ -90,6 +90,18 @@ Overload DATUM[local] = “LIST_TYPE WORD8”;
 Type plffi[local,pp] = “:string # (string |-> word8 list list) # network”
 Overload trans = “payloadSem$trans”
 
+val _ = temp_set_mapped_fixity {fixity = Infixl 500, term_name = "pretty_app",
+                                tok = "∙"};
+Overload pretty_app[local] = “λf x. App Opapp [f; x]”
+Overload Cif[local] = “smallStep$Cif ()”
+Overload Clet[local] = “λvb. smallStep$Clet vb ()”
+Overload sscont[local] = “smallStep$continue”
+Overload ssret[local] = “smallStep$return”
+Overload ssstep[local] = “smallStep$Estep”
+Overload Capp[local] = “λop args rest. smallStep$Capp op args () rest”
+Overload "❪❫"[local] = “Con NONE []”
+
+
 Theorem ps2cs_11[simp]:
   ps2cs x = ps2cs y ⇔ x = y
 Proof
