@@ -416,6 +416,19 @@ Proof
   >> fs[SUBSET_DEF,INSERT_DEF,DIFF_DEF] >> metis_tac[]
 QED
 
+(* Transitions preserve ‘no_undefined_vars’ since they can not remove
+   variables from the state
+*)
+Theorem no_undefined_vars_trans_s_pres:
+  ∀sc alpha sc'. no_undefined_vars sc ∧ trans_s sc sc' ⇒ no_undefined_vars sc'
+Proof
+  rpt gen_tac \\ disch_then(MAP_EVERY assume_tac o rev o CONJUNCTS)
+  \\ rpt (pop_assum mp_tac) \\ simp[trans_s_def]
+  \\ MAP_EVERY (W(curry Q.SPEC_TAC)) (rev [`sc`,`sc'`])
+  \\ ho_match_mp_tac RTC_INDUCT \\ rw[]
+  \\ metis_tac [no_undefined_vars_trans_pres]
+QED
+
 (* A tag does not remove variables from the state, hence preserving
    ‘no_undefined_vars_def’
 *)

@@ -235,15 +235,14 @@ Proof
 QED
 
 Theorem dvarsOf_imp_free_fix_names_network:
-  ∀c s conf fv.
+  ∀c s conf fv l.
     dvarsOf c = []
     ⇒ free_fix_names_network
         (endpoint_to_payload$compile_network conf
            (compile_network_fv fv
-              (compile_network s c (procsOf c)))) = []
+              (compile_network s c l))) = []
 Proof
-  rw [] \\ qmatch_goalsub_abbrev_tac ‘compile_network _ _ l’
-  \\ pop_assum kall_tac
+  rw []
   \\ induct_on ‘l’ \\ EVAL_TAC \\ rw [] \\ gs []
   \\ simp [dvarsOf_imp_free_fix_names_endpoint]
 QED
@@ -262,15 +261,14 @@ Proof
 QED
 
 Theorem no_undefined_vars_chor_to_network:
-  ∀s c conf fv.
+  ∀s c conf fv l.
     no_undefined_vars (s,c)
     ⇒ no_undefined_vars_network
         (endpoint_to_payload$compile_network conf
              (compile_network_fv fv
-                (compile_network s c (procsOf c))))
+                (compile_network s c l)))
 Proof
-  rw [] \\ qmatch_goalsub_abbrev_tac ‘compile_network _ _ l’
-  \\ pop_assum kall_tac
+  rw []
   \\ induct_on ‘l’ \\ EVAL_TAC \\ rw [] \\ gs []
   >- (pop_assum kall_tac \\ pop_assum mp_tac
       \\ qmatch_goalsub_abbrev_tac ‘project' h l c’
@@ -986,12 +984,66 @@ Proof
   simp[payloadPropsTheory.junkcong_refl]
 QED
 
-Theorem compile_network_alt_BISIM:
-  ∀p q conf.
-    BISIM_REL (trans conf) p q ⇒
-    BISIM_REL (trans conf) (compile_network_alt p) (compile_network_alt q)
+Theorem junkcong_binding_subset:
+  ∀fv epn1 epn2.
+    payloadProps$junkcong fv epn1 epn2 ⇒
+    LIST_REL (λ((p1,s1,e1) (p2,s2,e2)).
+                ∃fv0. (FDOM s1.bindings = FDOM s2.bindings ∪ fv0 ∨ FDOM s2.bindings = FDOM s1.bindings ∪ fv0) ∧
+                      (∀x. x ∈ fv0 ⇒ ¬MEM x (free_var_names_endpoint e1)))
+          (endpoints epn1) (endpoints epn2)
 Proof
- cheat
+  cheat
+QED
+
+Theorem junkcong_no_undefined_vars_closure_aux:
+  ∀fv epn1 epn2.
+    payloadProps$junkcong fv epn1 epn2 ⇒
+    (EVERY (λ(p,s,e). EVERY (λ(s,cl). no_undefined_vars_closure cl) s.funs) (endpoints epn1)
+     ⇔ EVERY (λ(p,s,e). EVERY (λ(s,cl). no_undefined_vars_closure cl) s.funs) (endpoints epn2))
+Proof
+  ho_match_mp_tac payloadPropsTheory.junkcong_strongind
+  \\ rw[] \\ EQ_TAC \\ rw[]
+  \\ gs[no_undefined_vars_network_def,payloadLangTheory.endpoints_def,
+       no_undefined_vars_closure_def]
+  >- (drule junkcong_binding_subset
+      \\ rw[payloadLangTheory.endpoints_def]
+      \\ gs[SUBSET_DEF,INTER_DEF] \\ rw[]
+      \\ first_x_assum drule \\ rw[] \\ rw[] \\ gs[])
+  >- (drule junkcong_binding_subset
+      \\ rw[payloadLangTheory.endpoints_def]
+      \\ gs[SUBSET_DEF,INTER_DEF] \\ rw[]
+      \\ first_x_assum drule \\ rw[] \\ rw[] \\ gs[])
+  >- (gs [SUBSET_DEF] \\ rw[] \\ first_x_assum drule
+      \\ rw[] \\ rw[] \\ gs[])
+  >- (gs [SUBSET_DEF] \\ rw[] \\ first_x_assum drule
+      \\ rw[] \\ rw[] \\ gs[])
+QED
+
+Theorem junkcong_no_undefined_vars_network_aux:
+  ∀fv epn epn'.
+    junkcong fv epn epn' ⇒
+    (no_undefined_vars_network epn ⇔ no_undefined_vars_network epn')
+Proof
+  ho_match_mp_tac payloadPropsTheory.junkcong_strongind
+  \\ rw[] \\ EQ_TAC \\ rw[]
+  \\ gs[no_undefined_vars_network_def,payloadLangTheory.endpoints_def,
+       no_undefined_vars_closure_def]
+  >- (drule junkcong_no_undefined_vars_closure_aux
+      \\ rw[payloadLangTheory.endpoints_def] \\ gs[]
+      \\ drule junkcong_binding_subset
+      \\ rw[payloadLangTheory.endpoints_def]
+      \\ gs[SUBSET_DEF,INTER_DEF] \\ rw[]
+      \\ first_x_assum drule \\ rw[] \\ rw[] \\ gs[])
+  >- (drule junkcong_no_undefined_vars_closure_aux
+      \\ rw[payloadLangTheory.endpoints_def] \\ gs[]
+      \\ drule junkcong_binding_subset
+      \\ rw[payloadLangTheory.endpoints_def]
+      \\ gs[SUBSET_DEF,INTER_DEF] \\ rw[]
+      \\ first_x_assum drule \\ rw[] \\ rw[] \\ gs[])
+  >- (gs [SUBSET_DEF] \\ rw[] \\ first_x_assum drule
+      \\ rw[] \\ rw[] \\ gs[])
+  >- (gs [SUBSET_DEF] \\ rw[] \\ first_x_assum drule
+      \\ rw[] \\ rw[] \\ gs[])
 QED
 
 Theorem projection_preservation:
@@ -1020,7 +1072,20 @@ Proof
   match_mp_tac BISIM_TRANS >>
   dxrule_then assume_tac BISIM_SYM >>
   goal_assum drule >>
-  irule compile_network_alt_BISIM >>
+  irule compile_network_alt_fully_abstract >> simp[fix_network_compile_network] >>
+  conj_tac >-
+   (drule_then (mp_tac o GSYM) junkcong_no_undefined_vars_network_aux >> rw[] >>
+    irule no_undefined_vars_chor_to_network >>
+    metis_tac[trans_s_trans,no_undefined_vars_trans_s_pres])
+  conj_tac >-
+   (irule no_undefined_vars_chor_to_network >>
+    metis_tac[trans_s_trans,no_undefined_vars_trans_s_pres]) >>
+  conj_tac >- cheat >>
+  conj_tac >-
+   (irule dvarsOf_imp_free_fix_names_network >>
+    drule_all trans_s_trans >>
+    disch_then (mp_then Any assume_tac dvarsOf_nil_trans_s) >>
+    gs[]) >>
   match_mp_tac BISIM_TRANS >>
   goal_assum drule >>
   qpat_abbrev_tac ‘fv1 = gen_fresh_name _’ >>
