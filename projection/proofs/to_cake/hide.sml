@@ -24,8 +24,9 @@ fun hide_pp (tyg,tmg) backend printer ppfns gravs depth t =
       )
     end
 
-val _ = temp_add_user_printer ("hide-printer", list_mk_comb(hidec, [sv,tv]),
-                               hide_pp)
+fun install_hidepp() =
+    temp_add_user_printer ("hide-printer", list_mk_comb(hidec, [sv,tv]),
+                           hide_pp)
 
 val _ = BasicProvers.logged_addfrags {thyname = "hide"}
           [simpLib.SSFRAG {ac = [], congs = [hideCONG],

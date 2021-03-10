@@ -102,6 +102,12 @@ Proof
   gen_tac >> simp[triR_def] >> irule_at Any RTC_REFL
 QED
 
+Theorem triR_SYM:
+  ∀x y. triR R x y = triR R y x
+Proof
+  simp[triR_def] >> metis_tac[]
+QED
+
 
 Theorem triR_forward_simulation_has_all_terminations:
   simulates simR sR (triR tR) ∧ CR tR ∧
