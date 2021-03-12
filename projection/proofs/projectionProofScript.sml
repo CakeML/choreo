@@ -984,15 +984,42 @@ Proof
   simp[payloadPropsTheory.junkcong_refl]
 QED
 
-Theorem junkcong_binding_subset:
+Theorem junkcong_binding_LIST_REL_bindings:
   ∀fv epn1 epn2.
     payloadProps$junkcong fv epn1 epn2 ⇒
     LIST_REL (λ((p1,s1,e1) (p2,s2,e2)).
-                ∃fv0. (FDOM s1.bindings = FDOM s2.bindings ∪ fv0 ∨ FDOM s2.bindings = FDOM s1.bindings ∪ fv0) ∧
-                      (∀x. x ∈ fv0 ⇒ ¬MEM x (free_var_names_endpoint e1)))
-          (endpoints epn1) (endpoints epn2)
+                e1 = e2 ∧ p1 = p2 ∧
+                (∀x. x ∈ (FDOM s1.bindings DIFF FDOM s2.bindings)
+                     ⇒ ¬MEM x (free_var_names_endpoint e1)) ∧
+                (∀x. x ∈ (FDOM s2.bindings DIFF FDOM s1.bindings)
+                     ⇒ ¬MEM x (free_var_names_endpoint e2)))
+             (endpoints epn1) (endpoints epn2)
 Proof
-  cheat
+  ho_match_mp_tac payloadPropsTheory.junkcong_strongind
+  \\ rw[payloadLangTheory.endpoints_def] \\ simp[]
+  >- (Induct_on ‘epn1’ \\ rw[payloadLangTheory.endpoints_def]
+      \\ last_x_assum assume_tac
+      \\ dxrule_all (EQ_IMP_RULE LIST_REL_APPEND  |> fst) \\ rw[])
+  >- (pop_assum mp_tac \\ pop_assum kall_tac
+      \\ qmatch_goalsub_abbrev_tac ‘LIST_REL _ e1 e2’
+      \\ pop_assum kall_tac \\ pop_assum kall_tac
+      \\ MAP_EVERY (W(curry Q.SPEC_TAC)) [‘e2’,‘e1’]
+      \\ ho_match_mp_tac LIST_REL_ind
+      \\ rw[] \\ PairCases_on ‘h1’ \\ PairCases_on ‘h2’
+      \\ gs[] \\ metis_tac[INTER_COMM])
+  >- (ho_match_mp_tac LIST_REL_trans
+      \\ qexists_tac ‘endpoints epn1'’
+      \\ simp[] \\ rw[]
+      \\ qmatch_goalsub_abbrev_tac ‘_ e1 e2’
+      \\ pop_assum kall_tac \\ pop_assum kall_tac
+      \\ qmatch_asmsub_abbrev_tac ‘_ e1 e3’
+      \\ PairCases_on ‘e1’
+      \\ PairCases_on ‘e2’
+      \\ PairCases_on ‘e3’
+      \\ gs[] \\ metis_tac [])
+  >- (qpat_x_assum ‘LIST_REL _ (endpoints epn1) _’ assume_tac
+      \\ (EQ_IMP_RULE LIST_REL_APPEND  |> fst  |> GEN_ALL  |> dxrule_all)
+      \\ simp[payloadLangTheory.endpoints_def])
 QED
 
 Theorem junkcong_no_undefined_vars_closure_aux:
@@ -1005,14 +1032,14 @@ Proof
   \\ rw[] \\ EQ_TAC \\ rw[]
   \\ gs[no_undefined_vars_network_def,payloadLangTheory.endpoints_def,
        no_undefined_vars_closure_def]
-  >- (drule junkcong_binding_subset
+  >- (drule junkcong_binding_LIST_REL_bindings
       \\ rw[payloadLangTheory.endpoints_def]
-      \\ gs[SUBSET_DEF,INTER_DEF] \\ rw[]
-      \\ first_x_assum drule \\ rw[] \\ rw[] \\ gs[])
-  >- (drule junkcong_binding_subset
+      \\ gs[SUBSET_DEF,INTER_DEF]
+      \\ metis_tac [])
+  >- (drule junkcong_binding_LIST_REL_bindings
       \\ rw[payloadLangTheory.endpoints_def]
-      \\ gs[SUBSET_DEF,INTER_DEF] \\ rw[]
-      \\ first_x_assum drule \\ rw[] \\ rw[] \\ gs[])
+      \\ gs[SUBSET_DEF,INTER_DEF]
+      \\ metis_tac [])
   >- (gs [SUBSET_DEF] \\ rw[] \\ first_x_assum drule
       \\ rw[] \\ rw[] \\ gs[])
   >- (gs [SUBSET_DEF] \\ rw[] \\ first_x_assum drule
@@ -1030,16 +1057,16 @@ Proof
        no_undefined_vars_closure_def]
   >- (drule junkcong_no_undefined_vars_closure_aux
       \\ rw[payloadLangTheory.endpoints_def] \\ gs[]
-      \\ drule junkcong_binding_subset
+      \\ drule junkcong_binding_LIST_REL_bindings
       \\ rw[payloadLangTheory.endpoints_def]
-      \\ gs[SUBSET_DEF,INTER_DEF] \\ rw[]
-      \\ first_x_assum drule \\ rw[] \\ rw[] \\ gs[])
+      \\ gs[SUBSET_DEF,INTER_DEF]
+      \\ metis_tac [])
   >- (drule junkcong_no_undefined_vars_closure_aux
       \\ rw[payloadLangTheory.endpoints_def] \\ gs[]
-      \\ drule junkcong_binding_subset
+      \\ drule junkcong_binding_LIST_REL_bindings
       \\ rw[payloadLangTheory.endpoints_def]
-      \\ gs[SUBSET_DEF,INTER_DEF] \\ rw[]
-      \\ first_x_assum drule \\ rw[] \\ rw[] \\ gs[])
+      \\ gs[SUBSET_DEF,INTER_DEF]
+      \\ metis_tac [])
   >- (gs [SUBSET_DEF] \\ rw[] \\ first_x_assum drule
       \\ rw[] \\ rw[] \\ gs[])
   >- (gs [SUBSET_DEF] \\ rw[] \\ first_x_assum drule
@@ -1076,7 +1103,7 @@ Proof
   conj_tac >-
    (drule_then (mp_tac o GSYM) junkcong_no_undefined_vars_network_aux >> rw[] >>
     irule no_undefined_vars_chor_to_network >>
-    metis_tac[trans_s_trans,no_undefined_vars_trans_s_pres])
+    metis_tac[trans_s_trans,no_undefined_vars_trans_s_pres]) >>
   conj_tac >-
    (irule no_undefined_vars_chor_to_network >>
     metis_tac[trans_s_trans,no_undefined_vars_trans_s_pres]) >>
