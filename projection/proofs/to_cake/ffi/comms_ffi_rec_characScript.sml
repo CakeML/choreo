@@ -627,6 +627,7 @@ Proof
   metis_tac[ffi_eq_equivRel,equivalence_def,reflexive_def]
 QED
 
+(*
 Theorem ffi_gets_stream:
   ∀conf src (st : total_state ffi_state).
     conf.payload_size > 0 ∧
@@ -745,7 +746,6 @@ Proof
       metis_tac[ffi_eq_equivRel,equivalence_def,reflexive_def])
   *)
 QED
-
-
+*)
 
 val _ = export_theory ();
