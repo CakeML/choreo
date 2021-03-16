@@ -1046,7 +1046,7 @@ Proof
       \\ rw[] \\ rw[] \\ gs[])
 QED
 
-Theorem junkcong_no_undefined_vars_network_aux:
+Theorem junkcong_no_undefined_vars_network:
   ∀fv epn epn'.
     junkcong fv epn epn' ⇒
     (no_undefined_vars_network epn ⇔ no_undefined_vars_network epn')
@@ -1071,6 +1071,15 @@ Proof
       \\ rw[] \\ rw[] \\ gs[])
   >- (gs [SUBSET_DEF] \\ rw[] \\ first_x_assum drule
       \\ rw[] \\ rw[] \\ gs[])
+QED
+
+Theorem junkcong_free_fix_names_network:
+  ∀fv epn epn'.
+    junkcong fv epn epn' ⇒
+    (free_fix_names_network epn = free_fix_names_network epn')
+Proof
+  ho_match_mp_tac payloadPropsTheory.junkcong_strongind
+  \\ rw[payloadLangTheory.free_fix_names_network_def]
 QED
 
 Theorem projection_preservation:
@@ -1101,13 +1110,21 @@ Proof
   goal_assum drule >>
   irule compile_network_alt_fully_abstract >> simp[fix_network_compile_network] >>
   conj_tac >-
-   (drule_then (mp_tac o GSYM) junkcong_no_undefined_vars_network_aux >> rw[] >>
+   (drule_then (mp_tac o GSYM) junkcong_no_undefined_vars_network >> rw[] >>
     irule no_undefined_vars_chor_to_network >>
     metis_tac[trans_s_trans,no_undefined_vars_trans_s_pres]) >>
   conj_tac >-
    (irule no_undefined_vars_chor_to_network >>
     metis_tac[trans_s_trans,no_undefined_vars_trans_s_pres]) >>
-  conj_tac >- cheat >>
+  conj_tac >-
+   (drule junkcong_free_fix_names_network >>
+    qmatch_goalsub_abbrev_tac ‘free_fix_names_network pp’ >>
+    ‘free_fix_names_network pp = []’ suffices_by  rw[] >>
+    UNABBREV_ALL_TAC >>
+    irule dvarsOf_imp_free_fix_names_network >>
+    drule_all trans_s_trans >>
+    disch_then (mp_then Any assume_tac dvarsOf_nil_trans_s) >>
+    gs[]) >>
   conj_tac >-
    (irule dvarsOf_imp_free_fix_names_network >>
     drule_all trans_s_trans >>
@@ -1194,11 +1211,13 @@ val from_endpoint_reflection =
 val from_payload_reflection =
   endpoint_to_payloadProofTheory.compile_network_reflection;
 
+val from_closure_reflection =
+  payload_closureProofTheory.compile_network_reflection_alt;
 
 (* Enpoints names are preserved over the endpoint_to_choice
    compilation step (generic version)
 *)
-Theorem endpoints_compile_network_epn_aux:
+Theorem endpoints_compile_network_choice_aux:
   ∀epn fv.
    MAP FST (endpoints (endpoint_to_choice$compile_network_fv fv epn))
    = MAP FST (endpoints epn)
@@ -1211,21 +1230,20 @@ QED
 (* Enpoints names are preserved over the endpoint_to_choice
    compilation step
 *)
-Theorem endpoints_compile_network_epn:
+Theorem endpoints_compile_network_choice:
   ∀epn.
    MAP FST (endpoints (endpoint_to_choice$compile_network epn)) = MAP FST (endpoints epn)
 Proof
-  rw [endpoint_to_choiceTheory.compile_network_def,endpoints_compile_network_epn_aux]
+  rw [endpoint_to_choiceTheory.compile_network_def,endpoints_compile_network_choice_aux]
 QED
-
 
 (* split_sel can only remove processes *)
 Triviality MEM_partners_endpoint_split_sel:
-  ∀(c : chor) p l b x r.
+  ∀(c : chor) p dvars l b x r.
    split_sel p l c = SOME (b,r) ∧
    no_self_comunication c ∧
-   MEM x (partners_endpoint (project' p r))
-   ⇒ MEM x (partners_endpoint (project' p c))
+   MEM x (partners_endpoint (project' p dvars r))
+   ⇒ MEM x (partners_endpoint (project' p dvars c))
 Proof
   Induct
   \\ fs [project_def,partners_endpoint_def,
@@ -1251,9 +1269,9 @@ QED
    when compared with the choreography (procsOf)
 *)
 Theorem MEM_partners_endpoint_imp_procsOf:
-  ∀(c : chor) p x.
+  ∀(c : chor) p dvars x.
     no_self_comunication c ∧
-    MEM x (partners_endpoint (project' p c))
+    MEM x (partners_endpoint (project' p dvars c))
     ⇒ MEM x (procsOf c)
 Proof
   Induct
@@ -1261,12 +1279,13 @@ Proof
          chor_to_endpointTheory.project_def,
          partners_endpoint_def,
          nub'_def]
-  \\ (fn (asms,goal) =>
-      goal
-      |> dest_disj |> fst
-      |> (fn t => (ASM_CASES_TAC t \\ fs []) (asms,goal)))
+  \\ TRY (fn (asms,goal) =>
+            goal |> dest_disj |> fst
+                 |> (fn t => (ASM_CASES_TAC t \\ fs []) (asms,goal)))
   \\ fs [MEM_FILTER,MEM_nub',no_self_comunication_def]
-  >- metis_tac [] >- metis_tac []
+  \\ TRY (EVERY_CASE_TAC \\ fs [partners_endpoint_def] \\ NO_TAC)
+  >- metis_tac []
+  >- metis_tac []
   >- (EVERY_CASE_TAC \\ fs [partners_endpoint_def]
       >- metis_tac []
       >- metis_tac []
@@ -1329,9 +1348,9 @@ QED
    using a projected network
 *)
 Theorem partners_network_compile_network:
-  ∀l (c : chor) s.
+  ∀l (c : chor) dvars s.
     partners_network (compile_network s c l)
-    = FLAT (MAP (\proc. partners_endpoint (project' proc c)) l)
+    = FLAT (MAP (\proc. partners_endpoint (project' proc [] c)) l)
 Proof
   Induct
   \\ rw [chor_to_endpointTheory.compile_network_gen_def,
@@ -1362,7 +1381,7 @@ QED
 Theorem endpoints_ok_compile_network:
   ∀l (c : chor) s.
    EVERY endpoint_ok (endpoints (compile_network s c l))
-   = EVERY I (MAP (λp . ¬MEM p (partners_endpoint (project' p c))) l)
+   = EVERY I (MAP (λp . ¬MEM p (partners_endpoint (project' p [] c))) l)
 Proof
   Induct \\ rw [chor_to_endpointTheory.compile_network_gen_def,
                 endpoint_ok_def,
@@ -1373,7 +1392,7 @@ QED
    (because no self-communication is allowed)
 *)
 Theorem MEM_partners_endpoint_project:
-  ∀(c : chor) p. no_self_comunication c ⇒ ¬MEM p (partners_endpoint (project' p c))
+  ∀(c : chor) p dvars. no_self_comunication c ⇒ ¬MEM p (partners_endpoint (project' p dvars c))
 Proof
  Induct
  \\ rw [partners_endpoint_def, chor_to_endpointTheory.project_def,no_self_comunication_def]
@@ -1411,26 +1430,56 @@ Proof
   \\ EVAL_TAC
 QED
 
+Theorem endpoints_compile_network_payload:
+  ∀epn conf.
+   MAP FST (endpoints (endpoint_to_payload$compile_network conf epn)) = MAP FST (endpoints epn)
+Proof
+  Induct \\ rw [endpoint_to_payloadTheory.compile_network_def,
+                endpointPropsTheory.endpoints_def,
+                payloadLangTheory.endpoints_def]
+QED
+
+Theorem endpoints_compile_network_closure:
+  ∀epn conf.
+   MAP FST (endpoints (payload_closure$compile_network_alt epn)) = MAP FST (endpoints epn)
+Proof
+  Induct \\ rw [payload_closureTheory.compile_network_alt_def,
+                payloadLangTheory.endpoints_def]
+QED
+
 Theorem projection_reflection_junkcong:
   ∀s c epn conf.
    compile_network_ok s c (procsOf c)
    ∧ conf.payload_size > 0
+   ∧ dvarsOf c = []
    ∧ no_undefined_vars (s,c)
    ∧ no_self_comunication c
    ∧ (reduction conf)^* (projection conf s c (procsOf c)) epn
-   ⇒ ∃epn' c' s'.
-      (reduction conf)^* epn (compile_network conf epn') ∧
-      trans_s (s,c) (s',c') ∧
-      junkcong {new_fv s c} (project_choice (new_fv s c) s' c' (procsOf c)) epn'
+   ⇒ ∃epn0 epn1 c' s'.
+       compile_rel conf epn (compile_network_alt epn0) ∧
+       (reduction conf)^* epn0 (compile_network conf epn1) ∧
+       trans_s (s,c) (s',c') ∧
+       junkcong {new_fv s c} (project_choice (new_fv s c) s' c' (procsOf c)) epn1
 Proof
   rw [projection_def]
+  \\ first_assum (mp_then Any mp_tac from_closure_reflection)
+  \\ impl_tac
+  \\ rw [fix_network_compile_network,
+         endpoint_to_choiceTheory.compile_network_def,
+         dvarsOf_imp_free_fix_names_network,
+         no_undefined_vars_chor_to_network]
+  >- rw [endpoints_compile_network_choice_aux,
+         endpoints_compile_network_chor,
+         endpoints_compile_network_payload,
+         procsOf_all_distinct]
+  \\ asm_exists_tac \\ simp[]
   \\ first_assum (mp_then Any mp_tac from_payload_reflection)
   \\ impl_tac \\ rw []
-  >- rw [endpoints_compile_network_epn,
+  >- (rw [endpoints_compile_network_choice_aux,
          endpoints_compile_network_chor,
-         procsOf_all_distinct]
-  >- rw [choice_free_network_compile_network_fv,
-         endpoint_to_choiceTheory.compile_network_def]
+         procsOf_all_distinct])
+  >- (rw [choice_free_network_compile_network_fv,
+          endpoint_to_choiceTheory.compile_network_def])
   \\ fs [endpoint_to_choiceTheory.compile_network_def]
   \\ first_assum (mp_then Any mp_tac from_choice_reflection)
   \\ impl_tac
@@ -1445,7 +1494,7 @@ Proof
       \\ Induct_on ‘l’ \\ rw [])
   \\ rw []
   \\ first_assum (mp_then Any mp_tac from_endpoint_reflection)
-  \\ rw []
+  \\ rw [] \\ fs[procsOf_all_distinct]
   \\ first_assum (mp_then Any mp_tac to_choice_preservation)
   \\ qmatch_asmsub_abbrev_tac ‘junkcong {fv}’
   \\ disch_then (qspec_then ‘fv’ mp_tac)
@@ -1466,8 +1515,8 @@ Proof
   >- (fs [] \\ irule choice_free_reduction
       \\ metis_tac [choice_free_network_compile_network_fv])
   \\ rw []
-  \\ qpat_assum ‘(reduction conf)^* epn _’ (mp_then Any (drule_then assume_tac) RTC_SPLIT)
-  \\ qspec_then ‘p3'’ drule endpointPropsTheory.qcong_sym
+  \\ qpat_assum ‘(reduction conf)^* p3 _’ (mp_then Any (drule_then assume_tac) RTC_SPLIT)
+  \\ qspec_then ‘p3''’ drule endpointPropsTheory.qcong_sym
   \\ disch_then (mp_then Any mp_tac endpointPropsTheory.empty_queue_qcong)
   \\ rw [compile_network_empty_q]
   \\ first_x_assum (mp_then Any drule junkcong_trans)
@@ -1479,31 +1528,54 @@ Proof
   \\ rpt(goal_assum drule)
 QED
 
-Theorem projection_reflection:
+
+Theorem projection_reflection_aux:
   ∀s c epn conf.
    compile_network_ok s c (procsOf c)
    ∧ conf.payload_size > 0
+   ∧ dvarsOf c = []
    ∧ no_undefined_vars (s,c)
    ∧ no_self_comunication c
    ∧ (reduction conf)^* (projection conf s c (procsOf c)) epn
-   ⇒ ∃epn' c' s'.
-      (reduction conf)^* epn epn' ∧
+   ⇒ ∃epn0 epn1 c' s'.
+       compile_rel conf epn (compile_network_alt epn0) ∧
+       (reduction conf)^* epn0 epn1 ∧
       trans_s (s,c) (s',c') ∧
-      BISIM_REL (trans conf) (projection conf s' c' (procsOf c)) epn'
+      BISIM_REL (trans conf) (projection conf s' c' (procsOf c)) (compile_network_alt epn1)
 Proof
   rw [] >>
   drule_all_then strip_assume_tac projection_reflection_junkcong >>
   goal_assum drule >>
   goal_assum drule >>
   fs[projection_def,endpoint_to_choiceTheory.compile_network_def] >>
-  fs[project_choice_def] >>
+  fs[project_choice_def,compile_rel_def] >>
   drule junkcong_compile_to_payload >>
   disch_then(qspec_then ‘conf’ strip_assume_tac) >>
-  match_mp_tac BISIM_SYM >>
   drule_then(qspec_then ‘conf’ assume_tac) junkcong_bisim >>
-  match_mp_tac BISIM_TRANS >>
-  dxrule_then assume_tac BISIM_SYM >>
   goal_assum drule >>
+  irule compile_network_alt_fully_abstract >> simp[fix_network_compile_network] >>
+  conj_tac >-
+   (irule no_undefined_vars_chor_to_network >>
+    metis_tac[trans_s_trans,no_undefined_vars_trans_s_pres]) >>
+  conj_tac >-
+   (drule_then (mp_tac o GSYM) junkcong_no_undefined_vars_network >> rw[] >>
+    irule no_undefined_vars_chor_to_network >>
+    metis_tac[trans_s_trans,no_undefined_vars_trans_s_pres]) >>
+  conj_tac >-
+   (irule dvarsOf_imp_free_fix_names_network >>
+    dxrule_then assume_tac dvarsOf_nil_trans_s >>
+    gs[]) >>
+  conj_tac >-
+   (drule junkcong_free_fix_names_network >>
+    qmatch_goalsub_abbrev_tac ‘free_fix_names_network pp’ >>
+    ‘free_fix_names_network pp = []’ suffices_by  rw[] >>
+    UNABBREV_ALL_TAC >>
+    irule dvarsOf_imp_free_fix_names_network >>
+    dxrule_then assume_tac dvarsOf_nil_trans_s >>
+    gs[]) >>
+  irule BISIM_TRANS >>
+  first_x_assum (irule_at Any) >>
+  irule BISIM_SYM >>
   qpat_abbrev_tac ‘fv1 = gen_fresh_name _’ >>
   qpat_abbrev_tac ‘fv2 = gen_fresh_name _’ >>
   qmatch_goalsub_abbrev_tac ‘BISIM_REL _ a1 a2’ >>
@@ -1572,6 +1644,25 @@ Proof
   simp[perm_network_bisim]
 QED
 
+Theorem projection_reflection:
+  ∀s c epn conf.
+   compile_network_ok s c (procsOf c)
+   ∧ conf.payload_size > 0
+   ∧ dvarsOf c = []
+   ∧ no_undefined_vars (s,c)
+   ∧ no_self_comunication c
+   ∧ (reduction conf)^* (projection conf s c (procsOf c)) epn
+   ⇒ ∃epn' c' s'.
+       (reduction conf)^* epn epn' ∧
+      trans_s (s,c) (s',c') ∧
+      BISIM_REL (trans conf) (projection conf s' c' (procsOf c)) epn'
+Proof
+  rw[] \\ drule_all projection_reflection_aux
+  \\ rw[] \\ fs[compile_rel_def]
+  cheat
+QED
+
+
 Theorem REPN_projection:
   ∀conf s c l. REPN (projection conf s c l)
 Proof
@@ -1605,21 +1696,13 @@ Proof
          payloadCongTheory.REPN_def]
 QED
 
-Theorem endpoints_compile_network_payload:
-  ∀epn conf.
-   MAP FST (endpoints (endpoint_to_payload$compile_network conf epn)) = MAP FST (endpoints epn)
-Proof
-  Induct \\ rw [endpoint_to_payloadTheory.compile_network_def,
-                endpointPropsTheory.endpoints_def,
-                payloadLangTheory.endpoints_def]
-QED
-
 Theorem endpoints_projection:
   ∀conf s c l. MAP FST (endpoints (projection conf s c l)) = l
 Proof
   rw [projection_def,
       endpoints_compile_network_payload,
-      endpoints_compile_network_epn,
+      endpoints_compile_network_choice,
+      endpoints_compile_network_closure,
       endpoints_compile_network_chor]
 QED
 
