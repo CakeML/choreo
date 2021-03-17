@@ -7945,13 +7945,25 @@ Proof
   *)
 QED
 
+(* TODO: move *)
+Theorem smallstep_oracle_invariant:
+  stepr (env, st, e, l) (env', st', e', l') ⇒
+  (SND st').oracle = (SND st).oracle
+Proof
+  PairCases_on ‘st’ >>
+  rw[e_step_reln_def,e_step_def,AllCaseEqs(),smallStepTheory.push_def,smallStepTheory.return_def,
+     continue_def] >>
+  gvs[application_def,AllCaseEqs(),do_opapp_def,return_def] >>
+  gvs[do_app_def,call_FFI_def,AllCaseEqs(),ELIM_UNCURRY]
+QED
+
 Theorem ffi_irrel_smallstep:
   ffi_eq conf cSt.ffi.ffi_state ffi2 ∧ ffi_wf cSt.ffi.ffi_state ∧ ffi_wf ffi2 ∧
   cSt.ffi.oracle = comms_ffi_oracle conf ∧
   stepr (env, smSt cSt, e, l) (env', smSt cSt', e', l') ⇒
   ∃ffi3. stepr (env, smSt(cSt with ffi := (cSt.ffi with ffi_state := ffi2)), e, l)
                (env', smSt(cSt' with ffi := (cSt'.ffi with ffi_state := ffi3)), e', l') ∧
-         ffi_wf ffi3 ∧
+         ffi_wf ffi3 ∧ ffi_wf cSt'.ffi.ffi_state ∧
          ffi_eq conf cSt'.ffi.ffi_state ffi3
 Proof
   rw[e_step_reln_def,e_step_def,AllCaseEqs(),smallStepTheory.push_def,smallStepTheory.return_def,
@@ -7976,6 +7988,7 @@ Proof
           >- (gvs[ffi_eq_def, Once bisimulationTheory.BISIM_REL_cases] >>
               metis_tac[]) >>
           rw[]
+          >- metis_tac[strans_pres_wf]
           >- metis_tac[strans_pres_wf]
           >- metis_tac[ffi_eq_pres])
       >- (gvs[ffi_receive_def,AllCaseEqs()] >>
@@ -8004,21 +8017,244 @@ Proof
           metis_tac[ffi_eq_pres,strans_pres_wf]))
 QED
 
-Theorem network_NPar_forward_correctness_reduction:
+Theorem ffi_irrel_smallsteps:
+  ∀conf cSt ffi2 env e l env' cSt' e' l'.
+  ffi_eq conf cSt.ffi.ffi_state ffi2 ∧ ffi_wf cSt.ffi.ffi_state ∧ ffi_wf ffi2 ∧
+  cSt.ffi.oracle = comms_ffi_oracle conf ∧
+  stepr꙳ (env, smSt cSt, e, l) (env', smSt cSt', e', l') ⇒
+  ∃ffi3. stepr꙳ (env, smSt(cSt with ffi := (cSt.ffi with ffi_state := ffi2)), e, l)
+               (env', smSt(cSt' with ffi := (cSt'.ffi with ffi_state := ffi3)), e', l') ∧
+         ffi_wf ffi3 ∧ ffi_wf cSt'.ffi.ffi_state ∧
+         ffi_eq conf cSt'.ffi.ffi_state ffi3
+Proof
+  rpt strip_tac >>
+  qmatch_asmsub_abbrev_tac ‘RTC _ f1 f2’ >>
+  ntac 2 (pop_assum (mp_tac o PURE_ONCE_REWRITE_RULE[markerTheory.Abbrev_def])) >>
+  rpt(last_x_assum mp_tac) >>
+  MAP_EVERY qid_spec_tac [`cSt`,`ffi2`,`env`,`e`,`l`,`env'`,`cSt'`,`e'`,`l'`,‘f2’,‘f1’] >>
+  Ho_Rewrite.PURE_REWRITE_TAC[GSYM PULL_FORALL] >>
+  ho_match_mp_tac RTC_STRONG_INDUCT >>
+  rw[]
+  >- (gvs[to_small_st_def] >>
+      irule_at (Pos hd) RTC_REFL >>
+      simp[])
+  >- (rename1 ‘stepr _ sst’ >>
+      PairCases_on ‘sst’ >>
+      ‘∃s. (sst1,sst2) = smSt s’
+        by(rw[to_small_st_def] >>
+           qexists_tac ‘<|refs := sst1; ffi := sst2|>’ >> simp[]) >>
+      drule ffi_irrel_smallstep >>
+      rpt(disch_then drule) >>
+      disch_then (mp_tac o CONV_RULE(RESORT_FORALL_CONV List.rev)) >>
+      gvs[] >>
+      disch_then drule >>
+      strip_tac >>
+      irule_at (Pos hd) (cj 2 RTC_rules) >>
+      first_x_assum (irule_at (Pos hd)) >>
+      first_x_assum (match_mp_tac o MP_CANON) >>
+      simp[] >>
+      drule smallstep_oracle_invariant >>
+      rw[to_small_st_def])
+QED
+
+Theorem EP_nodenames_dsubst_lemma:
+  ∀e dn e'.
+  x ∈ EP_nodenames (dsubst e dn e') ⇒
+  x ∈ EP_nodenames e ∨ x ∈ EP_nodenames e'
+Proof
+ rpt strip_tac >> Induct_on ‘e’ >>
+ rw[dsubst_def] >>
+ res_tac >> rw[]
+QED
+        
+Theorem network_NPar_forward_correctness':
   ∀conf s c n p s' c' n' cSt0 vs cvs env0.
-  (reduction conf)꙳ (NPar (NEndpoint p s c) n) (NPar (NEndpoint p s' c') n') ∧
+  trans conf (NPar (NEndpoint p s c) n) LTau (NPar (NEndpoint p s' c') n') ∧
   (∀nd. nd ∈ EP_nodenames c ⇒ ffi_has_node nd cSt0.ffi.ffi_state) ∧
+  (∀nd. nd ∈ EP_nodenames c ⇒ ffi_has_node nd (p,s.queues,n)) ∧
   cpEval_valid conf p env0 s c vs cvs cSt0 ∧
-  cSt0.ffi.ffi_state = (p,s.queues,n) ∧
+  ffi_eq conf cSt0.ffi.ffi_state (p,s.queues,n) ∧
+  ffi_wf (p,s.queues,n) ∧
   pletrec_vars_ok c ∧
   normalised s.queues
   ⇒
-  ∃env cSt.
-    triR stepr
-         (env0, smSt cSt0, Exp (compile_endpoint conf vs c), [])
-         (env, smSt cSt, Exp (compile_endpoint conf vs c'), []) ∧
+  ∃env cSt env' e' l' sst sst'.
+    stepr꙳
+      (env0, smSt cSt0, Exp (compile_endpoint conf vs c), [])
+      (env', sst, e', l') ∧
+    stepr꙳
+      (env, smSt cSt, Exp (compile_endpoint conf vs c'), [])
+      (env', sst', e', l') ∧
+    ffi_eq conf (SND sst).ffi_state (SND sst').ffi_state ∧
     cpEval_valid conf p env s' c' vs cvs cSt ∧
     ffi_eq conf cSt.ffi.ffi_state (p,s'.queues,n') ∧
+    FST sst = FST sst' ∧
+    (SND sst).oracle = (SND sst').oracle ∧
+    (SND sst).io_events = (SND sst').io_events ∧        
+    (∀nd. nd ∈ EP_nodenames c' ⇒ ffi_has_node nd cSt.ffi.ffi_state)
+Proof
+  rpt strip_tac >>
+  drule_at (Pos last) network_NPar_forward_correctness >>
+  disch_then (drule_at (Pos last)) >>
+  disch_then drule >>
+  disch_then(qspec_then ‘cSt0 with ffi := (cSt0.ffi with ffi_state := (p,s.queues,n))’ mp_tac) >>
+  simp[] >>
+  disch_then(qspecl_then [‘vs’,‘cvs’,‘env0’] mp_tac) >>
+  impl_tac  
+  >- (gvs[cpEval_valid_def, ffi_state_cor_def]) >>
+  strip_tac >>
+  gvs[triR_def] >>
+  rename1 ‘RTC _ _ sst’ >>
+  PairCases_on ‘sst’ >>
+  ‘∃s. (sst1,sst2) = smSt s’
+    by(rw[to_small_st_def] >>
+       qexists_tac ‘<|refs := sst1; ffi := sst2|>’ >> simp[]) >>
+  gvs[] >>
+  drule_at (Pos last) ffi_irrel_smallsteps >>
+  simp[] >>
+  imp_res_tac ffi_eq_SYM >>
+  disch_then drule >>
+  impl_tac
+  >- (gvs[cpEval_valid_def]) >>
+  qmatch_goalsub_abbrev_tac ‘smSt a1’ >>
+  ‘a1 = cSt0’
+    by(rw[Abbr ‘a1’,semanticPrimitivesTheory.state_component_equality,
+          ffi_state_component_equality]) >>
+  gvs[Abbr ‘a1’] >>
+  pop_assum kall_tac >>
+  strip_tac >>
+  simp[PULL_EXISTS] >>
+  first_assum(irule_at (Pos hd)) >>
+  last_assum(fn thm => mp_then (Pos last) mp_tac ffi_irrel_smallsteps thm) >>
+  disch_then drule >>
+  impl_tac
+  >- (gvs[cpEval_valid_def] >>
+      gvs[Once trans_cases] >>
+      metis_tac[ffi_wf_def,trans_pres_ffi_wf]) >>
+  strip_tac >>
+  first_x_assum(irule_at (Pos hd)) >>
+  simp[to_small_st_def] >>
+  conj_tac >- metis_tac[ffi_eq_SYM,ffi_eq_TRANS] >>
+  conj_tac
+  >- (gvs[cpEval_valid_def] >>
+      gvs[ffi_state_cor_def] >>
+      simp[PULL_EXISTS] >>
+      irule_at (Pos hd) ffi_eq_REFL >>
+      gvs[Once trans_cases] >>
+      metis_tac[ffi_wf_def,trans_pres_ffi_wf]) >>
+  (* TODO: make a lemma out of this crap *)
+  gvs[Once trans_cases] >>
+  gvs[ffi_has_node_def,net_has_node_MEM_endpoints] >>
+  imp_res_tac endpoint_names_trans >>
+  gvs[endpoints_def] >>
+  qpat_x_assum ‘trans _ (NEndpoint _ _ _) _ _’ mp_tac >>
+  rw[Once trans_cases] >>
+  gvs[EP_nodenames_def] >>
+  imp_res_tac EP_nodenames_dsubst_lemma >>
+  gvs[EP_nodenames_def] >>
+  first_x_assum drule >>
+  Cases_on ‘cSt.ffi.ffi_state’ >>
+  Cases_on ‘r’ >>
+  gvs[ffi_has_node_def,net_has_node_MEM_endpoints] >>
+  (* unprovable from here *)
+  cheat
+QED
+
+Theorem network_NPar_forward_correctness'':
+  ∀conf s c n p s' c' n' cSt0 vs cvs env0.
+  trans conf (NPar (NEndpoint p s c) n) LTau (NPar (NEndpoint p s' c') n') ∧
+  (∀nd. nd ∈ EP_nodenames c ⇒ ffi_has_node nd cSt0.ffi.ffi_state) ∧
+  (∀nd. nd ∈ EP_nodenames c ⇒ ffi_has_node nd (p,s.queues,n)) ∧
+  cpEval_valid conf p env0 s c vs cvs cSt0 ∧
+  ffi_eq conf cSt0.ffi.ffi_state (p,s.queues,n) ∧
+  ffi_wf (p,s.queues,n) ∧
+  pletrec_vars_ok c ∧
+  normalised s.queues
+  ⇒
+  ∃env cSt env' e' l' sst sst'.
+    stepr꙳
+      (env0, smSt cSt0, Exp (compile_endpoint conf vs c), [])
+      (env', sst, e', l') ∧
+    stepr꙳
+      (env, smSt cSt, Exp (compile_endpoint conf vs c'), [])
+      (env', sst', e', l') ∧
+    ffi_eq conf (SND sst).ffi_state (SND sst').ffi_state ∧
+    FST sst = FST sst' ∧
+    (SND sst).oracle = (SND sst').oracle ∧
+    (SND sst).io_events = (SND sst').io_events ∧
+    cpEval_valid conf p env s' c' vs cvs cSt ∧
+    cSt.ffi.ffi_state = (p,s'.queues,n') ∧
+    (∀nd. nd ∈ EP_nodenames c' ⇒ ffi_has_node nd cSt.ffi.ffi_state)
+Proof
+  rpt strip_tac >>
+  drule_all network_NPar_forward_correctness' >>
+  strip_tac >>
+  first_x_assum(irule_at (Pos hd)) >>
+  drule ffi_irrel_smallsteps >>
+  PairCases_on ‘sst'’ >>
+  ‘∃s. (sst'0,sst'1) = smSt s’
+    by(rw[to_small_st_def] >>
+       qexists_tac ‘<|refs := sst'0; ffi := sst'1|>’ >> simp[]) >>
+  gvs[] >>
+  disch_then(drule_at (Pos last)) >>
+  impl_tac
+  >- (gvs[cpEval_valid_def, ffi_state_cor_def] >>
+      gvs[Once trans_cases] >>
+      metis_tac[ffi_wf_def,trans_pres_ffi_wf]) >>
+  strip_tac >>
+  first_x_assum(irule_at (Pos hd)) >>
+  gvs[to_small_st_def] >>
+  conj_tac >- metis_tac[ffi_eq_SYM,ffi_eq_TRANS] >>
+  conj_tac
+  >- (gvs[cpEval_valid_def,ffi_state_cor_def,PULL_EXISTS] >>
+      irule_at (Pos hd) ffi_eq_REFL >>
+      gvs[Once trans_cases] >>
+      metis_tac[ffi_wf_def,trans_pres_ffi_wf]) >>
+  (* unprovable *)
+  cheat
+QED
+
+Theorem stepr_cut_paste:
+  ∀s1 s2 s3.
+  stepr꙳ s1 s2 ∧ stepr꙳ s1 s3 ⇒
+  s2 = s3 ∨
+  stepr꙳ s2 s3 ∨
+  stepr꙳ s3 s2
+Proof
+  simp[GSYM AND_IMP_INTRO,GSYM PULL_FORALL] >>
+  ho_match_mp_tac RTC_STRONG_INDUCT >>
+  rw[]
+  >- (rw[] >>
+      qpat_x_assum ‘RTC stepr s1 s3’ (strip_assume_tac o REWRITE_RULE[Once RTC_cases]) >>
+      gvs[]
+      >- metis_tac[RTC_rules] >>
+      gvs[e_step_reln_def])
+QED
+        
+Theorem network_NPar_forward_correctness_reduction_lemma:
+  ∀conf s c n p s' c' n' cSt0 vs cvs env0.
+  (reduction conf)꙳ (NPar (NEndpoint p s c) n) (NPar (NEndpoint p s' c') n') ∧
+  (∀nd. nd ∈ EP_nodenames c ⇒ ffi_has_node nd cSt0.ffi.ffi_state) ∧
+  (∀nd. nd ∈ EP_nodenames c ⇒ ffi_has_node nd (p,s.queues,n)) ∧
+  cpEval_valid conf p env0 s c vs cvs cSt0 ∧
+  ffi_eq conf cSt0.ffi.ffi_state (p,s.queues,n) ∧
+  ffi_wf (p,s.queues,n) ∧         
+  pletrec_vars_ok c ∧
+  normalised s.queues
+  ⇒
+  ∃env cSt env' e' l' sst sst'.
+    stepr꙳
+      (env0, smSt cSt0, Exp (compile_endpoint conf vs c), [])
+      (env', sst, e', l') ∧
+    stepr꙳
+      (env, smSt cSt, Exp (compile_endpoint conf vs c'), [])
+      (env', sst', e', l') ∧
+    ffi_eq conf (SND sst).ffi_state (SND sst').ffi_state ∧
+    FST sst = FST sst' ∧
+    (SND sst).oracle = (SND sst').oracle ∧
+    (SND sst).io_events = (SND sst').io_events ∧        
+    cpEval_valid conf p env s' c' vs cvs cSt ∧
+    cSt.ffi.ffi_state = (p,s'.queues,n') ∧
     (∀nd. nd ∈ EP_nodenames c' ⇒ ffi_has_node nd cSt.ffi.ffi_state)
 Proof
   rpt strip_tac >>
@@ -8031,21 +8267,122 @@ Proof
   rpt strip_tac >> rveq
   >- (gvs[triR_def,PULL_EXISTS,GSYM CONJ_ASSOC] >>
       ntac 2 (irule_at (Pos hd) RTC_REFL) >>
-      simp[])
+      simp[to_small_st_def] >>
+      qexists_tac ‘cSt0 with ffi := (cSt0.ffi with ffi_state := (p,s.queues,n))’ >>
+      gvs[cpEval_valid_def] >>
+      simp[ffi_state_cor_def])
   >- (gvs[reduction_def] >>
       rename1 ‘trans _ _ _ nn’ >>
       ‘∃s' c' n'. nn = NPar (NEndpoint p s' c') n'’
         by(gvs[Once trans_cases] >>
            imp_res_tac trans_struct_pres_NEndpoint >> gvs[]) >>
       rveq >>
-      drule network_NPar_forward_correctness >>
+      drule network_NPar_forward_correctness'' >>
       disch_then(qspec_then ‘cSt0’ mp_tac) >>
       simp[] >>
       disch_then drule >>
       strip_tac >>
       first_x_assum drule >>
+      ‘∀nd. nd ∈ EP_nodenames c'' ⇒ ffi_has_node nd (p,s''.queues,n'')’
+        by cheat (* unprovable *) >>
       disch_then drule >>
-      cheat)
+      disch_then drule >>
+      simp[] >>
+      impl_tac >- cheat >> (* unprovable *)
+      strip_tac >>
+      qpat_x_assum ‘RTC stepr (env,smSt cSt,_,_) _’ mp_tac >>
+      disch_then (fn thm => mp_then (Pos hd) drule stepr_cut_paste thm >> assume_tac thm) >>
+      strip_tac
+      >- (simp[] >>
+          first_x_assum (irule_at (Pos hd)) >>
+          gvs[] >>
+          first_x_assum(irule_at (Pos hd)) >>
+          simp[] >>
+          metis_tac[ffi_eq_TRANS,ffi_eq_SYM])
+      >- (first_assum (irule_at (Pos hd)) >>
+          irule_at (Pos hd) RTC_RTC >>
+          first_assum (irule_at (Pos hd)) >>
+          rename1 ‘RTC stepr (_,ssta,_,_) (_,sstb,_,_)’ >>
+          MAP_EVERY PairCases_on [‘ssta’,‘sstb’] >>
+          gvs[] >>
+          ‘∃s1. (FST sst''',ssta1) = smSt s1’
+            by(rw[to_small_st_def] >>
+               qexists_tac ‘<|refs := FST sst'''; ffi := ssta1|>’ >> simp[]) >>
+          ‘∃s2. (FST sst,sstb1) = smSt s2’
+            by(rw[to_small_st_def] >>
+               qexists_tac ‘<|refs := FST sst; ffi := sstb1|>’ >> simp[]) >>
+          gvs[] >>
+          drule_at (Pos last) ffi_irrel_smallsteps >>
+          gvs[to_small_st_def] >>
+          disch_then drule >>
+          impl_tac >- cheat (* looks provable enough *) >>
+          strip_tac >>
+          gvs[] >>
+          irule_at (Pos hd) RTC_RTC >>
+          irule_at (Pos hd) (METIS_PROVE [RTC_REFL] “∀R A B. A = B ⇒ RTC R A B”) >>
+          first_x_assum(irule_at (Pat ‘RTC _ _ _’)) >>
+          simp[] >>
+          Cases_on ‘sst'''’ >> gvs[ffi_state_component_equality] >>
+          metis_tac[ffi_eq_TRANS,ffi_eq_SYM])
+      >- (irule_at (Pos hd) RTC_RTC >>
+          first_assum (irule_at (Pos hd)) >>
+          rename1 ‘RTC stepr (_,ssta,_,_) (_,sstb,_,_)’ >>
+          MAP_EVERY PairCases_on [‘ssta’,‘sstb’] >>
+          gvs[] >>
+          ‘∃s1. (FST sst,ssta1) = smSt s1’
+            by(rw[to_small_st_def] >>
+               qexists_tac ‘<|refs := FST sst; ffi := ssta1|>’ >> simp[]) >>
+          ‘∃s2. (FST sst''',sstb1) = smSt s2’
+            by(rw[to_small_st_def] >>
+               qexists_tac ‘<|refs := FST sst'''; ffi := sstb1|>’ >> simp[]) >>
+          gvs[] >>
+          drule_at (Pos last) ffi_irrel_smallsteps >>
+          gvs[to_small_st_def] >>
+          imp_res_tac ffi_eq_SYM >>
+          disch_then drule >>
+          impl_tac >- cheat (* looks provable enough *) >>
+          strip_tac >>
+          gvs[] >>
+          irule_at (Pos hd) RTC_RTC >>
+          irule_at (Pos hd) (METIS_PROVE [RTC_REFL] “∀R A B. A = B ⇒ RTC R A B”) >>
+          first_x_assum(irule_at (Pat ‘RTC _ _ _’)) >>
+          simp[] >>
+          Cases_on ‘sst’ >> gvs[ffi_state_component_equality] >>
+          first_x_assum(irule_at (Pos hd)) >>
+          simp[] >>
+          metis_tac[ffi_eq_TRANS,ffi_eq_SYM]))
+QED
+
+Theorem network_NPar_forward_correctness_reduction:
+  ∀conf s c n p s' c' n' cSt0 vs cvs env0.
+  (reduction conf)꙳ (NPar (NEndpoint p s c) n) (NPar (NEndpoint p s' c') n') ∧
+  (∀nd. nd ∈ EP_nodenames c ⇒ ffi_has_node nd cSt0.ffi.ffi_state) ∧
+  cpEval_valid conf p env0 s c vs cvs cSt0 ∧
+  cSt0.ffi.ffi_state = (p,s.queues,n) ∧
+  pletrec_vars_ok c ∧
+  normalised s.queues
+  ⇒
+  ∃env cSt env' e' l' sst sst'.
+    stepr꙳
+      (env0, smSt cSt0, Exp (compile_endpoint conf vs c), [])
+      (env', sst, e', l') ∧
+    stepr꙳
+      (env, smSt cSt, Exp (compile_endpoint conf vs c'), [])
+      (env', sst', e', l') ∧
+    ffi_eq conf (SND sst).ffi_state (SND sst').ffi_state ∧
+    FST sst = FST sst' ∧
+    (SND sst).oracle = (SND sst').oracle ∧
+    (SND sst).io_events = (SND sst').io_events ∧        
+    cpEval_valid conf p env s' c' vs cvs cSt ∧
+    cSt.ffi.ffi_state = (p,s'.queues,n') ∧
+    (∀nd. nd ∈ EP_nodenames c' ⇒ ffi_has_node nd cSt.ffi.ffi_state)
+Proof
+  rpt strip_tac >>
+  match_mp_tac network_NPar_forward_correctness_reduction_lemma >>
+  simp[] >>
+  irule_at Any ffi_eq_REFL >>
+  gvs[] >>
+  gvs[cpEval_valid_def]
 QED
 
 (*
