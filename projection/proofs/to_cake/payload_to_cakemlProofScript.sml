@@ -7871,8 +7871,8 @@ Proof
       \\ gvs[cpFFI_valid_def]
       \\ qpat_x_assum ‘trans _ _ (LReceive _ _ _) _’ (strip_assume_tac o ONCE_REWRITE_RULE[trans_cases])
       \\ gvs[]
-      \\ dxrule_then assume_tac ffi_eq_sym
-      \\ drule_then match_mp_tac ffi_eq_trans
+      \\ dxrule_then assume_tac ffi_eq_SYM
+      \\ drule_then match_mp_tac ffi_eq_TRANS
       \\ match_mp_tac active_trans_equiv_irrel
       \\ conj_tac >- gvs[cpEval_valid_def]
       \\ match_mp_tac RTC_SUBSET
@@ -7943,6 +7943,109 @@ Proof
   \\ MAP_EVERY qexists_tac [‘mc’,‘env2’,‘vs2’]
   \\ fs [cpFFI_valid_def,cpEval_valid_def,ffi_state_cor_def]
   *)
+QED
+
+Theorem ffi_irrel_smallstep:
+  ffi_eq conf cSt.ffi.ffi_state ffi2 ∧ ffi_wf cSt.ffi.ffi_state ∧ ffi_wf ffi2 ∧
+  cSt.ffi.oracle = comms_ffi_oracle conf ∧
+  stepr (env, smSt cSt, e, l) (env', smSt cSt', e', l') ⇒
+  ∃ffi3. stepr (env, smSt(cSt with ffi := (cSt.ffi with ffi_state := ffi2)), e, l)
+               (env', smSt(cSt' with ffi := (cSt'.ffi with ffi_state := ffi3)), e', l') ∧
+         ffi_wf ffi3 ∧
+         ffi_eq conf cSt'.ffi.ffi_state ffi3
+Proof
+  rw[e_step_reln_def,e_step_def,AllCaseEqs(),smallStepTheory.push_def,smallStepTheory.return_def,
+     continue_def] >>
+  gvs[to_small_st_def,semanticPrimitivesTheory.state_component_equality,ffi_state_component_equality]
+  >- (gvs[application_def,AllCaseEqs(),do_app_def,do_opapp_def])
+  >- (gvs[application_def,AllCaseEqs(),do_app_def,do_opapp_def])
+  >- (qpat_x_assum ‘_ = ssstep _’ (strip_assume_tac o REWRITE_RULE[application_def]) >>
+      gvs[AllCaseEqs(),return_def] >>
+      gvs[do_app_def,AllCaseEqs(),application_def,return_def,semanticPrimitivesTheory.state_component_equality,ffi_state_component_equality,ELIM_UNCURRY] >>
+      gvs[call_FFI_def,AllCaseEqs(),PULL_EXISTS] >>
+      qpat_x_assum ‘comms_ffi_oracle _ = _’ (assume_tac o GSYM) >>
+      gvs[comms_ffi_oracle_def,ffi_send_def,ffi_receive_def] >>
+      rw[] >> gvs[]
+      >- (gvs[ffi_send_def,AllCaseEqs()] >>
+          gvs[some_def] >>
+          conj_tac
+          >- (gvs[ffi_eq_def, Once bisimulationTheory.BISIM_REL_cases] >>
+              metis_tac[]) >>
+          SELECT_ELIM_TAC >>
+          conj_tac
+          >- (gvs[ffi_eq_def, Once bisimulationTheory.BISIM_REL_cases] >>
+              metis_tac[]) >>
+          rw[]
+          >- metis_tac[strans_pres_wf]
+          >- metis_tac[ffi_eq_pres])
+      >- (gvs[ffi_receive_def,AllCaseEqs()] >>
+          gvs[some_def] >>
+          gvs[ELIM_UNCURRY] >>
+          first_x_assum(irule_at (Pat ‘store_assign _ _ _ = _’)) >>
+          qhdtm_assum ‘ffi_eq’ (strip_assume_tac o REWRITE_RULE[ffi_eq_def, Once bisimulationTheory.BISIM_REL_cases]) >>
+          gvs[FORALL_AND_THM] >>
+          first_x_assum drule_all >>
+          strip_tac >>
+          simp[Once EXISTS_PROD] >>
+          first_assum(irule_at (Pos hd)) >>
+          SELECT_ELIM_TAC >>
+          conj_tac >- (simp[Once EXISTS_PROD] >> metis_tac[]) >>
+          rw[] >>
+          qpat_x_assum ‘$@ _ = _’ mp_tac >>
+          SELECT_ELIM_TAC >>
+          conj_tac >- metis_tac[] >>
+          rpt strip_tac >>
+          imp_res_tac functional_ARecv >>
+          rveq >>
+          rename1 ‘tup = (_,_)’ >>
+          Cases_on ‘tup’ >>
+          simp[] >>
+          fs[] >> rveq >>
+          metis_tac[ffi_eq_pres,strans_pres_wf]))
+QED
+
+Theorem network_NPar_forward_correctness_reduction:
+  ∀conf s c n p s' c' n' cSt0 vs cvs env0.
+  (reduction conf)꙳ (NPar (NEndpoint p s c) n) (NPar (NEndpoint p s' c') n') ∧
+  (∀nd. nd ∈ EP_nodenames c ⇒ ffi_has_node nd cSt0.ffi.ffi_state) ∧
+  cpEval_valid conf p env0 s c vs cvs cSt0 ∧
+  cSt0.ffi.ffi_state = (p,s.queues,n) ∧
+  pletrec_vars_ok c ∧
+  normalised s.queues
+  ⇒
+  ∃env cSt.
+    triR stepr
+         (env0, smSt cSt0, Exp (compile_endpoint conf vs c), [])
+         (env, smSt cSt, Exp (compile_endpoint conf vs c'), []) ∧
+    cpEval_valid conf p env s' c' vs cvs cSt ∧
+    ffi_eq conf cSt.ffi.ffi_state (p,s'.queues,n') ∧
+    (∀nd. nd ∈ EP_nodenames c' ⇒ ffi_has_node nd cSt.ffi.ffi_state)
+Proof
+  rpt strip_tac >>
+  qmatch_asmsub_abbrev_tac ‘RTC _ n1 n2’ >>
+  ntac 2 (pop_assum (mp_tac o REWRITE_RULE[markerTheory.Abbrev_def])) >>
+  rpt(pop_assum mp_tac) >>
+  MAP_EVERY qid_spec_tac [`s`,`c`,`n`,`p`,`s'`,`c'`,`n'`,`cSt0`,`vs`,`cvs`,`env0`,‘n2’,‘n1’] >>
+  Ho_Rewrite.PURE_REWRITE_TAC[GSYM PULL_FORALL] >>
+  ho_match_mp_tac RTC_STRONG_INDUCT >>
+  rpt strip_tac >> rveq
+  >- (gvs[triR_def,PULL_EXISTS,GSYM CONJ_ASSOC] >>
+      ntac 2 (irule_at (Pos hd) RTC_REFL) >>
+      simp[])
+  >- (gvs[reduction_def] >>
+      rename1 ‘trans _ _ _ nn’ >>
+      ‘∃s' c' n'. nn = NPar (NEndpoint p s' c') n'’
+        by(gvs[Once trans_cases] >>
+           imp_res_tac trans_struct_pres_NEndpoint >> gvs[]) >>
+      rveq >>
+      drule network_NPar_forward_correctness >>
+      disch_then(qspec_then ‘cSt0’ mp_tac) >>
+      simp[] >>
+      disch_then drule >>
+      strip_tac >>
+      first_x_assum drule >>
+      disch_then drule >>
+      cheat)
 QED
 
 (*
