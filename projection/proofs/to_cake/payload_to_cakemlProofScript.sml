@@ -3051,10 +3051,60 @@ Definition EP_nodenames_def[simp]:
   EP_nodenames (FCall _ _) = ∅
 End
 
+Definition closure_nodenames_def[simp]:
+  closure_nodenames (Closure params (funs,bindings) body) =
+  EP_nodenames body ∪ LIST_UNION (MAP (closure_nodenames) (MAP SND funs))
+Termination
+  WF_REL_TAC ‘measure(closure_size)’ >>
+  simp[MEM_MAP,PULL_EXISTS] >>
+  simp[FORALL_PROD] >> rw[] >>
+  drule closure_size_MEM >>
+  intLib.COOPER_TAC
+End
+
+Definition network_nodenames_def[simp]:
+  network_nodenames (NNil) = ∅ ∧
+  network_nodenames (NEndpoint p s e) =
+  LIST_UNION(MAP (closure_nodenames o SND) s.funs)
+   ∪ EP_nodenames e ∧
+  network_nodenames (NPar n1 n2) =
+  network_nodenames n1 ∪ network_nodenames n2
+End
+
+(* TODO: move *)
+Theorem MEM_LIST_UNION:
+  ∀x l.
+  x ∈ LIST_UNION l ⇔
+  (∃e. MEM e l ∧ x ∈ e)
+Proof
+  strip_tac >> Induct >>
+  rw[regexpTheory.LIST_UNION_def] >>
+  metis_tac[]
+QED
+
 Theorem FINITE_EP_nodenames[simp]:
   FINITE (EP_nodenames e)
 Proof
   Induct_on ‘e’ >> simp[]
+QED
+
+Theorem FINITE_closure_nodenames[simp]:
+  FINITE (closure_nodenames c)
+Proof
+  qid_spec_tac ‘c’ >>
+  ho_match_mp_tac closure_nodenames_ind >>
+  rw[] >>
+  Induct_on ‘funs’ >>
+  rw[regexpTheory.LIST_UNION_def]
+QED
+
+Theorem FINITE_network_nodenames[simp]:
+  FINITE (network_nodenames n)
+Proof
+  Induct_on ‘n’ >> simp[] >>
+  Cases >> simp[] >>
+  Induct_on ‘l’ >>
+  gvs[regexpTheory.LIST_UNION_def]
 QED
 
 Definition wfclosure_def[simp]:
@@ -3176,6 +3226,28 @@ QED
 (* FFI and Payload State *)
 (* -- Check identifier and FFI model contains
       correct messages *)
+
+Theorem ffi_eq_REFL[simp]:
+  ffi_eq c s s
+Proof
+  ‘equivalence (ffi_eq c)’ by simp[ffi_eq_equivRel] >>
+  fs[equivalence_def, reflexive_def]
+QED
+
+Theorem ffi_eq_SYM:
+  ffi_eq c s1 s2 ⇒ ffi_eq c s2 s1
+Proof
+  ‘equivalence (ffi_eq c)’ by simp[ffi_eq_equivRel] >>
+  fs[equivalence_def, symmetric_def]
+QED
+
+Theorem ffi_eq_TRANS:
+  ffi_eq c s1 s2 ∧ ffi_eq c s2 s3 ⇒ ffi_eq c s1 s3
+Proof
+  ‘equivalence (ffi_eq c)’ by simp[ffi_eq_equivRel] >>
+  fs[equivalence_def, transitive_def] >> metis_tac[]
+QED
+
 Definition ffi_state_cor_def:
   ffi_state_cor conf cpNum pSt (fNum,fQueue,fNet) ⇔
     cpNum = fNum ∧
@@ -3691,7 +3763,7 @@ Theorem simulation:
   ∀p0 pSt0 EP0 L p pSt EP cEnv0 vs cSt0.
     trans conf (NEndpoint p0 pSt0 EP0) L (NEndpoint p pSt EP) ∧
     cpEval_valid conf p0 cEnv0 pSt0 EP0 vs cvs cSt0 ∧
-    (∀nd. nd ∈ EP_nodenames EP0 ⇒ ffi_has_node nd cSt0.ffi.ffi_state) ∧
+    (∀nd. nd ∈ network_nodenames (NEndpoint p0 pSt0 EP0) ⇒ ffi_has_node nd cSt0.ffi.ffi_state) ∧
     pletrec_vars_ok EP0
     ⇒
     ∃cEnv cSt.
@@ -3700,7 +3772,7 @@ Theorem simulation:
         (cEnv, smSt cSt, Exp (compile_endpoint conf vs EP), []) ∧
       cpEval_valid conf p cEnv pSt EP vs cvs cSt ∧
       cpFFI_valid conf pSt0 pSt cSt0.ffi.ffi_state cSt.ffi.ffi_state L ∧
-      (∀nd. nd ∈ EP_nodenames EP ⇒ ffi_has_node nd cSt.ffi.ffi_state)
+      (∀nd. nd ∈ network_nodenames (NEndpoint p pSt EP) ⇒ ffi_has_node nd cSt.ffi.ffi_state)
 Proof
   Induct_on ‘trans’ >> simp[compile_endpoint_def] >> rpt strip_tac (* 11 *)
   >- (gs[cpEval_valid_Send] >>
@@ -3761,9 +3833,14 @@ Proof
       gs[DECIDE “y ≤ x ⇒ x - y + y - x = 0n”] >>
       pop_assum $ irule_at (Pos hd) >> simp[] >>
       reverse (rpt conj_tac)
-      >- (Cases_on ‘cSt0.ffi.ffi_state’ >>
+      >- (gvs[DISJ_IMP_THM,FORALL_AND_THM] >> rw[] >>
+          res_tac >>
+          dep_rewrite.DEP_ONCE_REWRITE_TAC[update_state_ffi_has_node] >>
+          simp[update_state_ffi_has_node] >>
+          Cases_on ‘cSt0.ffi.ffi_state’ >>
           rename [‘cSt0.ffi.ffi_state = (pn,X)’] >> Cases_on ‘X’ >>
-          gs[ffi_state_cor_def])
+          gs[ffi_state_cor_def]
+          )
       >- (simp[cpFFI_valid_def] >>
           Cases_on ‘cSt0.ffi.ffi_state’ >>
           rename [‘cSt0.ffi.ffi_state = (pn,X)’] >> Cases_on ‘X’ >>
@@ -4023,8 +4100,7 @@ Proof
       ‘nn = n0’ by metis_tac[strans_pres_pnum, FST] >>
       gvs[ffi_state_cor_def] >> rpt strip_tac
       >- (irule match_send_hold_queues_ffi_eq >> metis_tac[])
-      >- (simp[cpFFI_valid_def] >> metis_tac[])
-      >- (simp[ffi_has_node_def] >> metis_tac[strans_send_has_node]) >>
+      >- (simp[cpFFI_valid_def] >> metis_tac[]) >>
       metis_tac[strans_pres_nodes])
   >- ((* receive, pushing queue *) all_tac >>
       qexistsl_tac [‘cEnv0’, ‘cSt0’] >> simp[triR_REFL] >>
@@ -4114,26 +4190,20 @@ Proof
               Induct_on‘ vars’ using SNOC_INDUCT >>
               simp[EVERY_SNOC, REVERSE_SNOC, MAP_SNOC] >> rw[] >>
               gs[] >> metis_tac[]) >>
-          gs[ps2cs_def] >> metis_tac[]))
+          gs[ps2cs_def] >> metis_tac[])
+      >- (simp[cpFFI_valid_def] >>
+          simp[some_def] >>
+          rw[ELIM_UNCURRY] >>
+          spose_not_then kall_tac >>
+          pop_assum mp_tac >>
+          rw[fmap_eq_flookup,FLOOKUP_normalise_queues,FLOOKUP_UPDATE] >>
+          rename1 ‘if a1 = _ then _ else _’ >>
+          qexists_tac ‘a1’ >>
+          rw[] >>
+          simp[qlk_def,fget_def] >>
+          TOP_CASE_TAC >> simp[])
+      >- (gvs[regexpTheory.LIST_UNION_def,MEM_LIST_UNION,MEM_MAP,PULL_EXISTS]))
   >- ((* FCall *) cheat)
-QED
-
-Theorem simulation:
-  ∀p0 pSt0 EP0 L p pSt EP cEnv0 vs cSt0.
-    trans conf (NEndpoint p0 pSt0 EP0) L (NEndpoint p pSt EP) ∧
-    cpEval_valid conf p0 cEnv0 pSt0 EP0 vs cvs cSt0 ∧
-    (∀nd. nd ∈ EP_nodenames EP0 ⇒ ffi_has_node nd cSt0.ffi.ffi_state) ∧
-    pletrec_vars_ok EP0
-    ⇒
-    ∃cEnv cSt.
-      triR stepr
-        (cEnv0, smSt cSt0, Exp (compile_endpoint conf vs EP0), [])
-        (cEnv, smSt cSt, Exp (compile_endpoint conf vs EP), []) ∧
-      cpEval_valid conf p cEnv pSt EP vs cvs cSt ∧
-      cpFFI_valid conf pSt0 pSt cSt0.ffi.ffi_state cSt.ffi.ffi_state L ∧
-      (∀nd. nd ∈ EP_nodenames EP ⇒ ffi_has_node nd cSt.ffi.ffi_state)
-Proof
-  cheat
 QED
 
 (*
@@ -6088,27 +6158,6 @@ QED
 
 *)
 
-Theorem ffi_eq_REFL[simp]:
-  ffi_eq c s s
-Proof
-  ‘equivalence (ffi_eq c)’ by simp[ffi_eq_equivRel] >>
-  fs[equivalence_def, reflexive_def]
-QED
-
-Theorem ffi_eq_SYM:
-  ffi_eq c s1 s2 ⇒ ffi_eq c s2 s1
-Proof
-  ‘equivalence (ffi_eq c)’ by simp[ffi_eq_equivRel] >>
-  fs[equivalence_def, symmetric_def]
-QED
-
-Theorem ffi_eq_TRANS:
-  ffi_eq c s1 s2 ∧ ffi_eq c s2 s3 ⇒ ffi_eq c s1 s3
-Proof
-  ‘equivalence (ffi_eq c)’ by simp[ffi_eq_equivRel] >>
-  fs[equivalence_def, transitive_def] >> metis_tac[]
-QED
-
 (*
 
 Theorem ffi_eq_bisimulation_L:
@@ -7731,7 +7780,7 @@ QED
 Theorem network_NPar_forward_correctness:
   ∀conf s c n p s' c' n' cSt0 vs cvs env0.
   trans conf (NPar (NEndpoint p s c) n) LTau (NPar (NEndpoint p s' c') n') ∧
-  (∀nd. nd ∈ EP_nodenames c ⇒ ffi_has_node nd cSt0.ffi.ffi_state) ∧
+  (∀nd. nd ∈ network_nodenames (NEndpoint p s c) ⇒ ffi_has_node nd cSt0.ffi.ffi_state) ∧
   cpEval_valid conf p env0 s c vs cvs cSt0 ∧
   cSt0.ffi.ffi_state = (p,s.queues,n) ∧
   pletrec_vars_ok c ∧
@@ -7743,7 +7792,7 @@ Theorem network_NPar_forward_correctness:
          (env, smSt cSt, Exp (compile_endpoint conf vs c'), []) ∧
     cpEval_valid conf p env s' c' vs cvs cSt ∧
     ffi_eq conf cSt.ffi.ffi_state (p,s'.queues,n') ∧
-    (∀nd. nd ∈ EP_nodenames c' ⇒ ffi_has_node nd cSt.ffi.ffi_state)
+    (∀nd. nd ∈ network_nodenames (NEndpoint p s' c') ⇒ ffi_has_node nd cSt.ffi.ffi_state)
 
 (*
   (* These assumptions should be dischargable by the static part of the compiler *)
@@ -7777,7 +7826,7 @@ Proof
   \\ fs [] \\ rveq
   (* p is not involved at all *)
   >- (first_assum(irule_at (Pat ‘cpEval_valid _ _ _ _ _ _ _ _’))
-      \\ simp[]
+      \\ gs[DISJ_IMP_THM,FORALL_AND_THM]
       \\ match_mp_tac trans_ffi_eq_same
       \\ first_assum(irule_at (Pos last))
       \\ gvs[cpEval_valid_def])
@@ -7837,7 +7886,7 @@ Proof
       *)
       drule simulation
       \\ disch_then drule
-      \\ impl_tac >- simp[]
+      \\ impl_tac >- gs[DISJ_IMP_THM,FORALL_AND_THM]
       \\ rpt strip_tac
       \\ goal_assum drule
       \\ simp[]
@@ -7846,7 +7895,7 @@ Proof
    (* LSend *)
   >- (drule simulation
       \\ disch_then drule
-      \\ impl_tac >- simp[]
+      \\ impl_tac >- gs[DISJ_IMP_THM,FORALL_AND_THM]
       \\ rpt strip_tac
       \\ goal_assum drule
       \\ simp[]
@@ -7854,7 +7903,9 @@ Proof
       \\ drule (strans_rules |> CONJUNCTS |> last)
       \\ disch_then (qspec_then ‘s.queues’ mp_tac)
       \\ strip_tac
-      \\ ‘s'.queues = s.queues’ by cheat
+      \\ ‘s'.queues = s.queues’
+        by(qpat_x_assum ‘trans _ _ (LSend _ _ _) _’ mp_tac >>
+           rw[Once trans_cases])
       \\ gvs[]
       \\ match_mp_tac ffi_eq_pres
       \\ first_x_assum(irule_at (Pos last))
@@ -7864,7 +7915,7 @@ Proof
    (* LReceive *)
   >- (drule simulation
       \\ disch_then drule
-      \\ impl_tac >- simp[]
+      \\ impl_tac >- gs[DISJ_IMP_THM,FORALL_AND_THM]
       \\ rpt strip_tac
       \\ goal_assum drule
       \\ simp[]
@@ -8066,12 +8117,12 @@ Proof
  rw[dsubst_def] >>
  res_tac >> rw[]
 QED
-        
+
 Theorem network_NPar_forward_correctness':
   ∀conf s c n p s' c' n' cSt0 vs cvs env0.
   trans conf (NPar (NEndpoint p s c) n) LTau (NPar (NEndpoint p s' c') n') ∧
-  (∀nd. nd ∈ EP_nodenames c ⇒ ffi_has_node nd cSt0.ffi.ffi_state) ∧
-  (∀nd. nd ∈ EP_nodenames c ⇒ ffi_has_node nd (p,s.queues,n)) ∧
+  (∀nd. nd ∈ network_nodenames (NEndpoint p s c) ⇒ ffi_has_node nd cSt0.ffi.ffi_state) ∧
+  (∀nd. nd ∈ network_nodenames (NEndpoint p s c) ⇒ ffi_has_node nd (p,s.queues,n)) ∧
   cpEval_valid conf p env0 s c vs cvs cSt0 ∧
   ffi_eq conf cSt0.ffi.ffi_state (p,s.queues,n) ∧
   ffi_wf (p,s.queues,n) ∧
@@ -8090,8 +8141,8 @@ Theorem network_NPar_forward_correctness':
     ffi_eq conf cSt.ffi.ffi_state (p,s'.queues,n') ∧
     FST sst = FST sst' ∧
     (SND sst).oracle = (SND sst').oracle ∧
-    (SND sst).io_events = (SND sst').io_events ∧        
-    (∀nd. nd ∈ EP_nodenames c' ⇒ ffi_has_node nd cSt.ffi.ffi_state)
+    (SND sst).io_events = (SND sst').io_events ∧
+    (∀nd. nd ∈ network_nodenames (NEndpoint p s' c') ⇒ ffi_has_node nd cSt.ffi.ffi_state)
 Proof
   rpt strip_tac >>
   drule_at (Pos last) network_NPar_forward_correctness >>
@@ -8100,7 +8151,7 @@ Proof
   disch_then(qspec_then ‘cSt0 with ffi := (cSt0.ffi with ffi_state := (p,s.queues,n))’ mp_tac) >>
   simp[] >>
   disch_then(qspecl_then [‘vs’,‘cvs’,‘env0’] mp_tac) >>
-  impl_tac  
+  impl_tac
   >- (gvs[cpEval_valid_def, ffi_state_cor_def]) >>
   strip_tac >>
   gvs[triR_def] >>
@@ -8143,6 +8194,7 @@ Proof
       gvs[Once trans_cases] >>
       metis_tac[ffi_wf_def,trans_pres_ffi_wf]) >>
   (* TODO: make a lemma out of this crap *)
+  gvs[DISJ_IMP_THM,FORALL_AND_THM] >>
   gvs[Once trans_cases] >>
   gvs[ffi_has_node_def,net_has_node_MEM_endpoints] >>
   imp_res_tac endpoint_names_trans >>
@@ -8156,8 +8208,18 @@ Proof
   Cases_on ‘cSt.ffi.ffi_state’ >>
   Cases_on ‘r’ >>
   gvs[ffi_has_node_def,net_has_node_MEM_endpoints] >>
-  (* unprovable from here *)
-  cheat
+  gvs[regexpTheory.LIST_UNION_def] >>
+  gvs[MEM_LIST_UNION,PULL_EXISTS] >>
+
+  first_x_assum match_mp_tac >>
+  simp[MEM_MAP,PULL_EXISTS] >>
+  drule_then (irule_at (Pos hd)) ALOOKUP_MEM >>
+  simp[]
+
+  strip_tac >>
+  first_x_assum match_mp_tac >>
+  simp[MEM_MAP,PULL_EXISTS] >>
+
 QED
 
 Theorem network_NPar_forward_correctness'':
@@ -8230,7 +8292,7 @@ Proof
       >- metis_tac[RTC_rules] >>
       gvs[e_step_reln_def])
 QED
-        
+
 Theorem network_NPar_forward_correctness_reduction_lemma:
   ∀conf s c n p s' c' n' cSt0 vs cvs env0.
   (reduction conf)꙳ (NPar (NEndpoint p s c) n) (NPar (NEndpoint p s' c') n') ∧
@@ -8238,7 +8300,7 @@ Theorem network_NPar_forward_correctness_reduction_lemma:
   (∀nd. nd ∈ EP_nodenames c ⇒ ffi_has_node nd (p,s.queues,n)) ∧
   cpEval_valid conf p env0 s c vs cvs cSt0 ∧
   ffi_eq conf cSt0.ffi.ffi_state (p,s.queues,n) ∧
-  ffi_wf (p,s.queues,n) ∧         
+  ffi_wf (p,s.queues,n) ∧
   pletrec_vars_ok c ∧
   normalised s.queues
   ⇒
@@ -8252,7 +8314,7 @@ Theorem network_NPar_forward_correctness_reduction_lemma:
     ffi_eq conf (SND sst).ffi_state (SND sst').ffi_state ∧
     FST sst = FST sst' ∧
     (SND sst).oracle = (SND sst').oracle ∧
-    (SND sst).io_events = (SND sst').io_events ∧        
+    (SND sst).io_events = (SND sst').io_events ∧
     cpEval_valid conf p env s' c' vs cvs cSt ∧
     cSt.ffi.ffi_state = (p,s'.queues,n') ∧
     (∀nd. nd ∈ EP_nodenames c' ⇒ ffi_has_node nd cSt.ffi.ffi_state)
@@ -8372,7 +8434,7 @@ Theorem network_NPar_forward_correctness_reduction:
     ffi_eq conf (SND sst).ffi_state (SND sst').ffi_state ∧
     FST sst = FST sst' ∧
     (SND sst).oracle = (SND sst').oracle ∧
-    (SND sst).io_events = (SND sst').io_events ∧        
+    (SND sst).io_events = (SND sst').io_events ∧
     cpEval_valid conf p env s' c' vs cvs cSt ∧
     cSt.ffi.ffi_state = (p,s'.queues,n') ∧
     (∀nd. nd ∈ EP_nodenames c' ⇒ ffi_has_node nd cSt.ffi.ffi_state)
