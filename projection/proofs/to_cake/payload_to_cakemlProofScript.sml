@@ -87,6 +87,42 @@ Definition pletrec_vars_ok_def[simp]:
   pletrec_vars_ok (Fix _ e) = pletrec_vars_ok e
 End
 
+Definition cletrec_vars_ok_def[simp]:
+  cletrec_vars_ok (Closure params (funs,bindings) body) =
+  (pletrec_vars_ok body ∧ EVERY cletrec_vars_ok (MAP SND funs))
+Termination
+  WF_REL_TAC ‘measure(closure_size)’ >>
+  simp[MEM_MAP,PULL_EXISTS] >>
+  simp[FORALL_PROD] >> rw[] >>
+  drule closure_size_MEM >>
+  intLib.COOPER_TAC
+End
+
+Theorem pletrec_vars_ok_dsubst:
+  ∀e e' dn.
+  pletrec_vars_ok e ∧ pletrec_vars_ok e' ⇒
+  pletrec_vars_ok (dsubst e dn e')
+Proof
+  Induct_on ‘e’ >> gvs[dsubst_def] >>
+  rw[]
+QED
+
+Theorem letrec_vars_ok_trans_pres:
+  trans conf (NEndpoint p s c) α (NEndpoint p' s' c') ∧
+  pletrec_vars_ok c ∧
+  EVERY cletrec_vars_ok (MAP SND s.funs)
+  ⇒
+  pletrec_vars_ok c' ∧
+  EVERY cletrec_vars_ok (MAP SND s'.funs)
+Proof
+  rw[Once trans_cases] >>
+  gvs[pletrec_vars_ok_dsubst,ETA_THM] >>
+  imp_res_tac ALOOKUP_MEM >>
+  gvs[EVERY_MEM,MEM_MAP,PULL_EXISTS] >>
+  res_tac >>
+  fs[EVERY_MEM,MEM_MAP,PULL_EXISTS]
+QED
+
 val WORD8 = “WORD:word8 -> v -> bool”;
 Overload WORD8 = “WORD:word8 -> v -> bool”;
 Overload DATUM[local] = “LIST_TYPE WORD8”;
@@ -3764,7 +3800,8 @@ Theorem simulation:
     trans conf (NEndpoint p0 pSt0 EP0) L (NEndpoint p pSt EP) ∧
     cpEval_valid conf p0 cEnv0 pSt0 EP0 vs cvs cSt0 ∧
     (∀nd. nd ∈ network_nodenames (NEndpoint p0 pSt0 EP0) ⇒ ffi_has_node nd cSt0.ffi.ffi_state) ∧
-    pletrec_vars_ok EP0
+    pletrec_vars_ok EP0 ∧
+    EVERY cletrec_vars_ok (MAP SND pSt0.funs)
     ⇒
     ∃cEnv cSt.
       triR stepr
@@ -7784,6 +7821,7 @@ Theorem network_NPar_forward_correctness:
   cpEval_valid conf p env0 s c vs cvs cSt0 ∧
   cSt0.ffi.ffi_state = (p,s.queues,n) ∧
   pletrec_vars_ok c ∧
+  EVERY cletrec_vars_ok (MAP SND s.funs) ∧
   normalised s.queues
   ⇒
   ∃env cSt.
@@ -8147,6 +8185,7 @@ Theorem network_NPar_forward_correctness':
   ffi_eq conf cSt0.ffi.ffi_state (p,s.queues,n) ∧
   ffi_wf (p,s.queues,n) ∧
   pletrec_vars_ok c ∧
+  EVERY cletrec_vars_ok (MAP SND s.funs) ∧
   normalised s.queues
   ⇒
   ∃env cSt env' e' l' sst sst'.
@@ -8231,6 +8270,7 @@ Theorem network_NPar_forward_correctness'':
   ffi_eq conf cSt0.ffi.ffi_state (p,s.queues,n) ∧
   ffi_wf (p,s.queues,n) ∧
   pletrec_vars_ok c ∧
+  EVERY cletrec_vars_ok (MAP SND s.funs) ∧
   normalised s.queues
   ⇒
   ∃env cSt env' e' l' sst sst'.
@@ -8307,6 +8347,7 @@ Theorem network_NPar_forward_correctness_reduction_lemma:
   ffi_eq conf cSt0.ffi.ffi_state (p,s.queues,n) ∧
   ffi_wf (p,s.queues,n) ∧
   pletrec_vars_ok c ∧
+  EVERY cletrec_vars_ok (MAP SND s.funs) ∧
   normalised s.queues
   ⇒
   ∃env cSt env' e' l' sst sst'.
@@ -8354,24 +8395,14 @@ Proof
       strip_tac >>
       gvs[DISJ_IMP_THM,FORALL_AND_THM] >>
       last_x_assum(drule_at (Pat ‘cpEval_valid _ _ _ _ _ _ _ _’)) >>
-      impl_tac >-
-       (simp[] >>
-        conj_tac
-        >- (gvs[Once trans_cases] >> metis_tac[ffi_wf_def,trans_pres_ffi_wf]) >>
-        cheat (* pletrec_vars_ok looks dubious *)
-       ) >>
-(*      ‘∀nd. nd ∈ network_nodenames (NEndpoint p s'' c'') ⇒ ffi_has_node nd (p,s''.queues,n'')’
-        by(drule trans_network_nodenames_mono_NPar >>
-           simp[SUBSET_DEF,DISJ_IMP_THM,FORALL_AND_THM] >>
-           rw[] >>
-           res_tac >>
-           gvs[ffi_has_node_def,net_has_node_MEM_endpoints] >>
-           imp_res_tac endpoint_names_trans >>
-           gvs[endpoints_def]) >>*)
-(*      disch_then drule >>
-      simp[] >>*)
-(*      impl_tac >- cheat >> (* unprovable *)*)
-(*      strip_tac >>*)
+      impl_tac
+      >- (simp[] >>
+          conj_tac >- (gvs[Once trans_cases] >> metis_tac[ffi_wf_def,trans_pres_ffi_wf]) >>
+          conj_tac >- (gvs[Once trans_cases] >> metis_tac[letrec_vars_ok_trans_pres]) >>
+          conj_tac >- (gvs[Once trans_cases] >> metis_tac[letrec_vars_ok_trans_pres]) >>
+          gvs[Once trans_cases] >>
+          imp_res_tac payload_trans_normalised >>
+          gvs[normalised_network_def]) >>
       strip_tac >>
       qpat_x_assum ‘RTC stepr (env,smSt cSt,_,_) _’ mp_tac >>
       disch_then (fn thm => mp_then (Pos hd) drule stepr_cut_paste thm >> assume_tac thm) >>
@@ -8398,7 +8429,8 @@ Proof
           drule_at (Pos last) ffi_irrel_smallsteps >>
           gvs[to_small_st_def] >>
           disch_then drule >>
-          impl_tac >- cheat (* looks provable enough *) >>
+          impl_tac
+          >- (cheat (* looks provable enough *)) >>
           strip_tac >>
           gvs[] >>
           irule_at (Pos hd) RTC_RTC >>
@@ -8443,6 +8475,7 @@ Theorem network_NPar_forward_correctness_reduction:
   cpEval_valid conf p env0 s c vs cvs cSt0 ∧
   cSt0.ffi.ffi_state = (p,s.queues,n) ∧
   pletrec_vars_ok c ∧
+  EVERY cletrec_vars_ok (MAP SND s.funs) ∧
   normalised s.queues
   ⇒
   ∃env cSt env' e' l' sst sst'.
