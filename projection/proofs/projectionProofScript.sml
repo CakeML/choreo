@@ -1430,6 +1430,14 @@ Proof
   \\ EVAL_TAC
 QED
 
+Theorem empty_q_to_closure:
+  ∀epn conf. empty_q epn ⇒ empty_q (compile_network_alt epn)
+Proof
+  Induct \\ gen_tac
+  \\ EVAL_TAC \\ rw []
+  \\ EVAL_TAC
+QED
+
 Theorem endpoints_compile_network_payload:
   ∀epn conf.
    MAP FST (endpoints (endpoint_to_payload$compile_network conf epn)) = MAP FST (endpoints epn)
@@ -1736,9 +1744,11 @@ Proof
   \\ fs [endpointCongTheory.REPN_def,
          payloadCongTheory.REPN_def,
          compile_network_def]
+  >- EVAL_TAC
   \\ rw []
   \\ Cases_on ‘epn’ \\ fs [endpointCongTheory.REPN_def]
   \\ rw [endpoint_to_payloadTheory.compile_network_def,
+         payload_closureTheory.compile_network_alt_def,
          payloadCongTheory.REPN_def]
 QED
 
@@ -1758,6 +1768,7 @@ Proof
   rw [projection_def,
       endpoint_to_choiceTheory.compile_network_def,
       empty_q_to_payload,
+      empty_q_to_closure,
       compile_network_fv_empty_q,
       compile_network_empty_q]
 QED
