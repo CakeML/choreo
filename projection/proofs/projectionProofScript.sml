@@ -1457,6 +1457,8 @@ Theorem projection_reflection_junkcong:
    ∧ (reduction conf)^* (projection conf s c (procsOf c)) epn
    ⇒ ∃epn0 epn1 c' s'.
        compile_rel conf epn (compile_network_alt epn0) ∧
+       fix_network epn0 ∧ free_fix_names_network epn0 = [] ∧
+       no_undefined_vars_network epn0 ∧
        (reduction conf)^* epn0 (compile_network conf epn1) ∧
        trans_s (s,c) (s',c') ∧
        junkcong {new_fv s c} (project_choice (new_fv s c) s' c' (procsOf c)) epn1
@@ -1525,9 +1527,21 @@ Proof
   >- rw [compile_network_fv_empty_q,compile_network_empty_q]
   \\ rw []
   \\ drule_then (qspec_then ‘conf’ assume_tac) empty_q_to_payload
-  \\ rpt(goal_assum drule)
+  \\ first_x_assum (irule_at Any) \\ simp[]
+  \\ conj_tac
+  >- (irule fix_network_reduction_RTC_pres
+      \\ first_x_assum (irule_at Any)
+      \\ simp[fix_network_compile_network])
+  \\ conj_tac
+  >- (qmatch_asmsub_abbrev_tac ‘(reduction conf)^* pp p3’
+      \\ qspecl_then [‘conf’,‘pp’,‘p3’] mp_tac free_fix_names_network_reduction_RTC_pres
+      \\ impl_tac >- simp[Abbr‘pp’,fix_network_compile_network]
+      \\ qunabbrev_tac ‘pp’ \\ drule dvarsOf_imp_free_fix_names_network
+      \\ rw[])
+  >- (irule no_undefined_vars_network_reduction_RTC_pres
+      \\ first_x_assum (irule_at Any)
+      \\ simp[no_undefined_vars_chor_to_network])
 QED
-
 
 Theorem projection_reflection_aux:
   ∀s c epn conf.
@@ -1539,13 +1553,16 @@ Theorem projection_reflection_aux:
    ∧ (reduction conf)^* (projection conf s c (procsOf c)) epn
    ⇒ ∃epn0 epn1 c' s'.
        compile_rel conf epn (compile_network_alt epn0) ∧
+       fix_network epn0 ∧ free_fix_names_network epn0 = [] ∧
+       no_undefined_vars_network epn0 ∧
        (reduction conf)^* epn0 epn1 ∧
       trans_s (s,c) (s',c') ∧
       BISIM_REL (trans conf) (projection conf s' c' (procsOf c)) (compile_network_alt epn1)
 Proof
   rw [] >>
   drule_all_then strip_assume_tac projection_reflection_junkcong >>
-  goal_assum drule >>
+  goal_assum drule >> goal_assum drule >>
+  goal_assum drule >> goal_assum drule >>
   goal_assum drule >>
   fs[projection_def,endpoint_to_choiceTheory.compile_network_def] >>
   fs[project_choice_def,compile_rel_def] >>
@@ -1644,6 +1661,30 @@ Proof
   simp[perm_network_bisim]
 QED
 
+Theorem BISIM_REL_reduction_RTC:
+  ∀conf q p p'.
+    (reduction conf)^* p p' ∧ BISIM_REL (trans conf)  p q
+    ⇒ ∃q'. (reduction conf)^* q q' ∧ BISIM_REL (trans conf) p' q'
+Proof
+  strip_tac
+  \\ ‘∀p p'. (reduction conf)^* p p'
+             ⇒ ∀q. BISIM_REL (trans conf)  p q
+                   ⇒ ∃q'. (reduction conf)^* q q' ∧
+                          BISIM_REL (trans conf) p' q'’
+  suffices_by metis_tac[]
+  \\ ho_match_mp_tac RTC_INDUCT
+  \\ rw[]
+  >- metis_tac[RTC_REFL]
+  >- (gs[payloadSemTheory.reduction_def]
+      \\ drule (BISIM_REL_cases  |> SPEC_ALL |>  EQ_IMP_RULE  |> fst)
+      \\ disch_then (qspec_then ‘LTau’ assume_tac)
+      \\ gs[] \\ pop_assum drule \\ rw []
+      \\ last_x_assum drule \\ rw[]
+      \\ pop_assum (irule_at Any)
+      \\ irule RTC_TRANS
+      \\ metis_tac[payloadSemTheory.reduction_def])
+QED
+
 Theorem projection_reflection:
   ∀s c epn conf.
    compile_network_ok s c (procsOf c)
@@ -1659,9 +1700,14 @@ Theorem projection_reflection:
 Proof
   rw[] \\ drule_all projection_reflection_aux
   \\ rw[] \\ fs[compile_rel_def]
-  cheat
+  \\ drule_then drule to_closure_preservation
+  \\ impl_tac >- simp[]
+  \\ rw[] \\ drule BISIM_REL_reduction_RTC
+  \\ disch_then (qspec_then ‘epn’ mp_tac)
+  \\ impl_tac >- simp[BISIM_SYM]
+  \\ rw[] \\ gs[compile_rel_def]
+  \\ metis_tac[BISIM_TRANS,BISIM_SYM]
 QED
-
 
 Theorem REPN_projection:
   ∀conf s c l. REPN (projection conf s c l)

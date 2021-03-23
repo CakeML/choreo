@@ -3004,6 +3004,19 @@ Proof
   match_mp_tac fix_endpoint_dsubst >> simp[fix_endpoint_def]
 QED
 
+Theorem fix_network_reduction_RTC_pres:
+  ∀conf p q.
+  (reduction conf)^* p q ∧
+  fix_network p ⇒
+  fix_network q
+Proof
+  strip_tac
+  \\ simp[GSYM AND_IMP_INTRO]
+  \\ ho_match_mp_tac RTC_INDUCT
+  \\ rw[reduction_def]
+  \\ metis_tac[fix_network_trans_pres]
+QED
+
 Theorem letrec_network_trans_pres:
   ∀conf p α q.
   trans conf p α q ∧
@@ -3115,6 +3128,19 @@ Proof
   metis_tac[reduction_def,no_undefined_vars_network_trans_pres]
 QED
 
+Theorem no_undefined_vars_network_reduction_RTC_pres:
+  ∀conf n1 n2.
+    (reduction conf)^* n1 n2 ∧
+    no_undefined_vars_network n1 ⇒
+    no_undefined_vars_network n2
+Proof
+  strip_tac
+  \\ simp[GSYM AND_IMP_INTRO]
+  \\ ho_match_mp_tac RTC_INDUCT
+  \\ rw[reduction_def]
+  \\ metis_tac[no_undefined_vars_network_trans_pres]
+QED
+
 Theorem reduction_list_trans:
   (reduction conf)^* p q = ?n. list_trans conf p (REPLICATE n LTau) q
 Proof
@@ -3166,6 +3192,18 @@ Theorem free_fix_names_network_reduction_pres:
   set(free_fix_names_network n2) ⊆ set(free_fix_names_network n1)
 Proof
   metis_tac[reduction_def,free_fix_names_network_trans_pres]
+QED
+
+Theorem free_fix_names_network_reduction_RTC_pres:
+  ∀conf n1 n2.
+  (reduction conf)^* n1 n2 ∧ fix_network n1 ⇒
+  set(free_fix_names_network n2) ⊆ set(free_fix_names_network n1)
+Proof
+  strip_tac
+  \\ simp[GSYM AND_IMP_INTRO]
+  \\ ho_match_mp_tac RTC_INDUCT
+  \\ rw[reduction_def]
+  \\ metis_tac[SUBSET_TRANS,fix_network_trans_pres,free_fix_names_network_trans_pres]
 QED
 
 Theorem MEM_free_fun_names_endpoint_dsubst:
