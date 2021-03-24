@@ -3305,31 +3305,32 @@ Proof
 QED
 
 Definition ffi_state_cor_def:
-  ffi_state_cor conf cpNum pSt (fNum,fQueue,fNet) ⇔
+  ffi_state_cor conf cpNum pSt pN (fNum,fQueue,fNet) ⇔
     cpNum = fNum ∧
-    ∃N. ffi_eq conf (fNum, fQueue, fNet) (fNum, pSt.queues, N) ∧
-        ffi_wf (fNum, pSt.queues, N)
+    ffi_eq conf (fNum, fQueue, fNet) (fNum, pSt.queues, pN) ∧
+    ffi_wf (fNum, pSt.queues, pN)
 End
 
 Theorem ffi_state_cor_ignores_funs[simp]:
-  ffi_state_cor conf cpNum (pst with funs := fv) ffis ⇔
-  ffi_state_cor conf cpNum pst ffis
+  ffi_state_cor conf cpNum (pst with funs := fv) pN ffis ⇔
+  ffi_state_cor conf cpNum pst pN ffis
 Proof
   PairCases_on ‘ffis’ >> simp[ffi_state_cor_def]
 QED
 
 (* Combined *)
 Definition cpEval_valid_def:
-  cpEval_valid conf cpNum cEnv pSt pCd vs cvs cSt ⇔
+  cpEval_valid conf cpNum cEnv pSt pCd pN vs cvs cSt ⇔
     conf.payload_size ≠ 0 ∧
     env_asm cEnv conf cvs ∧
     enc_ok conf cEnv (letfuns pCd) vs ∧
     pSt_pCd_corr pSt pCd ∧
     sem_env_cor conf pSt cEnv cvs ∧
-    ffi_state_cor conf cpNum pSt cSt.ffi.ffi_state ∧
+    ffi_state_cor conf cpNum pSt pN cSt.ffi.ffi_state ∧
     ffi_wf cSt.ffi.ffi_state ∧
     cSt.ffi.oracle = comms_ffi_oracle conf
 End
+Overload simR[local] = “cpEval_valid”
 
 (* VALIDITY *)
 (* Check that Payload States with label transition and
@@ -3400,15 +3401,16 @@ Proof
 QED
 
 Theorem cpEval_valid_Send:
-  cpEval_valid conf p1 env pst (Send p2 v n e) vs cvs cst ⇔
-    cpEval_valid conf p1 env pst e vs cvs cst ∧
+  cpEval_valid conf p1 env pst (Send p2 v n e) pN vs cvs cst ⇔
+    cpEval_valid conf p1 env pst e pN vs cvs cst ∧
     (∃vv. FLOOKUP pst.bindings v = SOME vv)
 Proof
   simp[cpEval_valid_def, EQ_IMP_THM, letfuns_def, pSt_pCd_corr_Send]
 QED
 
 Theorem cpEval_nsLookup_PLbindings:
-  cpEval_valid conf p cEnv pSt e vs cvs cSt ∧ FLOOKUP pSt.bindings v = SOME d ⇒
+  cpEval_valid conf p cEnv pSt e pN vs cvs cSt ∧
+  FLOOKUP pSt.bindings v = SOME d ⇒
   ∃dd. nsLookup cEnv.v (Short (ps2cs v)) = SOME dd ∧ DATUM d dd
 Proof
   simp[cpEval_valid_def, pSt_pCd_corr_def, sem_env_cor_def] >> rw[]
@@ -3567,12 +3569,13 @@ Proof
 QED
 
 Theorem update_state_send_ffi_state_cor:
-  ∀ffst dest.
+  ∀ffst dest pN.
     ffi_has_node dest ffst ∧ dest ≠ FST ffst ∧ ffi_wf ffst ∧
-    ffi_state_cor conf src pSt ffst ⇒
-    ffi_state_cor conf src pSt
-                  (update_state ffst (comms_ffi_oracle conf)
-                   (send_events conf (MAP (n2w o ORD) dest) data))
+    ffi_state_cor conf src pSt pN ffst ⇒
+    ∃pN'.
+      ffi_state_cor conf src pSt pN'
+                    (update_state ffst (comms_ffi_oracle conf)
+                     (send_events conf (MAP (n2w o ORD) dest) data))
 Proof
   simp[send_events_def] >> completeInduct_on ‘LENGTH data’ >>
   Cases >> simp[update_state_def, Once compile_message_def] >>
@@ -3816,27 +3819,26 @@ Proof
 QED
 
 Definition can_match_def:
-  (can_match conf (p,qs,N) (LReceive src m dest : payloadSem$label) ⇔
-     dest = p ∧
-     ∃N'. trans conf N (LSend src m p) N') ∧
+  (can_match conf N (LReceive src m dest : payloadSem$label) ⇔
+     ∃N'. trans conf N (LSend src m dest) N') ∧
   (can_match conf _ _ ⇔ T)
 End
 
 Theorem simulation:
-  ∀p0 pSt0 EP0 L p pSt EP cEnv0 vs cSt0.
+  ∀p0 pSt0 EP0 L p pSt EP pN0 cEnv0 vs cSt0.
     trans conf (NEndpoint p0 pSt0 EP0) L (NEndpoint p pSt EP) ∧
-    cpEval_valid conf p0 cEnv0 pSt0 EP0 vs cvs cSt0 ∧
+    cpEval_valid conf p0 cEnv0 pSt0 EP0 pN0 vs cvs cSt0 ∧
     (∀nd. nd ∈ network_nodenames (NEndpoint p0 pSt0 EP0) ⇒
           ffi_has_node nd cSt0.ffi.ffi_state) ∧
     pletrec_vars_ok EP0 ∧
     EVERY cletrec_vars_ok (MAP SND pSt0.funs) ∧
-    (* can_match conf cSt0.ffi.ffi_state L *)
+    can_match conf pN0 L
     ⇒
-    ∃cEnv cSt.
+    ∃cEnv cSt pN.
       triR stepr
         (cEnv0, smSt cSt0, Exp (compile_endpoint conf vs EP0), [])
         (cEnv, smSt cSt, Exp (compile_endpoint conf vs EP), []) ∧
-      cpEval_valid conf p cEnv pSt EP vs cvs cSt ∧
+      cpEval_valid conf p cEnv pSt EP pN vs cvs cSt ∧
       cpFFI_valid conf pSt0 pSt cSt0.ffi.ffi_state cSt.ffi.ffi_state L ∧
       (∀nd. nd ∈ network_nodenames (NEndpoint p pSt EP) ⇒
             ffi_has_node nd cSt.ffi.ffi_state)
@@ -3899,15 +3901,13 @@ Proof
                      DECIDE “∀x y. y ≤ x ⇒ x ≤ (x - y) + y:num”) >>
       gs[DECIDE “y ≤ x ⇒ x - y + y - x = 0n”] >>
       pop_assum $ irule_at (Pos hd) >> simp[] >>
+      simp[RIGHT_EXISTS_AND_THM, LEFT_EXISTS_AND_THM] >>
       reverse (rpt conj_tac)
       >- (gvs[DISJ_IMP_THM,FORALL_AND_THM] >> rw[] >>
-          res_tac >>
-          dep_rewrite.DEP_ONCE_REWRITE_TAC[update_state_ffi_has_node] >>
-          simp[update_state_ffi_has_node] >>
+          irule (iffRL update_state_ffi_has_node) >> simp[] >>
           Cases_on ‘cSt0.ffi.ffi_state’ >>
           rename [‘cSt0.ffi.ffi_state = (pn,X)’] >> Cases_on ‘X’ >>
-          gs[ffi_state_cor_def]
-          )
+          gs[ffi_state_cor_def])
       >- (simp[cpFFI_valid_def] >>
           Cases_on ‘cSt0.ffi.ffi_state’ >>
           rename [‘cSt0.ffi.ffi_state = (pn,X)’] >> Cases_on ‘X’ >>
@@ -4118,7 +4118,10 @@ Proof
       CONV_TAC (pull_namedexvar_conv "cEnv''") >> qexists_tac ‘cEnv0’ >>
       gs[cpEval_valid_def, EXstrefsffi] >>
       qmatch_goalsub_abbrev_tac ‘triR stepr (_, (new_refs, new_ffi), _, _)’ >>
-      qexistsl_tac [‘new_refs’, ‘new_ffi’] >>
+      map_every (fn (s1,s2) =>
+                   CONV_TAC (pull_namedexvar_conv s1) >>
+                   qexists_tac [QUOTE s2])
+                [("refs", "new_refs"), ("ffi", "new_ffi")] >>
       simp[Abbr‘new_refs’, Abbr‘new_ffi’] >>
 
       simp[Once triR_SYM]>>
@@ -4158,6 +4161,7 @@ Proof
                    nsLookup_build_rec_env_sendloop]) >>
       simp[do_opapp_def] >>
       (* symbolic evaluation all done!!!! *)
+      simp[LEFT_EXISTS_AND_THM, RIGHT_EXISTS_AND_THM] >>
       ntac 5 (pop_assum kall_tac) (* cruft about length *) >>
       qmatch_goalsub_abbrev_tac ‘ffi_wf new_ffi’ >>
       ‘ffi_wf new_ffi’ by metis_tac[strans_pres_wf] >>
@@ -4173,7 +4177,8 @@ Proof
       qexistsl_tac [‘cEnv0’, ‘cSt0’] >> simp[triR_REFL] >>
       gs[cpEval_valid_def, sem_env_cor_def, pSt_pCd_corr_def] >>
       ‘∃p qs N0. cSt0.ffi.ffi_state = (p,qs,N0)’ by metis_tac[pair_CASES] >>
-      gs[ffi_state_cor_def] >> reverse (rpt conj_tac)
+      gs[ffi_state_cor_def, RIGHT_EXISTS_AND_THM, LEFT_EXISTS_AND_THM] >>
+      reverse (rpt conj_tac)
       >- metis_tac[]
       >- simp[cpFFI_valid_def] >> cheat)
   >- ((* receiveloop - finishing*) cheat)
@@ -4241,7 +4246,8 @@ Proof
            astTheory.pat_bindings_def, pat_bindings_MAP_Pvar,
            MAP_REVERSE] >>
       csimp[pmatch_tuple_MAP_Pvar, terminationTheory.pmatch_def] >>
-      irule_at Any triR_REFL >> simp[] >> rpt strip_tac
+      irule_at Any triR_REFL >>
+      simp[LEFT_EXISTS_AND_THM, RIGHT_EXISTS_AND_THM] >> rpt strip_tac
       >- ((* vars in letrec binding all distinct *) all_tac >>
           irule ALL_DISTINCT_MAP_INJ >> simp[ps2cs_def])
       >- gs[FLOOKUP_DEF, AllCaseEqs()] (* v's all bound *)
