@@ -76,6 +76,26 @@ fun atcj i f th =
    LIST_CONJ ths
  end
 
+Theorem ffi_eq_REFL[simp]:
+  ffi_eq c s s
+Proof
+  ‘equivalence (ffi_eq c)’ by simp[ffi_eq_equivRel] >>
+  fs[equivalence_def, reflexive_def]
+QED
+
+Theorem ffi_eq_SYM:
+  ffi_eq c s1 s2 ⇒ ffi_eq c s2 s1
+Proof
+  ‘equivalence (ffi_eq c)’ by simp[ffi_eq_equivRel] >>
+  fs[equivalence_def, symmetric_def]
+QED
+
+Theorem ffi_eq_TRANS:
+  ffi_eq c s1 s2 ∧ ffi_eq c s2 s3 ⇒ ffi_eq c s1 s3
+Proof
+  ‘equivalence (ffi_eq c)’ by simp[ffi_eq_equivRel] >>
+  fs[equivalence_def, transitive_def] >> metis_tac[]
+QED
 Definition pletrec_vars_ok_def[simp]:
   pletrec_vars_ok Nil = T ∧
   pletrec_vars_ok (Send dest var i e) = pletrec_vars_ok e ∧
@@ -4143,7 +4163,11 @@ Proof
       qexistsl_tac [‘cEnv0’, ‘cSt0’] >> simp[triR_REFL] >>
       gs[cpEval_valid_def, sem_env_cor_def, pSt_pCd_corr_def] >>
       ‘∃p x y. cSt0.ffi.ffi_state = (p,x,y)’ by metis_tac[pair_CASES] >>
-      gvs[ffi_state_cor_def] >> cheat)
+      gvs[ffi_state_cor_def] >> reverse conj_tac
+      >- simp[cpFFI_valid_def] >>
+      ffi_wf_def
+
+)
   >- ((* receiveloop - finishing*) cheat)
   >- ((* receiveloop - continuing *) cheat)
   >- ((* if 1 *) cheat)
