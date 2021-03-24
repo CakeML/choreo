@@ -3815,13 +3815,22 @@ Proof
   Induct_on ‘x’ >> simp[LIST_TYPE_def] >> rw[] >> metis_tac[WORD8_11]
 QED
 
+Definition can_match_def:
+  (can_match conf (p,qs,N) (LReceive src m dest : payloadSem$label) ⇔
+     dest = p ∧
+     ∃N'. trans conf N (LSend src m p) N') ∧
+  (can_match conf _ _ ⇔ T)
+End
+
 Theorem simulation:
   ∀p0 pSt0 EP0 L p pSt EP cEnv0 vs cSt0.
     trans conf (NEndpoint p0 pSt0 EP0) L (NEndpoint p pSt EP) ∧
     cpEval_valid conf p0 cEnv0 pSt0 EP0 vs cvs cSt0 ∧
-    (∀nd. nd ∈ network_nodenames (NEndpoint p0 pSt0 EP0) ⇒ ffi_has_node nd cSt0.ffi.ffi_state) ∧
+    (∀nd. nd ∈ network_nodenames (NEndpoint p0 pSt0 EP0) ⇒
+          ffi_has_node nd cSt0.ffi.ffi_state) ∧
     pletrec_vars_ok EP0 ∧
-    EVERY cletrec_vars_ok (MAP SND pSt0.funs)
+    EVERY cletrec_vars_ok (MAP SND pSt0.funs) ∧
+    (* can_match conf cSt0.ffi.ffi_state L *)
     ⇒
     ∃cEnv cSt.
       triR stepr
@@ -3829,7 +3838,8 @@ Theorem simulation:
         (cEnv, smSt cSt, Exp (compile_endpoint conf vs EP), []) ∧
       cpEval_valid conf p cEnv pSt EP vs cvs cSt ∧
       cpFFI_valid conf pSt0 pSt cSt0.ffi.ffi_state cSt.ffi.ffi_state L ∧
-      (∀nd. nd ∈ network_nodenames (NEndpoint p pSt EP) ⇒ ffi_has_node nd cSt.ffi.ffi_state)
+      (∀nd. nd ∈ network_nodenames (NEndpoint p pSt EP) ⇒
+            ffi_has_node nd cSt.ffi.ffi_state)
 Proof
   Induct_on ‘trans’ >> simp[compile_endpoint_def] >> rpt strip_tac (* 11 *)
   >- (gs[cpEval_valid_Send] >>
@@ -4162,12 +4172,10 @@ Proof
   >- ((* receive, pushing queue *) all_tac >>
       qexistsl_tac [‘cEnv0’, ‘cSt0’] >> simp[triR_REFL] >>
       gs[cpEval_valid_def, sem_env_cor_def, pSt_pCd_corr_def] >>
-      ‘∃p x y. cSt0.ffi.ffi_state = (p,x,y)’ by metis_tac[pair_CASES] >>
-      gvs[ffi_state_cor_def] >> reverse conj_tac
-      >- simp[cpFFI_valid_def] >>
-      ffi_wf_def
-
-)
+      ‘∃p qs N0. cSt0.ffi.ffi_state = (p,qs,N0)’ by metis_tac[pair_CASES] >>
+      gs[ffi_state_cor_def] >> reverse (rpt conj_tac)
+      >- metis_tac[]
+      >- simp[cpFFI_valid_def] >> cheat)
   >- ((* receiveloop - finishing*) cheat)
   >- ((* receiveloop - continuing *) cheat)
   >- ((* if 1 *) cheat)
