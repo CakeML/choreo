@@ -4180,7 +4180,15 @@ Proof
       gs[ffi_state_cor_def, RIGHT_EXISTS_AND_THM, LEFT_EXISTS_AND_THM] >>
       reverse (rpt conj_tac)
       >- metis_tac[]
-      >- simp[cpFFI_valid_def] >> cheat)
+      >- simp[cpFFI_valid_def] >>
+      irule_at Any ffi_eq_TRANS >> first_assum $ irule_at Any >>
+      gs[can_match_def] >>
+      rename [‘trans conf pN0 (LSend src msg dest) pN’] >>
+      ‘active_trans conf dest (s.queues,pN0) (qpush s.queues src msg,pN)’
+        by simp[active_trans_def, emit_trans_def] >>
+      dxrule_then assume_tac RTC_SINGLE >>
+      drule_all active_trans_equiv_irrel >>
+      metis_tac[active_trans_pres_wf])
   >- ((* receiveloop - finishing*) cheat)
   >- ((* receiveloop - continuing *) cheat)
   >- ((* if 1 *) cheat)
