@@ -3175,18 +3175,25 @@ Termination
 End
 
 Definition pSt_pCd_corr_def:
-  pSt_pCd_corr (pSt :payloadLang$closure payloadLang$state) pCd ⇔
+  pSt_pCd_corr conf (pSt :payloadLang$closure payloadLang$state) pCd ⇔
     (∀vn. vn ∈ pFv pCd ⇒ ∃vv. FLOOKUP pSt.bindings vn = SOME vv) ∧
-    ∀nm c. MEM (nm,c) pSt.funs ⇒ wfclosure c
+    (∀nm c. MEM (nm,c) pSt.funs ⇒ wfclosure c) ∧
+    (∀k d ds. FLOOKUP pSt.queues k = SOME ds ∧ MEM d ds ⇒
+              LENGTH d = conf.payload_size + 1)
 End
 
 Theorem pSt_pCd_corr_alt:
-  pSt_pCd_corr pst pcd ⇔ (∀v. v ∈ pFv pcd ⇒ v ∈ FDOM pst.bindings) ∧
-                         ∀nm c. MEM (nm,c) pst.funs ⇒ wfclosure c
+  pSt_pCd_corr conf pst pcd ⇔
+    (∀v. v ∈ pFv pcd ⇒ v ∈ FDOM pst.bindings) ∧
+    (∀nm c. MEM (nm,c) pst.funs ⇒ wfclosure c) ∧
+    (∀k d ds. FLOOKUP pst.queues k = SOME ds ∧ MEM d ds ⇒
+              LENGTH d = conf.payload_size + 1)
 Proof
   simp[pSt_pCd_corr_def, FLOOKUP_DEF]
 QED
 
+(* only true if all of a network is wf, as trans doesn't preclude external
+   garbage appearing in queues
 Theorem trans_pSt_pCd_corr_pres:
   ∀conf p p' s c L s' c'.
     trans conf (NEndpoint p s c) L (NEndpoint p' s' c') ∧ pSt_pCd_corr s c ⇒
@@ -3205,6 +3212,7 @@ Proof
   >- (drule_then assume_tac ALOOKUP_MEM >> first_x_assum drule >> simp[] >>
       metis_tac[])
 QED
+*)
 
 (* Payload State and Semantic Environment *)
 (* -- Check the semantic environment contains all the variable bindings in
@@ -3291,7 +3299,7 @@ Proof
 QED
 
 Theorem ffi_eq_SYM:
-  ffi_eq c s1 s2 ⇒ ffi_eq c s2 s1
+  ffi_eq c s1 s2 ⇔ ffi_eq c s2 s1
 Proof
   ‘equivalence (ffi_eq c)’ by simp[ffi_eq_equivRel] >>
   fs[equivalence_def, symmetric_def]
@@ -3324,7 +3332,7 @@ Definition cpEval_valid_def:
     conf.payload_size ≠ 0 ∧
     env_asm cEnv conf cvs ∧
     enc_ok conf cEnv (letfuns pCd) vs ∧
-    pSt_pCd_corr pSt pCd ∧
+    pSt_pCd_corr conf pSt pCd ∧
     sem_env_cor conf pSt cEnv cvs ∧
     ffi_state_cor conf cpNum pSt pN cSt.ffi.ffi_state ∧
     ffi_wf cSt.ffi.ffi_state ∧
@@ -3394,8 +3402,8 @@ Overload smSt[local] = “bigSmallEquiv$to_small_st”
 Overload smEv[local] = “smallStep$small_eval”
 Overload stepr[local] = “smallStep$e_step_reln”
 Theorem pSt_pCd_corr_Send:
-  pSt_pCd_corr pst (Send p v n e) ⇔
-    (∃vv. FLOOKUP pst.bindings v = SOME vv) ∧ pSt_pCd_corr pst e
+  pSt_pCd_corr conf pst (Send p v n e) ⇔
+    (∃vv. FLOOKUP pst.bindings v = SOME vv) ∧ pSt_pCd_corr conf pst e
 Proof
   simp[pSt_pCd_corr_def, DISJ_IMP_THM, FORALL_AND_THM] >> metis_tac[]
 QED
@@ -3824,9 +3832,21 @@ Definition can_match_def:
   (can_match conf _ _ ⇔ T)
 End
 
+Theorem ORD_MOD256[simp]:
+  ORD c MOD 256 = ORD c
+Proof
+  simp[X_MOD_Y_EQ_X, ORD_BOUND]
+QED
+
+Definition wfLabel_def[simp]:
+  (wfLabel conf (LReceive src msg dest) ⇔ LENGTH msg = conf.payload_size + 1) ∧
+  (wfLabel conf (l : payloadSem$label) ⇔ T)
+End
+
 Theorem simulation:
   ∀p0 pSt0 EP0 L p pSt EP pN0 cEnv0 vs cSt0.
     trans conf (NEndpoint p0 pSt0 EP0) L (NEndpoint p pSt EP) ∧
+    wfLabel conf L ∧
     cpEval_valid conf p0 cEnv0 pSt0 EP0 pN0 vs cvs cSt0 ∧
     (∀nd. nd ∈ network_nodenames (NEndpoint p0 pSt0 EP0) ⇒
           ffi_has_node nd cSt0.ffi.ffi_state) ∧
@@ -4180,16 +4200,54 @@ Proof
       gs[ffi_state_cor_def, RIGHT_EXISTS_AND_THM, LEFT_EXISTS_AND_THM] >>
       reverse (rpt conj_tac)
       >- metis_tac[]
-      >- simp[cpFFI_valid_def] >>
-      irule_at Any ffi_eq_TRANS >> first_assum $ irule_at Any >>
-      gs[can_match_def] >>
-      rename [‘trans conf pN0 (LSend src msg dest) pN’] >>
-      ‘active_trans conf dest (s.queues,pN0) (qpush s.queues src msg,pN)’
-        by simp[active_trans_def, emit_trans_def] >>
-      dxrule_then assume_tac RTC_SINGLE >>
-      drule_all active_trans_equiv_irrel >>
-      metis_tac[active_trans_pres_wf])
-  >- ((* receiveloop - finishing*) cheat)
+      >- simp[cpFFI_valid_def]
+      >- (irule_at Any ffi_eq_TRANS >> first_assum $ irule_at Any >>
+          gs[can_match_def] >>
+          rename [‘trans conf pN0 (LSend src msg dest) pN’] >>
+          ‘active_trans conf dest (s.queues,pN0) (qpush s.queues src msg,pN)’
+            by simp[active_trans_def, emit_trans_def] >>
+          dxrule_then assume_tac RTC_SINGLE >>
+          drule_all active_trans_equiv_irrel >>
+          metis_tac[active_trans_pres_wf]) >>
+      gs[qpush_def, FLOOKUP_DEF, AllCaseEqs(), qlk_def, fget_def,
+         RIGHT_AND_OVER_OR, DISJ_IMP_THM, FORALL_AND_THM] >>
+      Cases_on ‘p1 ∈ FDOM s.queues’ >> simp[FAPPLY_FUPDATE_THM] >> rw[] >>
+      simp[])
+  >- ((* receiveloop - finishing*) all_tac >>
+      simp[to_small_st_def] >>
+      ntac 21 (irule_at Any triR_step1 >>
+               simp[e_step_def, e_step_reln_def, push_def, return_def,
+                    continue_def, application_def, do_app_thm,
+                    store_alloc_def, do_opapp_def,
+                    nsLookup_build_rec_env_sendloop]) >>
+      irule_at Any triR_step1 >>
+      simp[e_step_def, e_step_reln_def, continue_def, application_def,
+           do_app_thm, store_lookup_def, EL_APPEND2, call_FFI_def] >>
+      gs[cpEval_valid_def, comms_ffi_oracle_def, ffi_receive_def,
+         MAP_MAP_o, CHR_ORD, IMPLODE_EXPLODE_I] >>
+      ‘∃N. (some (m,ns). strans conf cSt0.ffi.ffi_state (ARecv p1 m) ns) =
+           SOME (d,N)’
+        by (‘∃dn qs0 N0. cSt0.ffi.ffi_state = (dn,qs0,N0)’
+              by metis_tac[pair_CASES] >>
+            gs[ffi_state_cor_def] >>
+            ‘strans conf (dn,s.queues,pN0) (ARecv p1 d)
+                    (dn,normalise_queues(s.queues |+ (p1,tl)),pN0)’
+              by (irule (hd (CONJUNCTS strans_rules)) >> simp[]) >>
+            drule_all_then strip_assume_tac
+                           (ONCE_REWRITE_RULE [ffi_eq_SYM] ffi_eq_simulationL)>>
+            DEEP_INTRO_TAC some_intro >> simp[FORALL_PROD] >>
+            metis_tac[ffi_eq_ARecv]) >>
+      simp[] >>
+      ‘LENGTH d = conf.payload_size + 1’
+        by (gs[pSt_pCd_corr_def, qlk_def, fget_def, AllCaseEqs()] >>
+            metis_tac[MEM]) >>
+      simp[store_assign_def, store_v_same_type_def, EL_APPEND2] >>
+      ntac 5 (irule_at Any triR_step1 >>
+               simp[e_step_def, e_step_reln_def, push_def, return_def,
+                    continue_def, application_def, do_app_thm,
+                    store_alloc_def, do_opapp_def,
+                    nsLookup_build_rec_env_sendloop]) >>
+      cheat)
   >- ((* receiveloop - continuing *) cheat)
   >- ((* if 1 *) cheat)
   >- ((* if 2 *) cheat)
