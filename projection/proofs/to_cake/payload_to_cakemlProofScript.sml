@@ -3761,17 +3761,19 @@ Theorem simulation:
     EVERY cletrec_vars_ok (MAP SND pSt0.funs) ∧
     can_match conf pN0 L
     ⇒
-    ∃cEnv cSt pN.
+    ∃cEnv cSt pN vs0.
       triR stepr
         (cEnv0, smSt cSt0, Exp (compile_endpoint conf vs EP0), [])
-        (cEnv, smSt cSt, Exp (compile_endpoint conf vs EP), []) ∧
-      cpEval_valid conf p cEnv pSt EP pN vs cvs cSt ∧
+        (cEnv, smSt cSt, Exp (compile_endpoint conf vs0 EP), []) ∧
+      ∃vsF vsB. vs = vsF ++ vs0 ++ vsB ∧
+      cpEval_valid conf p cEnv pSt EP pN vs0 cvs cSt ∧
       cpFFI_valid conf pSt0 pSt cSt0.ffi.ffi_state cSt.ffi.ffi_state L ∧
       (∀nd. nd ∈ network_nodenames (NEndpoint p pSt EP) ⇒
             ffi_has_node nd cSt.ffi.ffi_state)
 Proof
   Induct_on ‘trans’ >> simp[compile_endpoint_def] >> rpt strip_tac (* 11 *)
   >- (gs[cpEval_valid_Send] >>
+      irule_at Any (PROVE [APPEND_NIL] “vs = [] ++ vs ++ []”)>>
       irule_at (Pos hd) RTC_triR >>
       irule_at (Pos hd) break_smallstep_LetNONE >>
       strip_assume_tac
@@ -3859,6 +3861,7 @@ Proof
       rename [‘cSt0.ffi.ffi_state = (pn,X)’] >> Cases_on ‘X’ >>
       gs[ffi_state_cor_def])
   >- ((* second SEND case *) gs[cpEval_valid_Send] >>
+      irule_at Any (PROVE [APPEND_NIL] “vs = [] ++ vs ++ []”)>>
       ntac 3 (irule_at (Pos hd) triR_one_step_each >> simp[e_step_reln_def] >>
               simp[e_step_def, push_def, return_def, continue_def]) >>
       irule_at (Pos hd) triR_steps1 >>
@@ -4102,6 +4105,7 @@ Proof
       metis_tac[strans_pres_nodes])
   >- ((* receive, pushing queue *) all_tac >>
       qexistsl_tac [‘cEnv0’, ‘cSt0’] >> simp[triR_REFL] >>
+      irule_at Any (PROVE [APPEND_NIL] “vs = [] ++ vs ++ []”)>>
       gs[cpEval_valid_def, sem_env_cor_def, pSt_pCd_corr_def] >>
       ‘∃p qs N0. cSt0.ffi.ffi_state = (p,qs,N0)’ by metis_tac[pair_CASES] >>
       gs[ffi_state_cor_def, RIGHT_EXISTS_AND_THM, LEFT_EXISTS_AND_THM] >>
@@ -4121,6 +4125,7 @@ Proof
       Cases_on ‘p1 ∈ FDOM s.queues’ >> simp[FAPPLY_FUPDATE_THM] >> rw[] >>
       simp[])
   >- ((* receiveloop - finishing*) all_tac >>
+      irule_at Any (PROVE [APPEND_NIL] “vs = [] ++ vs ++ []”)>>
       ‘nsLookup cEnv0.c conf.cons = SOME (2, TypeStamp "::" list_type_num) ∧
        nsLookup cEnv0.c conf.nil = SOME (0, TypeStamp "[]" list_type_num)’
         by gvs[env_asm_def, has_v_def, cpEval_valid_def] >>
@@ -4215,12 +4220,82 @@ Proof
                    nsLookup_build_rec_env_sendloop]) >>
       cheat)
   >- ((* receiveloop - continuing *) cheat)
-  >- ((* if 1 *) cheat)
-  >- ((* if 2 *) cheat)
+  >- ((* if 1 *) all_tac>>
+      ‘nsLookup cEnv0.c conf.cons = SOME (2, TypeStamp "::" list_type_num) ∧
+       nsLookup cEnv0.c conf.nil = SOME (0, TypeStamp "[]" list_type_num)’
+        by gvs[env_asm_def, has_v_def, cpEval_valid_def]>>
+      qmatch_asmsub_abbrev_tac ‘(2,lcons)’>>
+      qmatch_asmsub_abbrev_tac ‘(0,lnil)’>>
+      ‘nsLookup cEnv0.v (Short (ps2cs v)) = SOME (Conv (SOME lcons) [Litv (Word8 1w);
+                                                  Conv (SOME lnil) []])’
+      by (gvs[sem_env_cor_def, cpEval_valid_def,Abbr‘lcons’,Abbr‘lnil’]>>
+          first_x_assum drule>>rw[]>>gs[LIST_TYPE_def,WORD_def,list_type_num_def])>>
+      simp[to_small_st_def,w1ckV_def] >>
+      ntac 11 (irule_at Any triR_step1 >>
+               simp[e_step_def, e_step_reln_def, push_def, return_def,
+                    continue_def, application_def, do_app_thm,build_conv_def,
+                    store_alloc_def, do_opapp_def,do_con_check_def,do_if_def,
+                    nsLookup_build_rec_env_sendloop]) >>
+      irule_at Any triR_REFL>>
+      qexistsl_tac [‘[]’,‘DROP (LENGTH (letfuns e1)) vs’,‘pN0’]>>(rpt conj_tac)
+      >- simp[TAKE_DROP]
+      >- gs[cpEval_valid_def,letfuns_def,enc_ok_take,pSt_pCd_corr_def]
+      >- (simp[cpFFI_valid_def] >>
+          simp[some_def] >>
+          rw[ELIM_UNCURRY] >>
+          spose_not_then kall_tac >>
+          pop_assum mp_tac >>
+          rw[fmap_eq_flookup,FLOOKUP_normalise_queues,FLOOKUP_UPDATE] >>
+          rename1 ‘if a1 = _ then _ else _’ >>
+          qexists_tac ‘a1’ >>
+          rw[] >>
+          simp[qlk_def,fget_def] >>
+          TOP_CASE_TAC >> simp[])
+      >- metis_tac[])
+  >- ((* if 2 *) all_tac>>
+      ‘nsLookup cEnv0.c conf.cons = SOME (2, TypeStamp "::" list_type_num) ∧
+       nsLookup cEnv0.c conf.nil = SOME (0, TypeStamp "[]" list_type_num)’
+        by gvs[env_asm_def, has_v_def, cpEval_valid_def]>>
+      qmatch_asmsub_abbrev_tac ‘(2,lcons)’>>
+      qmatch_asmsub_abbrev_tac ‘(0,lnil)’>>
+      ‘∃v'. nsLookup cEnv0.v (Short (ps2cs v)) = SOME v' ∧
+            do_eq v' (Conv (SOME lcons) [Litv (Word8 1w); Conv (SOME lnil) []]) = Eq_val F’
+      by (gvs[sem_env_cor_def, cpEval_valid_def,Abbr‘lcons’,Abbr‘lnil’]>>
+          first_x_assum drule>>rw[]>>first_x_assum (irule_at Any)>>
+          Cases_on ‘w’>>gs[LIST_TYPE_def,WORD_def,list_type_num_def,
+                           do_eq_def,ctor_same_type_def,same_type_def,
+                           lit_same_type_def]>>
+          rw[]>>rveq>>
+          Cases_on ‘t’>>gs[LIST_TYPE_def,WORD_def,list_type_num_def,
+                           do_eq_def,ctor_same_type_def,same_type_def,
+                           lit_same_type_def])>>
+      simp[to_small_st_def,w1ckV_def]>>
+      ntac 11 (irule_at Any triR_step1>>
+               simp[e_step_def, e_step_reln_def, push_def, return_def,
+                    continue_def, application_def,do_app_thm,build_conv_def,
+                    store_alloc_def, do_opapp_def,do_con_check_def,do_if_def,
+                    nsLookup_build_rec_env_sendloop]) >>
+      irule_at Any triR_REFL>>
+      qexistsl_tac [‘TAKE (LENGTH (letfuns e1)) vs’,‘[]’,‘pN0’]>>(rpt conj_tac)
+      >- simp[TAKE_DROP]
+      >- gs[cpEval_valid_def,letfuns_def,enc_ok_drop,pSt_pCd_corr_def]
+      >- (simp[cpFFI_valid_def] >>
+          simp[some_def] >>
+          rw[ELIM_UNCURRY] >>
+          spose_not_then kall_tac >>
+          pop_assum mp_tac >>
+          rw[fmap_eq_flookup,FLOOKUP_normalise_queues,FLOOKUP_UPDATE] >>
+          rename1 ‘if a1 = _ then _ else _’ >>
+          qexists_tac ‘a1’ >>
+          rw[] >>
+          simp[qlk_def,fget_def] >>
+          TOP_CASE_TAC >> simp[])
+      >- metis_tac[])
   >- ((* let *) cheat)
   >- ((* fix *) gs[cpEval_valid_def, pSt_pCd_corr_def] >>
       cheat (* stuff needs ruling out in assumptions *))
   >- ((* letrec *) all_tac >>
+      irule_at Any (PROVE [APPEND_NIL] “vs = [] ++ vs ++ []”)>>
       gs[cpEval_valid_def, pSt_pCd_corr_def, DISJ_IMP_THM, FORALL_AND_THM] >>
       ntac 2 (irule_at (Pos hd) triR_step1 >>
               simp[e_step_def, e_step_reln_def, build_rec_env_def, push_def,
