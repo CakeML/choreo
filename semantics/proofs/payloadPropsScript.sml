@@ -3216,4 +3216,44 @@ Proof
   fs[MEM_FILTER] >> res_tac >> fs[]
 QED
 
+Definition wfLabel_def[simp]:
+  (wfLabel conf (LReceive src msg dest) ⇔ LENGTH msg = conf.payload_size + 1) ∧
+  (wfLabel conf (l : payloadSem$label) ⇔ T)
+End
+
+Definition dual_trans_def[simp]:
+  (dual_trans conf N (LReceive src m dest : payloadSem$label) N' ⇔
+     trans conf N (LSend src m dest) N') ∧
+  (dual_trans conf N (LSend src m dest) N' ⇔
+     trans conf N (LReceive src m dest) N') ∧
+  (dual_trans conf _ _ _ ⇔ T)
+End
+
+Definition can_match_def:
+  (can_match conf N α ⇔ ∃N'. dual_trans conf N α N')
+End
+
+Theorem can_match_wfLabel:
+  ∀conf n α n'. can_match conf n α ⇒ wfLabel conf α
+Proof
+  simp[can_match_def,PULL_EXISTS] >>
+  Cases_on ‘α’ >> TRY(simp[] >> NO_TAC) >>
+  PURE_REWRITE_TAC[dual_trans_def] >>
+  rpt strip_tac >>
+  qmatch_asmsub_abbrev_tac ‘trans _ _ α _’ >>
+  pop_assum(mp_tac o REWRITE_RULE[markerTheory.Abbrev_def]) >>
+  pop_assum mp_tac >>
+  MAP_EVERY qid_spec_tac [‘N'’,‘α’,‘n’,‘conf’] >>
+  ho_match_mp_tac trans_ind >>
+  rw[] >> rw[pad_LENGTH]
+QED
+
+Theorem trans_wfLabel:
+  trans conf n (LSend q d p) n' ⇒ wfLabel conf (LReceive q d p)
+Proof
+  rpt strip_tac >>
+  match_mp_tac can_match_wfLabel >>
+  simp[can_match_def] >> metis_tac[]
+QED
+
 val _ = export_theory ();
