@@ -85,17 +85,11 @@ Proof
   fs[equivalence_def, reflexive_def]
 QED
 
-Theorem ffi_eq_SYM_IMP:
-  ffi_eq c s1 s2 ⇒ ffi_eq c s2 s1
-Proof
-  ‘equivalence (ffi_eq c)’ by simp[ffi_eq_equivRel] >>
-  fs[equivalence_def, symmetric_def]
-QED
-
 Theorem ffi_eq_SYM:
   ffi_eq c s1 s2 ⇔ ffi_eq c s2 s1
 Proof
-  metis_tac[ffi_eq_SYM_IMP]
+  ‘equivalence (ffi_eq c)’ by simp[ffi_eq_equivRel] >>
+  fs[equivalence_def, symmetric_def]
 QED
 
 Theorem ffi_eq_TRANS:
@@ -232,10 +226,10 @@ Definition env_asm_def:
     LENGTH vs = 8 ∧
     has_v env.c conf.nil  $= (0,TypeStamp "[]" list_type_num) ∧
     has_v env.c conf.cons $= (2,TypeStamp "::" list_type_num) ∧
-    has_v env.v conf.append (at vs 0 (DATUM --> DATUM --> DATUM)) $++ ∧
-    has_v env.v conf.append (at vs 0 (LIST_TYPE DATUM -->
-                                      LIST_TYPE DATUM --> LIST_TYPE DATUM))$++ ∧
-    has_v env.v conf.concat (at vs 1 (LIST_TYPE DATUM --> DATUM)) FLAT ∧
+    has_v env.v conf.append (at vs 0 (DATUM ~~> DATUM ~~> DATUM)) $++ ∧
+    has_v env.v conf.append (at vs 0 (LIST_TYPE DATUM ~~>
+                                      LIST_TYPE DATUM ~~> LIST_TYPE DATUM))$++ ∧
+    has_v env.v conf.concat (at vs 1 (LIST_TYPE DATUM ~~> DATUM)) FLAT ∧
     has_v env.v conf.length (at vs 2 (DATUM ~~> NUM)) LENGTH ∧
     has_v env.v conf.null (at vs 3 (DATUM --> BOOL)) NULL ∧
     has_v env.v conf.take (at vs 4 (DATUM --> NUM --> DATUM)) (combin$C TAKE) ∧
@@ -1639,6 +1633,25 @@ Proof
   qexists_tac ‘EL 5 vs’ >> simp[] >> metis_tac[]
 QED
 
+Theorem env_asm_appendf_sem0:
+  ∃appf.
+    (∀v env. env_asm env conf vs ⇒ nsLookup env.v conf.append = SOME appf) ∧
+    ((∃env. env_asm env conf vs) ⇒
+     (LIST_TYPE DATUM ~~> LIST_TYPE DATUM ~~> LIST_TYPE DATUM) $++ appf)
+Proof
+  simp[env_asm_def, in_module_def, has_v_def, at_def] >>
+  qexists_tac ‘HD vs’ >> simp[] >> metis_tac[]
+QED
+
+Theorem env_asm_concatf_sem0:
+  ∃concatf.
+    (∀v env. env_asm env conf vs ⇒ nsLookup env.v conf.concat = SOME concatf) ∧
+    ((∃env. env_asm env conf vs) ⇒ (LIST_TYPE DATUM ~~> DATUM) FLAT concatf)
+Proof
+  simp[env_asm_def, in_module_def, has_v_def, at_def] >>
+  qexists_tac ‘EL 1 vs’ >> simp[] >> metis_tac[]
+QED
+
 Theorem env_asm_LENGTH =
   env_asm_lenf_sem0
       |> SRULE [reffree_AppReturns_def, reffree_Arrow_def,
@@ -1694,6 +1707,26 @@ Theorem env_asm_DROP =
             Q.SPECL [‘(st1:plffi state).clock’, ‘(st1:plffi state).refs’,
                      ‘st1’])
       |> SRULE[]
+
+Theorem env_asm_APPEND =
+        env_asm_appendf_sem0
+          |> SRULE [reffree_AppReturns_def, reffree_Arrow_def, eval_rel0_thm,
+                    GSYM LEFT_EXISTS_AND_THM]
+          |> underEXs (atcj 2
+                       (GENL [“l1:word8 list list”, “lv1 : v”] o
+                        DISCH “LIST_TYPE DATUM l1 lv1” o
+                        DISCH “∃env. env_asm env conf vs” o
+                        C MATCH_MP (ASSUME “LIST_TYPE DATUM l1 lv1”) o UNDISCH))
+
+Theorem env_asm_FLAT =
+        env_asm_concatf_sem0
+          |> SRULE [reffree_AppReturns_def, reffree_Arrow_def, eval_rel0_thm,
+                    GSYM LEFT_EXISTS_AND_THM]
+          |> underEXs (atcj 2
+                       (GENL [“l1:word8 list list”, “lv1 : v”] o
+                        DISCH “LIST_TYPE DATUM l1 lv1” o
+                        DISCH “∃env. env_asm env conf vs” o
+                        C MATCH_MP (ASSUME “LIST_TYPE DATUM l1 lv1”) o UNDISCH))
 
 Theorem in_module_nsLookup_nsBind:
   in_module id ⇒
@@ -3113,13 +3146,6 @@ QED
 (* -- Check identifier and FFI model contains
       correct messages *)
 
-Theorem ffi_eq_REFL[simp]:
-  ffi_eq c s s
-Proof
-  ‘equivalence (ffi_eq c)’ by simp[ffi_eq_equivRel] >>
-  fs[equivalence_def, reflexive_def]
-QED
-
 Definition ffi_state_cor_def:
   ffi_state_cor conf cpNum pSt pN (fNum,fQueue,fNet) ⇔
     cpNum = fNum ∧
@@ -3153,7 +3179,8 @@ Definition cpEval_valid_def:
     sem_env_cor conf pSt cEnv cvs ∧
     ffi_state_cor conf cpNum pSt pN cSt.ffi.ffi_state ∧
     ffi_wf cSt.ffi.ffi_state ∧
-    cSt.ffi.oracle = comms_ffi_oracle conf
+    cSt.ffi.oracle = comms_ffi_oracle conf ∧
+    normalised pSt.queues
 End
 Overload simR[local] = “cpEval_valid”
 
@@ -3739,6 +3766,18 @@ Proof
        build_conv_def, LIST_TYPE_def, list_type_num_def] >> gs[]
 QED
 
+Theorem normqs_update_cons:
+  normalise_queues (fm |+ (k, h::t)) =
+  normalise_queues fm |+ (k, h::t)
+Proof
+  simp[fmap_EXT, normalise_queues_def, FLOOKUP_UPDATE, AllCaseEqs(),
+       DRESTRICT_DEF, DISJ_IMP_THM, FORALL_AND_THM, FAPPLY_FUPDATE_THM] >>
+  rw[]
+  >- (simp[EXTENSION] >> metis_tac[]) >>
+  rename [‘FLOOKUP fm k1 = SOME [] ⇒ k2 = k1’] >>
+  Cases_on ‘FLOOKUP fm k1 = SOME []’ >> gs[] >> metis_tac[]
+QED
+
 Theorem simulation:
   ∀p0 pSt0 EP0 L p pSt EP pN0 cEnv0 vs cSt0.
     trans conf (NEndpoint p0 pSt0 EP0) L (NEndpoint p pSt EP) ∧
@@ -4165,12 +4204,14 @@ Proof
                         (evaluate_ffi_intro' |> INST_TYPE [beta |-> “:plffi”])>>
       gs[] >>
       first_x_assum $ irule_at (Pos hd) >> simp[continue_def] >>
+      (* Exp (If (finalv "buff") ... ...) *)
       irule_at Any triR_step1 >>
       simp[e_step_def, e_step_reln_def, push_def, return_def,
            continue_def, application_def, do_app_thm, store_lookup_def,
            EL_APPEND1, EL_APPEND2,
            store_alloc_def, do_opapp_def,
            nsLookup_build_rec_env_sendloop] >>
+      (* Exp (finalv "buff") *)
       irule_at Any triR_steps1 >>
       irule_at (Pos hd) RTC_stepr_fixedstate_evaluateL >>
       CONV_TAC (pull_namedexvar_conv "newrefs") >> qexists_tac ‘[]’ >> simp[] >>
@@ -4196,18 +4237,111 @@ Proof
                   (convDatumList_correct |> INST_TYPE [alpha |-> “:plffi”]) >>
       first_x_assum $ irule_at (Pos hd) >>
       simp[continue_def, push_def] >>
-      ‘∃appv.
-         nsLookup ENV.v conf.append = SOME appv ∧
-         (LIST_TYPE DATUM --> LIST_TYPE DATUM --> LIST_TYPE DATUM) $++ appv’
-        by gs[Abbr‘ENV’, env_asm_def, has_v_def, at_def, in_module_def,
-              build_rec_env_def, receiveloop_def] >>
+      strip_assume_tac (env_asm_APPEND |> Q.INST [‘vs’ |-> ‘cvs’]) >>
+      first_assum (first_x_assum o resolve_then (Pos hd) assume_tac) >>
+      ‘env_asm ENV conf cvs’ by simp[Abbr‘ENV’] >>
+      first_x_assum $
+        drule_then (strip_assume_tac o SRULE [SKOLEM_THM, FORALL_AND_THM]) >>
+      rename [‘do_opapp [appf; _] = SOME (appenv1f _ _, appenv1e _ _)’] >>
       ntac 1 (irule_at Any triR_step1 >>
               simp[e_step_def, e_step_reln_def, push_def, return_def,
                    continue_def, application_def, do_app_thm, store_lookup_def,
                    EL_APPEND1, EL_APPEND2, do_con_check_def,
                    store_alloc_def, do_opapp_def, build_conv_def,
                    nsLookup_build_rec_env_sendloop]) >>
-      cheat)
+      irule_at Any triR_step1 >>
+      simp[e_step_def, e_step_reln_def, continue_def, application_def] >>
+      irule_at (Pos hd) triR_steps1 >>
+      irule_at (Pos hd) RTC_stepr_fixedstate_evaluateL >>
+      first_x_assum (C (resolve_then (Pos hd) (irule_at Any o iffRL))
+                     evaluate_generalise') >> simp[] >>
+      CONV_TAC (pull_namedexvar_conv "newrefs") >> qexists_tac ‘[]’ >> simp[] >>
+      irule_at (Pos hd) LESS_EQ_REFL >>
+      simp[continue_def, application_def] >>
+      qpat_x_assum ‘∀s msgs. do_opapp [appf; _] = _’ kall_tac >>
+      ‘∀v e. DATUM e v ⇒
+             LIST_TYPE DATUM [e]
+                       (Conv (SOME (TypeStamp "::" list_type_num))
+                        [v; Conv (SOME (TypeStamp "[]" list_type_num)) []])’
+        by simp[LIST_TYPE_def, list_type_num_def] >>
+      pop_assum (first_x_assum o resolve_then (Pos hd) strip_assume_tac) >>
+      first_assum (pop_assum o resolve_then (Pos hd) strip_assume_tac) >>
+      pop_assum (strip_assume_tac o SRULE [SKOLEM_THM]) >>
+      simp[] >> pop_assum (strip_assume_tac o cj 2) >>
+      pop_assum (strip_assume_tac o SRULE [SKOLEM_THM, FORALL_AND_THM]) >>
+      irule_at (Pos hd) triR_steps1 >>
+      irule_at (Pos hd) RTC_stepr_fixedstate_evaluateL >>
+      first_x_assum (C (resolve_then (Pos hd) (irule_at Any o iffRL))
+                     evaluate_generalise') >> simp[] >>
+      CONV_TAC (pull_namedexvar_conv "newrefs") >> qexists_tac ‘[]’ >> simp[] >>
+      irule_at (Pos hd) LESS_EQ_REFL >>
+      simp[continue_def, application_def, push_def] >>
+      strip_assume_tac (env_asm_FLAT |> Q.INST[‘vs’ |-> ‘cvs’]) >>
+      ntac 2 (irule_at (Pos hd) triR_step1 >>
+              simp[e_step_def, e_step_reln_def, return_def, continue_def,
+                   application_def]) >>
+      first_assum (pop_assum o resolve_then (Pos hd) strip_assume_tac) >>
+      pop_assum $ drule_then (strip_assume_tac o SRULE [SKOLEM_THM]) >>
+      simp[] >> pop_assum (strip_assume_tac o
+                           SRULE [SKOLEM_THM, FORALL_AND_THM] o cj 2) >>
+      irule_at (Pos hd) triR_steps1 >>
+      irule_at (Pos hd) RTC_stepr_fixedstate_evaluateL >>
+      first_x_assum (C (resolve_then (Pos hd) (irule_at Any o iffRL))
+                     evaluate_generalise') >> simp[] >>
+      CONV_TAC (pull_namedexvar_conv "newrefs") >> qexists_tac ‘[]’ >> simp[] >>
+      irule_at (Pos hd) LESS_EQ_REFL >> simp[continue_def] >>
+      simp[EXstrefsffi] >> irule_at (Pos hd) triR_REFL >> simp[] >>
+      (* symbolic evaluation done *)
+      simp[LEFT_EXISTS_AND_THM, RIGHT_EXISTS_AND_THM] >> rpt strip_tac (* 8 *)
+      >- gs[letfuns_def]
+      >- (gs[pSt_pCd_corr_def, FLOOKUP_UPDATE, AllCaseEqs(), EXISTS_OR_THM] >>
+          conj_tac >- metis_tac[] >>
+          simp[FLOOKUP_normalise_queues, AllCaseEqs()] >>
+          dsimp[FLOOKUP_UPDATE, AllCaseEqs()] >>
+          gs[qlk_def, fget_def, AllCaseEqs()] >> metis_tac[MEM])
+      >- gs[sem_env_cor_def, FLOOKUP_UPDATE, AllCaseEqs(), DISJ_IMP_THM,
+            FORALL_AND_THM]
+      >- (‘(∃Np Nq Nn. N = (Np,Nq,Nn)) ∧
+           (∃Cp Cq Cn. cSt0.ffi.ffi_state = (Cp,Cq,Cn))’
+            by metis_tac[pair_CASES] >>
+          gvs[ffi_state_cor_def] >> qpat_x_assum ‘$some _ = SOME _’ mp_tac >>
+          DEEP_INTRO_TAC some_intro >> simp[] >> strip_tac >>
+          drule_then assume_tac strans_pres_pnum >> gvs[] >>
+          irule_at (Pos hd) ffi_eq_pres >>
+          first_assum $ irule_at Any >> simp[] >>
+          irule_at Any (hd $ CONJUNCTS strans_rules) >> simp[] >>
+          first_assum $ irule_at Any >> simp[] >> gs[ffi_wf_def])
+      >- (‘(∃Np Nq Nn. N = (Np,Nq,Nn)) ∧
+           (∃Cp Cq Cn. cSt0.ffi.ffi_state = (Cp,Cq,Cn))’
+            by metis_tac[pair_CASES] >>
+          qpat_x_assum ‘$some _ = SOME _’ mp_tac >>
+          DEEP_INTRO_TAC some_intro >> simp[] >> metis_tac[strans_pres_wf])
+      >- (simp[cpFFI_valid_def] >> DEEP_INTRO_TAC some_intro >>
+          simp[FORALL_PROD, normqs_update_cons] >> rw[]
+          >- (pop_assum mp_tac >> simp[fmap_EXT, EXTENSION] >> strip_tac >>
+              rpt (pop_assum $ qspec_then ‘p1’ mp_tac) >>
+              ‘p1 ∈ FDOM s.queues’
+                by gvs[qlk_def, fget_def, AllCaseEqs(), FLOOKUP_DEF] >>
+              simp[FAPPLY_FUPDATE_THM] >>
+              gvs[qlk_def, fget_def, AllCaseEqs(), FLOOKUP_DEF,
+                  FAPPLY_normalise_queues] >> rw[]
+              >- (qpat_x_assum ‘$some _ = SOME _’ mp_tac >>
+                  DEEP_INTRO_TAC some_intro >> simp[])
+              >- (qpat_x_assum ‘$some _ = SOME _’ mp_tac >>
+                  DEEP_INTRO_TAC some_intro >> simp[]) >>
+              gs[FDOM_normalise_queues]) >>
+          first_x_assum $ qspecl_then [‘p1’, ‘d’] mp_tac >>
+          simp[qlk_def, fget_def] >>
+          gvs[normalised_def, qlk_def, fget_def, AllCaseEqs(), FLOOKUP_DEF] >>
+          simp[fmap_EXT] >> impl_tac
+          >- (simp[EXTENSION] >> metis_tac[])>>
+          simp[FAPPLY_FUPDATE_THM, AllCaseEqs()])
+      >- (qpat_x_assum ‘$some _ = SOME _’ mp_tac >>
+          DEEP_INTRO_TAC some_intro >> simp[] >>
+          metis_tac[strans_pres_nodes])
+      >- (qpat_x_assum ‘$some _ = SOME _’ mp_tac >>
+          DEEP_INTRO_TAC some_intro >> simp[] >>
+          metis_tac[strans_pres_nodes]))
   >- ((* receiveloop - continuing *) cheat)
   >- ((* if 1 *) all_tac>>
       ‘nsLookup cEnv0.c conf.cons = SOME (2, TypeStamp "::" list_type_num) ∧
@@ -8151,7 +8285,7 @@ Proof
       gvs[cpFFI_valid_def] >>
       qpat_x_assum ‘trans _ _ (LReceive _ _ _) _’ (strip_assume_tac o ONCE_REWRITE_RULE[trans_cases]) >>
       gvs[] >>
-      dxrule_then assume_tac ffi_eq_SYM_IMP >>
+      dxrule_then assume_tac (iffLR ffi_eq_SYM) >>
       drule_then match_mp_tac ffi_eq_TRANS >>
       match_mp_tac active_trans_equiv_irrel >>
       conj_tac >- gvs[cpEval_valid_def] >>
