@@ -7814,7 +7814,7 @@ Proof
       \\ rw [] \\ metis_tac [])
   \\ metis_tac []
 QED
-,
+
 Theorem NPar_trans_l_cases:
   ∀p s c s' c' conf n n'.
    trans conf (NPar (NEndpoint p s c) n) LTau (NPar (NEndpoint p s' c') n')
