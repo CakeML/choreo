@@ -4472,7 +4472,7 @@ Proof
   >- ((* fix *) gs[cpEval_valid_def, pSt_pCd_corr_def] >>
       cheat (* stuff needs ruling out in assumptions *))
   >- ((* letrec *) all_tac >>
-      irule_at Any (PROVE [APPEND_NIL] “vs = [] ++ vs ++ []”)>>
+      CONV_TAC (pull_namedexvar_conv "vs0")>>qexists_tac‘vs’>>
       gs[cpEval_valid_def, pSt_pCd_corr_def, DISJ_IMP_THM, FORALL_AND_THM] >>
       ntac 2 (irule_at (Pos hd) triR_step1 >>
               simp[e_step_def, e_step_reln_def, build_rec_env_def, push_def,
