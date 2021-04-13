@@ -3806,7 +3806,6 @@ QED
 Theorem simulation:
   ∀p0 pSt0 EP0 L p pSt EP pN0 cEnv0 vs cSt0.
     trans conf (NEndpoint p0 pSt0 EP0) L (NEndpoint p pSt EP) ∧
-    wfLabel conf L ∧
     cpEval_valid conf p0 cEnv0 pSt0 EP0 pN0 vs cvs cSt0 ∧
     (∀nd. nd ∈ network_nodenames (NEndpoint p0 pSt0 EP0) ⇒
           ffi_has_node nd cSt0.ffi.ffi_state) ∧
@@ -4158,6 +4157,7 @@ Proof
   >- ((* receive, pushing queue *) all_tac >>
       CONV_TAC (pull_namedexvar_conv "vs0")>>qexists_tac‘vs’>>
       qexistsl_tac [‘cEnv0’, ‘cSt0’] >> simp[triR_REFL] >>
+      drule_then assume_tac can_match_wfLabel >>
       gs[cpEval_valid_def, sem_env_cor_def, pSt_pCd_corr_def] >>
       ‘∃p qs N0. cSt0.ffi.ffi_state = (p,qs,N0)’ by metis_tac[pair_CASES] >>
       gs[ffi_state_cor_def, RIGHT_EXISTS_AND_THM, LEFT_EXISTS_AND_THM] >>
@@ -4366,7 +4366,91 @@ Proof
       >- (qpat_x_assum ‘$some _ = SOME _’ mp_tac >>
           DEEP_INTRO_TAC some_intro >> simp[] >>
           metis_tac[strans_pres_nodes]))
-  >- ((* receiveloop - continuing *) cheat)
+  >- ((* receiveloop - continuing *) all_tac >>
+      CONV_TAC (pull_namedexvar_conv "vs0")>>qexists_tac‘vs’>>
+      ‘nsLookup cEnv0.c conf.cons = SOME (2, TypeStamp "::" list_type_num) ∧
+       nsLookup cEnv0.c conf.nil = SOME (0, TypeStamp "[]" list_type_num)’
+        by gvs[env_asm_def, has_v_def, cpEval_valid_def] >>
+      simp[to_small_st_def] >>
+      ntac 21 (irule_at Any triR_step1 >>
+               simp[e_step_def, e_step_reln_def, push_def, return_def,
+                    continue_def, application_def, do_app_thm,
+                    store_alloc_def, do_opapp_def,
+                    nsLookup_build_rec_env_sendloop]) >>
+      irule_at Any triR_step1 >>
+      simp[e_step_def, e_step_reln_def, continue_def, application_def,
+           do_app_thm, store_lookup_def, EL_APPEND2, call_FFI_def] >>
+      gs[cpEval_valid_def, comms_ffi_oracle_def, ffi_receive_def,
+         MAP_MAP_o, CHR_ORD, IMPLODE_EXPLODE_I] >>
+      ‘∃N. (some (m,ns). strans conf cSt0.ffi.ffi_state (ARecv p1 m) ns) =
+           SOME (d,N)’
+        by (‘∃dn qs0 N0. cSt0.ffi.ffi_state = (dn,qs0,N0)’
+              by metis_tac[pair_CASES] >>
+            gs[ffi_state_cor_def] >>
+            ‘strans conf (dn,s.queues,pN0) (ARecv p1 d)
+                    (dn,normalise_queues(s.queues |+ (p1,tl)),pN0)’
+              by (irule (hd (CONJUNCTS strans_rules)) >> simp[]) >>
+            drule_all_then strip_assume_tac
+                           (ONCE_REWRITE_RULE [ffi_eq_SYM] ffi_eq_simulationL)>>
+            DEEP_INTRO_TAC some_intro >> simp[FORALL_PROD] >>
+            metis_tac[ffi_eq_ARecv]) >>
+      simp[] >>
+      ‘LENGTH d = conf.payload_size + 1’
+        by (gs[pSt_pCd_corr_def, qlk_def, fget_def, AllCaseEqs()] >>
+            metis_tac[MEM]) >>
+      simp[store_assign_def, store_v_same_type_def, EL_APPEND2, return_def] >>
+      ntac 7 (irule_at Any triR_step1 >>
+              simp[e_step_def, e_step_reln_def, push_def, return_def,
+                   continue_def, application_def, do_app_thm,
+                   store_alloc_def, do_opapp_def, unpadv_def,
+                   nsLookup_build_rec_env_sendloop]) >>
+      irule_at Any triR_steps1 >>
+      irule_at (Pos hd) RTC_stepr_fixedstate_evaluateL >>
+      qmatch_goalsub_abbrev_tac ‘evaluate _ ENV [unpadv_code conf]’ >>
+      ‘env_asm ENV conf cvs’ by simp[Abbr‘ENV’] >>
+      dxrule_then strip_assume_tac unpadv_correct >>
+      ‘LENGTH cSt0.refs < LENGTH (cSt0.refs ++ [W8array d])’ by simp[] >>
+      first_x_assum $ dxrule_then strip_assume_tac >>
+      gs[Abbr‘ENV’, EL_APPEND2] >> ‘d ≠ []’ by (Cases_on ‘d’ >> gs[]) >>
+      first_x_assum $
+        dxrule_then (strip_assume_tac o SRULE [SKOLEM_THM, FORALL_AND_THM]) >>
+      first_x_assum $ C (resolve_then (Pos hd) assume_tac)
+                        (evaluate_ffi_intro' |> INST_TYPE [beta |-> “:plffi”])>>
+      gs[] >>
+      first_x_assum $ irule_at (Pos hd) >> simp[continue_def] >>
+      (* If (finalv "buff") ... *)
+      irule_at Any triR_step1 >>
+      simp[e_step_def, e_step_reln_def, push_def, return_def,
+           continue_def, application_def, do_app_thm, store_lookup_def,
+           EL_APPEND1, EL_APPEND2,
+           store_alloc_def, do_opapp_def,
+           nsLookup_build_rec_env_sendloop] >>
+      (* Exp (finalv "buff") *)
+      irule_at Any triR_steps1 >>
+      irule_at (Pos hd) RTC_stepr_fixedstate_evaluateL >>
+      CONV_TAC (pull_namedexvar_conv "newrefs") >> qexists_tac ‘[]’ >> simp[] >>
+      (* apply finalv_correct *)
+      irule_at (Pos hd) finalv_correct >>
+      simp[store_lookup_def, EL_APPEND1, EL_APPEND2] >>
+      ‘¬final d’ by metis_tac[final_inter_mutexc] >>
+      simp[continue_def, do_if_def] >> ‘d ≠ []’ by (Cases_on‘d’ >> gs[]) >>
+      simp[] >>
+      ntac 6 (irule_at Any triR_step1 >>
+              simp[e_step_def, e_step_reln_def, do_con_check_def, push_def,
+                   return_def, continue_def, application_def, do_opapp_def]) >>
+      (* symbolically evaluate on other side *)
+      irule_at (Pos hd) (iffLR triR_SYM) >>
+      ntac 16 (irule_at Any triR_step1 >>
+               simp[e_step_def, e_step_reln_def, push_def, return_def,
+                    continue_def, application_def, do_app_thm,
+                    store_alloc_def, do_opapp_def,
+                    nsLookup_build_rec_env_sendloop]) >> cheat
+      (* both have Exp (receiveloop_body conf p1), but with different
+         continuations and different input references;
+         second state has buff all-zero; first state has buff filled with d
+         and other garbage resulting from first iteration of loop.
+       *)
+     )
   >- ((* if 1 *) all_tac>>
       ‘nsLookup cEnv0.c conf.cons = SOME (2, TypeStamp "::" list_type_num) ∧
        nsLookup cEnv0.c conf.nil = SOME (0, TypeStamp "[]" list_type_num)’
