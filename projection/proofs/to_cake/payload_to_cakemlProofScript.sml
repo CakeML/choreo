@@ -3809,6 +3809,9 @@ Theorem simulation:
     cpEval_valid conf p0 cEnv0 pSt0 EP0 pN0 vs cvs cSt0 ∧
     (∀nd. nd ∈ network_nodenames (NEndpoint p0 pSt0 EP0) ⇒
           ffi_has_node nd cSt0.ffi.ffi_state) ∧
+    (* EP0 does not contain Fix nor Call *)
+    letrec_endpoint EP0 ∧
+    EVERY (letrec_closure o SND) pSt0.funs ∧
     pletrec_vars_ok EP0 ∧
     EVERY cletrec_vars_ok (MAP SND pSt0.funs) ∧
     can_match conf pN0 L
@@ -4553,9 +4556,10 @@ Proof
           rw[FLOOKUP_UPDATE,nsBind_def,nsLookup_def]>>simp[])
       >- simp[cpFFI_valid_LTau_queue_eq]
       >- metis_tac[])
-  >- ((* fix *) gs[cpEval_valid_def, pSt_pCd_corr_def] >>
-      cheat (* stuff needs ruling out in assumptions *))
+  >- ((* fix *) gs[letrec_endpoint_def])
   >- ((* letrec *) all_tac >>
+      qpat_x_assum ‘EVERY (letrec_closure o SND) _’ kall_tac>>
+      qpat_x_assum ‘letrec_endpoint _’ kall_tac>>
       CONV_TAC (pull_namedexvar_conv "vs0")>>qexists_tac‘vs’>>
       gs[cpEval_valid_def, pSt_pCd_corr_def, DISJ_IMP_THM, FORALL_AND_THM] >>
       ntac 2 (irule_at (Pos hd) triR_step1 >>
