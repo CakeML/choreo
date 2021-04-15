@@ -4274,6 +4274,7 @@ Proof
       first_x_assum $ C (resolve_then (Pos hd) assume_tac)
                         (evaluate_ffi_intro' |> INST_TYPE [beta |-> “:plffi”])>>
       gs[] >>
+      CONV_TAC (pull_namedexvar_conv "newrefs") >> qexists_tac ‘[]’ >> simp[] >>
       first_x_assum $ irule_at (Pos hd) >> simp[continue_def] >>
       (* Exp (If (finalv "buff") ... ...) *)
       irule_at Any triR_step1 >>
@@ -4464,6 +4465,7 @@ Proof
       first_x_assum $ C (resolve_then (Pos hd) assume_tac)
                         (evaluate_ffi_intro' |> INST_TYPE [beta |-> “:plffi”])>>
       gs[] >>
+      CONV_TAC (pull_namedexvar_conv "newrefs") >> qexists_tac ‘[]’ >> simp[] >>
       first_x_assum $ irule_at (Pos hd) >> simp[continue_def] >>
       (* If (finalv "buff") ... *)
       irule_at Any triR_step1 >>
@@ -4491,7 +4493,15 @@ Proof
                simp[e_step_def, e_step_reln_def, push_def, return_def,
                     continue_def, application_def, do_app_thm,
                     store_alloc_def, do_opapp_def,
-                    nsLookup_build_rec_env_sendloop]) >> cheat
+                    nsLookup_build_rec_env_sendloop]) >>
+      qabbrev_tac ‘
+       rEnv = λ(rfs: v store_v list) env.
+                build_rec_env (receiveloop conf p1)
+                              (env with v := nsBind "buff" (Loc (LENGTH rfs))
+                                                    env.v)
+                              (nsBind "buff" (Loc (LENGTH rfs)) env.v)’ >>
+      simp[EXstrefsffi] >> pop_assum (hide "rEnv") >>
+      cheat
       (* both have Exp (receiveloop_body conf p1), but with different
          continuations and different input references;
          second state has buff all-zero; first state has buff filled with d
