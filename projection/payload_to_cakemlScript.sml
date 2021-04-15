@@ -195,49 +195,65 @@ Definition find_one_def:
 End
 
 (* -- CakeML deep embedding of the unpad function. *)
+(* fun unpadv x =
+     if validv x then
+       let val l = Aw8.length x
+           val n = if Aw8.sub(x,0) = 0x7w orelse
+                      Aw8.sub(x,0) = 0x2w
+                   then
+                      1
+                   else
+                     let
+                       fun find_one i = ...
+                     in
+                       1 + find_one 1
+       in
+           if n = 1 + Aw8.length x then []
+           else
+             let fun backseg A i = if i <= n then A
+                                   else backseg (Aw8.sub(x,i) :: A) (i - 1)
+             in
+                 backseg [] (l - 1)
+             end
+       end
+     else []
+*)
+
+Definition backseg_code_def:
+  backseg_code conf =
+  If (App (Opb Leq) [Var (Short"i"); Var (Short "n")])
+     (Var (Short "A"))
+     (App Opapp [
+         App Opapp [
+             Var (Short "backseg");
+             Con (SOME conf.cons) [
+                 App Aw8sub [Var (Short "x");
+                             Var (Short "i")];
+                 Var (Short "A")
+               ];
+           ];
+         App (Opn Minus) [Var (Short "i"); Lit (IntLit 1)]
+       ])
+End
+
 Definition unpadv_def:
   unpadv conf =
    Fun "x"
    (If (validv "x")
-   (Let (SOME "n")
+    (Let (SOME "l") (App Aw8length [Var (Short "x")])
+    (Let (SOME "n")
      (If (Log Or
              (App Equality [Lit (Word8 7w); App Aw8sub [Var(Short "x");
                                                         Lit(IntLit 0)]])
              (App Equality [Lit (Word8 2w); App Aw8sub [Var(Short "x");
                                                         Lit(IntLit 0)]]))
-        (Lit(IntLit 1))
-        (App (Opn Plus) [Lit (IntLit 1);
-        Letrec find_one (App Opapp [Var(Short "find_one"); Lit(IntLit 1)])])
-     )
-     (If (App Equality [Var (Short "n");
-                        App (Opn Plus) [Lit (IntLit 1);
-                                        App Aw8length [Var (Short "x")]
-                                        ]
-                        ])
+        (Lit(IntLit 0))
+        (Letrec find_one (App Opapp [Var(Short "find_one"); Lit(IntLit 1)])))
+     (If (App Equality [Var (Short "n"); Var (Short "l")])
       (Con (SOME conf.nil) [])
-      (Let (SOME "y")
-          (App Aw8alloc
-               [App (Opn Minus)
-                    [App Aw8length [Var (Short "x")];
-                     Var(Short "n")];
-                Lit(Word8 0w)
-               ]
-          )
-          (Let NONE
-               (App CopyAw8Aw8
-                    [Var(Short "x");
-                     Var(Short "n");
-                     App Aw8length [Var (Short "y")];
-                     Var(Short "y");
-                     Lit(IntLit 0)
-                    ]
-               )
-               (App Opapp [Var conf.toList; Var(Short "y")]
-               )
-          )
-      )
-     )
-     )
+      (Letrec [("backseg", "A", Fun "i" (backseg_code conf))]
+       (App Opapp [App Opapp [Var (Short "backseg"); Con (SOME conf.nil) []];
+                  App (Opn Minus) [Var (Short "l"); Lit (IntLit 1)]])))))
    (Con (SOME conf.nil) []))
 End
 
