@@ -261,20 +261,34 @@ End
       function definition. *)
 Definition receiveloop_def:
   receiveloop conf src =
-    [("receiveloop","u",
-      (Let NONE (App (FFI "receive") [Lit(StrLit src); Var(Short "buff")])
+    [("receiveloop","A",
+      Let NONE (App (FFI "receive") [Lit(StrLit src); Var(Short "buff")])
         (Let (SOME "n") (App Opapp [unpadv conf;Var(Short "buff")])
-         (If (finalv "buff")
-            (Con (SOME conf.cons)
-                 [Var (Short "n");
-                  Con(SOME conf.nil) []])
-            (Con(SOME conf.cons)
-                 [Var (Short "n");
-                  App Opapp [Var(Short "receiveloop");Var(Short "u")]])
+          (If (finalv "buff")
+            (App Opapp [Var conf.concat;
+                        App Opapp [Var conf.reverse;
+                                   Con (SOME conf.cons) [Var (Short "n");
+                                                         Var (Short "A")]]])
+            (Let NONE (Letrec [("zerobuf", "i",
+                                Let NONE (App Aw8update [
+                                             Var (Short "buff");
+                                             Var (Short "i");
+                                             Lit (Word8 0w)])
+                                    (App Opapp [Var (Short "zerobuf");
+                                                App (Opn Minus) [
+                                                    Var (Short "i");
+                                                    Lit (IntLit 1)]]))]
+                       (App Opapp [Var (Short "zerobuf");
+                                   App (Opn Minus) [
+                                       App Aw8length[Var (Short "buff")];
+                                       Lit (IntLit 1)]]))
+             (App Opapp [
+                 Var(Short "receiveloop");
+                 Con(SOME conf.cons) [Var(Short "n"); Var (Short "A")]])
+            )
           )
         )
-      )
-    )]
+     )]
 End
 
 (* COMPILATION *)
@@ -324,15 +338,8 @@ Definition compile_endpoint_def:
                                             Lit(Word8 0w)])
                (Letrec
                   (receiveloop conf p)
-                  (App Opapp
-                    [Var conf.concat;
-                     App Opapp
-                       [App Opapp [Var conf.append;
-                                   convDatumList conf l];
-                        App Opapp [Var(Short "receiveloop");
-                                   Con NONE []]             ]]
-                  )
-               )
+                  (App Opapp [Var (Short "receiveloop");
+                              convDatumList conf (REVERSE l)]))
           )
           (compile_endpoint conf vs e)
      ) ∧

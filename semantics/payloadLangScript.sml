@@ -40,7 +40,7 @@ Datatype:
               null : (modN,varN) id;
               take : (modN,varN) id;
               drop : (modN,varN) id;
-              toList : (modN,varN) id;
+              reverse : (modN,varN) id;
               fromList : (modN,varN) id;
               concat : (modN,varN) id;
               append : (modN,varN) id;

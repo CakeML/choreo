@@ -234,14 +234,8 @@ Definition env_asm_def:
     has_v env.v conf.null (at vs 3 (DATUM --> BOOL)) NULL ∧
     has_v env.v conf.take (at vs 4 (DATUM --> NUM --> DATUM)) (combin$C TAKE) ∧
     has_v env.v conf.drop (at vs 5 (DATUM ~~> NUM ~~> DATUM)) (combin$C DROP) ∧
-    nsLookup env.v conf.toList = SOME (EL 6 vs) ∧
-    (∀s1:unit semanticPrimitives$state l ll. (* toList spec *)
-       store_lookup ll s1.refs = SOME (W8array l) ⇒
-       ∃env' exp ck1 ck2 lv.
-         do_opapp [EL 6 vs; Loc ll] = SOME(env',exp)           ∧
-         evaluate (s1 with clock := ck1) env' [exp] =
-               (s1 with <|clock := ck2|>,Rval [lv])      ∧
-         DATUM l lv) ∧
+    has_v env.v conf.reverse
+          (at vs 6 (LIST_TYPE DATUM ~~> LIST_TYPE DATUM)) REVERSE ∧
     nsLookup env.v conf.fromList = SOME (EL 7 vs) ∧
     (∀l lv. (* fromList spec *)
        DATUM l lv ⇒
@@ -259,7 +253,7 @@ Definition env_asm_def:
     in_module conf.take ∧
     in_module conf.drop ∧
     in_module conf.fromList ∧
-    in_module conf.toList
+    in_module conf.reverse
 End
 
 (* LUPDATE (List Update) HELPER THEOREMS *)
@@ -1652,6 +1646,16 @@ Proof
   qexists_tac ‘EL 1 vs’ >> simp[] >> metis_tac[]
 QED
 
+Theorem env_asm_reversef_sem0:
+  ∃revf.
+    (∀v env. env_asm env conf vs ⇒ nsLookup env.v conf.reverse = SOME revf) ∧
+    ((∃env. env_asm env conf vs) ⇒
+     (LIST_TYPE DATUM ~~> LIST_TYPE DATUM) REVERSE revf)
+Proof
+  simp[env_asm_def, in_module_def, has_v_def, at_def] >>
+  qexists_tac ‘EL 6 vs’ >> simp[] >> metis_tac[]
+QED
+
 Theorem env_asm_LENGTH =
   env_asm_lenf_sem0
       |> SRULE [reffree_AppReturns_def, reffree_Arrow_def,
@@ -1727,6 +1731,7 @@ Theorem env_asm_FLAT =
                         DISCH “LIST_TYPE DATUM l1 lv1” o
                         DISCH “∃env. env_asm env conf vs” o
                         C MATCH_MP (ASSUME “LIST_TYPE DATUM l1 lv1”) o UNDISCH))
+
 
 Theorem in_module_nsLookup_nsBind:
   in_module id ⇒
@@ -2773,7 +2778,7 @@ Overload receiveloop_body = “λ(conf:config) (src:string). ^b”
 
 Theorem find_recfun_receiveloop[simp]:
   find_recfun "receiveloop" (receiveloop conf src) =
-  SOME ("u", receiveloop_body conf src)
+  SOME ("A", receiveloop_body conf src)
 Proof
   simp[receiveloop_def]
 QED
@@ -3847,6 +3852,54 @@ Proof
   TOP_CASE_TAC >> simp[]
 QED
 
+Theorem DATUM_exists:
+  ∀d. ∃!v. DATUM d v
+Proof
+  simp[EXISTS_UNIQUE_DEF, FORALL_AND_THM] >> conj_tac >> Induct >>
+  simp[LIST_TYPE_def, PULL_EXISTS, WORD_def]
+QED
+
+Definition mkDATUM_def:
+  mkDATUM d = @v. DATUM d v
+End
+
+Theorem DATUM_mkDATUM[simp]:
+  DATUM d v ⇔ v = mkDATUM d
+Proof
+  simp[mkDATUM_def] >> SELECT_ELIM_TAC >> metis_tac[DATUM_exists]
+QED
+
+Theorem LTD_exists:
+  ∀l. ∃!v. LIST_TYPE DATUM l v
+Proof
+  simp[EXISTS_UNIQUE_DEF, FORALL_AND_THM] >> conj_tac >>
+  Induct >> simp[LIST_TYPE_def, PULL_EXISTS]
+QED
+
+Definition mkLTD_def:
+  mkLTD l = @v. LIST_TYPE DATUM l v
+End
+
+Theorem LTD_mkLTD[simp]:
+  LIST_TYPE DATUM l v ⇔ v = mkLTD l
+Proof
+  simp[mkLTD_def] >> SELECT_ELIM_TAC >> metis_tac[LTD_exists]
+QED
+
+Theorem env_asm_REVERSE =
+        env_asm_reversef_sem0
+          |> SRULE [reffree_Arrow_def, reffree_AppReturns_def, eval_rel0_thm,
+                    GSYM LEFT_EXISTS_AND_THM]
+          |> Q.GEN ‘vs’
+
+Theorem LTD_CONS:
+  Conv (SOME (TypeStamp "::" list_type_num)) [mkDATUM h; mkLTD t] =
+  mkLTD (h::t)
+Proof
+  simp[Excl "LTD_mkLTD", SYM LTD_mkLTD, LIST_TYPE_def, list_type_num_def] >>
+  simp[]
+QED
+
 Theorem simulation:
   ∀p0 pSt0 EP0 L p pSt EP pN0 cEnv0 vs cSt0.
     trans conf (NEndpoint p0 pSt0 EP0) L (NEndpoint p pSt EP) ∧
@@ -3891,15 +3944,12 @@ Proof
       gs[FORALL_AND_THM] >>
       ‘in_module conf.drop’ by gs[env_asm_def] >>
       simp[in_module_nsLookup_build_rec_env] >>
-      first_x_assum (qpat_assum ‘DATUM _ _’ o
-                     mp_then (Pos hd) strip_assume_tac) >>
       simp[bind_eq_Rval, PULL_EXISTS, AllCaseEqs(), dec_clock_def] >>
       irule_at (Pos hd) (DECIDE “∀clk. clk + 1n ≠ 0”) >> simp[] >>
       irule_at (Pos hd) (DECIDE “∀clk. x ≤ x + clk + 1n”) >> simp[] >>
       irule_at Any (DECIDE “∀clk. ¬((clk + y + 1) + (x + 2) ≤ x + (y + 2n))”) >>
       simp[] >>
-      pop_assum (assume_tac o cj 5) >>
-      pop_assum (C (resolve_then (Pos hd) assume_tac) sendloop_correct) >>
+      assume_tac (SRULE [] sendloop_correct) >>
       simp[nsLookup_build_rec_env_sendloop] >>
       gs[cpEval_valid_def] >> pop_assum $ drule_then assume_tac >>
       rename [‘Recclosure _ (sendloop conf dest_s)’] >>
@@ -3923,7 +3973,6 @@ Proof
       gs[] >>
       first_x_assum (C (resolve_then (Pos hd) (assume_tac o iffLR o cj 2))
                      (evaluate_induce_timeout |> cj 1)) >> gs[] >>
-      rename [‘clk1 _ _ _ _ ≤ _ + clk2 _ _ _ _’] >>
       first_x_assum (resolve_then (Pos hd) assume_tac $
                      DECIDE “∀x y. y ≤ x ⇒ x ≤ (x - y) + y:num”) >>
       gs[DECIDE “y ≤ x ⇒ x - y + y - x = 0n”] >>
@@ -3971,11 +4020,9 @@ Proof
       ‘env_asm cEnv0 conf cvs’ by gs[cpEval_valid_def] >>
       ‘in_module conf.drop’ by gs[env_asm_def] >>
       simp[in_module_nsLookup_build_rec_env] >>
-      simp[evaluate_opapp, Abbr‘dropv’] >>
-      hide_assum "DROP" (qpat_assum ‘DATUM _ _’ o
-                         mp_then (Pos hd) strip_assume_tac) >>
+      simp[evaluate_opapp, Abbr‘dropv’, Abbr‘cEnv’] >>
       simp[bind_eq_Rval, PULL_EXISTS, AllCaseEqs(), dec_clock_def] >>
-      simp[Abbr‘cEnv’, DECIDE “¬(n:num ≤ m) ⇔ m < n”] >> csimp[] >>
+      simp[DECIDE “¬(n:num ≤ m) ⇔ m < n”] >> csimp[] >>
       CONV_TAC (pull_namedexvar_conv "vfn") >>
       qexists_tac ‘λs. drop2_v d dd s.refs n s.refs’ >> simp[] >>
       CONV_TAC (pull_namedexvar_conv "ckf1") >>
@@ -3985,6 +4032,7 @@ Proof
       CONV_TAC (pull_namedexvar_conv "rfn") >> qexists_tac ‘λs. []’ >> simp[]>>
       CONV_TAC (pull_namedexvar_conv "ckf2") >> qexists_tac ‘K 0’>> simp[]>>
       simp[continue_def, push_def] >>
+      hide_assum "DROP" (qspecl_then [‘ARB’, ‘ARB’] kall_tac) >>
       (* have to show (.., 𝕍 "sendloop", kont = args=DROP n d) -->₃
                       (.., Exp (drop (n+psz) d), kont = call sendloop)
        *)
@@ -4002,41 +4050,31 @@ Proof
       simp[e_step_def, e_step_reln_def, do_opapp_def, push_def,
            return_def, continue_def, application_def] >>
       (* now show padv "x" using padv_correct' *)
-      irule_at Any triR_steps1 >>
-      irule_at Any RTC_stepr_evaluateL >> irule_at Any RTC_REFL >>
-      simp[continue_def, bind_eq_Rval, AllCaseEqs(), PULL_EXISTS,
-           dec_clock_def] >>
-      qmatch_goalsub_abbrev_tac ‘nsBind "x" dnd_v (build_rec_env _ _ _)’ >>
-      qmatch_goalsub_abbrev_tac ‘triR stepr (_, _, Exp bod0, _)’ >>
-      ‘DATUM (DROP n d) dnd_v’ by metis_tac[] >>
-      RM_ABBREV_TAC "dnd_v" >>
-      qpat_x_assum ‘∀(s1:plffi semanticPrimitives$state)
-                     (s2:plffi semanticPrimitives$state). _’ kall_tac >>
-      drule_then (qspecl_then [‘cvs’, ‘conf’]
-                  (qx_choosel_then [‘prfn’, ‘ck1f’, ‘ck2f’, ‘plfn’] assume_tac o
-                   SRULE [SKOLEM_THM]))
-                 padv_correct' >>
-      qmatch_goalsub_abbrev_tac ‘evaluate _ cEnv' [padv conf]’ >>
-      ‘env_asm cEnv' conf cvs’ by simp[Abbr‘cEnv'’] >>
-      first_x_assum $
-        drule_then (qx_choosel_then [‘pvfn’, ‘pclvfn’, ‘pclenvfn’] assume_tac o
-                    SRULE[SKOLEM_THM]) >>
-      pop_assum (strip_assume_tac o SRULE[FORALL_AND_THM]) >>
-      last_x_assum (C (resolve_then Any (assume_tac o SRULE[]))
-                    (cj 1 evaluate_choose_final_clock')) >> simp[] >>
-      pop_assum kall_tac >>
-      CONV_TAC (pull_namedexvar_conv "ckf1")>>
-      qexists_tac ‘λs. ck1f s + 1’ >> simp[] >>
-      CONV_TAC (pull_namedexvar_conv "ckf2") >> qexists_tac ‘ck2f’ >> simp[]>>
-      CONV_TAC (pull_namedexvar_conv "rfn") >> qexists_tac ‘prfn’ >> simp[]>>
-      qexists_tac ‘λs. Loc (plfn s)’ >> simp[] >>
-      qpat_x_assum ‘∀s. evaluate (s with clock := ck1f s) _ _ = _’ kall_tac >>
-      qpat_x_assum ‘∀s. do_opapp [pvfn s; dnd_v] = SOME _’ kall_tac >>
-      RM_ABBREV_TAC "cEnv'" >>
+      irule_at Any triR_steps1 >> simp[to_small_st_def] >>
+      irule_at (Pos hd) RTC_stepr_fixedstate_evaluateL >>
+      qspecl_then [‘cvs’, ‘DROP n d’, ‘conf’]
+                  (strip_assume_tac o
+                   SRULE[IMP_CONJ_THM, FORALL_AND_THM] o
+                   SRULE[SKOLEM_THM, GSYM RIGHT_EXISTS_IMP_THM])
+                  (SRULE [] $ GEN_ALL padv_correct') >>
+      simp[bind_eq_Rval, PULL_EXISTS] >>
+      last_x_assum (C (resolve_then (Pos hd) mp_tac) $
+                    INST_TYPE [beta |-> “:plffi”] evaluate_ffi_intro') >>
+      simp[] >>
+      disch_then (C (resolve_then (Pos hd) mp_tac) evaluate_add_to_clock) >>
+      simp[] >> disch_then $ irule_at Any >> simp[AllCaseEqs()] >>
+      CONV_TAC (pull_namedexvar_conv "extra") >> Q.REFINE_EXISTS_TAC ‘ex + 1’ >>
+      simp[dec_clock_def] >>
+      first_x_assum (C (resolve_then (Pos hd) mp_tac) evaluate_add_to_clock) >>
+      simp[] >> strip_tac >>
+      CONV_TAC (pull_namedexvar_conv "t") >> qexists_tac ‘cSt0’ >> simp[] >>
+      irule_at Any EQ_REFL >> simp[continue_def] >>
 
       (* ready to proceed with next step of bod0 *)
       irule_at Any triR_step1 >>
-      simp[Abbr‘bod0’, e_step_def, e_step_reln_def, push_def] >>
+      simp[e_step_def, e_step_reln_def, push_def] >>
+      pop_assum kall_tac >>
+      qpat_x_assum ‘∀x y. env_asm _ _ _ ⇒ do_opapp _ = _’ kall_tac >>
       (* evaluating send (Lit p2, 𝕍 y) *)
       ‘∀v. ∃ns. cSt0.ffi.oracle "send" cSt0.ffi.ffi_state
                     (MAP (λc. n2w (ORD c)) (EXPLODE p2)) (pad conf v) =
@@ -4076,15 +4114,9 @@ Proof
       gvs[has_v_def, at_def] >>
       gs[reffree_Arrow_def, reffree_AppReturns_def, FORALL_AND_THM,
          IMP_CONJ_THM] >>
-      first_x_assum (drule_at_then (Pos hd) assume_tac) >>
-      RULE_ASSUM_TAC (SRULE [LEFT_FORALL_IMP_THM]) >>
-      RULE_ASSUM_TAC
-      (SRULE [SKOLEM_THM, GSYM RIGHT_EXISTS_IMP_THM,
-              FORALL_AND_THM, IMP_CONJ_THM]) >>
-      pop_assum (qx_choosel_then [‘lencl’, ‘lenexp’]
-                 $ CONJUNCTS_THEN2 assume_tac
-                 (qx_choose_then ‘lenvalf’ strip_assume_tac)) >>
-      gs[NUM_def, INT_def] >> (* lenvalf now unused *) pop_assum kall_tac >>
+      first_x_assum (qspec_then ‘DROP n d’ $
+                     qx_choosel_then [‘lencl’, ‘lenexp’] strip_assume_tac) >>
+      gs[NUM_def, INT_def] >>
       irule_at Any triR_step1 >>
       simp[e_step_def, e_step_reln_def, push_def, return_def,
            continue_def, application_def, do_app_thm,
@@ -4100,35 +4132,37 @@ Proof
       irule_at Any triR_step1 >>
       simp[e_step_def, e_step_reln_def, push_def, return_def, continue_def,
            do_if_def] >>
+      ntac 4 (pop_assum kall_tac) >>
       (* now up to Let x = drop x (payload_size) in sendloop x *)
       ntac 9 (irule_at Any triR_step1 >>
               simp[e_step_def, e_step_reln_def, push_def, return_def,
                    continue_def, application_def]) >>
-      use_hidden_assum "DROP" (first_assum o mp_then (Pos hd) mp_tac) >>
-      impl_tac >- simp[]>>
-      disch_then (strip_assume_tac o SRULE[FORALL_AND_THM]) >>
-      simp[] >>
+      use_hidden_assum "DROP" (assume_tac o cj 1) >> simp[] >>
+      pop_assum kall_tac >>
       irule_at Any triR_steps1 >> irule_at (Pos hd) RTC_stepr_evaluateL' >>
       irule_at Any RTC_REFL >>
       simp[eval_rel_def] >>
+      use_hidden_assum "DROP" (assume_tac o cj 2) >> simp[] >>
       CONV_TAC (pull_namedexvar_conv "vfn") >>
-      qexists_tac ‘drop1_v (DROP n d) dnd_v’ >> simp[] >>
+      qexists_tac ‘drop1_v (DROP n d) (mkDATUM (DROP n d))’ >> simp[] >>
       simp[e_step_def, e_step_reln_def, push_def, return_def,
-           continue_def, application_def] >>
+           continue_def, application_def] >> pop_assum kall_tac >>
+      use_hidden_assum "DROP" (assume_tac o cj 3) >> gs[FAstrefsffi] >>
+      pop_assum kall_tac >>
+      use_hidden_assum "DROP" (assume_tac o cj 4) >>
       irule_at Any triR_steps1 >> irule_at (Pos hd) RTC_stepr_evaluateL' >>
       irule_at Any RTC_REFL >>
-      simp[eval_rel_def] >>
+      simp[eval_rel_def] >> gs[FAstrefsffi] >>
       CONV_TAC (pull_namedexvar_conv "vfn") >>
+      rename [‘drop2_v (DROP n d) (mkDATUM (DROP n d))
+               (cSt0.refs ++ droprff cSt0)’] >>
       qexists_tac
-        ‘drop2_v (DROP n d) dnd_v (cSt0.refs ++ prfn cSt0) conf.payload_size’ >>
+        ‘drop2_v (DROP n d) (mkDATUM (DROP n d)) (cSt0.refs ++ droprff cSt0)
+         conf.payload_size’ >>
       simp[] >>
-      simp[continue_def] >>
-      pop_assum $
-        qspecl_then [‘cSt0.refs ++ prfn cSt0’, ‘cSt0.refs ++ prfn cSt0’,
-                     ‘conf.payload_size’] assume_tac >>
-      qmatch_asmsub_abbrev_tac ‘DATUM (DROP _ (DROP _ d)) dpsznd_v’ >>
-      RM_ABBREV_TAC "dpsznd_v" >>
-      pop_assum (fn th => ntac 4 (pop_assum kall_tac) >> assume_tac th) >>
+      simp[continue_def] >> pop_assum kall_tac >>
+      use_hidden_assum "DROP" (assume_tac o cj 5) >> gs[FAstrefsffi] >>
+      pop_assum kall_tac >>
 
       (* triR over
            left = (Exp (sendloop x), continue = [e],
@@ -4143,7 +4177,7 @@ Proof
                    continue_def, application_def,
                    nsLookup_build_rec_env_sendloop]) >>
       simp[do_opapp_def] >> (* now have sendloop_code conf p2 on left *)
-      CONV_TAC (pull_namedexvar_conv "cEnv''") >> qexists_tac ‘cEnv0’ >>
+      CONV_TAC (pull_namedexvar_conv "cEnv") >> qexists_tac ‘cEnv0’ >>
       gs[cpEval_valid_def, EXstrefsffi] >>
       qmatch_goalsub_abbrev_tac ‘triR stepr (_, (new_refs, new_ffi), _, _)’ >>
       map_every (fn (s1,s2) =>
@@ -4157,50 +4191,48 @@ Proof
               simp[e_step_def, e_step_reln_def, push_def, return_def,
                    continue_def, application_def,
                    nsLookup_build_rec_env_sendloop]) >>
-      use_hidden_assum "DROP" (last_assum o mp_then (Pos hd) mp_tac) >>
-      impl_tac >- simp[] >>
-      disch_then (strip_assume_tac o SRULE[FORALL_AND_THM]) >>
-      simp[] >>
+      use_hidden_assum "DROP" (assume_tac o cj 1) >> simp[] >>
+      pop_assum kall_tac >>
       irule_at Any triR_steps1 >> irule_at (Pos hd) RTC_stepr_evaluateL' >>
       irule_at Any RTC_REFL >>
       simp[eval_rel_def] >>
+      use_hidden_assum "DROP" (assume_tac o cj 2) >> simp[] >>
       CONV_TAC (pull_namedexvar_conv "vfn") >>
-      qexists_tac ‘drop1_v d dd’ >> simp[] >>
+      qexists_tac ‘drop1_v d (mkDATUM d)’ >> simp[] >>
       simp[e_step_def, e_step_reln_def, push_def, return_def,
-           continue_def, application_def] >>
+           continue_def, application_def] >> pop_assum kall_tac >>
+      use_hidden_assum "DROP" (assume_tac o cj 3) >> gs[FAstrefsffi] >>
+      pop_assum kall_tac >>
       irule_at Any triR_steps1 >> irule_at (Pos hd) RTC_stepr_evaluateL' >>
       irule_at Any RTC_REFL >>
       simp[eval_rel_def] >>
+      use_hidden_assum "DROP" (assume_tac o cj 4) >> gs[FAstrefsffi] >>
       CONV_TAC (pull_namedexvar_conv "vfn") >>
       qexists_tac
-        ‘drop2_v d dd (cSt0.refs ++ prfn cSt0) (n + conf.payload_size)’ >>
+        ‘drop2_v d (mkDATUM d) (cSt0.refs ++ droprff cSt0)
+         (n + conf.payload_size)’ >>
       simp[] >>
       simp[e_step_def, e_step_reln_def, push_def, return_def,
-           continue_def, application_def] >>
-      pop_assum $
-        qspecl_then [‘cSt0.refs ++ prfn cSt0’, ‘cSt0.refs ++ prfn cSt0’,
-                     ‘n + conf.payload_size’] assume_tac >>
+           continue_def, application_def] >> pop_assum kall_tac >>
       gs[DROP_DROP_T] >>
-      dxrule_then (drule_then assume_tac) DATUM_11 >> simp[] >>
-      ntac 5 (pop_assum kall_tac) >>
       ntac 2 (irule_at Any triR_step1 >>
               simp[e_step_def, e_step_reln_def, push_def, return_def,
                    continue_def, application_def,
                    nsLookup_build_rec_env_sendloop]) >>
       simp[do_opapp_def] >>
+      use_hidden_assum "DROP" (assume_tac o cj 5) >> gs[FAstrefsffi] >>
       (* symbolic evaluation all done!!!! *)
       simp[LEFT_EXISTS_AND_THM, RIGHT_EXISTS_AND_THM] >>
-      ntac 5 (pop_assum kall_tac) (* cruft about length *) >>
       qmatch_goalsub_abbrev_tac ‘ffi_wf new_ffi’ >>
       ‘ffi_wf new_ffi’ by metis_tac[strans_pres_wf] >>
       ‘(∃nn nq nnet. new_ffi = (nn,nq,nnet)) ∧
        ∃n0 q0 net0. cSt0.ffi.ffi_state = (n0,q0,net0)’
         by metis_tac[pair_CASES] >>
       ‘nn = n0’ by metis_tac[strans_pres_pnum, FST] >>
-      gvs[ffi_state_cor_def] >> rpt strip_tac
+      gvs[ffi_state_cor_def] >> rpt strip_tac (* 5 *)
       >- (irule match_send_hold_queues_ffi_eq >> metis_tac[])
       >- (simp[cpFFI_valid_def] >> metis_tac[]) >>
-      metis_tac[strans_pres_nodes])
+      (* 3 *) metis_tac[strans_pres_nodes])
   >- ((* receive, pushing queue *) all_tac >>
       CONV_TAC (pull_namedexvar_conv "vs0")>>qexists_tac‘vs’>>
       qexistsl_tac [‘cEnv0’, ‘cSt0’] >> simp[triR_REFL] >>
@@ -4229,14 +4261,26 @@ Proof
        nsLookup cEnv0.c conf.nil = SOME (0, TypeStamp "[]" list_type_num)’
         by gvs[env_asm_def, has_v_def, cpEval_valid_def] >>
       simp[to_small_st_def] >>
-      ntac 21 (irule_at Any triR_step1 >>
+      ntac 10 (irule_at Any triR_step1 >>
                simp[e_step_def, e_step_reln_def, push_def, return_def,
                     continue_def, application_def, do_app_thm,
                     store_alloc_def, do_opapp_def,
                     nsLookup_build_rec_env_sendloop]) >>
-      irule_at Any triR_step1 >>
-      simp[e_step_def, e_step_reln_def, continue_def, application_def,
-           do_app_thm, store_lookup_def, EL_APPEND2, call_FFI_def] >>
+      irule_at Any triR_steps1 >>
+      irule_at (Pos hd) RTC_stepr_fixedstate_evaluateL >>
+      CONV_TAC (pull_namedexvar_conv "newrefs") >> qexists_tac ‘[]’ >> simp[] >>
+      (* apply convDatumList_correct *)
+      qmatch_goalsub_abbrev_tac ‘evaluate _ ENV [convDatumList _ _]’ >>
+      ‘env_asm ENV conf cvs’ by gs[Abbr‘ENV’, cpEval_valid_def] >>
+      dxrule_then (strip_assume_tac o
+                   SRULE [SKOLEM_THM, FORALL_AND_THM])
+                  (convDatumList_correct |> INST_TYPE [alpha |-> “:plffi”]) >>
+      first_x_assum $ irule_at (Pos hd) >>
+      simp[continue_def, push_def, Abbr‘ENV’] >>
+      ntac 8 (irule_at Any triR_step1 >>
+              simp[e_step_def, e_step_reln_def, continue_def, application_def,
+                   return_def, do_opapp_def, push_def,
+                   do_app_thm, store_lookup_def, EL_APPEND2, call_FFI_def]) >>
       gs[cpEval_valid_def, comms_ffi_oracle_def, ffi_receive_def,
          MAP_MAP_o, CHR_ORD, IMPLODE_EXPLODE_I] >>
       ‘∃N. (some (m,ns). strans conf cSt0.ffi.ffi_state (ARecv p1 m) ns) =
@@ -4261,6 +4305,7 @@ Proof
                    continue_def, application_def, do_app_thm,
                    store_alloc_def, do_opapp_def, unpadv_def,
                    nsLookup_build_rec_env_sendloop]) >>
+      (* Exp (unpadv_code conf) *)
       irule_at Any triR_steps1 >>
       irule_at (Pos hd) RTC_stepr_fixedstate_evaluateL >>
       qmatch_goalsub_abbrev_tac ‘evaluate _ ENV [unpadv_code conf]’ >>
@@ -4292,76 +4337,47 @@ Proof
       simp[store_lookup_def, EL_APPEND1, EL_APPEND2] >>
       simp[continue_def, do_if_def] >> ‘d ≠ []’ by (Cases_on‘d’ >> gs[]) >>
       simp[] >>
-      ntac 7 (irule_at Any triR_step1 >>
+      ntac 8 (irule_at Any triR_step1 >>
               simp[e_step_def, e_step_reln_def, push_def, return_def,
                    continue_def, application_def, do_app_thm, store_lookup_def,
                    EL_APPEND1, EL_APPEND2, do_con_check_def,
                    store_alloc_def, do_opapp_def, build_conv_def,
                    nsLookup_build_rec_env_sendloop]) >>
-      irule_at Any triR_steps1 >>
-      irule_at (Pos hd) RTC_stepr_fixedstate_evaluateL >>
-      CONV_TAC (pull_namedexvar_conv "newrefs") >> qexists_tac ‘[]’ >> simp[] >>
-      (* apply convDatumList_correct *)
-      qmatch_goalsub_abbrev_tac ‘evaluate _ ENV [convDatumList _ _]’ >>
+      qmatch_goalsub_abbrev_tac‘triR stepr (ENV, _, Exp(Var conf.reverse), _)’>>
       ‘env_asm ENV conf cvs’ by simp[Abbr‘ENV’] >>
-      dxrule_then (strip_assume_tac o
-                   SRULE [SKOLEM_THM, FORALL_AND_THM])
-                  (convDatumList_correct |> INST_TYPE [alpha |-> “:plffi”]) >>
-      first_x_assum $ irule_at (Pos hd) >>
-      simp[continue_def, push_def] >>
-      strip_assume_tac (env_asm_APPEND |> Q.INST [‘vs’ |-> ‘cvs’]) >>
-      first_assum (first_x_assum o resolve_then (Pos hd) assume_tac) >>
-      ‘env_asm ENV conf cvs’ by simp[Abbr‘ENV’] >>
-      first_x_assum $
-        drule_then (strip_assume_tac o SRULE [SKOLEM_THM, FORALL_AND_THM]) >>
-      rename [‘do_opapp [appf; _] = SOME (appenv1f _ _, appenv1e _ _)’] >>
-      ntac 1 (irule_at Any triR_step1 >>
-              simp[e_step_def, e_step_reln_def, push_def, return_def,
-                   continue_def, application_def, do_app_thm, store_lookup_def,
-                   EL_APPEND1, EL_APPEND2, do_con_check_def,
-                   store_alloc_def, do_opapp_def, build_conv_def,
-                   nsLookup_build_rec_env_sendloop]) >>
+      qspec_then ‘cvs’ strip_assume_tac env_asm_REVERSE >>
+      last_x_assum drule >> simp[Abbr‘ENV’] >> strip_tac >>
+      irule_at Any triR_step1 >> simp[e_step_def, e_step_reln_def, return_def]>>
+      pop_assum kall_tac >>
+      pop_assum (strip_assume_tac o
+                 SRULE [SKOLEM_THM, GSYM RIGHT_EXISTS_IMP_THM, IMP_CONJ_THM,
+                        FORALL_AND_THM])
+                irule_at Any triR_steps1 >>
       irule_at Any triR_step1 >>
-      simp[e_step_def, e_step_reln_def, continue_def, application_def] >>
+      simp[e_step_def, e_step_reln_def, return_def, continue_def,
+           application_def, LTD_CONS]>>
       irule_at (Pos hd) triR_steps1 >>
       irule_at (Pos hd) RTC_stepr_fixedstate_evaluateL >>
-      first_x_assum (C (resolve_then (Pos hd) (irule_at Any o iffRL))
-                     evaluate_generalise') >> simp[] >>
       CONV_TAC (pull_namedexvar_conv "newrefs") >> qexists_tac ‘[]’ >> simp[] >>
-      irule_at (Pos hd) LESS_EQ_REFL >>
-      simp[continue_def, application_def] >>
-      qpat_x_assum ‘∀s msgs. do_opapp [appf; _] = _’ kall_tac >>
-      ‘∀v e. DATUM e v ⇒
-             LIST_TYPE DATUM [e]
-                       (Conv (SOME (TypeStamp "::" list_type_num))
-                        [v; Conv (SOME (TypeStamp "[]" list_type_num)) []])’
-        by simp[LIST_TYPE_def, list_type_num_def] >>
-      pop_assum (first_x_assum o resolve_then (Pos hd) strip_assume_tac) >>
-      first_assum (pop_assum o resolve_then (Pos hd) strip_assume_tac) >>
-      pop_assum (strip_assume_tac o SRULE [SKOLEM_THM]) >>
-      simp[] >> pop_assum (strip_assume_tac o cj 2) >>
-      pop_assum (strip_assume_tac o SRULE [SKOLEM_THM, FORALL_AND_THM]) >>
-      irule_at (Pos hd) triR_steps1 >>
-      irule_at (Pos hd) RTC_stepr_fixedstate_evaluateL >>
       first_x_assum (C (resolve_then (Pos hd) (irule_at Any o iffRL))
-                     evaluate_generalise') >> simp[] >>
-      CONV_TAC (pull_namedexvar_conv "newrefs") >> qexists_tac ‘[]’ >> simp[] >>
-      irule_at (Pos hd) LESS_EQ_REFL >>
-      simp[continue_def, application_def, push_def] >>
-      strip_assume_tac (env_asm_FLAT |> Q.INST[‘vs’ |-> ‘cvs’]) >>
-      ntac 2 (irule_at (Pos hd) triR_step1 >>
-              simp[e_step_def, e_step_reln_def, return_def, continue_def,
+                     evaluate_generalise') >>
+      simp[continue_def, push_def] >> irule_at Any LESS_EQ_REFL >>
+      first_assum $ irule_at (Pat ‘env_asm _ _’) >> pop_assum kall_tac >>
+      qspec_then ‘cvs’ strip_assume_tac (Q.GEN ‘vs’ $ SRULE [] env_asm_FLAT) >>
+      qmatch_goalsub_abbrev_tac ‘triR stepr (ENV, _, _, _)’ >>
+      pop_assum $ hide "ENV" >> last_x_assum $ drule_then strip_assume_tac >>
+      ntac 2 (irule_at Any triR_step1 >>
+              simp[e_step_reln_def, e_step_def, return_def, continue_def,
                    application_def]) >>
-      first_assum (pop_assum o resolve_then (Pos hd) strip_assume_tac) >>
-      pop_assum $ drule_then (strip_assume_tac o SRULE [SKOLEM_THM]) >>
-      simp[] >> pop_assum (strip_assume_tac o
-                           SRULE [SKOLEM_THM, FORALL_AND_THM] o cj 2) >>
+      first_x_assum (drule_then strip_assume_tac o SRULE [PULL_EXISTS]) >>
+      pop_assum (strip_assume_tac o SRULE [SKOLEM_THM, FORALL_AND_THM]) >>
+      simp[] >>
       irule_at (Pos hd) triR_steps1 >>
       irule_at (Pos hd) RTC_stepr_fixedstate_evaluateL >>
-      first_x_assum (C (resolve_then (Pos hd) (irule_at Any o iffRL))
-                     evaluate_generalise') >> simp[] >>
       CONV_TAC (pull_namedexvar_conv "newrefs") >> qexists_tac ‘[]’ >> simp[] >>
-      irule_at (Pos hd) LESS_EQ_REFL >> simp[continue_def] >>
+      first_x_assum (C (resolve_then (Pos hd) (irule_at Any o iffRL))
+                     evaluate_generalise') >> simp[continue_def] >>
+      irule_at Any LESS_EQ_REFL >>
       simp[EXstrefsffi] >> irule_at (Pos hd) triR_REFL >> simp[] >>
       (* symbolic evaluation done *)
       simp[LEFT_EXISTS_AND_THM, RIGHT_EXISTS_AND_THM] >> rpt strip_tac (* 8 *)
