@@ -1913,6 +1913,59 @@ Proof
   simp[MIN_DEF]
 QED
 
+Theorem zerobuf_correct:
+  ∀i e srefs ds.
+    j < LENGTH srefs ∧ EL j srefs = W8array ds ∧ i < LENGTH ds ∧
+    nsLookup e.v (Short "i") = SOME (Litv (IntLit &i)) ∧
+    nsLookup e.v (Short "buff") = SOME (Loc j) ∧
+    nsLookup e0.v (Short "buff") = SOME (Loc j) ∧
+    nsLookup e.v (Short "zerobuf") =
+    SOME (Recclosure e0 [("zerobuf", "i", zerobuf_code)] "zerobuf")
+    ⇒
+    ∃ck1 ck2.
+      evaluate ((s with <| clock := ck1; refs := srefs |>) :
+                plffi semanticPrimitives$state) e
+               [zerobuf_code] =
+      (s with <|
+         clock := ck2;
+         refs := LUPDATE (W8array (REPLICATE (i + 1) 0w ++ DROP (i + 1) ds))
+                         j
+                         srefs
+              |>,
+       Rval [Conv NONE []])
+Proof
+  Induct >> rpt strip_tac >>
+  simp[zerobuf_code_def, find_evalform ‘If _ _ _’, find_evalform ‘App _ _’,
+       find_evalform ‘Con _ _’, do_app_thm, do_if_def, opb_lookup_def] >>
+  simp[find_evalform ‘Let _ _ _’, do_opapp_def, find_evalform ‘App _ _’,
+       do_app_thm, store_lookup_def, store_assign_def, store_v_same_type_def,
+       AllCaseEqs(), dec_clock_def]
+  >- (simp[zerobuf_code_def, find_evalform ‘If _ _ _’, find_evalform ‘App _ _’,
+           find_evalform ‘Con _ _’, do_app_thm, do_if_def, opb_lookup_def,
+           opn_lookup_def, do_con_check_def, build_conv_def] >>
+      simp[state_component_equality] >> qexists_tac ‘SUC 0’ >> simp[] >>
+      Cases_on ‘ds’ >> gs[LUPDATE_def, REPLICATE_compute]) >>
+  gs[] >>
+  qmatch_goalsub_abbrev_tac
+    ‘evaluate (s with <| clock := _; refs := rfs|>) ENV [zerobuf_code]’ >>
+  first_x_assum $ qspecl_then [‘ENV’, ‘rfs’] mp_tac >>
+  simp[Abbr‘ENV’, Abbr‘rfs’, opn_lookup_def, build_rec_env_def,
+       EL_LUPDATE, integerTheory.INT_SUB] >>
+  disch_then $ qx_choosel_then [‘ck1’, ‘ck2’] strip_assume_tac >>
+  qexists_tac ‘ck1 + 1’ >> simp[] >>
+  simp[state_component_equality, LUPDATE_LUPDATE_c] >>
+  rpt (AP_TERM_TAC ORELSE AP_THM_TAC) >>
+  simp[GSYM ADD1] >> Cases_on ‘ds’ >> gs[LUPDATE_def] >>
+  simp[LIST_EQ_REWRITE] >> qx_gen_tac ‘k’ >> strip_tac >>
+  Cases_on ‘k’ >> simp[]
+  >- (Cases_on ‘i’ >> simp[LUPDATE_def] >> Cases_on ‘t’ >> gs[LUPDATE_def]) >>
+  rename [‘SUC k0 < LENGTH t’] >> Cases_on ‘SUC k0 < i’
+  >- simp[EL_APPEND1, EL_REPLICATE] >>
+  simp[EL_APPEND2, EL_DROP, EL_LUPDATE] >> Cases_on ‘SUC k0 ≤ i’ >>
+  simp[EL_APPEND1, EL_APPEND2, EL_REPLICATE, EL_DROP,
+       DECIDE “x + SUC y - y = SUC x”]
+QED
+
 Theorem unpadv_correct:
   env_asm e conf cvs ∧
   i < LENGTH srefs ∧ EL i srefs = W8array ds ∧ LENGTH ds ≠ 0 ∧
@@ -2724,9 +2777,8 @@ Theorem FORALL_state = FORALL_state |> INST_TYPE [“:'ffi0” |-> alpha,
 
 Theorem RTC_stepr_fixedstate_evaluateL0:
   evaluate ((s00 with <| clock := clk1; refs := refs00 |>) : α state) env [e] =
-  (s00 with <| clock := clk2; refs := refs00 ++ newrefs|>,
-   Rval [rval]) ∧
-  smallStep$continue (refs00 ++ newrefs, ffi00) rval cs =
+  (s00 with <| clock := clk2; refs := refs01|>, Rval [rval]) ∧
+  smallStep$continue (refs01, ffi00) rval cs =
   smallStep$Estep a ∧ stepr꙳ a b ⇒
   stepr꙳ (env,(refs00,ffi00 : α ffi_state),Exp e,cs) b
 Proof
@@ -2753,8 +2805,12 @@ Proof
 QED
 
 Theorem RTC_stepr_fixedstate_evaluateL =
-        RTC_stepr_fixedstate_evaluateL0 |> Q.INST [‘b’ |-> ‘a’]
-                                        |> SRULE []
+        RTC_stepr_fixedstate_evaluateL0
+          |> Q.INST [‘b’ |-> ‘a’, ‘refs01’ |-> ‘refs00 ++ newrefs’]
+          |> SRULE []
+
+Theorem RTC_stepr_changerefs_evaluateL =
+        RTC_stepr_fixedstate_evaluateL0 |> Q.INST [‘b’ |-> ‘a’] |> SRULE []
 
 Theorem ps2cs_neqxy[simp]:
   ps2cs v ≠ "x" ∧ ps2cs v ≠ "y"
@@ -3674,6 +3730,19 @@ Proof
                     build_rec_env_def, do_app_thm, store_lookup_def, EL_APPEND2,
                     return_def, continue_def, application_def, do_opapp_def,
                     opn_lookup_def, integerTheory.INT_SUB]) >>
+      (* Exp zerobuf_code *)
+      irule_at Any triR_steps1 >>
+      irule_at (Pos hd) RTC_stepr_changerefs_evaluateL >>
+      ‘LENGTH cSt0.refs < LENGTH (cSt0.refs ++ [W8array d])’ by simp[] >>
+      dxrule zerobuf_correct >> simp[EL_APPEND2] >>
+      ‘conf.payload_size < conf.payload_size + 1’ by simp[] >>
+      disch_then dxrule >>
+      qmatch_goalsub_abbrev_tac ‘evaluate _ ENV1 [zerobuf_code]’ >>
+      CONV_TAC (LAND_CONV (pull_namedallvar_conv "e")) >>
+      disch_then $ qspec_then ‘ENV1’ mp_tac >>
+      simp[Abbr‘ENV1’, DROP_LENGTH_TOO_LONG] >>
+      disch_then (strip_assume_tac o SRULE [SKOLEM_THM]) >>
+      pop_assum $ irule_at Any >> simp[continue_def]
       (* symbolically evaluate on other side *)
       irule_at (Pos hd) (iffLR triR_SYM) >>
       ntac 16 (irule_at Any triR_step1 >>
