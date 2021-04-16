@@ -259,7 +259,7 @@ End
 
 Definition zerobuf_code_def:
   zerobuf_code =
-  If (App (Opb Leq) [Var (Short "i"); Lit (IntLit 0)])
+  If (App (Opb Lt) [Var (Short "i"); Lit (IntLit 0)])
      (Con NONE [])
      (Let NONE
       (App Aw8update [Var (Short "buff"); Var (Short "i"); Lit (Word8 0w)])
