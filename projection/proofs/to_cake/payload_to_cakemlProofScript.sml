@@ -4351,8 +4351,7 @@ Proof
       pop_assum kall_tac >>
       pop_assum (strip_assume_tac o
                  SRULE [SKOLEM_THM, GSYM RIGHT_EXISTS_IMP_THM, IMP_CONJ_THM,
-                        FORALL_AND_THM])
-                irule_at Any triR_steps1 >>
+                        FORALL_AND_THM]) >>
       irule_at Any triR_step1 >>
       simp[e_step_def, e_step_reln_def, return_def, continue_def,
            application_def, LTD_CONS]>>
@@ -4436,11 +4435,22 @@ Proof
        nsLookup cEnv0.c conf.nil = SOME (0, TypeStamp "[]" list_type_num)’
         by gvs[env_asm_def, has_v_def, cpEval_valid_def] >>
       simp[to_small_st_def] >>
-      ntac 21 (irule_at Any triR_step1 >>
+      ntac 10 (irule_at Any triR_step1 >>
                simp[e_step_def, e_step_reln_def, push_def, return_def,
                     continue_def, application_def, do_app_thm,
                     store_alloc_def, do_opapp_def,
                     nsLookup_build_rec_env_sendloop]) >>
+      irule_at Any triR_steps1 >>
+      irule_at (Pos hd) RTC_stepr_fixedstate_evaluateL >>
+      CONV_TAC (pull_namedexvar_conv "newrefs") >> qexists_tac ‘[]’ >> simp[] >>
+      (* apply convDatumList_correct *)
+      qmatch_goalsub_abbrev_tac ‘evaluate _ ENV [convDatumList _ _]’ >>
+      ‘env_asm ENV conf cvs’ by gs[Abbr‘ENV’, cpEval_valid_def] >>
+      dxrule_then (strip_assume_tac o
+                   SRULE [SKOLEM_THM, FORALL_AND_THM])
+                  (convDatumList_correct |> INST_TYPE [alpha |-> “:plffi”]) >>
+      first_x_assum $ irule_at (Pos hd) >>
+      simp[continue_def, push_def, Abbr‘ENV’] >>
       irule_at Any triR_step1 >>
       simp[e_step_def, e_step_reln_def, continue_def, application_def,
            do_app_thm, store_lookup_def, EL_APPEND2, call_FFI_def] >>
@@ -4462,17 +4472,25 @@ Proof
       ‘LENGTH d = conf.payload_size + 1’
         by (gs[pSt_pCd_corr_def, qlk_def, fget_def, AllCaseEqs()] >>
             metis_tac[MEM]) >>
-      simp[store_assign_def, store_v_same_type_def, EL_APPEND2, return_def] >>
-      ntac 7 (irule_at Any triR_step1 >>
-              simp[e_step_def, e_step_reln_def, push_def, return_def,
-                   continue_def, application_def, do_app_thm,
-                   store_alloc_def, do_opapp_def, unpadv_def,
-                   nsLookup_build_rec_env_sendloop]) >>
+      (* enter receiveloop *)
+      irule_at Any triR_step1 >>
+      simp[store_assign_def, store_v_same_type_def, EL_APPEND2, return_def,
+           e_step_def, e_step_reln_def, continue_def, application_def,
+           do_opapp_def] >>
+      (* Exp (receiveloop_body conf p1) *)
+      ntac 13 (irule_at Any triR_step1 >>
+               simp[e_step_def, e_step_reln_def, push_def, return_def,
+                    continue_def, application_def, do_app_thm, store_lookup_def,
+                    EL_APPEND2, call_FFI_def, comms_ffi_oracle_def, MAP_MAP_o,
+                    CHR_w2n_n2w_ORD, CHR_ORD, IMPLODE_EXPLODE_I,
+                    store_assign_def, store_v_same_type_def,
+                    store_alloc_def, do_opapp_def, unpadv_def, ffi_receive_def,
+                    nsLookup_build_rec_env_sendloop]) >>
       irule_at Any triR_steps1 >>
       irule_at (Pos hd) RTC_stepr_fixedstate_evaluateL >>
       qmatch_goalsub_abbrev_tac ‘evaluate _ ENV [unpadv_code conf]’ >>
       ‘env_asm ENV conf cvs’ by simp[Abbr‘ENV’] >>
-      dxrule_then strip_assume_tac unpadv_correct >>
+      dxrule_then strip_assume_tac (SRULE [] unpadv_correct) >>
       ‘LENGTH cSt0.refs < LENGTH (cSt0.refs ++ [W8array d])’ by simp[] >>
       first_x_assum $ dxrule_then strip_assume_tac >>
       gs[Abbr‘ENV’, EL_APPEND2] >> ‘d ≠ []’ by (Cases_on ‘d’ >> gs[]) >>
@@ -4500,9 +4518,16 @@ Proof
       ‘¬final d’ by metis_tac[final_inter_mutexc] >>
       simp[continue_def, do_if_def] >> ‘d ≠ []’ by (Cases_on‘d’ >> gs[]) >>
       simp[] >>
-      ntac 6 (irule_at Any triR_step1 >>
-              simp[e_step_def, e_step_reln_def, do_con_check_def, push_def,
-                   return_def, continue_def, application_def, do_opapp_def]) >>
+      (* Exp (Letrec [("zerobuf", ...)] ... *)
+      qmatch_goalsub_abbrev_tac ‘triR stepr (ENV, _, _, _)’ >>
+      pop_assum $ hide "ENV" >>
+      ‘nsLookup ENV.v (Short "buff") = SOME (Loc (LENGTH cSt0.refs))’
+        by (unhide "ENV" >> simp[Abbr‘ENV’]) >>
+      ntac 13 (irule_at Any triR_step1 >>
+               simp[e_step_def, e_step_reln_def, do_con_check_def, push_def,
+                    build_rec_env_def, do_app_thm, store_lookup_def, EL_APPEND2,
+                    return_def, continue_def, application_def, do_opapp_def,
+                    opn_lookup_def, integerTheory.INT_SUB]) >>
       (* symbolically evaluate on other side *)
       irule_at (Pos hd) (iffLR triR_SYM) >>
       ntac 16 (irule_at Any triR_step1 >>
