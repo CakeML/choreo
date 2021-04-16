@@ -257,6 +257,16 @@ Definition unpadv_def:
    (Con (SOME conf.nil) []))
 End
 
+Definition zerobuf_code_def:
+  zerobuf_code =
+  If (App (Opb Leq) [Var (Short "i"); Lit (IntLit 0)])
+     (Con NONE [])
+     (Let NONE
+      (App Aw8update [Var (Short "buff"); Var (Short "i"); Lit (Word8 0w)])
+      (App Opapp [Var (Short "zerobuf");
+                  App (Opn Minus) [Var (Short "i"); Lit (IntLit 1)]]))
+End
+
 (* -- Encoding of the payloadLang Receive instruction as a CakeML recursive
       function definition. *)
 Definition receiveloop_def:
@@ -269,15 +279,7 @@ Definition receiveloop_def:
                         App Opapp [Var conf.reverse;
                                    Con (SOME conf.cons) [Var (Short "n");
                                                          Var (Short "A")]]])
-            (Let NONE (Letrec [("zerobuf", "i",
-                                Let NONE (App Aw8update [
-                                             Var (Short "buff");
-                                             Var (Short "i");
-                                             Lit (Word8 0w)])
-                                    (App Opapp [Var (Short "zerobuf");
-                                                App (Opn Minus) [
-                                                    Var (Short "i");
-                                                    Lit (IntLit 1)]]))]
+            (Let NONE (Letrec [("zerobuf", "i", zerobuf_code)]
                        (App Opapp [Var (Short "zerobuf");
                                    App (Opn Minus) [
                                        App Aw8length[Var (Short "buff")];
