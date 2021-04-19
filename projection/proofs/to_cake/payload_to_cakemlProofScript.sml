@@ -3742,43 +3742,93 @@ Proof
       disch_then $ qspec_then ‘ENV1’ mp_tac >>
       simp[Abbr‘ENV1’, DROP_LENGTH_TOO_LONG] >>
       disch_then (strip_assume_tac o SRULE [SKOLEM_THM]) >>
-      pop_assum $ irule_at Any >> simp[continue_def]
+      pop_assum $ irule_at Any >> unhide "ENV" >>
+      simp[continue_def, Abbr‘ENV’] >> pop_assum kall_tac >>
+      ntac 9 (irule_at (Pos hd) triR_step1 >>
+              simp[e_step_reln_def, e_step_def, push_def, return_def,
+                   do_con_check_def, continue_def, build_conv_def, LTD_CONS,
+                   application_def, do_opapp_def]) >>
       (* symbolically evaluate on other side *)
       irule_at (Pos hd) (iffLR triR_SYM) >>
-      ntac 16 (irule_at Any triR_step1 >>
+      ntac 10 (irule_at Any triR_step1 >>
                simp[e_step_def, e_step_reln_def, push_def, return_def,
                     continue_def, application_def, do_app_thm,
                     store_alloc_def, do_opapp_def,
                     nsLookup_build_rec_env_sendloop]) >>
-      qabbrev_tac ‘
-       rEnv = λ(rfs: v store_v list) env.
-                build_rec_env (receiveloop conf p1)
-                              (env with v := nsBind "buff" (Loc (LENGTH rfs))
-                                                    env.v)
-                              (nsBind "buff" (Loc (LENGTH rfs)) env.v)’ >>
-      simp[EXstrefsffi] >> pop_assum (hide "rEnv") >>
-      cheat
-      (* both have Exp (receiveloop_body conf p1), but with different
-         continuations and different input references;
-         second state has buff all-zero; first state has buff filled with d
-         and other garbage resulting from first iteration of loop.
-       *)
-     )
+      (* convDatumList *)
+      irule_at Any triR_steps1 >>
+      irule_at (Pos hd) RTC_stepr_fixedstate_evaluateL >>
+      CONV_TAC (pull_namedexvar_conv "newrefs") >> qexists_tac ‘[]’ >> simp[] >>
+      irule_at (Pos hd)
+               (convDatumList_correct
+                  |> INST_TYPE [alpha |-> “:plffi”]
+                  |> Q.GEN ‘vs’
+                  |> SRULE [LEFT_FORALL_IMP_THM]
+                  |> GEN_ALL
+                  |> SRULE [SKOLEM_THM, GSYM RIGHT_EXISTS_IMP_THM]) >>
+      simp[continue_def, push_def] >>
+      simp[EXstrefsffi, REVERSE_SNOC] >>
+      ntac 2 (irule_at Any triR_step1 >>
+              simp[e_step_reln_def, e_step_def, return_def, continue_def,
+                   application_def, do_opapp_def]) >>
+      irule_at (Pos hd) triR_REFL >>
+      (* symbolic evaluation done! *)
+      simp[LEFT_EXISTS_AND_THM, RIGHT_EXISTS_AND_THM] >>
+      gs[letfuns_def] >>
+      qpat_x_assum ‘$some _ = _’ mp_tac >> DEEP_INTRO_TAC some_intro >>
+      simp[FORALL_PROD] >>
+      ‘∃nnm qs0 N0. cSt0.ffi.ffi_state = (nnm,qs0,N0)’
+        by metis_tac[pair_CASES] >> rpt gen_tac >> strip_tac >> strip_tac >>
+      gvs[] >>
+      rename [‘strans _ _ _ (nnm', qs, N)’] >> rpt strip_tac (* 8 *)
+      >- (gs[pSt_pCd_corr_def, FLOOKUP_normalise_queues, AllCaseEqs()] >>
+          gs[qlk_def, fget_def, FLOOKUP_DEF, DISJ_IMP_THM, FORALL_AND_THM,
+             RIGHT_AND_OVER_OR, AllCaseEqs()] >>
+          simp[FAPPLY_FUPDATE_THM, AllCaseEqs()] >> rw[] >>
+          metis_tac[MEM])
+      >- gs[sem_env_cor_def]
+      >- (gs[ffi_state_cor_def] >> drule strans_pres_pnum >> simp[] >>
+          strip_tac >> gvs[] >>
+          irule_at (Pos hd) ffi_eq_pres >>
+          first_assum $ irule_at Any >> simp[] >>
+          irule_at Any (hd $ CONJUNCTS strans_rules) >> simp[] >>
+          first_assum $ irule_at Any >> simp[] >> gs[ffi_wf_def])
+      >- metis_tac[strans_pres_wf]
+      >- (gs[cpFFI_valid_def] >> DEEP_INTRO_TAC some_intro >>
+          simp[FORALL_PROD, normqs_update_cons] >> rw[]
+          >- (pop_assum mp_tac >> simp[fmap_EXT, EXTENSION] >> strip_tac >>
+              rpt (pop_assum $ qspec_then ‘p1’ mp_tac) >>
+              ‘p1 ∈ FDOM s.queues’
+                by gvs[qlk_def, fget_def, AllCaseEqs(), FLOOKUP_DEF] >>
+              simp[FAPPLY_FUPDATE_THM] >>
+              gvs[qlk_def, fget_def, AllCaseEqs(), FLOOKUP_DEF,
+                  FAPPLY_normalise_queues] >> rw[] >> simp[] >>
+              gs[FDOM_normalise_queues]) >>
+          first_x_assum $ qspecl_then [‘p1’, ‘d’] mp_tac >>
+          simp[qlk_def, fget_def] >>
+          gvs[normalised_def, qlk_def, fget_def, AllCaseEqs(), FLOOKUP_DEF] >>
+          simp[fmap_EXT] >> impl_tac
+          >- (simp[EXTENSION] >> metis_tac[])>>
+          simp[FAPPLY_FUPDATE_THM, AllCaseEqs()]) >>
+      metis_tac[strans_pres_nodes])
   >- ((* if 1 *) all_tac>>
       ‘nsLookup cEnv0.c conf.cons = SOME (2, TypeStamp "::" list_type_num) ∧
        nsLookup cEnv0.c conf.nil = SOME (0, TypeStamp "[]" list_type_num)’
         by gvs[env_asm_def, has_v_def, cpEval_valid_def]>>
       qmatch_asmsub_abbrev_tac ‘(2,lcons)’>>
       qmatch_asmsub_abbrev_tac ‘(0,lnil)’>>
-      ‘nsLookup cEnv0.v (Short (ps2cs v)) = SOME (Conv (SOME lcons) [Litv (Word8 1w);
-                                                  Conv (SOME lnil) []])’
-      by (gvs[sem_env_cor_def, cpEval_valid_def,Abbr‘lcons’,Abbr‘lnil’]>>
-          first_x_assum drule>>rw[]>>gs[LIST_TYPE_def,WORD_def,list_type_num_def])>>
+      ‘nsLookup cEnv0.v (Short (ps2cs v)) =
+       SOME (Conv (SOME lcons) [Litv (Word8 1w); Conv (SOME lnil) []])’
+      by (gvs[sem_env_cor_def, cpEval_valid_def,Abbr‘lcons’,Abbr‘lnil’,
+              Excl "LTD_mkLTD", Excl "DATUM_mkDATUM"]>>
+          first_x_assum drule >>
+          rw[Excl "DATUM_mkDATUM"] >>
+          gs[Excl "DATUM_mkDATUM", LIST_TYPE_def,WORD_def,list_type_num_def])>>
       simp[to_small_st_def,w1ckV_def] >>
       ntac 11 (irule_at Any triR_step1 >>
                simp[e_step_def, e_step_reln_def, push_def, return_def,
                     continue_def, application_def, do_app_thm,build_conv_def,
-                    store_alloc_def, do_opapp_def,do_con_check_def,do_if_def]) >>
+                    store_alloc_def, do_opapp_def,do_con_check_def,do_if_def])>>
       irule_at Any triR_REFL>>
       qexists_tac ‘pN0’>>(rpt conj_tac)
       >- gs[cpEval_valid_def,letfuns_def,enc_ok_take,pSt_pCd_corr_def]
@@ -3791,16 +3841,21 @@ Proof
       qmatch_asmsub_abbrev_tac ‘(2,lcons)’>>
       qmatch_asmsub_abbrev_tac ‘(0,lnil)’>>
       ‘∃v'. nsLookup cEnv0.v (Short (ps2cs v)) = SOME v' ∧
-            do_eq v' (Conv (SOME lcons) [Litv (Word8 1w); Conv (SOME lnil) []]) = Eq_val F’
-      by (gvs[sem_env_cor_def, cpEval_valid_def,Abbr‘lcons’,Abbr‘lnil’]>>
-          first_x_assum drule>>rw[]>>first_x_assum (irule_at Any)>>
-          Cases_on ‘w’>>gs[LIST_TYPE_def,WORD_def,list_type_num_def,
-                           do_eq_def,ctor_same_type_def,same_type_def,
-                           lit_same_type_def]>>
+            do_eq v' (Conv (SOME lcons) [Litv (Word8 1w);
+                                         Conv (SOME lnil) []]) = Eq_val F’
+      by (gvs[sem_env_cor_def, cpEval_valid_def,Abbr‘lcons’,Abbr‘lnil’,
+              Excl "DATUM_mkDATUM", Excl "LTD_mkLTD"]>>
+          first_x_assum drule>> rw[Excl "DATUM_mkDATUM"] >>
+          first_x_assum (irule_at Any) >>
+          Cases_on ‘w’>>
+          gs[LIST_TYPE_def,WORD_def,list_type_num_def, Excl "DATUM_mkDATUM",
+             do_eq_def,ctor_same_type_def,same_type_def,
+             lit_same_type_def]>>
           rw[]>>rveq>>
-          Cases_on ‘t’>>gs[LIST_TYPE_def,WORD_def,list_type_num_def,
-                           do_eq_def,ctor_same_type_def,same_type_def,
-                           lit_same_type_def])>>
+          Cases_on ‘t’>>
+          gs[LIST_TYPE_def,WORD_def,list_type_num_def,Excl "DATUM_mkDATUM",
+             do_eq_def,ctor_same_type_def,same_type_def,
+             lit_same_type_def])>>
       simp[to_small_st_def,w1ckV_def]>>
       ntac 11 (irule_at Any triR_step1>>
                simp[e_step_def, e_step_reln_def, push_def, return_def,
@@ -3820,7 +3875,7 @@ Proof
              (LIST_TYPE DATUM --> DATUM) f f'’
         by (gs[cpEval_valid_def,letfuns_def]>>Cases_on‘vs’>>
             gs[enc_ok_def]>>first_x_assum (irule_at Any)>>
-            simp[])>>rveq>>
+            simp[])>> rveq >>
       simp[to_small_st_def,compile_endpoint_def]>>
       irule_at Any triR_step1>>
       simp[e_step_def, e_step_reln_def,
@@ -3833,7 +3888,7 @@ Proof
            evaluate st cEnv0
                     [convList conf (MAP (Var ∘ Short ∘ ps2cs) vl)] =
            (st,Rval [vs])’
-        by (gs[cpEval_valid_def]>>
+        by (gs[cpEval_valid_def,Excl "LTD_mkLTD"]>>
             ntac 2 (qpat_x_assum ‘nsLookup cEnv0.c _ = _’ mp_tac)>>
             qpat_x_assum ‘sem_env_cor _ _ _ _’ mp_tac>>
             last_x_assum mp_tac>>
@@ -3841,21 +3896,21 @@ Proof
             simp[AND_IMP_INTRO]>>
             Induct_on‘vl’>>rw[convList_def]>>rw[evaluate_def,build_conv_def]>>
             gs[do_con_check_def]
-            >- simp[LIST_TYPE_def,list_type_num_def]>>
-            first_x_assum (qspec_then ‘st’ assume_tac)>>
+            >- simp[SYM LTD_mkLTD, Excl "LTD_mkLTD", LIST_TYPE_def,
+                    list_type_num_def] >>
+            simp[bind_eq_Rval, AllCaseEqs(), PULL_EXISTS] >>
             gs[sem_env_cor_def,IS_SOME_EXISTS]>>
-            first_x_assum drule>>rw[]>>simp[]>>
-            simp[LIST_TYPE_def,list_type_num_def])>>
+            first_x_assum drule>>rw[LTD_CONS])>>
       simp[]>>pop_assum kall_tac>>
-      gs[Arrow_def,AppReturns_thm]>>
-      first_x_assum drule>>rw[]>>simp[]>>
+      gs[Arrow_def,AppReturns_thm,AllCaseEqs(),PULL_EXISTS]>>
+      first_x_assum $
+        qspec_then ‘MAP (THE o FLOOKUP s.bindings) vl’ strip_assume_tac >>
       CONV_TAC (pull_namedexvar_conv "clk1") >>
       Q.REFINE_EXISTS_TAC ‘SUC clk1’>>simp[dec_clock_def]>>
       gs[eval_rel_def]>>pop_assum(qspec_then‘cSt0.refs’assume_tac)>>gs[]>>
-      (iffRL evaluate_generalise'
-         |> SIMP_RULE std_ss [PULL_FORALL,GSYM AND_IMP_INTRO]
-         |> irule_at (Pos hd))>>
-      asm_exists_tac>>simp[continue_def]>>
+      (iffRL evaluate_generalise' |> irule_at (Pos hd)) >>
+      first_x_assum $ irule_at (Pos hd) >>
+      simp[continue_def]>> irule_at (Pos hd) EQ_REFL >>
       CONV_TAC (pull_namedexvar_conv "cSt") >>
       qexists_tac ‘cSt0 with  refs := cSt0.refs ++ refs'’>>
       simp[]>>irule_at Any triR_REFL>>
@@ -3882,12 +3937,13 @@ Proof
       qpat_x_assum ‘∀v. MEM _ vars ⇒ _’
                    (qx_choose_then ‘vval’ assume_tac o
                     SRULE [GSYM RIGHT_EXISTS_IMP_THM, SKOLEM_THM])>>
-      gs[sem_env_cor_def] >>
+      gs[sem_env_cor_def, Excl "DATUM_mkDATUM"] >>
       ‘∀vn. MEM vn vars ⇒ ∃v'. nsLookup cEnv0.v (Short (ps2cs vn)) = SOME v' ∧
                                DATUM (vval vn) v'’ by metis_tac[]>>
       pop_assum (qx_choose_then ‘VVAL’ assume_tac o
-                 SRULE [GSYM RIGHT_EXISTS_IMP_THM, SKOLEM_THM]) >>
-      gs[letfuns_def] >>
+                 SRULE [GSYM RIGHT_EXISTS_IMP_THM, SKOLEM_THM,
+                        Excl "DATUM_mkDATUM"]) >>
+      gs[letfuns_def, Excl "DATUM_mkDATUM"] >>
       ‘∀s:plffi state.
          evaluate s E (REVERSE $ MAP (Var o Short o ps2cs) vars) =
          (s, Rval (REVERSE $ MAP VVAL vars))’
@@ -3979,21 +4035,26 @@ Proof
            evaluate st cEnv0
                     [Con NONE (MAP (Var ∘ Short ∘ ps2cs) args)] =
            (st,Rval [Conv NONE vs])’
-        by (gs[cpEval_valid_def]>>
+        by (gs[cpEval_valid_def, Excl "LTD_mkLTD"]>>
             qpat_x_assum ‘sem_env_cor _ _ _ _’ mp_tac>>
             qpat_x_assum ‘LENGTH args = LENGTH params’ mp_tac>>
             qpat_x_assum ‘EVERY _ args’ mp_tac>>
             rpt (pop_assum kall_tac)>>
-            simp[AND_IMP_INTRO]>>
+            simp[AND_IMP_INTRO, Excl "LTD_mkLTD"]>>
             MAP_EVERY (W (curry Q.SPEC_TAC)) [‘params’,‘args’]>>
-            Induct_on‘args’ using SNOC_INDUCT>>rw[evaluate_def,build_conv_NONE]
+            Induct_on‘args’ using SNOC_INDUCT>>
+            rw[evaluate_def,build_conv_NONE,Excl "LTD_mkLTD"]
             >-simp[can_pmatch_all_def,terminationTheory.pmatch_def]>>
-            qspec_then‘params’ mp_tac SNOC_CASES>>rw[]>>gs[]>>
+            qspec_then‘params’ mp_tac SNOC_CASES>>
+            rw[Excl "LTD_mkLTD"] >> gs[Excl "LTD_mkLTD"] >>
             first_x_assum(qspec_then‘l’assume_tac)>>
-            gs[EVERY_SNOC,LIST_REL_SNOC,MAP_SNOC]>>simp[PULL_EXISTS]>>
+            gs[EVERY_SNOC,LIST_REL_SNOC,MAP_SNOC,Excl "LTD_mkLTD",
+               Excl "DATUM_mkDATUM"] >>
+            simp[PULL_EXISTS,Excl "LTD_mkLTD", Excl "DATUM_mkDATUM"]>>
             first_x_assum (irule_at Any)>>
-            gs[sem_env_cor_def,IS_SOME_EXISTS]>>
-            first_x_assum drule>>rw[]>>simp[]>>
+            gs[sem_env_cor_def,IS_SOME_EXISTS,Excl "DATUM_mkDATUM"]>>
+            first_x_assum drule>>rw[Excl "DATUM_mkDATUM"]>>
+            simp[Excl "DATUM_mkDATUM"]>>
             first_x_assum (irule_at Any)>>rw[]
             >-(first_x_assum (qspecl_then[‘cEnv0'’,‘refs’] assume_tac)>>
                gs[terminationTheory.pmatch_def]>>
@@ -4024,7 +4085,8 @@ Proof
                      Mat (𝕍 "")
                        [(Pcon NONE (MAP (Pvar o ps2cs) params), compile_endpoint conf vs' e)])] (ps2cs2 dn))’
         by cheat>>
-      first_x_assum(qspecl_then[‘cEnv0'’,‘cSt0.refs’]assume_tac)>>gs[]>>
+      first_x_assum(qspecl_then[‘cEnv0'’,‘cSt0.refs’]assume_tac)>>
+      gs[Excl "DATUM_mkDATUM"]>>
       ‘ALL_DISTINCT (MAP ps2cs params)’
         by (qpat_x_assum ‘ALL_DISTINCT _’ mp_tac>>rpt(pop_assum kall_tac)>>
             Induct_on‘params’>>rw[ps2cs_def,MEM_MAP])>>
@@ -4037,8 +4099,9 @@ Proof
       irule_at Any triR_REFL>>
       qexists_tac‘pN0’>>simp[]>>
       rpt(conj_tac)
-      >- (gs[cpEval_valid_def]>>rpt conj_tac
-          >- (gs[pSt_pCd_corr_def]>>conj_tac
+      >- (gs[cpEval_valid_def,Excl "LTD_mkLTD",Excl "DATUM_mkDATUM"]>>
+          rpt conj_tac
+          >- (gs[pSt_pCd_corr_def,Excl "LTD_mkLTD"]>>conj_tac
               >- (rw[flookup_update_list_some]>>
                   first_x_assum (pop_assum o mp_then Any assume_tac)>>gs[IS_SOME_EXISTS]
                   >- (qexists_tac ‘x’>>simp[]>>disj2_tac>>gs[ALOOKUP_FAILS,MEM_ZIP,MEM_MAP,MEM_EL])
@@ -4049,12 +4112,21 @@ Proof
                       simp[MEM_REVERSE,MEM_ZIP]>>gs[MEM_EL]>>asm_exists_tac>>simp[]))
               >- metis_tac[ALOOKUP_MEM,wfclosure_def])
           >- (rw[namespacePropsTheory.nsLookup_nsAppend_some,sem_env_cor_def,
-                 id_to_mods_def,build_rec_env_def,nsLookup_nsBind_compute]>>
-              ‘¬("" = ps2cs n) ∧ ¬(ps2cs2 dn = ps2cs n)’ by simp[ps2cs_def,ps2cs2_def]>>
-              simp[]>>gs[flookup_update_list_some]
-              >- (drule ALOOKUP_MEM>>simp[MEM_REVERSE,MEM_ZIP,LENGTH_MAP]>>rw[]>>
-                  drule (iffLR LIST_REL_EL_EQN)>>rw[LENGTH_MAP]>>
-                  pop_assum(qspec_then‘n'’ mp_tac)>>simp[]>>disch_then (irule_at Any)>>disj1_tac>>
+                 id_to_mods_def,build_rec_env_def,nsLookup_nsBind_compute,
+                 Excl "LTD_mkLTD",Excl "DATUM_mkDATUM"]>>
+              ‘¬("" = ps2cs n) ∧ ¬(ps2cs2 dn = ps2cs n)’
+                by simp[ps2cs_def,ps2cs2_def]>>
+              simp[Excl "DATUM_mkDATUM"]>>
+              gs[flookup_update_list_some,Excl "LTD_mkLTD",
+                 Excl "DATUM_mkDATUM"]
+              >- (drule ALOOKUP_MEM>>
+                  simp[MEM_REVERSE,MEM_ZIP,LENGTH_MAP,Excl "DATUM_mkDATUM"]>>
+                  rw[Excl "DATUM_mkDATUM"]>>
+                  drule (iffLR LIST_REL_EL_EQN)>>
+                  rw[LENGTH_MAP,Excl "DATUM_mkDATUM"]>>
+                  pop_assum(qspec_then‘n'’ mp_tac)>>
+                  simp[Excl "DATUM_mkDATUM"]>>disch_then (irule_at Any)>>
+                  disj1_tac>>
                   simp[namespacePropsTheory.nsLookup_alist_to_ns_some]>>
                   irule ALOOKUP_ALL_DISTINCT_MEM>>
                   conj_tac
@@ -4062,13 +4134,19 @@ Proof
                       ‘LENGTH (MAP ps2cs params) = LENGTH vs'’
                       by (drule LIST_REL_LENGTH>>simp[LENGTH_MAP])>>
                       simp[MAP_ZIP])
-                  >- (simp[MEM_REVERSE,LENGTH_MAP,MEM_ZIP]>>qexists_tac‘n'’>>simp[Req0 EL_MAP]))
-              >- (first_x_assum (qpat_x_assum ‘FLOOKUP bindings _ = _’ o mp_then Any assume_tac)>>
-                  gs[]>>first_x_assum (irule_at Any)>>disj2_tac>>
+                  >- (simp[MEM_REVERSE,LENGTH_MAP,MEM_ZIP]>>qexists_tac‘n'’>>
+                      simp[Req0 EL_MAP]))
+              >- (first_x_assum
+                  (qpat_x_assum ‘FLOOKUP bindings _ = _’ o mp_then Any
+                   assume_tac)>>
+                  gs[Excl "DATUM_mkDATUM"]>>
+                  first_x_assum (irule_at Any)>>disj2_tac>>
                   simp[namespacePropsTheory.nsLookup_alist_to_ns_none]>>
-                  gs[ALOOKUP_NONE,MEM_MAP,ZIP_MAP,LENGTH_MAP]>>rw[]>>PairCases_on‘y’>>gs[]>>rveq>>
+                  gs[ALOOKUP_NONE,MEM_MAP,ZIP_MAP,LENGTH_MAP]>>rw[]>>
+                  PairCases_on‘y’>>gs[]>>rveq>>
                   ‘LENGTH params = LENGTH vs'’
-                  by (drule LIST_REL_LENGTH>>simp[LENGTH_MAP])>>gs[MEM_ZIP]>>CCONTR_TAC>>gs[EL_MAP])))
+                    by (drule LIST_REL_LENGTH>>simp[LENGTH_MAP])>>
+                  gs[MEM_ZIP]>>CCONTR_TAC>>gs[EL_MAP])))
       >- simp[cpFFI_valid_LTau_queue_eq]
       >- (rw []
           >- (first_x_assum irule>>
