@@ -4418,6 +4418,7 @@ Theorem network_NPar_forward_correctness:
   trans conf (NPar (NEndpoint p s c) n) LTau (NPar (NEndpoint p s' c') n') ∧
   (∀nd. nd ∈ network_nodenames (NEndpoint p s c) ⇒ ffi_has_node nd cSt0.ffi.ffi_state) ∧
   cpEval_valid conf p env0 s c n vs cvs cSt0 ∧
+  letrec_network (NPar (NEndpoint p s c) n) ∧
   cSt0.ffi.ffi_state = (p,s.queues,n) ∧
   pletrec_vars_ok c ∧
   EVERY cletrec_vars_ok (MAP SND s.funs) ∧
@@ -4526,7 +4527,10 @@ Proof
       drule simulation >>
       simp[wfLabel_def] >>
       disch_then drule >>
-      impl_tac >- gs[DISJ_IMP_THM,FORALL_AND_THM,can_match_def] >>
+      impl_tac
+      >- (gs[DISJ_IMP_THM,FORALL_AND_THM,can_match_def,
+             letrec_network_def,endpoints_def,o_DEF,
+             ELIM_UNCURRY]) >>
       rpt strip_tac >>
       goal_assum drule >>
       simp[] >>
@@ -4545,7 +4549,9 @@ Proof
       simp[wfLabel_def] >>
       disch_then drule >>
       impl_tac
-      >- gs[DISJ_IMP_THM,FORALL_AND_THM,can_match_def] >>
+      >- (gs[DISJ_IMP_THM,FORALL_AND_THM,can_match_def,
+             letrec_network_def,endpoints_def,o_DEF,
+             ELIM_UNCURRY]) >>
       rpt strip_tac >>
       goal_assum drule >>
       simp[] >>
@@ -4578,7 +4584,10 @@ Proof
       imp_res_tac trans_wfLabel >>
       simp[] >>
       disch_then drule >>
-      impl_tac >- gs[DISJ_IMP_THM,FORALL_AND_THM,can_match_def] >>
+      impl_tac
+      >- (gs[DISJ_IMP_THM,FORALL_AND_THM,can_match_def,
+             letrec_network_def,endpoints_def,o_DEF,
+             ELIM_UNCURRY]) >>
       rpt strip_tac >>
       goal_assum drule >>
       simp[] >>
@@ -4856,6 +4865,7 @@ Theorem network_NPar_forward_correctness':
   trans conf (NPar (NEndpoint p s c) n) LTau (NPar (NEndpoint p s' c') n') ∧
   (∀nd. nd ∈ network_nodenames (NEndpoint p s c) ⇒ ffi_has_node nd cSt0.ffi.ffi_state) ∧
   (∀nd. nd ∈ network_nodenames (NEndpoint p s c) ⇒ ffi_has_node nd (p,s.queues,n)) ∧
+  letrec_network (NPar (NEndpoint p s c) n) ∧
   cpEval_valid conf p env0 s c n vs cvs cSt0 ∧
   ffi_eq conf cSt0.ffi.ffi_state (p,s.queues,n) ∧
   ffi_wf (p,s.queues,n) ∧
@@ -4937,6 +4947,7 @@ Theorem network_NPar_forward_correctness'':
   (∀nd. nd ∈ network_nodenames (NEndpoint p s c) ⇒ ffi_has_node nd cSt0.ffi.ffi_state) ∧
   (∀nd. nd ∈ network_nodenames (NEndpoint p s c) ⇒ ffi_has_node nd (p,s.queues,n)) ∧
   cpEval_valid conf p env0 s c n vs cvs cSt0 ∧
+  letrec_network (NPar (NEndpoint p s c) n) ∧
   ffi_eq conf cSt0.ffi.ffi_state (p,s.queues,n) ∧
   ffi_wf (p,s.queues,n) ∧
   pletrec_vars_ok c ∧
@@ -5014,6 +5025,7 @@ Theorem network_NPar_forward_correctness_reduction_lemma:
   (∀nd. nd ∈ network_nodenames (NEndpoint p s c) ⇒ ffi_has_node nd cSt0.ffi.ffi_state) ∧
   (∀nd. nd ∈ network_nodenames (NEndpoint p s c) ⇒ ffi_has_node nd (p,s.queues,n)) ∧
   cpEval_valid conf p env0 s c n vs cvs cSt0 ∧
+  letrec_network (NPar (NEndpoint p s c) n) ∧
   ffi_eq conf cSt0.ffi.ffi_state (p,s.queues,n) ∧
   ffi_wf (p,s.queues,n) ∧
   pletrec_vars_ok c ∧
@@ -5067,6 +5079,7 @@ Proof
       last_x_assum(drule_at (Pat ‘cpEval_valid _ _ _ _ _ _ _ _’)) >>
       impl_tac
       >- (simp[] >>
+          conj_tac >- metis_tac[letrec_network_trans_pres] >>
           conj_tac >- (gvs[Once trans_cases] >> metis_tac[ffi_wf_def,trans_pres_ffi_wf]) >>
           conj_tac >- (gvs[Once trans_cases] >> metis_tac[letrec_vars_ok_trans_pres]) >>
           conj_tac >- (gvs[Once trans_cases] >> metis_tac[letrec_vars_ok_trans_pres]) >>
@@ -5160,23 +5173,24 @@ Theorem network_NPar_forward_correctness_reduction:
   (reduction conf)꙳ (NPar (NEndpoint p s c) n) (NPar (NEndpoint p s' c') n') ∧
   (∀nd. nd ∈ network_nodenames (NEndpoint p s c) ⇒ ffi_has_node nd cSt0.ffi.ffi_state) ∧
   cpEval_valid conf p env0 s c n vs cvs cSt0 ∧
+  letrec_network (NPar (NEndpoint p s c) n) ∧
   cSt0.ffi.ffi_state = (p,s.queues,n) ∧
   pletrec_vars_ok c ∧
   EVERY cletrec_vars_ok (MAP SND s.funs) ∧
   normalised s.queues
   ⇒
-  ∃env cSt env' e' l' sst sst'.
+  ∃env cSt env' e' l' sst sst' vs'.
     stepr꙳
       (env0, smSt cSt0, Exp (compile_endpoint conf vs c), [])
       (env', sst, e', l') ∧
     stepr꙳
-      (env, smSt cSt, Exp (compile_endpoint conf vs c'), [])
+      (env, smSt cSt, Exp (compile_endpoint conf vs' c'), [])
       (env', sst', e', l') ∧
     ffi_eq conf (SND sst).ffi_state (SND sst').ffi_state ∧
     FST sst = FST sst' ∧
     (SND sst).oracle = (SND sst').oracle ∧
     (SND sst).io_events = (SND sst').io_events ∧
-    cpEval_valid conf p env s' c' n' vs cvs cSt ∧
+    cpEval_valid conf p env s' c' n' vs' cvs cSt ∧
     cSt.ffi.ffi_state = (p,s'.queues,n') ∧
     (∀nd. nd ∈ network_nodenames (NEndpoint p s' c') ⇒ ffi_has_node nd cSt.ffi.ffi_state)
 Proof
