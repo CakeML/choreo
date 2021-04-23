@@ -5585,4 +5585,43 @@ Proof
 QED
 
 *)
+
+Theorem network_forward_correctness_reduction:
+  ∀conf s c n p s' c' n' cSt0 vs cvs env0.
+    (reduction conf)꙳ n n' ∧
+    REPN n ∧
+    net_has_node n p ∧
+    net_find p n  = SOME (NEndpoint p s  c ) ∧
+    net_find p n' = SOME (NEndpoint p s' c') ∧
+    (∀nd. nd ∈ network_nodenames (NEndpoint p s c) ⇒ ffi_has_node nd cSt0.ffi.ffi_state) ∧
+    cpEval_valid conf p env0 s c (net_filter p n) vs cvs cSt0 ∧
+    letrec_network (NPar (NEndpoint p s c) (net_filter p n)) ∧
+    cSt0.ffi.ffi_state = (p,s.queues,net_filter p n) ∧
+    pletrec_vars_ok c ∧
+    EVERY cletrec_vars_ok (MAP SND s.funs) ∧
+    normalised s.queues
+  ⇒
+  ∃env cSt env' e' l' sst sst' vs'.
+    stepr꙳
+      (env0, smSt cSt0, Exp (compile_endpoint conf vs c), [])
+      (env', sst, e', l') ∧
+    stepr꙳
+      (env, smSt cSt, Exp (compile_endpoint conf vs' c'), [])
+      (env', sst', e', l') ∧
+    ffi_eq conf (SND sst).ffi_state (SND sst').ffi_state ∧
+    FST sst = FST sst' ∧
+    (SND sst).oracle = (SND sst').oracle ∧
+    (SND sst).io_events = (SND sst').io_events ∧
+    cpEval_valid conf p env s' c' (net_filter p n') vs' cvs cSt ∧
+    cSt.ffi.ffi_state = (p,s'.queues,net_filter p n') ∧
+    (∀nd. nd ∈ network_nodenames (NEndpoint p s' c') ⇒ ffi_has_node nd cSt.ffi.ffi_state)
+Proof
+  rpt strip_tac
+  \\ irule network_NPar_forward_correctness_reduction
+  \\ simp[] \\ qexists_tac ‘s’ \\ rw[] \\ gs[]
+  >- (drule_then (qspec_then ‘p’ mp_tac) net_find_filter_reduction
+      \\ impl_tac >- simp[net_has_node_IS_SOME_net_find]
+      \\ simp[])
+QED
+
 val _ = export_theory ();
