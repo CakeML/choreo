@@ -2958,14 +2958,6 @@ Definition letrec_endpoint_def:
     (letrec_endpoint (Call dn) = F)
 End
 
-Theorem closure_size_MEM:
-  MEM (s,cl) cls ⇒
-  closure_size cl < closure2_size cls
-Proof
-  Induct_on ‘cls’ >> rw[closure_size_def] >> rw[closure_size_def] >>
-  res_tac >> DECIDE_TAC
-QED
-
 Definition letrec_closure_def:
   letrec_closure (Closure args env e) =
   (letrec_endpoint e ∧

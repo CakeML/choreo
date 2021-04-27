@@ -575,7 +575,7 @@ Definition perm_closure_def:
 Termination
   WF_REL_TAC ‘inv_image $< (closure_size o SND o SND)’ >>
   rw[payloadLangTheory.closure_size_def] >> imp_res_tac ALOOKUP_MEM >>
-  imp_res_tac closure_size_MEM >>
+  imp_res_tac payloadLangTheory.closure_size_MEM >>
   DECIDE_TAC
 End
 

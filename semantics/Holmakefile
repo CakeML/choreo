@@ -3,7 +3,8 @@ CAKEDIR = ../../cakeml
 endif
 
 
-INCLUDES = $(CAKEDIR)/misc $(CHOREODIR)/utils $(CAKEDIR)/semantics
+INCLUDES = $(CAKEDIR)/misc $(CHOREODIR)/utils $(CAKEDIR)/semantics \
+	   $(HOLDIR)/examples/formal-languages/regular
 
 all: $(DEFAULT_TARGETS)
 .PHONY: all
