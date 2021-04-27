@@ -78,7 +78,7 @@ Definition choice_free_network_def:
    (choice_free_network endpointLang$NNil = T)
 ∧ (choice_free_network (NPar n1 n2) = (choice_free_network n1 ∧ choice_free_network n2))
 ∧ (choice_free_network (NEndpoint p s e) = choice_free_endpoint e)
-End  
+End
 
 Definition net_end_def:
   net_end NNil = T
@@ -106,5 +106,24 @@ Definition dsubst_def:
     else
       Call dn')
 End
-        
+
+Definition EP_nodenames_def[simp]:
+  EP_nodenames endpointLang$Nil = ∅ ∧
+  EP_nodenames (Send dest _ e) = dest INSERT EP_nodenames e ∧
+  EP_nodenames (Receive sender _ e) = sender INSERT EP_nodenames e ∧
+  EP_nodenames (IfThen _ e1 e2) = EP_nodenames e1 ∪ EP_nodenames e2 ∧
+  EP_nodenames (IntChoice _ p e) = p INSERT EP_nodenames e ∧
+  EP_nodenames (ExtChoice p e1 e2) = p INSERT (EP_nodenames e1 ∪ EP_nodenames e2) ∧
+  EP_nodenames (Let _ _ _ e) = EP_nodenames e ∧
+  EP_nodenames (Fix _ e) = EP_nodenames e ∧
+  EP_nodenames (Call _) = ∅
+End
+
+Definition network_nodenames_def[simp]:
+  network_nodenames (NNil) = ∅ ∧
+  network_nodenames (NEndpoint p s e) = EP_nodenames e ∧
+  network_nodenames (NPar n1 n2) =
+  network_nodenames n1 ∪ network_nodenames n2
+End
+
 val _ = export_theory ()
