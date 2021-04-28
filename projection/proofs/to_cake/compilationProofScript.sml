@@ -333,32 +333,41 @@ QED
 Theorem compilation_preservation:
   ∀s1 (c1 : chor) s2 c2    (* Chor *)
    conf p pSt1 pCd1 pEPN1  (* Payload *)
-   cSt1 vs1 env1.          (* CakeML *)
+   cSt1 vs1 env1 cvs.          (* CakeML *)
    trans_s (s1,c1) (s2,c2) ∧
    compile_network_ok s1 c1 (procsOf c1) ∧
    conf.payload_size > 0   ∧
    no_undefined_vars (s1,c1) ∧
+   dvarsOf c1 = [] ∧
    (* new stuff *)
    pEPN1 = projection conf s1 c1 (procsOf c1) ∧
    net_find p pEPN1  = SOME (NEndpoint p pSt1 pCd1 ) ∧
    cSt1.ffi.oracle = comms_ffi_oracle conf ∧
    cSt1.ffi.ffi_state = (p,pSt1.queues,net_filter p pEPN1) ∧
    (* payload_to_cakeml assumptions *)
-   pSt_pCd_corr pSt1 pCd1 ∧ (* Should be true by construction *)
-   sem_env_cor conf pSt1 env1 ∧
+   pSt_pCd_corr conf pSt1 pCd1 ∧ (* Should be true by construction *)
+   env_asm env1 conf cvs ∧
    enc_ok conf env1 (letfuns pCd1) vs1
-   ⇒ ∃s3 c3             (* Chor *)
-      cEPN3             (* Choice *)
-      pSt3 pCd3         (* Payload *)
-      mc cSt2 env2 vs2. (* CakeML *)
+   ⇒ ∃s3 c3                   (* Chor *)
+      cEPN4 pSt4 pCd4         (* Payload *)
+      cSt4  env4 vs4          (* CakeML *)
+      env5 sst51 sst52 e5 l5.
       trans_s (s2,c2) (s3,c3) ∧
-      BISIM_REL (trans conf) (projection conf s3 c3 (procsOf c1)) cEPN3 ∧
-      net_find p cEPN3 = SOME (NEndpoint p pSt3 pCd3) ∧
-      cEval_equiv conf
-        (evaluate (cSt1 with clock := mc) env1
-                        [compile_endpoint conf vs1 pCd1])
-        (evaluate (cSt2 with clock := mc) env2
-                        [compile_endpoint conf vs2 pCd3])
+      compile_rel conf cEPN4 (projection conf s3 c3 (procsOf c1)) ∧
+      net_find p cEPN4 = SOME (NEndpoint p pSt4 pCd4) ∧
+      stepr꙳
+        (env1, smSt cSt1, Exp (compile_endpoint conf vs1 pCd1), [])
+        (env5, sst51, e5, l5) ∧
+      stepr꙳
+        (env4, smSt cSt4, Exp (compile_endpoint conf vs4 pCd4), [])
+        (env5, sst52, e5, l5) ∧
+    ffi_eq conf (SND sst51).ffi_state (SND sst52).ffi_state ∧
+    FST sst51 = FST sst52 ∧
+    (SND sst51).oracle    = (SND sst52).oracle ∧
+    (SND sst51).io_events = (SND sst52).io_events ∧
+    cpEval_valid conf p env4 pSt4 pCd4 (net_filter p cEPN4) vs4 cvs cSt4 ∧
+    cSt4.ffi.ffi_state = (p,pSt4.queues,net_filter p cEPN4) ∧
+    (∀nd. nd ∈ network_nodenames (NEndpoint p pSt4 pCd4) ⇒ ffi_has_node nd cSt4.ffi.ffi_state)
 Proof
   rw []
   \\ drule_all projection_preservation
@@ -371,7 +380,7 @@ Proof
   \\ impl_tac >- rw [IS_SOME_EXISTS]
   \\ rw [IS_SOME_EXISTS] \\ drule net_find_NEndpoint
   \\ rw []
-  \\ drule network_forward_correctness_reduction'
+(*  \\ drule network_forward_correctness_reduction' *)
   \\ rpt (disch_then (first_assum o (mp_then Any mp_tac)))
   \\ impl_tac \\ rw []
   >- rw [Abbr‘pEPN1’,REPN_projection]
@@ -402,6 +411,7 @@ Proof
   \\ rw []
 QED
 
+(* Not true as stated
 Theorem compilation_deadlock_freedom:
   ∀s1 (c1 : chor)          (* Chor *)
    conf p pSt1 pCd1 pEPN1  (* Payload *)
@@ -446,5 +456,6 @@ Proof
   \\ qpat_x_assum ‘cEval_equiv _ _ _’ (ASSUME_TAC o EVAL_RULE)
   \\ asm_exists_tac \\ fs []
 QED
+ *)
 
 val _ = export_theory ()
