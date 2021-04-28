@@ -22,7 +22,7 @@ val _ = ml_prog_update (open_module "splittest");
 
 val _ = next_ml_names := ["KSplittest"];
 Theorem KSplittest_v_thm = translate KSplittest_def;
-
+Theorem K0_v_thm = translate endpoint_to_choiceTheory.K0_def;
 val _ = ml_prog_update (close_module NONE);
 
 Definition splittest_def:

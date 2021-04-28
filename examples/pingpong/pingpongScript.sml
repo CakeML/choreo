@@ -20,7 +20,7 @@ val _ = ml_prog_update (open_module "pingpong");
 
 val _ = next_ml_names := ["KNil"];
 Theorem KNil_v_thm = translate KNil_def;
-
+Theorem K0_v_thm = translate endpoint_to_choiceTheory.K0_def;
 val _ = ml_prog_update (close_module NONE);
 
 Definition pingpong_def:

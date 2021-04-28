@@ -340,7 +340,7 @@ Theorem compilation_preservation:
    no_undefined_vars (s1,c1) ∧
    dvarsOf c1 = [] ∧
    (* new stuff *)
-   pEPN1 = projection conf s1 c1 (procsOf c1) ∧
+   pEPN1 = projection_top conf s1 c1 (procsOf c1) ∧
    net_find p pEPN1  = SOME (NEndpoint p pSt1 pCd1 ) ∧
    cSt1.ffi.oracle = comms_ffi_oracle conf ∧
    cSt1.ffi.ffi_state = (p,pSt1.queues,net_filter p pEPN1) ∧

@@ -21,6 +21,7 @@ End
 val _ = ml_prog_update (open_module "hello");
 
 val _ = next_ml_names := ["KHello"];
+Theorem K0_v_thm = translate endpoint_to_choiceTheory.K0_def;
 Theorem KHello_v_thm = translate KHello_def;
 
 val _ = ml_prog_update (close_module NONE);

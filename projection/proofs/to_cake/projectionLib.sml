@@ -487,8 +487,9 @@ struct
           “base_conf with <|payload_size := ^(numSyntax.term_of_int payload_size);
                             letModule := ^(stringSyntax.fromMLstring letmodule)|>”
       val compile_to_payload_thm =
-          “projection ^conf FEMPTY ^chor (procsOf ^chor)”
+          “projection_top ^conf FEMPTY ^chor (procsOf ^chor)”
            |> EVAL |> PURE_REWRITE_RULE [DRESTRICT_FEMPTY,MAP_KEYS_FEMPTY]
+           |> CONV_RULE(RHS_CONV EVAL)
       val (p_state,p_code) =
           “THE(ALOOKUP (endpoints ^(compile_to_payload_thm |> concl |> rhs)) ^ptm)”
           |> EVAL |> concl |> rhs |> pairSyntax.dest_pair
@@ -526,14 +527,20 @@ struct
 
       val letfuns = map obtain_letfun letfun_names
 
-      val _ = if all isSome letfuns then
+      val kfun = obtain_letfun “K0”
+
+      val _ = if all isSome (kfun::letfuns) then
                 ()
               else
                 (print "Error: there are untranslated functions\n"; raise Domain);
 
       val letfuns = map valOf letfuns;
 
-      val letmodule = if null letfuns then “ARB:string”
+      val letmodule = if null letfuns then
+                        if isSome kfun then
+                          fst(valOf kfun)
+                        else
+                          (print "Error: K0 should be among the letfuns\n"; raise Domain)
                       else if all (term_eq (fst(hd letfuns)) o fst) letfuns then
                         fst(hd letfuns)
                       else
@@ -543,8 +550,9 @@ struct
           “base_conf with <|payload_size := ^(numSyntax.term_of_int payload_size);
                             letModule := ^letmodule|>”
       val compile_to_payload_thm =
-          “projection ^conf FEMPTY ^chor (procsOf ^chor)”
+          “projection_top ^conf FEMPTY ^chor (procsOf ^chor)”
            |> EVAL |> PURE_REWRITE_RULE [DRESTRICT_FEMPTY,MAP_KEYS_FEMPTY]
+           |> CONV_RULE(RHS_CONV EVAL)
       val (p_state,p_code) =
           “THE(ALOOKUP (endpoints ^(compile_to_payload_thm |> concl |> rhs)) ^ptm)”
           |> EVAL |> concl |> rhs |> pairSyntax.dest_pair
@@ -582,7 +590,7 @@ struct
           subst [hd(free_vars tm) |-> rex] tm
 
       val cst = get_ml_prog_state() |> get_state |> inst [alpha |-> oracle_type] |>
-                                 subst_the_var “initial_ffi_state ^oracle (^ptm,FEMPTY,net_filter ^ptm (projection ^conf FEMPTY ^chor (procsOf ^chor)))”
+                                 subst_the_var “initial_ffi_state ^oracle (^ptm,FEMPTY,net_filter ^ptm (projection_top ^conf FEMPTY ^chor (procsOf ^chor)))”
       val cenv = get_ml_prog_state() |> get_env
 
       val eval_assm = C MP TRUTH o CONV_RULE(LAND_CONV(EVAL))
@@ -593,6 +601,8 @@ struct
             |> C MATCH_MP chorLibProgTheory.env_asm_base_conf
             |> SPEC cenv
             |> eval_assm
+
+      val cvs = env_asm |> concl |> rand
 
       val enc_ok_thm =
           auto_prove "enc_ok"
@@ -616,23 +626,24 @@ struct
         |> SPEC(mk_var("c2",“:chorLang$chor”))
         |> SPEC conf
         |> SPEC ptm
-        |> Q.SPEC ‘<|bindings := FEMPTY; queues := FEMPTY|>’
+        |> Q.SPEC ‘<|bindings := FEMPTY; funs := []; queues := FEMPTY|>’
         |> SPEC pCd1
-        |> Q.SPEC ‘projection ^conf FEMPTY ^chor (procsOf ^chor)’
+        |> Q.SPEC ‘projection_top ^conf FEMPTY ^chor (procsOf ^chor)’
         |> SPEC cst
         |> SPEC vs
         |> SPEC cenv
+        |> SPEC cvs
         |> PURE_REWRITE_RULE [GSYM AND_IMP_INTRO]
         |> UNDISCH
+        |> eval_assm
         |> eval_assm
         |> eval_assm
         |> eval_assm
         |> CONV_RULE(LAND_CONV(SIMP_CONV pure_ss [EQ_REFL]))
         |> C MP TRUTH
         |> CONV_RULE(LAND_CONV EVAL)
-        |> CONV_RULE(LAND_CONV (PURE_REWRITE_CONV [DRESTRICT_FEMPTY,MAP_KEYS_FEMPTY]))
-        |> CONV_RULE(LAND_CONV(SIMP_CONV pure_ss [EQ_REFL]))
-        |> C MP TRUTH
+        |> CONV_RULE(LAND_CONV (PURE_REWRITE_CONV [DRESTRICT_FEMPTY,MAP_KEYS_FEMPTY,FDOM_FEMPTY,NOT_IN_EMPTY,NOT_CLAUSES,bool_case_thm]))
+        |> eval_assm
         |> eval_assm
         |> eval_assm
         |> CONV_RULE(LAND_CONV EVAL)
@@ -641,30 +652,30 @@ struct
         |> CONV_RULE(LAND_CONV (PURE_REWRITE_CONV[payload_to_cakemlProofTheory.sem_env_cor_def,env_asm_simps]))
         |> PURE_ONCE_REWRITE_RULE[GSYM AND_IMP_INTRO]
         |> C MP env_asm
-        |> CONV_RULE(LAND_CONV(SIMP_CONV
+(*        |> CONV_RULE(LAND_CONV(SIMP_CONV
                                  (std_ss ++ pred_setLib.PRED_SET_ss)
                                  [payload_to_cakemlProofTheory.pSt_pCd_corr_def,
                                   payload_to_cakemlProofTheory.pFv_def,
                                   payloadLangTheory.state_accfupds,
                                   finite_mapTheory.FLOOKUP_EMPTY,
                                   listTheory.MEM]))
-        |> C MP TRUTH
+        |> C MP TRUTH*)
         |> C MP enc_ok_thm
         |> DISCH_ALL
     end
 
   fun project_to_camkes builddir chorname chor =
     let
-      val pnames = pnames chor
-      val to_cakes = map(fn p => project_to_cake chor p camkes_payload_size) pnames
-      val thms = ListPair.map (fn (p,(pc,_)) => mk_projection_thm p chor pc) (pnames,to_cakes)
+      val pns = pnames chor
+      val to_cakes = map(fn p => project_to_cake chor p camkes_payload_size) pns
+      val thms = ListPair.map (fn (p,(pc,_)) => mk_projection_thm p chor pc) (pns,to_cakes)
       val _ = mk_camkes_boilerplate builddir chorname chor
       val _ = ListPair.map
                 (fn (p,(_,p_wholeprog)) =>
                     astToSexprLib.write_ast_to_file
                       (String.concat [builddir,"/components/",p,"/",p,".sexp"])
                       p_wholeprog)
-                (pnames,to_cakes)
+                (pns,to_cakes)
     in
       thms
     end
