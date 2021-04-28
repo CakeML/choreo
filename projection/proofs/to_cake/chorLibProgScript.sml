@@ -6,6 +6,16 @@ val _ = new_theory "chorLibProg";
 
 val _ = temp_delsimps ["NORMEQ_CONV"];
 
+val _ = set_grammar_ancestry
+  ["endpoint_to_payload",
+   "payloadCong","payloadLang","payloadSem","payloadProps",
+   "payload_to_cakeml","comms_ffi_model","comms_ffi_props",
+   "comms_ffi_eq","comms_ffi_rec_charac","comms_ffi_cons",
+   "evaluate_tools", "ckExp_Equiv","termination",
+   "ml_translator", "ml_prog", "evaluateProps", "namespace",
+   "semanticPrimitives", "abstractCompilation",
+   "ListProg","payload_to_cakemlProof"];
+
 val _ = translation_extends "basisProg";
 
 fun get_fun_name trm =
