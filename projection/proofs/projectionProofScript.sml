@@ -400,6 +400,29 @@ Proof
   \\ rw [] \\ asm_exists_tac \\ simp []
 QED
 
+Theorem projection_top_preservation_junkcong:
+  ∀s c s'' c'' conf.
+   compile_network_ok s c (procsOf c)
+   ∧ conf.payload_size > 0
+   ∧ trans_s (s,c) (s'',c'')
+   ∧ no_undefined_vars (s,c)
+   ∧ dvarsOf c = []
+   ⇒ ∃s''' c''' epn0 epn.
+      trans_s (s'',c'') (s''',c''') ∧
+      junkcong {new_fv s c}
+               (project_choice (new_fv s c) s''' c''' (procsOf c))
+               epn0 ∧
+      compile_rel conf epn (compile_network_alt (compile_network conf epn0)) ∧
+      (reduction conf)^* (projection_top conf s c (procsOf c)) epn
+Proof
+  rpt strip_tac >>
+  drule_all projection_preservation_junkcong >>
+  strip_tac >>
+  rpt(goal_assum drule) >>
+  gvs[projection_def,projection_top_def]
+  \\ metis_tac[compile_network_reduction_alt,RTC_RTC]
+QED
+
 Theorem trans_s_trans:
   trans_s (s,c) (s',c') ∧ trans_s (s',c') (s'',c'') ⇒
   trans_s (s,c) (s'',c'')
@@ -1202,6 +1225,126 @@ Proof
   simp[perm_network_bisim]
 QED
 
+Theorem projection_top_preservation:
+  ∀s c s'' c'' conf.
+   compile_network_ok s c (procsOf c)
+   ∧ conf.payload_size > 0
+   ∧ trans_s (s,c) (s'',c'')
+   ∧ no_undefined_vars (s,c)
+   ∧ dvarsOf c = []
+   ⇒ ∃s''' c''' epn.
+      trans_s (s'',c'') (s''',c''') ∧
+      (reduction conf)^* (projection_top conf s c (procsOf c))
+                         epn ∧
+      BISIM_REL (trans conf) (projection conf s''' c''' (procsOf c)) epn
+Proof
+  rw [] >>
+  drule_all_then strip_assume_tac projection_top_preservation_junkcong >>
+  goal_assum drule >>
+  goal_assum drule >>
+  fs[projection_def,endpoint_to_choiceTheory.compile_network_def] >>
+  fs[project_choice_def,compile_rel_def] >>
+  drule junkcong_compile_to_payload >>
+  disch_then(qspec_then ‘conf’ strip_assume_tac) >>
+  match_mp_tac BISIM_SYM >>
+  drule_then(qspec_then ‘conf’ assume_tac) junkcong_bisim >>
+  match_mp_tac BISIM_TRANS >>
+  dxrule_then assume_tac BISIM_SYM >>
+  goal_assum drule >>
+  irule compile_network_alt_fully_abstract >> simp[fix_network_compile_network] >>
+  conj_tac >-
+   (drule_then (mp_tac o GSYM) junkcong_no_undefined_vars_network >> rw[] >>
+    irule no_undefined_vars_chor_to_network >>
+    metis_tac[trans_s_trans,no_undefined_vars_trans_s_pres]) >>
+  conj_tac >-
+   (irule no_undefined_vars_chor_to_network >>
+    metis_tac[trans_s_trans,no_undefined_vars_trans_s_pres]) >>
+  conj_tac >-
+   (drule junkcong_free_fix_names_network >>
+    qmatch_goalsub_abbrev_tac ‘free_fix_names_network pp’ >>
+    ‘free_fix_names_network pp = []’ suffices_by  rw[] >>
+    UNABBREV_ALL_TAC >>
+    irule dvarsOf_imp_free_fix_names_network >>
+    drule_all trans_s_trans >>
+    disch_then (mp_then Any assume_tac dvarsOf_nil_trans_s) >>
+    gs[]) >>
+  conj_tac >-
+   (irule dvarsOf_imp_free_fix_names_network >>
+    drule_all trans_s_trans >>
+    disch_then (mp_then Any assume_tac dvarsOf_nil_trans_s) >>
+    gs[]) >>
+  match_mp_tac BISIM_TRANS >>
+  goal_assum drule >>
+  qpat_abbrev_tac ‘fv1 = gen_fresh_name _’ >>
+  qpat_abbrev_tac ‘fv2 = gen_fresh_name _’ >>
+  qmatch_goalsub_abbrev_tac ‘BISIM_REL _ a1 a2’ >>
+  ‘~MEM fv1 (free_var_names_network a1) ∧ ~MEM fv2 (free_var_names_network a1)’
+    by(unabbrev_all_tac >>
+       conj_asm1_tac >-
+         (dep_rewrite.DEP_ONCE_REWRITE_TAC[free_var_names_compile_to_payload_network] >>
+          conj_tac >- simp[choice_free_network_compile_network_fv] >>
+          match_mp_tac (compile_network_support |> ONCE_REWRITE_RULE[MONO_NOT_EQ]) >>
+          match_mp_tac (projection_free_variables_SUBSET |> REWRITE_RULE[SUBSET_DEF,Once MONO_NOT_EQ]) >>
+          match_mp_tac(MATCH_MP IMAGE_SUBSET (SPEC_ALL free_variables_variables) |> REWRITE_RULE[SUBSET_DEF,Once MONO_NOT_EQ]) >>
+          imp_res_tac trans_s_variables_mono >>
+          dxrule_then dxrule SUBSET_TRANS >>
+          strip_tac >>
+          match_mp_tac(IMAGE_SUBSET |> CONV_RULE(STRIP_QUANT_CONV(RAND_CONV(PURE_REWRITE_CONV[SUBSET_DEF,Once MONO_NOT_EQ]))) |> MP_CANON) >>
+          goal_assum drule >>
+          dep_rewrite.DEP_ONCE_REWRITE_TAC[GSYM projection_variables_eq] >>
+          simp[gen_fresh_name_same]) >-
+         (dep_rewrite.DEP_ONCE_REWRITE_TAC[free_var_names_compile_to_payload_network] >>
+          conj_tac >- simp[choice_free_network_compile_network_fv] >>
+          dep_rewrite.DEP_ONCE_REWRITE_TAC[endpoint_to_choiceProofTheory.MEM_free_vars_compile_network'] >>
+          simp[gen_fresh_name_same] >>
+          match_mp_tac(CONTRAPOS(SPEC_ALL free_var_names_var_names_network)) >>
+          simp[gen_fresh_name_same])
+      ) >>
+  ‘~MEM fv1 (free_var_names_network a2) ∧ ~MEM fv2 (free_var_names_network a2)’
+    by(unabbrev_all_tac >>
+       conj_asm1_tac >>
+         (dep_rewrite.DEP_ONCE_REWRITE_TAC[free_var_names_compile_to_payload_network] >>
+          conj_tac >- simp[choice_free_network_compile_network_fv] >>
+          dep_rewrite.DEP_ONCE_REWRITE_TAC[MEM_free_vars_compile_network'] >>
+          conj_tac >> match_mp_tac gen_fresh_nameE >>
+          simp[projection_variables_eq] >>
+          metis_tac[free_var_names_var_names_network,SUBSET_DEF,SUBSET_TRANS,
+                    IMAGE_SUBSET,trans_s_variables_mono,projection_variables_SUBSET])) >>
+  match_mp_tac BISIM_TRANS >>
+  qexists_tac ‘restrict_network (λx. x ≠ fv1 ∧ x ≠ fv2) a1’ >>
+  conj_tac >-
+   (match_mp_tac BISIM_SYM >> match_mp_tac restrict_network_bisim >> simp[]) >>
+  match_mp_tac BISIM_SYM >>
+  match_mp_tac BISIM_TRANS >>
+  qexists_tac ‘restrict_network (λx. x ≠ fv1 ∧ x ≠ fv2) a2’ >>
+  conj_tac >-
+   (match_mp_tac BISIM_SYM >> match_mp_tac restrict_network_bisim >> simp[]) >>
+  MAP_EVERY qunabbrev_tac [‘a1’,‘a2’] >>
+  dep_rewrite.DEP_ONCE_REWRITE_TAC[GSYM perm_network'] >>
+  conj_tac >-
+    (MAP_EVERY qunabbrev_tac [‘fv1’,‘fv2’] >>
+     simp[gen_fresh_name_same] >>
+     match_mp_tac gen_fresh_nameE >>
+     simp[projection_variables_eq] >>
+     metis_tac[free_var_names_var_names_network,SUBSET_DEF,SUBSET_TRANS,
+               IMAGE_SUBSET,trans_s_variables_mono,projection_variables_SUBSET]) >>
+  qmatch_goalsub_abbrev_tac ‘BISIM_REL _ (restrict_network _ a1) (restrict_network _ a2)’ >>
+  match_mp_tac BISIM_TRANS >>
+  qexists_tac ‘a1’ >>
+  conj_tac >-
+   (match_mp_tac restrict_network_bisim >> simp[] >>
+    qunabbrev_tac ‘a1’ >> simp[MEM_perm_network] >>
+    rw[perm1_def]) >>
+  match_mp_tac BISIM_SYM >>
+  match_mp_tac BISIM_TRANS >>
+  qexists_tac ‘a2’ >>
+  conj_tac >-
+   (match_mp_tac restrict_network_bisim >> simp[]) >>
+  MAP_EVERY qunabbrev_tac [‘a1’,‘a2’] >>
+  match_mp_tac BISIM_SYM >>
+  simp[perm_network_bisim]
+QED
+
 val from_choice_reflection =
   endpoint_to_choiceProofTheory.compile_network_reflection;
 
@@ -1549,6 +1692,45 @@ Proof
   >- (irule no_undefined_vars_network_reduction_RTC_pres
       \\ first_x_assum (irule_at Any)
       \\ simp[no_undefined_vars_chor_to_network])
+QED
+
+Theorem projection_top_reflection_junkcong:
+  ∀s c epn conf.
+   compile_network_ok s c (procsOf c)
+   ∧ conf.payload_size > 0
+   ∧ dvarsOf c = []
+   ∧ no_undefined_vars (s,c)
+   ∧ no_self_comunication c
+   ∧ (reduction conf)^* (projection_top conf s c (procsOf c)) epn
+   ⇒ ∃epn0 epn1 epn2 c' s'.
+       (reduction conf)^* epn epn2 ∧
+       compile_rel conf epn2 (compile_network_alt epn0) ∧
+       fix_network epn0 ∧ free_fix_names_network epn0 = [] ∧
+       no_undefined_vars_network epn0 ∧
+       (reduction conf)^* epn0 (compile_network conf epn1) ∧
+       trans_s (s,c) (s',c') ∧
+       junkcong {new_fv s c} (project_choice (new_fv s c) s' c' (procsOf c)) epn1
+Proof
+  rw [projection_def,projection_top_def,endpoint_to_choiceTheory.compile_network_def] >>
+  qmatch_asmsub_abbrev_tac ‘RTC _ (compile_network a1)’ >>
+  qspecl_then [‘conf’,‘a1’] assume_tac compile_network_reduction_alt >>
+  dxrule payloadConfluenceTheory.payload_confluence >>
+  disch_then drule >>
+  impl_tac >-
+   (simp[] >>
+    rw [Abbr ‘a1’,endpoints_compile_network_choice_aux,
+        endpoints_compile_network_chor,
+        endpoints_compile_network_payload,
+        payload_closureProofTheory.compile_network_endpoints,
+        procsOf_all_distinct]) >>
+  strip_tac >>
+  goal_assum dxrule >>
+  unabbrev_all_tac >>
+  gvs[GSYM projection_def,GSYM projection_top_def,GSYM endpoint_to_choiceTheory.compile_network_def] >>
+  drule_all projection_reflection_junkcong >>
+  rpt strip_tac >>
+  rpt(goal_assum drule) >>
+  gvs[project_choice_def]
 QED
 
 Theorem projection_reflection_aux:
