@@ -246,6 +246,31 @@ Proof
   >- simp[endpoints_def]
 QED
 
+Theorem pletrec_vars_ok_to_closure:
+  ∀epn p es ec.
+  fix_network epn
+  ∧ net_find p (compile_network_alt epn) = SOME (NEndpoint p es ec)
+  ⇒ pletrec_vars_ok ec
+Proof
+  Induct
+  >- (EVAL_TAC \\ rw[])
+  >- (rw[] \\ gs[payload_closureTheory.compile_network_alt_def,net_find_def,fix_network_NPar]
+      \\ Cases_on ‘net_find p (compile_network_alt epn)’ \\ gs[] \\ metis_tac[])
+  >- (rw[payload_closureTheory.compile_network_alt_def,net_find_def]
+      \\ gs[fix_network_def,endpoints_def]
+      \\ pop_assum mp_tac \\ pop_assum kall_tac
+      \\ qmatch_goalsub_abbrev_tac ‘compile_endpoint l e’
+      \\ ‘∀s. ALOOKUP l s = SOME vars ⇒ ALL_DISTINCT vars’ by simp[Abbr‘l’]
+      \\ pop_assum mp_tac \\ pop_assum kall_tac
+      \\ MAP_EVERY (W(curry Q.SPEC_TAC)) [‘l’,‘e’]
+      \\ Induct_on ‘e’
+      \\ gs[payload_closureTheory.compile_endpoint_def,fix_endpoint_def]
+      \\ rw [all_distinct_nub']
+      >- metis_tac[] >- metis_tac[] >- metis_tac[] >- metis_tac[] >- metis_tac[]
+      >- (first_x_assum irule \\ rw [] \\ simp [all_distinct_nub'] \\ metis_tac[])
+      >- (Cases_on ‘ALOOKUP l s’ \\ gs[]))
+QED
+
 Theorem compilation_preservation_junkcong:
   ∀s1 (c1 : chor) s2 c2    (* Chor *)
    conf p pSt1 pCd1 pEPN1  (* Payload *)
@@ -342,7 +367,8 @@ Proof
       \\ rw[projection_def,
             fix_network_compile_network,
             payload_closureProofTheory.letrec_network_compile_network_alt])
-  >- (cheat (* push this through *))
+  >- (irule pletrec_vars_ok_to_closure \\ gs[Abbr‘pEPN1’,projection_def]
+      \\ first_assum (irule_at Any) \\ simp[fix_network_compile_network])
   >- (last_x_assum (mp_then Any mp_tac empty_funs_net_find)
       \\ rw[Abbr‘pEPN1’,empty_funs_projection,empty_funs_def])
   >- (‘empty_q (NEndpoint p pSt1 pCd1)’
