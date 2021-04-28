@@ -197,6 +197,18 @@ Proof
   >- metis_tac [fix_network_def]
 QED
 
+Theorem empty_q_net_find:
+  ∀epn p e.
+    empty_q epn
+    ∧ net_find p epn = SOME e
+    ⇒ empty_q e
+Proof
+  Induct \\ EVAL_TAC \\ rw[]
+  >- (gs[] \\ Cases_on ‘net_find p epn’
+      \\ gs[] \\ metis_tac [])
+  >- simp[empty_q_def]
+QED
+
 Theorem net_filter_NNil_net_find_NONE:
   ∀epn p q.
     p ≠ q ∧ net_filter q epn = NNil
@@ -221,6 +233,19 @@ Proof
   rw [net_has_node_IS_SOME_net_find,IS_SOME_EXISTS,net_find_net_filter]
 QED
 
+
+Theorem letrec_network_rcong:
+  ∀epn1 epn2.
+    epn1 p≅ epn2
+    ⇒ (letrec_network epn1 ⇔ letrec_network epn2)
+Proof
+  ho_match_mp_tac payload_rcong_ind
+  \\ rw[letrec_network_def]
+  >- (irule PERM_EVERY \\ rw[endpoints_def]
+      \\ SIMP_TAC (std_ss++permLib.PERM_SIMPLE_ss) [])
+  >- simp[endpoints_def]
+QED
+
 Theorem compilation_preservation_junkcong:
   ∀s1 (c1 : chor) s2 c2    (* Chor *)
    conf p pSt1 pCd1 pEPN1  (* Payload *)
@@ -238,7 +263,7 @@ Theorem compilation_preservation_junkcong:
    cSt1.ffi.ffi_state = (p,pSt1.queues,net_filter p pEPN1) ∧
    (* payload_to_cakeml assumptions *)
    pSt_pCd_corr conf pSt1 pCd1 ∧
-   env_asm env1 conf cvs ∧
+   sem_env_cor conf pSt1 env1 cvs ∧
    enc_ok conf env1 (letfuns pCd1) vs1
    ⇒ ∃s3 c3                   (* Chor *)
       cEPN3                   (* Choice *)
@@ -293,12 +318,37 @@ Proof
           \\ rw[SUBSET_DEF] \\ metis_tac [])
       >- (simp[Abbr‘pEPN1’,net_has_node_MEM_endpoints,endpoints_projection]
           \\ drule_all EP_nodenames_projection \\ rw [SUBSET_DEF]))
-  >- cheat
-  >- cheat
-  >- cheat
-  >- cheat
-  >- cheat
-  >- cheat
+  >- (rw [cpEval_valid_def] \\  gs[sem_env_cor_def]
+      >- (last_x_assum (mp_then Any mp_tac empty_funs_net_find)
+          \\ rw[Abbr‘pEPN1’,empty_funs_projection,empty_funs_def,funs_cpEval_valid_def])
+      >- (rw[ffi_state_cor_def,ffi_wf_def]
+          >- (irule net_wf_filter \\ irule net_wf_ALL_DISTINCT_eq
+              \\ rw [Abbr‘pEPN1’,endpoints_projection,procsOf_all_distinct])
+          >- (irule not_net_has_node_net_filter \\ simp[Abbr‘pEPN1’,REPN_projection]
+              \\ irule net_wf_ALL_DISTINCT_eq
+              \\ rw [endpoints_projection,procsOf_all_distinct]))
+      >- (rw[ffi_state_cor_def,ffi_wf_def]
+          >- (irule net_wf_filter \\ irule net_wf_ALL_DISTINCT_eq
+              \\ rw [Abbr‘pEPN1’,endpoints_projection,procsOf_all_distinct])
+          >- (irule not_net_has_node_net_filter \\ simp[Abbr‘pEPN1’,REPN_projection]
+              \\ irule net_wf_ALL_DISTINCT_eq
+              \\ rw [endpoints_projection,procsOf_all_distinct]))
+      >- (‘empty_q (NEndpoint p pSt1 pCd1)’
+          by metis_tac [empty_q_net_find,Abbr‘pEPN1’,projection_empty_q]
+          \\ gs[empty_q_def,normalised_def,normalise_queues_def]))
+  >- (irule (SIMP_RULE std_ss [AND_IMP_INTRO] (iffLR letrec_network_rcong))
+      \\ irule_at Any net_find_filter_cong
+      \\ simp[Abbr‘pEPN1’,REPN_projection]
+      \\ rw[projection_def,
+            fix_network_compile_network,
+            payload_closureProofTheory.letrec_network_compile_network_alt])
+  >- (cheat (* push this through *))
+  >- (last_x_assum (mp_then Any mp_tac empty_funs_net_find)
+      \\ rw[Abbr‘pEPN1’,empty_funs_projection,empty_funs_def])
+  >- (‘empty_q (NEndpoint p pSt1 pCd1)’
+        by metis_tac [empty_q_net_find,Abbr‘pEPN1’,projection_empty_q]
+      \\ gs[empty_q_def,normalised_def,normalise_queues_def])
+  >- metis_tac[]
 QED
 
 (* TODO: move *)
