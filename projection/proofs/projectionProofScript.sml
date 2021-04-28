@@ -1581,6 +1581,14 @@ Proof
   \\ EVAL_TAC
 QED
 
+Theorem empty_q_to_closure':
+  ∀epn conf. empty_q epn ⇒ empty_q (payload_closure$compile_network epn)
+Proof
+  Induct \\ gen_tac
+  \\ EVAL_TAC \\ rw []
+  \\ EVAL_TAC
+QED
+
 Theorem endpoints_compile_network_payload:
   ∀epn conf.
    MAP FST (endpoints (endpoint_to_payload$compile_network conf epn)) = MAP FST (endpoints epn)
@@ -1595,6 +1603,14 @@ Theorem endpoints_compile_network_closure:
    MAP FST (endpoints (payload_closure$compile_network_alt epn)) = MAP FST (endpoints epn)
 Proof
   Induct \\ rw [payload_closureTheory.compile_network_alt_def,
+                payloadLangTheory.endpoints_def]
+QED
+
+Theorem endpoints_compile_network_closure':
+  ∀epn conf.
+   MAP FST (endpoints (payload_closure$compile_network epn)) = MAP FST (endpoints epn)
+Proof
+  Induct \\ rw [payload_closureTheory.compile_network_def,
                 payloadLangTheory.endpoints_def]
 QED
 
@@ -1934,6 +1950,15 @@ Proof
          payloadCongTheory.REPN_def]
 QED
 
+Theorem REPN_projection_top:
+  ∀conf s c l. REPN (projection_top conf s c l)
+Proof
+  rw[projection_top_def,endpoint_to_choiceTheory.compile_network_def]
+  \\ qmatch_goalsub_rename_tac ‘compile_network_fv fv _’
+  \\ map_every qid_spec_tac [‘s’,‘c’,‘l’]
+  \\ Induct \\ EVAL_TAC \\ rw [] \\ EVAL_TAC
+QED
+
 Theorem endpoints_projection:
   ∀conf s c l. MAP FST (endpoints (projection conf s c l)) = l
 Proof
@@ -1944,6 +1969,16 @@ Proof
       endpoints_compile_network_chor]
 QED
 
+Theorem endpoints_projection_top:
+  ∀conf s c l. MAP FST (endpoints (projection_top conf s c l)) = l
+Proof
+  rw [projection_top_def,
+      endpoints_compile_network_payload,
+      endpoints_compile_network_choice,
+      endpoints_compile_network_closure',
+      endpoints_compile_network_chor]
+QED
+
 Theorem projection_empty_q:
   ∀conf s c l. empty_q (projection conf s c l)
 Proof
@@ -1951,6 +1986,17 @@ Proof
       endpoint_to_choiceTheory.compile_network_def,
       empty_q_to_payload,
       empty_q_to_closure,
+      compile_network_fv_empty_q,
+      compile_network_empty_q]
+QED
+
+Theorem projection_top_empty_q:
+  ∀conf s c l. empty_q (projection_top conf s c l)
+Proof
+  rw [projection_top_def,
+      endpoint_to_choiceTheory.compile_network_def,
+      empty_q_to_payload,
+      empty_q_to_closure',
       compile_network_fv_empty_q,
       compile_network_empty_q]
 QED
