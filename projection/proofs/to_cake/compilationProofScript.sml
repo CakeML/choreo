@@ -377,59 +377,32 @@ Proof
   >- metis_tac[]
 QED
 
-(* TODO: move *)
-Theorem net_find_is_some_lemma:
-  ∀cs p s c:chor s2 c2:chor conf fv1 fv2.
-  IS_SOME(net_find p ((compile_network conf
-                      (compile_network_fv fv1
-                       (compile_network s c cs))))) =
-  IS_SOME(net_find p ((compile_network conf
-                      (compile_network_fv fv2
-                       (compile_network s2 c2 cs)))))
-Proof
-  Induct >>
-  fs[projection_def,chor_to_endpointTheory.compile_network_gen_def,
-     endpoint_to_choiceTheory.compile_network_def,
-     endpoint_to_choiceTheory.compile_network_fv_def,
-     endpoint_to_payloadTheory.compile_network_def,
-     net_find_def
-    ] >>
-  rw[]
-QED
-
-Theorem net_find_projection_IS_SOME:
-  ∀cs p s c s1 c2 conf.
-  IS_SOME(net_find p (projection conf s c cs)) =
-  IS_SOME(net_find p (projection conf s1 c2 cs))
-Proof
-  rw[net_find_is_some_lemma,projection_def,
-     endpoint_to_choiceTheory.compile_network_def]
-QED
-
 Theorem compilation_preservation:
   ∀s1 (c1 : chor) s2 c2    (* Chor *)
    conf p pSt1 pCd1 pEPN1  (* Payload *)
-   cSt1 vs1 env1 cvs.          (* CakeML *)
+   cSt1 vs1 env1 cvs.      (* CakeML *)
+   (* projection assumptions *)
    trans_s (s1,c1) (s2,c2) ∧
    compile_network_ok s1 c1 (procsOf c1) ∧
    conf.payload_size > 0   ∧
    no_undefined_vars (s1,c1) ∧
    dvarsOf c1 = [] ∧
-   (* new stuff *)
-   pEPN1 = projection_top conf s1 c1 (procsOf c1) ∧
+   (* The process being consider *)
+   pEPN1 = projection conf s1 c1 (procsOf c1) ∧
    net_find p pEPN1  = SOME (NEndpoint p pSt1 pCd1 ) ∧
    cSt1.ffi.oracle = comms_ffi_oracle conf ∧
    cSt1.ffi.ffi_state = (p,pSt1.queues,net_filter p pEPN1) ∧
    (* payload_to_cakeml assumptions *)
-   pSt_pCd_corr conf pSt1 pCd1 ∧ (* Should be true by construction *)
-   env_asm env1 conf cvs ∧
+   pSt_pCd_corr conf pSt1 pCd1 ∧
+   sem_env_cor conf pSt1 env1 cvs ∧
    enc_ok conf env1 (letfuns pCd1) vs1
    ⇒ ∃s3 c3                   (* Chor *)
+      cEPN3                   (* Choice *)
       cEPN4 pSt4 pCd4         (* Payload *)
       cSt4  env4 vs4          (* CakeML *)
       env5 sst51 sst52 e5 l5.
       trans_s (s2,c2) (s3,c3) ∧
-      compile_rel conf cEPN4 (projection conf s3 c3 (procsOf c1)) ∧
+      BISIM_REL (trans conf) (projection conf s3 c3 (procsOf c1)) cEPN4 ∧
       net_find p cEPN4 = SOME (NEndpoint p pSt4 pCd4) ∧
       stepr꙳
         (env1, smSt cSt1, Exp (compile_endpoint conf vs1 pCd1), [])
@@ -451,22 +424,59 @@ Proof
   \\ asm_exists_tac \\ fs []
   \\ asm_exists_tac \\ fs []
   \\ qmatch_asmsub_abbrev_tac ‘net_find p pEPN1’
-  \\ qmatch_goalsub_abbrev_tac ‘net_find p pEPN3’
+  \\ rename1 ‘net_find p pEPN3’
   \\ drule_then (qspec_then ‘p’ mp_tac) net_find_IS_SOME_reduction_pres_IMP
   \\ impl_tac >- rw [IS_SOME_EXISTS]
   \\ rw [IS_SOME_EXISTS] \\ drule net_find_NEndpoint
   \\ rw []
-(*  \\ drule network_forward_correctness_reduction' *)
+  \\ drule network_forward_correctness_reduction
   \\ rpt (disch_then (first_assum o (mp_then Any mp_tac)))
+  \\ disch_then (qspecl_then [‘vs1’,‘cvs’,‘env1’] mp_tac)
   \\ impl_tac \\ rw []
   >- rw [Abbr‘pEPN1’,REPN_projection]
-  >- (irule net_wf_ALL_DISTINCT_eq
-      \\ rw [Abbr‘pEPN1’,endpoints_projection,procsOf_all_distinct])
-  >- (irule empty_q_normalised_network \\ rw [Abbr‘pEPN1’,projection_empty_q])
-  >- rw [Abbr‘pEPN1’,projection_empty_q,empty_q_padded]
   >- rw [net_has_node_IS_SOME_net_find,IS_SOME_EXISTS]
-  \\ asm_exists_tac
-  \\ fs []
+  >- (last_x_assum (mp_then Any mp_tac empty_funs_net_find)
+      \\ rw[Abbr‘pEPN1’,empty_funs_projection,empty_funs_def]
+      \\ gs[regexpTheory.LIST_UNION_def])
+  >- (rw [ffi_has_node_def]
+      \\ irule (SIMP_RULE std_ss [AND_IMP_INTRO] (iffRL net_has_node_net_filter))
+      \\ conj_tac
+      >- (CCONTR_TAC \\ gs[Abbr‘pEPN1’] \\ drule_all EP_nodenames_projection
+          \\ rw[SUBSET_DEF] \\ metis_tac [])
+      >- (simp[Abbr‘pEPN1’,net_has_node_MEM_endpoints,endpoints_projection]
+          \\ drule_all EP_nodenames_projection \\ rw [SUBSET_DEF]))
+  >- (rw [cpEval_valid_def] \\  gs[sem_env_cor_def]
+      >- (last_x_assum (mp_then Any mp_tac empty_funs_net_find)
+          \\ rw[Abbr‘pEPN1’,empty_funs_projection,empty_funs_def,funs_cpEval_valid_def])
+      >- (rw[ffi_state_cor_def,ffi_wf_def]
+          >- (irule net_wf_filter \\ irule net_wf_ALL_DISTINCT_eq
+              \\ rw [Abbr‘pEPN1’,endpoints_projection,procsOf_all_distinct])
+          >- (irule not_net_has_node_net_filter \\ simp[Abbr‘pEPN1’,REPN_projection]
+              \\ irule net_wf_ALL_DISTINCT_eq
+              \\ rw [endpoints_projection,procsOf_all_distinct]))
+      >- (rw[ffi_state_cor_def,ffi_wf_def]
+          >- (irule net_wf_filter \\ irule net_wf_ALL_DISTINCT_eq
+              \\ rw [Abbr‘pEPN1’,endpoints_projection,procsOf_all_distinct])
+          >- (irule not_net_has_node_net_filter \\ simp[Abbr‘pEPN1’,REPN_projection]
+              \\ irule net_wf_ALL_DISTINCT_eq
+              \\ rw [endpoints_projection,procsOf_all_distinct]))
+      >- (‘empty_q (NEndpoint p pSt1 pCd1)’
+          by metis_tac [empty_q_net_find,Abbr‘pEPN1’,projection_empty_q]
+          \\ gs[empty_q_def,normalised_def,normalise_queues_def]))
+  >- (irule (SIMP_RULE std_ss [AND_IMP_INTRO] (iffLR letrec_network_rcong))
+      \\ irule_at Any net_find_filter_cong
+      \\ simp[Abbr‘pEPN1’,REPN_projection]
+      \\ rw[projection_def,
+            fix_network_compile_network,
+            payload_closureProofTheory.letrec_network_compile_network_alt])
+  >- (irule pletrec_vars_ok_to_closure \\ gs[Abbr‘pEPN1’,projection_def]
+      \\ first_assum (irule_at Any) \\ simp[fix_network_compile_network])
+  >- (last_x_assum (mp_then Any mp_tac empty_funs_net_find)
+      \\ rw[Abbr‘pEPN1’,empty_funs_projection,empty_funs_def])
+  >- (‘empty_q (NEndpoint p pSt1 pCd1)’
+        by metis_tac [empty_q_net_find,Abbr‘pEPN1’,projection_empty_q]
+      \\ gs[empty_q_def,normalised_def,normalise_queues_def])
+  >- metis_tac[]
 QED
 
 Theorem compile_network_fv_net_end:
