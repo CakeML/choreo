@@ -3932,6 +3932,7 @@ Theorem compile_network_reflection:
               reduction^* p2 p3
               ∧ trans_s (s,c) (s'',c'')
               ∧ qcong p3 (compile_network s'' c'' pn)
+              ∧ compile_network_ok s'' c'' pn
 Proof
   simp[reduction_list_trans_eq,PULL_EXISTS] >>
   CONV_TAC(RESORT_FORALL_CONV rev) >>
@@ -3988,6 +3989,7 @@ Theorem compile_network_reflection':
     ==> ∃s'' c''.
               reduction^* p2 (compile_network s'' c'' pn)
               ∧ trans_s (s,c) (s'',c'')
+              ∧ compile_network_ok s'' c'' pn
 Proof
   rpt strip_tac >>
   drule_all compile_network_reflection >>
