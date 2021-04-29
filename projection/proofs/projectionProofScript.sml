@@ -2093,7 +2093,17 @@ Proof
   drule proj_has_reduction' >>
   impl_tac >- cheat >>
   rw[]
-  >- (cheat) >>
+  >- (disj2_tac >>
+      gvs[projection_def] >>
+      drule_then assume_tac (cj 1 TC_RULES) >>
+      drule_at (Pos last) endpoint_to_choiceProofTheory.compile_network_preservation_TC >>
+      cheat
+(*      drule compile_network_preservation_TC >>
+      disch_then(qspecl_then [‘compile_network s' c' (procsOf c)’,‘p2’] mp_tac) >>
+      impl_tac >- cheat >>
+      rw[EXTEND_RTC_TC_EQN] >>
+      pop_assum kall_tac >>
+*)) >>
   cheat
 QED
 
