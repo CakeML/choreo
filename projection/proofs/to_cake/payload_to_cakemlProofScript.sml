@@ -3194,6 +3194,162 @@ Proof
   simp[]
 QED
 
+Definition triR_def:
+  triR n (env0,(refs0,ffi0),ev0,k0) (env,(refs,ffi),ev,k) ⇔
+    (ffi.io_events = ffi0.io_events ∧
+     NRC stepr n (env0,(refs0,ffi0),ev0,k0) (env,(refs,ffi),ev,k) ∨
+     ffi.io_events ≠ ffi0.io_events ∧
+     ∃env' refs' ffi' ev' k' p.
+       NRC stepr n (env0,(refs0,ffi0),ev0,k0) (env',(refs',ffi'),ev',k') ∧
+       NRC stepr p (env,(refs,ffi),ev,k) (env',(refs',ffi'),ev',k') ∧
+       ffi'.io_events = ffi.io_events)
+End
+
+Definition tcdistance_def:
+  tcd R a b = (@n. NRC R n a b) - 1
+End
+
+Theorem TC_triR0:
+  stepr⁺ a b ⇒ ∃n. triR (n + 1) a b
+Proof
+  map_every PairCases_on [‘a’, ‘b’] >>
+  simp[triR_def, TC_eq_NRC, ADD1] >> strip_tac >>
+  Cases_on ‘b2.io_events = a2.io_events’ >> simp[] >>
+  irule_at Any (NRC |> cj 1 |> iffRL) >> simp[]
+QED
+
+Theorem TC_triR[local] =
+        TC_triR0 |> Q.GENL[‘a’, ‘b’]
+                 |> SRULE [GSYM RIGHT_EXISTS_IMP_THM, SKOLEM_THM]
+
+val tcd_def = new_specification("tcd_def", ["tcd"], TC_triR)
+
+Theorem triR_one_step_each:
+  stepr (ae0,(ar0,af0),av0,ak0) (ae,(ar,af),av,ak) ∧
+  stepr (be0,(br0,bf0),bv0,bk0) (be,(br,bf),bv,bk) ∧
+  bf.io_events = bf0.io_events ∧ bf0.io_events ≠ af0.io_events ∧
+  triR n (ae,(ar,af),av,ak) (be,(br,bf),bv,bk) ⇒
+  triR (n + 1) (ae0,(ar0,af0),av0,ak0) (be0,(br0,bf0),bv0,bk0)
+Proof
+  simp[triR_def] >> strip_tac
+  >- (ONCE_REWRITE_TAC [ADD_COMM] >> irule_at Any NRC_ADD_I >>
+      simp[] >> first_assum $ irule_at Any >> simp[] >>
+      irule_at Any (NRC_1 |> iffRL) >> gs[]) >>
+  ONCE_REWRITE_TAC [ADD_COMM] >> irule_at Any NRC_ADD_I >>
+  simp[] >> first_assum $ irule_at Any >> simp[] >>
+  irule_at Any (NRC |> cj 2 |> iffRL) >> simp[]
+QED
+
+Theorem step_iomono:
+  stepr (e0,(r0,f0),v0,k0) (e,(r,f),v,k) ⇒ io_events_mono f0 f
+Proof
+  simp[e_step_reln_def]  >> Cases_on ‘v0’
+  >- (rename [‘Exp e0’] >> Cases_on ‘e0’ >>
+      dsimp[e_step_def, push_def, return_def, AllCaseEqs(), PULL_EXISTS] >>
+      rename [‘smallStep$application op’] >>
+      Cases_on ‘op’ >>
+      simp[application_def, AllCaseEqs(), PULL_EXISTS, return_def] >> rw[] >>
+      drule do_app_io_events_mono >> simp[]) >>
+  simp[e_step_def, continue_def, AllCaseEqs(), push_def, return_def] >>
+  rw[] >> simp[] >>
+  rename [‘smallStep$application op’] >>
+  Cases_on ‘op’ >>
+  gvs[application_def, AllCaseEqs(), PULL_EXISTS, return_def]>>
+  drule do_app_io_events_mono >> simp[]
+QED
+
+Theorem NRC_step_iomono:
+  NRC stepr n (a0,(a1,a2),a3,a4) (b0,(b1,b2),b3,b4) ⇒
+  io_events_mono a2 b2
+Proof
+  map_every qid_spec_tac
+            [‘a0’, ‘a1’, ‘a2’, ‘a3’, ‘a4’, ‘b0’, ‘b1’, ‘b2’, ‘b3’,‘b4’]>>
+  Induct_on ‘n’ >> simp[NRC, PULL_EXISTS, FORALL_PROD] >> rw[] >>
+  first_assum drule >> drule step_iomono >> metis_tac[io_events_mono_trans]
+QED
+
+Theorem triR_step1:
+  stepr a0 a ∧ triR n a b ⇒ triR (n + 1) a0 b
+Proof
+  map_every PairCases_on [‘a0’, ‘b’, ‘a’] >>
+  simp[triR_def] >> strip_tac
+  >- (Cases_on ‘a2.io_events = a02.io_events’ >> simp[]
+      >- (ONCE_REWRITE_TAC [ADD_COMM] >>
+          irule_at Any NRC_ADD_I >> simp[]) >>
+      irule_at Any (NRC |> cj 1 |> iffRL) >> simp[] >>
+      ONCE_REWRITE_TAC [ADD_COMM] >> metis_tac[NRC_ADD_I, NRC_1]) >>
+  ‘b2.io_events ≠ a02.io_events’ suffices_by
+    (simp[] >> strip_tac >> ONCE_REWRITE_TAC [ADD_COMM] >>
+     irule_at Any NRC_ADD_I >> simp[] >> first_assum $ irule_at Any >>
+     first_assum $ irule_at Any >> metis_tac[]) >>
+  strip_tac >> gs[] >>
+  ‘io_events_mono a02 a2’ by metis_tac[step_iomono] >>
+  ‘io_events_mono a2 ffi'’ by metis_tac[NRC_step_iomono] >>
+  gs[io_events_mono_def] >> metis_tac[IS_PREFIX_ANTISYM]
+QED
+
+Theorem RTC_steps =
+        RTC_eq_NRC |> Q.ISPEC ‘stepr’ |> iffLR
+                   |> SRULE [GSYM RIGHT_EXISTS_IMP_THM, SKOLEM_THM]
+
+val rtd_def = new_specification("rtd_def", ["rtd"], RTC_steps)
+
+Theorem triR_NRC:
+  NRC stepr m a b ∧ triR n b c ⇒ triR (m + n) a c
+Proof
+  map_every qid_spec_tac [‘m’, ‘a’, ‘b’, ‘c’, ‘n’] >>
+  Induct_on ‘m’ >> simp[NRC, PULL_EXISTS] >> rw[] >>
+  first_x_assum $ drule_all_then assume_tac >>
+  drule_all triR_step1 >> simp[ADD1]
+QED
+
+Theorem triR_steps1:
+  stepr꙳ a0 a ∧ triR n a b ⇒ triR (n + rtd a0 a) a0 b
+Proof
+  strip_tac >> drule rtd_def >> metis_tac[triR_NRC, ADD_COMM]
+QED
+
+Theorem triR_REFL[simp]:
+  ∀x. triR 0 x x
+Proof
+  simp[triR_def, FORALL_PROD]
+QED
+
+Theorem triR_step1R:
+  stepr (b00,(b01,b02),b03,b04) (b0,(b1,b2),b3,b4) ∧ 0 < n ∧
+  b2.io_events = b02.io_events ∧ a2.io_events ≠ b02.io_events ∧
+  triR n (a0,(a1,a2),a3,a4) (b0,(b1,b2),b3,b4) ⇒
+  triR n (a0,(a1,a2),a3,a4) (b00,(b01,b02),b03,b04)
+Proof
+  simp[triR_def] >> rpt strip_tac >> gs[] >> first_assum $ irule_at (Pos hd) >>
+  metis_tac[NRC]
+QED
+
+Theorem triR_stepsR:
+  stepr꙳ (b00,(b01,b02),b03,b04) (b0,(b1,b2),b3,b4) ∧ 0 < n ∧
+  b2.io_events = b02.io_events ∧ a2.io_events ≠ b02.io_events ∧
+  triR n (a0,(a1,a2),a3,a4) (b0,(b1,b2),b3,b4) ⇒
+  triR n (a0,(a1,a2),a3,a4) (b00,(b01,b02),b03,b04)
+Proof
+  map_every qid_spec_tac
+            [‘b00’, ‘b01’, ‘b02’, ‘b03’, ‘b04’, ‘b0’, ‘b1’, ‘b2’, ‘b3’, ‘b4’,
+             ‘a0’, ‘a1’, ‘a2’, ‘a3’, ‘a4’] >>
+  Induct_on ‘RTC’ >> simp[FORALL_PROD] >> rw[] >> gs[] >>
+  qmatch_asmsub_abbrev_tac ‘stepr Ax Bx’ >>
+  qmatch_asmsub_abbrev_tac ‘stepr꙳ Bx Cx’ >>
+  rename [‘Abbrev(Ax = (_, (_, Af), _, _))’, ‘stepr Ax Bx’, ‘stepr꙳ Bx Cx’,
+          ‘Abbrev(Bx = (_, (_, Bf), _, _))’,
+          ‘Abbrev(Cx = (_, (_, Cf), _, _))’
+          ] >>
+  ‘Af.io_events = Bf.io_events’
+    by (gs[Abbr‘Ax’, Abbr‘Bx’, Abbr‘Cx’, RTC_eq_NRC] >>
+        drule_then assume_tac step_iomono >>
+        drule_then assume_tac NRC_step_iomono >>
+        gs[io_events_mono_def] >> metis_tac[IS_PREFIX_ANTISYM]) >>
+  gs[] >> first_x_assum $ drule_all_then assume_tac >>
+  simp[Abbr‘Ax’] >> irule triR_step1R >> metis_tac[]
+QED
+
 Theorem simulation:
   ∀p0 pSt0 EP0 L p pSt EP pN0 cEnv0 vs cSt0.
     trans conf (NEndpoint p0 pSt0 EP0) L (NEndpoint p pSt EP) ∧
@@ -3208,7 +3364,7 @@ Theorem simulation:
     can_match conf pN0 L
     ⇒
     ∃cEnv cSt pN vs0 sc.
-      triR stepr sc
+      triR sc
         (cEnv0, smSt cSt0, Exp (compile_endpoint conf vs EP0), [])
         (cEnv, smSt cSt, Exp (compile_endpoint conf vs0 EP), []) ∧
       (sc = 0 ⇒ outgoing_size pN < outgoing_size pN0) ∧
@@ -3304,10 +3460,12 @@ Proof
       gs[ffi_state_cor_def])
   >- ((* second SEND case *) gs[cpEval_valid_Send] >>
       CONV_TAC (pull_namedexvar_conv "vs0")>>qexists_tac ‘vs’>>
-      ntac 3 (irule_at (Pos hd) triR_one_step_each >> simp[e_step_reln_def] >>
+      simp[to_small_st_def] >>
+      ntac 3 (irule_at Any triR_one_step_each >> simp[e_step_reln_def] >>
               simp[e_step_def, push_def, return_def, continue_def]) >>
       irule_at (Pos hd) triR_steps1 >>
-      irule_at (Pos hd) RTC_stepr_evaluateL >> irule_at Any RTC_REFL >>
+      irule_at (Pos hd) (SRULE [to_small_st_def] RTC_stepr_evaluateL) >>
+      irule_at Any RTC_REFL >>
       qmatch_goalsub_abbrev_tac ‘evaluate _ cEnv [dropv]’ >>
       drule_all_then strip_assume_tac cpEval_nsLookup_PLbindings >> simp[] >>
       strip_assume_tac (env_asm_DROP |> Q.INST [‘vs’ |-> ‘cvs’]) >>
@@ -3330,7 +3488,7 @@ Proof
       hide_assum "DROP" (qspecl_then [‘ARB’, ‘ARB’] kall_tac) >>
 
       (* now work a bit on right argument *)
-      CONV_TAC (pull_namedexvar_conv "cEnv") >> qexists_tac ‘cEnv0’ >>
+      CONV_TAC (pull_namedexvar_conv "be1") >> qexists_tac ‘cEnv0’ >>
       ntac 8 (irule_at Any triR_step1R >>
               simp[e_step_def, e_step_reln_def, push_def, return_def,
                    continue_def, application_def,
@@ -3501,12 +3659,13 @@ Proof
               simp[e_step_def, e_step_reln_def, push_def, return_def,
                    continue_def, application_def,
                    nsLookup_build_rec_env_sendloop]) >>
-      simp[do_opapp_def] >> (* now have sendloop_code conf p2 on left *)
+      simp[do_opapp_def] >>
+      (* now have sendloop_code conf p2 on left *)
 
       (* clean up to show we can now apply triR_REFL *)
       simp[payload_size_def] >>
       gs[cpEval_valid_def, EXstrefsffi] >>
-      qmatch_goalsub_abbrev_tac ‘triR stepr _ (_, (new_refs, new_ffi), _, _)’ >>
+      qmatch_goalsub_abbrev_tac ‘triR _ (_, (new_refs, new_ffi), _, _)’ >>
       map_every (fn (s1,s2) =>
                    CONV_TAC (pull_namedexvar_conv s1) >>
                    qexists_tac [QUOTE s2])
@@ -3644,8 +3803,7 @@ Proof
                    EL_APPEND1, EL_APPEND2, do_con_check_def,
                    store_alloc_def, do_opapp_def, build_conv_def,
                    nsLookup_build_rec_env_sendloop]) >>
-      qmatch_goalsub_abbrev_tac
-        ‘triR stepr _ (ENV, _, Exp(Var conf.reverse), _)’>>
+      qmatch_goalsub_abbrev_tac ‘triR _ (ENV, _, Exp(Var conf.reverse), _)’>>
       ‘env_asm ENV conf cvs’ by simp[Abbr‘ENV’] >>
       qspec_then ‘cvs’ strip_assume_tac env_asm_REVERSE >>
       last_x_assum drule >> simp[Abbr‘ENV’] >> strip_tac >>
@@ -3665,7 +3823,7 @@ Proof
       simp[continue_def, push_def] >> irule_at Any LESS_EQ_REFL >>
       first_assum $ irule_at (Pat ‘env_asm _ _’) >> pop_assum kall_tac >>
       qspec_then ‘cvs’ strip_assume_tac (Q.GEN ‘vs’ $ SRULE [] env_asm_FLAT) >>
-      qmatch_goalsub_abbrev_tac ‘triR stepr _ (ENV, _, _, _)’ >>
+      qmatch_goalsub_abbrev_tac ‘triR _ (ENV, _, _, _)’ >>
       pop_assum $ hide "ENV" >> last_x_assum $ drule_then strip_assume_tac >>
       ntac 2 (irule_at Any triR_step1 >>
               simp[e_step_reln_def, e_step_def, return_def, continue_def,
@@ -3850,7 +4008,7 @@ Proof
       simp[continue_def, do_if_def] >> ‘d ≠ []’ by (Cases_on‘d’ >> gs[]) >>
       simp[] >>
       (* Exp (Letrec [("zerobuf", ...)] ... *)
-      qmatch_goalsub_abbrev_tac ‘triR stepr _ (ENV, _, _, _)’ >>
+      qmatch_goalsub_abbrev_tac ‘triR _ (ENV, _, _, _)’ >>
       pop_assum $ hide "ENV" >>
       ‘nsLookup ENV.v (Short "buff") = SOME (Loc (LENGTH cSt0.refs))’
         by (unhide "ENV" >> simp[Abbr‘ENV’]) >>
@@ -4333,6 +4491,23 @@ Proof
   gs[choreoUtilsTheory.ALOOKUP_SOME_SPLIT, letrec_closure_def]
 QED
 
+Theorem NRC_same_start:
+  (∀a b c. R a b ∧ R a c ⇒ b = c) ⇒
+  NRC R m x y ∧ NRC R n x z ∧ m ≤ n ⇒
+  NRC R (n - m) y z
+Proof
+  strip_tac >> map_every qid_spec_tac [‘x’, ‘y’, ‘z’, ‘n’] >>
+  Induct_on ‘m’ >> simp[NRC] >> Cases_on ‘n’ >> simp[NRC] >>
+  metis_tac[]
+QED
+
+Theorem stepr_det:
+  ∀a b c. stepr a b ∧ stepr a c ⇒ b = c
+Proof
+  csimp[e_step_reln_def]
+QED
+
+
 Theorem simulated_stepr_pushes_forward:
   simR conf p0 cEnv0 pSt0 EP0 pN0 vs cvs cSt0 ∧
   (∀nd.
@@ -4340,9 +4515,10 @@ Theorem simulated_stepr_pushes_forward:
      ffi_has_node nd cSt0.ffi.ffi_state) ∧ letrec_endpoint EP0 ∧
   EVERY (letrec_closure ∘ SND) pSt0.funs ∧ pletrec_vars_ok EP0 ∧
   EVERY cletrec_vars_ok (MAP SND pSt0.funs) ∧
-  NRC stepr n
-      (cEnv0, smSt cSt0, Exp (compile_endpoint conf vs EP0), [])
-      c_ultimate
+  NRC stepr fn
+      (cEnv0, (cSt0.refs,cSt0.ffi), Exp (compile_endpoint conf vs EP0), [])
+      (ce, (cr,cf), cv, ck) ∧ cf.io_events = cSt0.ffi.io_events ∧
+  NRC stepr n (ce, (cr,cf), cv, ck) c_ultimate
   ⇒
   ∃EP pN pSt cs cEnv cSt vs' m.
     RTC (transN conf) (NEndpoint p0 pSt0 EP0, pN0) (NEndpoint p0 pSt EP, pN) ∧
@@ -4353,15 +4529,16 @@ Theorem simulated_stepr_pushes_forward:
     EVERY cletrec_vars_ok (MAP SND pSt.funs) ∧
     stepr꙳ (cEnv, smSt cSt, Exp (compile_endpoint conf vs' EP), []) cs ∧
     NRC stepr m (cEnv0, smSt cSt0, Exp (compile_endpoint conf vs EP0), []) cs ∧
-    (nf (transN conf) (NEndpoint p0 pSt EP, pN) ∧ m ≤ n ∨ n < m)
+    (nf (transN conf) (NEndpoint p0 pSt EP, pN) ∧ m ≤ fn + n ∨ fn + n < m)
 Proof
-  map_every qid_spec_tac [‘cEnv0’, ‘pSt0’, ‘cSt0’, ‘EP0’, ‘vs’] >>
-  ‘∃pair. pair = (n,pN0)’ by simp[] >> pop_assum mp_tac >>
-  map_every qid_spec_tac [‘n’, ‘pN0’, ‘pair’ ]>>
-  ‘WF (prim_rec$< LEX measure outgoing_size)’ by simp[WF_LEX] >>
+  map_every qid_spec_tac [‘cEnv0’, ‘pSt0’, ‘cSt0’, ‘EP0’, ‘vs’,
+                          ‘ce’, ‘cr’, ‘cf’, ‘cv’, ‘ck’] >>
+  ‘∃trip. trip = (n,fn,pN0)’ by simp[] >> pop_assum mp_tac >>
+  map_every qid_spec_tac [‘n’, ‘fn’, ‘pN0’, ‘trip’ ]>>
+  ‘WF (prim_rec$< LEX prim_rec$< LEX measure outgoing_size)’ by simp[WF_LEX] >>
   dxrule_then (ho_match_mp_tac o SRULE [RIGHT_FORALL_IMP_THM])
              WF_INDUCTION_THM >>
-  simp[FORALL_PROD] >> qx_genl_tac [‘n’, ‘pN0’] >>
+  simp[FORALL_PROD] >> qx_genl_tac [‘n’, ‘fn’, ‘pN0’] >>
   disch_then (hide "IH") >> rpt strip_tac >>
   Cases_on ‘∃epN. transN conf (NEndpoint p0 pSt0 EP0, pN0) epN’ >> gs[]
   >- (PairCases_on ‘epN’ >> gs[transN_def] >>
@@ -4372,9 +4549,49 @@ Proof
       drule_all_then strip_assume_tac letrec_vars_ok_trans_pres >>
       drule_all_then strip_assume_tac trans_pres_letrec_closure >>
       Cases_on ‘stepc = 0’
-      >- (gs[triR_def] >>
-          use_hidden_assum "IH" $ qspecl_then [‘n’, ‘pN1’] mp_tac >>
-          simp[LEX_DEF_THM] >>
+      >- (reverse (fs[triR_def, to_small_st_def]) >- fs[] >> gvs[] >>
+          use_hidden_assum "IH" $ qspecl_then [‘n’, ‘fn’, ‘pN1’] mp_tac >>
+          simp[LEX_DEF_THM] >> disch_then drule >> simp[] >>
+          first_assum (disch_then o resolve_then Any mp_tac)>>
+          first_assum (disch_then o resolve_then Any mp_tac)>>
+          impl_tac >- metis_tac[] >>
+          disch_then $ qx_choosel_then [‘EP2’, ‘pN2’, ‘pSt2’, ‘cs2’, ‘cEnv2’,
+                                        ‘cSt2’, ‘vs2’, ‘m2’] strip_assume_tac
+          >- (irule_at (Pos hd) (cj 2 RTC_RULES) >>
+              first_assum $ irule_at (Pos (el 2)) >> simp[] >>
+              gs[to_small_st_def] >>
+              first_assum $ irule_at (Pos last) >> simp[transN_def] >>
+              metis_tac[]) >>
+          irule_at (Pos hd) (cj 2 RTC_RULES) >> gs[to_small_st_def] >>
+          first_assum $ irule_at (Pos (el 2)) >> simp[transN_def] >>
+          metis_tac[]) >>
+      gs[triR_def, to_small_st_def] >> cheat) >> cheat (*
+
+      >- (Cases_on ‘n < stepc’
+          >- (irule_at Any RTC_SUBSET >> simp[transN_def] >>
+              irule_at Any (DECIDE “p ⇒ q ∨ p”) >> first_assum $ irule_at Any >>
+              first_assum $ irule_at (Pos last) >> metis_tac[RTC_REFL]) >>
+          ‘stepc ≤ n’ by simp[] >>
+          drule_all_then assume_tac (MATCH_MP NRC_same_start stepr_det) >>
+          use_hidden_assum "IH" $ qspecl_then [‘n - stepc’, ‘pN1’] mp_tac >>
+          simp[LEX_DEF_THM] >> simp[to_small_st_def] >>
+          disch_then $ drule_at (Pos last) >>
+          disch_then $ drule >> simp[] >> impl_tac >- metis_tac[] >>
+          disch_then $ qx_choosel_then [‘EP2’, ‘pN2’, ‘pSt2’, ‘cs2’, ‘cEnv2’,
+                                        ‘cSt2’, ‘vs2’, ‘m2’] strip_assume_tac
+          >- (irule_at (Pos hd) (cj 2 RTC_RULES) >>
+              first_assum $ irule_at (Pos (el 2)) >> simp[] >>
+              irule_at Any NRC_ADD_I >> first_assum $ irule_at (Pos hd) >>
+              first_assum $ irule_at (Pos hd) >> simp[transN_def] >>
+              metis_tac[]) >>
+          irule_at Any NRC_ADD_I >> first_assum $ irule_at (Pos hd) >>
+          irule_at Any (cj 2 RTC_RULES) >>
+          first_assum $ irule_at (Pos (el 2)) >> simp[transN_def] >>
+          metis_tac[ADD_COMM]) >>
+      (* case when c0 and c1 merge at c' *)
+      *)
+
+QED
 
 
        
