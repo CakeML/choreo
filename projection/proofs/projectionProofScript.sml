@@ -1726,7 +1726,8 @@ Theorem projection_top_reflection_junkcong:
        no_undefined_vars_network epn0 ∧
        (reduction conf)^* epn0 (compile_network conf epn1) ∧
        trans_s (s,c) (s',c') ∧
-       junkcong {new_fv s c} (project_choice (new_fv s c) s' c' (procsOf c)) epn1
+       junkcong {new_fv s c} (project_choice (new_fv s c) s' c' (procsOf c)) epn1 ∧
+       compile_network_ok s' c' (procsOf c)
 Proof
   rw [projection_def,projection_top_def,endpoint_to_choiceTheory.compile_network_def] >>
   qmatch_asmsub_abbrev_tac ‘RTC _ (compile_network a1)’ >>
@@ -1763,6 +1764,7 @@ Theorem projection_reflection_aux:
        fix_network epn0 ∧ free_fix_names_network epn0 = [] ∧
        no_undefined_vars_network epn0 ∧
        (reduction conf)^* epn0 epn1 ∧
+      compile_network_ok s' c' (procsOf c) ∧
       trans_s (s,c) (s',c') ∧
       BISIM_REL (trans conf) (projection conf s' c' (procsOf c)) (compile_network_alt epn1)
 Proof
@@ -1770,13 +1772,12 @@ Proof
   drule_all_then strip_assume_tac projection_reflection_junkcong >>
   goal_assum drule >> goal_assum drule >>
   goal_assum drule >> goal_assum drule >>
-  goal_assum drule >>
+  goal_assum drule >> goal_assum drule >>
   fs[projection_def,endpoint_to_choiceTheory.compile_network_def] >>
   fs[project_choice_def,compile_rel_def] >>
   drule junkcong_compile_to_payload >>
   disch_then(qspec_then ‘conf’ strip_assume_tac) >>
   drule_then(qspec_then ‘conf’ assume_tac) junkcong_bisim >>
-  goal_assum drule >>
   irule compile_network_alt_fully_abstract >> simp[fix_network_compile_network] >>
   conj_tac >-
    (irule no_undefined_vars_chor_to_network >>
@@ -2065,7 +2066,7 @@ Proof
     gvs[]) >>
   strip_tac >>
   gvs[GSYM trans_s_def] >>
-  conj_tac >- metis_tac[no_undefined_vars_trans_pres] >>  
+  conj_tac >- metis_tac[no_undefined_vars_trans_pres] >>
   conj_tac >- metis_tac[PAIR,FST,SND,no_self_comunication_trans_pres] >>
   metis_tac[PAIR,FST,SND,dvarsOf_nil_trans]
 QED
