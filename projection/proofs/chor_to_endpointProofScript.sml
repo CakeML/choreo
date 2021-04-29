@@ -9,7 +9,7 @@ val _ = new_theory "chor_to_endpointProof";
 
 val _ = set_grammar_ancestry
   ["endpointProps","endpointLang","endpointConfluence","chor_to_endpoint","chorProps","chorSyncProps",
-   "chor_to_endpointProof","chorSem","chorLang"];
+   "chor_to_endpointProof","chorSem","chorLang","endpointCong"];
 
 Theorem split_sel_dvars:
   ∀proc p c b r.
@@ -4008,6 +4008,7 @@ Theorem compile_network_reflection_procs:
    ∀s c pn p2.
     reduction^* (compile_network s c (procsOf c)) p2
     ∧ compile_network_ok s c (procsOf c)
+    ∧ no_self_comunication c
     ∧ no_undefined_vars (s,c)
     ∧ dvarsOf c = []
     ==> ∃s'' c''.
@@ -4016,9 +4017,8 @@ Theorem compile_network_reflection_procs:
 Proof
   rpt strip_tac >>
   drule compile_network_reflection' >>
-  disch_then match_mp_tac >>
-  simp[procsOf_all_distinct] >>
-  imp_res_tac compile_network_ok_no_self_comunication
+  impl_tac >- simp[procsOf_all_distinct] >>
+  rw[] >> metis_tac[]
 QED
 
 Theorem trans_s_nil:
@@ -4121,6 +4121,13 @@ Proof
   >- (gvs[dvarsOf_def])
 QED
 
+Theorem net_end_rcong:
+  ∀n1 n2.
+    n1 θ≅ n2 ⇒ (net_end n1 ⇔ net_end n2)
+Proof
+  ho_match_mp_tac epn_rcong_ind \\ rw[net_end_def] \\ metis_tac[]
+QED
+
 Theorem proj_has_reduction':
    ∀s c s'' c''.
     compile_network_ok s c ps
@@ -4180,12 +4187,20 @@ Proof
       strip_tac >>
       drule PERM_rcong_chor_compile_network >>
       disch_then(qspecl_then [‘s’,‘c’] mp_tac) >>
-      strip_tac >>          
+      strip_tac >>
       dxrule epn_rcong_imp_trans >>
       rw[FORALL_AND_THM] >>
       gvs[reduction_def] >>
-      metis_tac[]) >>
-  cheat
+      metis_tac[])
+  >- (disj2_tac >>
+      dxrule (iffLR PERM_SYM) >>
+      disch_then (mp_then Any mp_tac PERM_TRANS) >>
+      disch_then (qspec_then ‘a1 ++ procsOf c’ mp_tac) >>
+      impl_tac >- simp[PERM_APPEND] >>
+      disch_then (mp_then Any mp_tac PERM_rcong_chor_compile_network) >>
+      disch_then (qspecl_then [‘s’,‘c’] assume_tac) >>
+      drule net_end_rcong >>
+      metis_tac[net_end_rcong])
 QED
 
 val _ = export_theory ()
