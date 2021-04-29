@@ -144,6 +144,14 @@ val reduction_par_l = Q.store_thm("reduction_par_l",
   >> match_mp_tac (RTC_RULES |> SPEC_ALL |> CONJUNCT2)
   >> metis_tac[reduction_def,trans_par_l]);
 
+val reduction_par_l_TC = Q.store_thm("reduction_par_l_TC",
+  `∀p q r. reduction^+ p q ==> reduction^+ (NPar p r) (NPar q r)`,
+  rpt gen_tac
+  >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`q`,`p`]
+  >> ho_match_mp_tac TC_INDUCT
+  >> rpt strip_tac
+  >> metis_tac[TC_RULES,reduction_def,trans_par_l]);
+  
 val reduction_par_r = Q.store_thm("reduction_par_r",
   `∀p q r. reduction^* p q ==> reduction^* (NPar r p) (NPar r q)`,
   rpt gen_tac
@@ -153,6 +161,14 @@ val reduction_par_r = Q.store_thm("reduction_par_r",
   >- simp[RTC_REFL]
   >> match_mp_tac (RTC_RULES |> SPEC_ALL |> CONJUNCT2)
   >> metis_tac[reduction_def,trans_par_r]);
+
+val reduction_par_r_TC = Q.store_thm("reduction_par_r_TC",
+  `∀p q r. reduction^+ p q ==> reduction^+ (NPar r p) (NPar r q)`,
+  rpt gen_tac
+  >> MAP_EVERY (W(curry Q.SPEC_TAC)) [`q`,`p`]
+  >> ho_match_mp_tac TC_INDUCT
+  >> rpt strip_tac
+  >> metis_tac[TC_RULES,reduction_def,trans_par_r]);
 
 val weak_trans_par_l = Q.store_thm("weak_trans_par_l",
   `∀p alpha q r. weak_trans p alpha q ==> weak_trans (NPar p r) alpha (NPar q r)`,
@@ -511,7 +527,7 @@ val junkcong_reduction_eq = Q.store_thm("junkcong_reduction_eq",
      ⇒ ∀ p2 q2.
          ((reduction^* p1 p2 ⇒ (∃q2. reduction^* q1 q2 ∧ junkcong fvs p2 q2))
          ∧ (reduction^* q1 q2 ⇒ (∃p2. reduction^* p1 p2 ∧ junkcong fvs p2 q2)))`,
-  rw []
+  rw[]
   >- (last_x_assum mp_tac
       \\ MAP_EVERY (W(curry Q.SPEC_TAC)) [`q2`,`q1`,`fvs`]
       \\ first_x_assum mp_tac
@@ -535,6 +551,26 @@ val junkcong_reduction_eq = Q.store_thm("junkcong_reduction_eq",
   \\ rw [reduction_def] \\ irule RTC_TRANS \\ qexists_tac ‘p2’ \\ rw []
   \\ rw [reduction_def]
 );
+
+Theorem junkcong_reduction_eq_TC:
+  ∀fvs p1 q1.
+     junkcong fvs p1 q1
+     ⇒ ∀ p2 q2.
+         ((reduction^+ p1 p2 ⇒ (∃q2. reduction^+ q1 q2 ∧ junkcong fvs p2 q2))
+         ∧ (reduction^+ q1 q2 ⇒ (∃p2. reduction^+ p1 p2 ∧ junkcong fvs p2 q2)))
+Proof
+  rw [EXTEND_RTC_TC_EQN,PULL_EXISTS,reduction_def] >>
+  drule junkcong_trans_eq >>
+  rw[FORALL_AND_THM] >>
+  first_x_assum drule >>
+  strip_tac >>
+  goal_assum drule >>
+  drule junkcong_reduction_eq >>
+  rw[FORALL_AND_THM] >>
+  first_x_assum drule >>
+  strip_tac >>
+  goal_assum drule
+QED
 
 val junkcong_has_fv_eq = Q.store_thm("junkcong_has_fv_eq",
   `!fv e l s e2. junkcong {fv} (NEndpoint l s e) e2

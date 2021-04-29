@@ -347,14 +347,14 @@ Proof
   rw[compile_endpoint_def,dsubst_def]
 QED
 
-val compile_network_preservation_trans = Q.store_thm("compile_network_preservation_trans",
-  `∀n1 n2 q1 d q2 fv.
+Theorem compile_network_preservation_trans:
+  ∀n1 n2 q1 d q2 fv.
     ALL_DISTINCT (MAP FST (endpoints n1)) ∧
     ¬MEM fv (var_names_network n1) ∧
     trans n1 LTau n2
-    ==> ?n3. reduction^* (compile_network_fv fv n1) n3 ∧
+    ==> ?n3. reduction^+ (compile_network_fv fv n1) n3 ∧
              junkcong {fv} (compile_network_fv fv n2) n3
-  `,
+Proof
   rpt strip_tac
   >> qmatch_asmsub_abbrev_tac `trans _ alpha _`
   >> pop_assum (mp_tac o REWRITE_RULE[markerTheory.Abbrev_def])
@@ -371,14 +371,14 @@ val compile_network_preservation_trans = Q.store_thm("compile_network_preservati
       >> rpt(first_x_assum(qspec_then `fv` assume_tac))
       >> imp_res_tac trans_com_l
       >> fs[GSYM reduction_def,compile_network_fv_def]
-      >> metis_tac[RTC_SINGLE,junkcong_refl])
+      >> metis_tac[cj 1 TC_RULES,junkcong_refl])
   >- (* com-r *)
      (imp_res_tac compile_network_preservation_send
       >> imp_res_tac compile_network_preservation_receive
       >> rpt(first_x_assum(qspec_then `fv` assume_tac))
       >> imp_res_tac trans_com_r
       >> fs[GSYM reduction_def,compile_network_fv_def]
-      >> metis_tac[RTC_SINGLE,junkcong_refl])
+      >> metis_tac[cj 1 TC_RULES,junkcong_refl])
   >- (* com-choice-l *)
      (Cases_on `b`
       >- (fs[endpoints_def,ALL_DISTINCT_APPEND,compile_network_fv_def,K0_def,K1_def]
@@ -390,9 +390,12 @@ val compile_network_preservation_trans = Q.store_thm("compile_network_preservati
           >> qpat_x_assum `trans (compile_network_fv _ _) LTau _` assume_tac
           >> drule trans_par_l >> disch_then(qspec_then `compile_network_fv fv n1'` assume_tac)
           >> fs[GSYM reduction_def]
-          >> Q.ISPEC_THEN `reduction` imp_res_tac RTC_SINGLE
-          >> imp_res_tac RTC_RTC
-          >> asm_exists_tac >> simp[]
+          >> irule_at (Pos hd) (cj 2 TC_RULES)
+          >> irule_at (Pos hd) (cj 1 TC_RULES)
+          >> goal_assum drule
+          >> irule_at (Pos hd) (cj 1 TC_RULES)
+          >> goal_assum drule
+          >> simp[]
           >> match_mp_tac junkcong_par
           >> conj_tac
           >- (match_mp_tac junkcong_add_state_free_vars >> fs[var_names_network_def,reduction_def]
@@ -407,9 +410,11 @@ val compile_network_preservation_trans = Q.store_thm("compile_network_preservati
           >> qpat_x_assum `trans (compile_network_fv _ _) LTau _` assume_tac
           >> drule trans_par_l >> disch_then(qspec_then `compile_network_fv fv n1'` assume_tac)
           >> fs[GSYM reduction_def]
-          >> Q.ISPEC_THEN `reduction` imp_res_tac RTC_SINGLE
-          >> imp_res_tac RTC_RTC
-          >> asm_exists_tac >> simp[]
+          >> irule_at (Pos hd) (cj 2 TC_RULES)
+          >> irule_at (Pos hd) (cj 1 TC_RULES)
+          >> goal_assum drule
+          >> irule_at (Pos hd) (cj 1 TC_RULES)
+          >> goal_assum drule
           >> match_mp_tac junkcong_par
           >> conj_tac
           >- (match_mp_tac junkcong_add_state_free_vars >> fs[var_names_network_def,reduction_def]
@@ -426,9 +431,11 @@ val compile_network_preservation_trans = Q.store_thm("compile_network_preservati
           >> qpat_x_assum `trans (compile_network_fv _ _) LTau _` assume_tac
           >> drule trans_par_r >> disch_then(qspec_then `compile_network_fv fv n1` assume_tac)
           >> fs[GSYM reduction_def]
-          >> Q.ISPEC_THEN `reduction` imp_res_tac RTC_SINGLE
-          >> imp_res_tac RTC_RTC
-          >> asm_exists_tac >> simp[]
+          >> irule_at (Pos hd) (cj 2 TC_RULES)
+          >> irule_at (Pos hd) (cj 1 TC_RULES)
+          >> goal_assum drule
+          >> irule_at (Pos hd) (cj 1 TC_RULES)
+          >> goal_assum drule
           >> match_mp_tac junkcong_par
           >> conj_tac
           >- MATCH_ACCEPT_TAC junkcong_refl
@@ -444,9 +451,11 @@ val compile_network_preservation_trans = Q.store_thm("compile_network_preservati
           >> qpat_x_assum `trans (compile_network_fv _ _) LTau _` assume_tac
           >> drule trans_par_r >> disch_then(qspec_then `compile_network_fv fv n1` assume_tac)
           >> fs[GSYM reduction_def]
-          >> Q.ISPEC_THEN `reduction` imp_res_tac RTC_SINGLE
-          >> imp_res_tac RTC_RTC
-          >> asm_exists_tac >> simp[]
+          >> irule_at (Pos hd) (cj 2 TC_RULES)
+          >> irule_at (Pos hd) (cj 1 TC_RULES)
+          >> goal_assum drule
+          >> irule_at (Pos hd) (cj 1 TC_RULES)
+          >> goal_assum drule
           >> match_mp_tac junkcong_par
           >> conj_tac
           >- MATCH_ACCEPT_TAC junkcong_refl
@@ -460,7 +469,7 @@ val compile_network_preservation_trans = Q.store_thm("compile_network_preservati
       >> qmatch_goalsub_abbrev_tac `junkcong _ a1 _`
       >> qexists_tac `a1` >> unabbrev_all_tac
       >> conj_tac
-      >- (match_mp_tac RTC_SINGLE >> imp_res_tac trans_dequeue
+      >- (match_mp_tac (cj 1 TC_RULES) >> imp_res_tac trans_dequeue
           >> fs[reduction_def])
       >- MATCH_ACCEPT_TAC junkcong_refl)
   >- (* extchoice-l *)
@@ -469,14 +478,14 @@ val compile_network_preservation_trans = Q.store_thm("compile_network_preservati
       >> qmatch_goalsub_abbrev_tac `junkcong _ (NEndpoint a1 a2 a3) _`
       >> qexists_tac `NEndpoint a1 (a2 with bindings:= s.bindings |+ (fv,[1w])) a3` >> unabbrev_all_tac
       >> conj_tac
-      >- (Q.ISPEC_THEN `reduction` (match_mp_tac o CONJUNCT2) RTC_RULES
+      >- (Q.ISPEC_THEN `reduction` (match_mp_tac o CONJUNCT2) TC_RULES
           >> imp_res_tac trans_dequeue
           >> pop_assum(qspec_then `fv` assume_tac)
           >> qmatch_goalsub_abbrev_tac `Receive _ _ a1`
           >> qmatch_goalsub_abbrev_tac `NEndpoint _ a2 (compile_endpoint _ _)`
           >> qexists_tac `NEndpoint p2 a2 a1` >> unabbrev_all_tac
-          >> conj_tac >- fs[reduction_def]
-          >> match_mp_tac RTC_SINGLE
+          >> conj_tac >- (match_mp_tac (cj 1 TC_RULES) >> fs[reduction_def])
+          >> match_mp_tac (cj 1 TC_RULES)
           >> fs[reduction_def] >> match_mp_tac trans_if_true
           >> fs[FLOOKUP_UPDATE])
       >- (match_mp_tac junkcong_add_junk'''
@@ -488,15 +497,13 @@ val compile_network_preservation_trans = Q.store_thm("compile_network_preservati
       >> qmatch_goalsub_abbrev_tac `junkcong _ (NEndpoint a1 a2 a3) _`
       >> qexists_tac `NEndpoint a1 (a2 with bindings:= s.bindings |+ (fv,d)) a3` >> unabbrev_all_tac
       >> conj_tac
-      >- (Q.ISPEC_THEN `reduction` (match_mp_tac o CONJUNCT2) RTC_RULES
-          >> imp_res_tac trans_dequeue
-          >> first_x_assum(qspec_then `fv` assume_tac)
-          >> qmatch_goalsub_abbrev_tac `Receive _ _ a1`
-          >> qmatch_goalsub_abbrev_tac `NEndpoint _ a2 (compile_endpoint _ _)`
-          >> qexists_tac `NEndpoint p2 a2 a1` >> unabbrev_all_tac
-          >> conj_tac >- fs[reduction_def]
-          >> match_mp_tac RTC_SINGLE
-          >> fs[reduction_def] >> match_mp_tac trans_if_false
+      >- (match_mp_tac (cj 2 TC_RULES) >>
+          irule_at (Pos hd) (cj 1 TC_RULES) >>
+          simp[reduction_def] >>
+          irule_at (Pos hd) trans_dequeue >>
+          rpt(goal_assum drule) >>
+          match_mp_tac (cj 1 TC_RULES) >>
+          fs[reduction_def] >> match_mp_tac trans_if_false
           >> fs[FLOOKUP_UPDATE])
       >- (match_mp_tac junkcong_add_junk'''
           >> fs[free_var_names_endpoint_def,var_names_network_def,var_names_endpoint_def]
@@ -507,7 +514,7 @@ val compile_network_preservation_trans = Q.store_thm("compile_network_preservati
       >> qmatch_goalsub_abbrev_tac `junkcong _ a1 _`
       >> qexists_tac `a1` >> unabbrev_all_tac
       >> conj_tac
-      >- (match_mp_tac RTC_SINGLE >> imp_res_tac trans_if_true
+      >- (match_mp_tac (cj 1 TC_RULES) >> imp_res_tac trans_if_true
           >> fs[reduction_def])
       >- MATCH_ACCEPT_TAC junkcong_refl)
   >- (* trans_if_false *)
@@ -516,7 +523,7 @@ val compile_network_preservation_trans = Q.store_thm("compile_network_preservati
       >> qmatch_goalsub_abbrev_tac `junkcong _ a1 _`
       >> qexists_tac `a1` >> unabbrev_all_tac
       >> conj_tac
-      >- (match_mp_tac RTC_SINGLE >> imp_res_tac trans_if_false
+      >- (match_mp_tac (cj 1 TC_RULES) >> imp_res_tac trans_if_false
           >> fs[reduction_def])
       >- MATCH_ACCEPT_TAC junkcong_refl)
   >- (* trans_let *)
@@ -525,7 +532,7 @@ val compile_network_preservation_trans = Q.store_thm("compile_network_preservati
       >> qmatch_goalsub_abbrev_tac `junkcong _ a1 _`
       >> qexists_tac `a1` >> unabbrev_all_tac
       >> conj_tac
-      >- (match_mp_tac RTC_SINGLE >> imp_res_tac trans_let
+      >- (match_mp_tac (cj 1 TC_RULES) >> imp_res_tac trans_let
           >> fs[reduction_def])
       >- MATCH_ACCEPT_TAC junkcong_refl)
   >- (* trans_par_l *)
@@ -534,7 +541,7 @@ val compile_network_preservation_trans = Q.store_thm("compile_network_preservati
       >> first_x_assum drule
       >> (impl_tac >> fs[ALL_DISTINCT_APPEND,endpoints_def])
       >> strip_tac
-      >> drule reduction_par_l >> disch_then(qspec_then `compile_network_fv fv n2'` assume_tac)
+      >> drule reduction_par_l_TC >> disch_then(qspec_then `compile_network_fv fv n2'` assume_tac)
       >> asm_exists_tac >> simp[] >> match_mp_tac junkcong_par
       >> fs[junkcong_refl])
   >- (* trans_par_l *)
@@ -543,7 +550,7 @@ val compile_network_preservation_trans = Q.store_thm("compile_network_preservati
       >> first_x_assum drule
       >> (impl_tac >> fs[ALL_DISTINCT_APPEND,endpoints_def])
       >> strip_tac
-      >> drule reduction_par_r >> disch_then(qspec_then `compile_network_fv fv n1` assume_tac)
+      >> drule reduction_par_r_TC >> disch_then(qspec_then `compile_network_fv fv n1` assume_tac)
       >> asm_exists_tac >> simp[] >> match_mp_tac junkcong_par
       >> fs[junkcong_refl])
   >- (* trans_fix *)
@@ -551,18 +558,18 @@ val compile_network_preservation_trans = Q.store_thm("compile_network_preservati
       >> qmatch_goalsub_abbrev_tac `junkcong _ a1 _`
       >> qexists_tac `a1` >> unabbrev_all_tac
       >> simp[junkcong_refl]
-      >> match_mp_tac RTC_SUBSET
+      >> match_mp_tac (cj 1 TC_RULES)
       >> metis_tac[reduction_def,trans_fix])
-  );
+QED
 
-val compile_network_preservation = Q.store_thm("compile_network_preservation",
-  `∀n1 n2 fv.
+Theorem compile_network_preservation:
+  ∀n1 n2 fv.
     ALL_DISTINCT (MAP FST (endpoints n1)) ∧
     ¬MEM fv (var_names_network n1) ∧
     reduction^* n1 n2
     ==> ?n3. reduction^* (compile_network_fv fv n1) n3 ∧
-             junkcong {fv} (compile_network_fv fv n2) n3`,
-
+             junkcong {fv} (compile_network_fv fv n2) n3
+Proof
     `∀n1 n2.
         reduction^* n1 n2
         ==> ∀fv.
@@ -581,6 +588,7 @@ val compile_network_preservation = Q.store_thm("compile_network_preservation",
            \\ drule_then drule trans_var_names_mono \\ fs [])
     \\ drule_then (assume_tac o GSYM) endpoint_names_trans \\ fs []
     \\ first_x_assum (drule_then assume_tac) \\ fs []
+    \\ dxrule_then strip_assume_tac TC_RTC
     \\ qmatch_asmsub_abbrev_tac ‘reduction^* cn1  n3’
     \\ qmatch_asmsub_abbrev_tac ‘reduction^* cn1' n3'’
     \\ qspecl_then [‘{fv}’,‘cn1'’,‘n3’] assume_tac junkcong_reduction_eq
@@ -589,7 +597,46 @@ val compile_network_preservation = Q.store_thm("compile_network_preservation",
     \\ conj_tac
     >- (irule RTC_SPLIT \\ asm_exists_tac \\ fs [])
     \\ irule junkcong_trans \\ asm_exists_tac \\ fs []
-);
+QED
+
+Theorem compile_network_preservation_TC:
+  ∀n1 n2 fv.
+    ALL_DISTINCT (MAP FST (endpoints n1)) ∧
+    ¬MEM fv (var_names_network n1) ∧
+    reduction^+ n1 n2
+    ==> ?n3. reduction^+ (compile_network_fv fv n1) n3 ∧
+             junkcong {fv} (compile_network_fv fv n2) n3
+Proof
+    `∀n1 n2.
+        reduction^+ n1 n2
+        ==> ∀fv.
+             ALL_DISTINCT (MAP FST (endpoints n1)) ∧
+             ¬MEM fv (var_names_network n1)
+             ==> ?n3. reduction^+ (compile_network_fv fv n1) n3 ∧
+                      junkcong {fv} (compile_network_fv fv n2) n3`
+      suffices_by metis_tac []
+    \\ ho_match_mp_tac TC_INDUCT_LEFT1
+    \\ rw [reduction_def]
+    >- (metis_tac[compile_network_preservation_trans])
+    \\ drule_all compile_network_preservation_trans
+    \\ rw[]
+    \\ ‘~MEM fv (var_names_network n1')’
+       by (CCONTR_TAC \\ fs []
+           \\ drule_then drule trans_var_names_mono \\ fs [])
+    \\ drule_then (assume_tac o GSYM) endpoint_names_trans \\ fs []
+    \\ first_x_assum (drule_then strip_assume_tac)
+    \\ irule_at (Pos hd) (cj 2 TC_RULES)
+    \\ goal_assum drule
+    \\ qmatch_asmsub_abbrev_tac ‘reduction^+ cn1  n3’
+    \\ qmatch_asmsub_abbrev_tac ‘reduction^+ cn1' n3'’
+    \\ qspecl_then [‘{fv}’,‘cn1'’,‘n3’] assume_tac junkcong_reduction_eq_TC
+    \\ first_x_assum drule
+    \\ rw[FORALL_AND_THM]
+    \\ first_x_assum drule
+    \\ strip_tac
+    \\ goal_assum drule
+    \\ metis_tac[junkcong_rules]
+QED
 
 val (choice_rel_rules,choice_rel_ind,choice_rel_cases) = Hol_reln `
   (* choice_rel_eq_junk *)
