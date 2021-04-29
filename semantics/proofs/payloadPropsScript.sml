@@ -3226,7 +3226,7 @@ Definition can_match_def:
 End
 
 Theorem can_match_wfLabel:
-  ∀conf n α n'. can_match conf n α ⇒ wfLabel conf α
+  ∀conf n α. can_match conf n α ⇒ wfLabel conf α
 Proof
   simp[can_match_def,PULL_EXISTS] >>
   Cases_on ‘α’ >> TRY(simp[] >> NO_TAC) >>
