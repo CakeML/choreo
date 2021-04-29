@@ -804,6 +804,7 @@ Proof
                                   `compile_endpoint exp`,
                                   `<|bindings := ba; funs := []; queues := qa|>`,`v`] mp_tac) >>
           simp[Abbr ‘qa’,Abbr‘ba’] >>
+          disch_then (mp_then Any mp_tac TC_RTC) >>
           match_mp_tac(DECIDE “x = y ⇒ (x ⇒ y)”) >>
           rpt(AP_TERM_TAC ORELSE AP_THM_TAC) >>
           rw[compile_queue_midskip_lemma] >>
