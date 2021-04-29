@@ -1628,7 +1628,8 @@ Theorem projection_reflection_junkcong:
        no_undefined_vars_network epn0 ∧
        (reduction conf)^* epn0 (compile_network conf epn1) ∧
        trans_s (s,c) (s',c') ∧
-       junkcong {new_fv s c} (project_choice (new_fv s c) s' c' (procsOf c)) epn1
+       junkcong {new_fv s c} (project_choice (new_fv s c) s' c' (procsOf c)) epn1 ∧
+       compile_network_ok s' c' (procsOf c)
 Proof
   rw [projection_def]
   \\ first_assum (mp_then Any mp_tac from_closure_reflection)
@@ -1902,7 +1903,8 @@ Theorem projection_reflection:
    ⇒ ∃epn' c' s'.
        (reduction conf)^* epn epn' ∧
       trans_s (s,c) (s',c') ∧
-      BISIM_REL (trans conf) (projection conf s' c' (procsOf c)) epn'
+      BISIM_REL (trans conf) (projection conf s' c' (procsOf c)) epn' ∧
+      compile_network_ok s' c' (procsOf c)
 Proof
   rw[] \\ drule_all projection_reflection_aux
   \\ rw[] \\ fs[compile_rel_def]
@@ -2088,9 +2090,11 @@ Proof
   rpt(disch_then drule) >>
   rpt strip_tac
   >- metis_tac[] >>
-  rw[DISJ_EQ_IMP] >>
-  pop_assum(qspec_then ‘s'’ assume_tac) >>  
-  cheat (* needs moar *)
+  drule proj_has_reduction' >>
+  impl_tac >- cheat >>
+  rw[]
+  >- (cheat) >>
+  cheat
 QED
-        
+
 val _ = export_theory ()
