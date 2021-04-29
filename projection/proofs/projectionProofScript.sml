@@ -2089,8 +2089,8 @@ Proof
   rpt strip_tac
   >- metis_tac[] >>
   rw[DISJ_EQ_IMP] >>
-  pop_assum(qspec_then ‘s'’ assume_tac) >>
-  cheat
+  pop_assum(qspec_then ‘s'’ assume_tac) >>  
+  cheat (* needs moar *)
 QED
         
 val _ = export_theory ()
