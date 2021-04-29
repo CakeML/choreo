@@ -4119,4 +4119,71 @@ Proof
   >- (gvs[dvarsOf_def])
 QED
 
+Theorem proj_has_reduction':
+   ∀s c s'' c''.
+    compile_network_ok s c ps
+    ∧ dvarsOf c = []
+    ∧ no_undefined_vars (s,c)
+    ∧ set(procsOf c) ⊆ set ps
+    ∧ ALL_DISTINCT ps
+    ==> (∃p2.
+          reduction (compile_network s c ps) p2) ∨
+          net_end(compile_network s c ps)
+Proof
+  rpt strip_tac >>
+  ‘∀l. ALL_DISTINCT(l ++ procsOf c) ∧
+       compile_network_ok s c (procsOf c) ⇒
+       (∃p2. reduction (compile_network s c (l ++ procsOf c)) p2) ∨
+        net_end (compile_network s c (l ++ procsOf c))’
+    by(Induct_on ‘l’ >>
+       rw[]
+       >- (drule_all proj_has_reduction >>
+           metis_tac[]) >>
+       gvs[compile_network_gen_def] >>
+       simp[project_nonmember_nil,net_end_def] >>
+       metis_tac[reduction_def,trans_par_r]) >>
+  qspecl_then [‘λp. MEM p (procsOf c)’,‘ps’] assume_tac PERM_SPLIT >>
+  ‘PERM (FILTER (λp. MEM p (procsOf c)) ps) (procsOf c)’
+    by(match_mp_tac PERM_ALL_DISTINCT >>
+       rw[ALL_DISTINCT_FILTER,MEM_FILTER,FILTER_FILTER,EQ_IMP_THM] >>
+       fs[SUBSET_DEF] >> res_tac >> fs[] >-
+         (pop_assum(strip_assume_tac o REWRITE_RULE [MEM_SPLIT]) >>
+          fs[ALL_DISTINCT_APPEND,FILTER_APPEND,APPEND_EQ_SING] >>
+          fs[FILTER_EQ_NIL,EVERY_MEM]) >>
+       ‘ALL_DISTINCT (procsOf c)’ by(simp[procsOf_all_distinct]) >>
+       qpat_x_assum ‘MEM _ (procsOf _)’ (strip_assume_tac o REWRITE_RULE [MEM_SPLIT]) >>
+       fs[ALL_DISTINCT_APPEND,FILTER_APPEND,APPEND_EQ_SING] >>
+       fs[FILTER_EQ_NIL,EVERY_MEM]) >>
+  drule PERM_CONG >>
+  disch_then(qspecl_then [‘FILTER ($~ ∘ (λp. MEM p (procsOf c))) ps’,‘FILTER ($~ ∘ (λp. MEM p (procsOf c))) ps’] mp_tac) >>
+  simp[PERM_REFL] >>
+  strip_tac >>
+  dxrule_all PERM_TRANS >>
+  pop_assum kall_tac >>
+  strip_tac >>
+  fs[Once PERM_SYM] >>
+  qmatch_asmsub_abbrev_tac ‘PERM (_ ++ a1)’ >>
+  first_x_assum(qspec_then ‘a1’ mp_tac) >>
+  impl_tac >-
+   (conj_tac
+    >- (imp_res_tac ALL_DISTINCT_PERM >>
+        gvs[ALL_DISTINCT_APPEND] >>
+        metis_tac[]) >>
+    match_mp_tac compile_network_ok_subset >>
+    metis_tac[]) >>
+  strip_tac
+  >- (drule_at (Pos last) PERM_TRANS >>
+      disch_then(qspec_then ‘a1 ++ procsOf c’ mp_tac) >>
+      simp[PERM_APPEND] >>
+      strip_tac >>
+      drule PERM_rcong_chor_compile_network >>
+      disch_then(qspecl_then [‘s’,‘c’] mp_tac) >>
+      strip_tac >>          
+      dxrule epn_rcong_imp_trans >>
+      rw[FORALL_AND_THM] >>
+      gvs[reduction_def] >>
+      metis_tac[]) >>
+  cheat
+QED
+
 val _ = export_theory ()
