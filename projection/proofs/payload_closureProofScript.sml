@@ -3430,6 +3430,83 @@ Proof
   metis_tac[bisim_trans]
 QED
 
+Theorem compile_rel_trans_pres:
+  ∀conf n1 α n2 n1'.
+    compile_rel conf n1 n2 ∧ trans conf n1 α n1' ⇒
+    ∃n2'. trans conf n2 α n2' ∧ compile_rel conf n1' n2'
+Proof
+  rpt strip_tac >>
+  fs[compile_rel_def] >>
+  qhdtm_x_assum ‘BISIM_REL’ (strip_assume_tac o REWRITE_RULE[Once bisimulationTheory.BISIM_REL_cases]) >>
+  fs[FORALL_AND_THM] >>
+  res_tac >>
+  goal_assum drule >>
+  simp[] >>
+  imp_res_tac letrec_network_trans_pres >> simp[]
+QED
+
+Theorem compile_rel_reduction_pres:
+  ∀conf n1 α n2 n1'.
+    compile_rel conf n1 n2 ∧ reduction conf n1 n1' ⇒
+    ∃n2'. reduction conf n2 n2' ∧ compile_rel conf n1' n2'
+Proof
+  rw[reduction_def] \\ metis_tac[compile_rel_trans_pres]
+QED
+
+Theorem compile_rel_reduction_TC_pres:
+  ∀conf n1 n1' n2 .
+    (reduction conf)^+ n1 n1' ∧ compile_rel conf n1 n2 ⇒
+    ∃n2'. (reduction conf)^+ n2 n2' ∧ compile_rel conf n1' n2'
+Proof
+  rw[]
+  \\ pop_assum mp_tac
+  \\ qid_spec_tac ‘n2’
+  \\ pop_assum mp_tac
+  \\ map_every qid_spec_tac [‘n1'’,‘n1’]
+  \\ ho_match_mp_tac TC_STRONG_INDUCT
+  \\ rw[]
+  >- (drule_all compile_rel_reduction_pres
+      \\ metis_tac [TC_RULES])
+  >- metis_tac[TC_RULES]
+QED
+
+Theorem compile_rel_sym:
+  ∀n1 n2 conf. compile_rel conf n1 n2 ⇒ compile_rel conf n2 n1
+Proof
+  rw[compile_rel_def,bisimulationTheory.BISIM_REL_def,BISIM_SYM]
+QED
+
+Theorem compile_network_preservation_alt_TC:
+  ∀conf p1 p2.
+    (reduction conf)^+ p1 p2
+    ∧ conf.payload_size > 0
+    ∧ fix_network p1
+    ∧ free_fix_names_network p1 = []
+    ∧ no_undefined_vars_network p1
+    ⇒ ∃p3. (reduction conf)^+ (compile_network_alt p1) p3 ∧
+           compile_rel conf p3 (compile_network_alt p2)
+Proof
+  strip_tac >>
+  simp[GSYM AND_IMP_INTRO] >>
+  ho_match_mp_tac TC_STRONG_INDUCT >>
+  rw[]
+  >- metis_tac[cj 1 TC_RULES,compile_network_preservation_trans_alt] >>
+  gs[] >>
+  ‘fix_network p1'’ by metis_tac[fix_network_reduction_RTC_pres,reduction_def,TC_RTC] >>
+  first_x_assum drule >>
+  impl_tac
+  >- (conj_tac
+      >- (imp_res_tac TC_RTC >>
+          imp_res_tac free_fix_names_network_reduction_RTC_pres >>
+          gs[])
+      >- metis_tac[no_undefined_vars_network_reduction_RTC_pres,TC_RTC]) >>
+  strip_tac >>
+  last_x_assum (mp_then Any mp_tac compile_rel_sym) >>
+  disch_then (mp_then Any mp_tac compile_rel_reduction_TC_pres) >>
+  disch_then drule >> rw[] >>
+  metis_tac[compile_rel_sym,compile_rel_trans,TC_RULES]
+QED
+
 Theorem compile_network_reflection_single:
   ∀p1 p2 conf.
     conf.payload_size > 0
@@ -3732,21 +3809,6 @@ Theorem compile_network_endpoints:
     MAP FST(endpoints(compile_network p1)) = MAP FST (endpoints p1)
 Proof
   Induct >> rw[compile_network_def,endpoints_def]
-QED
-
-Theorem compile_rel_trans_pres:
-  ∀conf n1 α n2 n1'.
-    compile_rel conf n1 n2 ∧ trans conf n1 α n1' ⇒
-    ∃n2'. trans conf n2 α n2' ∧ compile_rel conf n1' n2'
-Proof
-  rpt strip_tac >>
-  fs[compile_rel_def] >>
-  qhdtm_x_assum ‘BISIM_REL’ (strip_assume_tac o REWRITE_RULE[Once bisimulationTheory.BISIM_REL_cases]) >>
-  fs[FORALL_AND_THM] >>
-  res_tac >>
-  goal_assum drule >>
-  simp[] >>
-  imp_res_tac letrec_network_trans_pres >> simp[]
 QED
 
 Theorem list_trans_compile_rel:
