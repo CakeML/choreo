@@ -1984,7 +1984,7 @@ QED
 
 (* trans preserves the structure of the network *)
 Theorem trans_struct_pres_NEndpoint:
-  ∀conf p s c n L n'.
+  ∀conf p s c L n'.
    trans conf (NEndpoint p s c) L n'
    ⇒ ∃ s' c'. n' = NEndpoint p s' c'
 Proof
