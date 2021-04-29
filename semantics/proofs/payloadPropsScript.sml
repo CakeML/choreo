@@ -297,7 +297,7 @@ Proof
   >- simp[RTC_REFL]
   >> match_mp_tac (RTC_RULES |> SPEC_ALL |> CONJUNCT2)
   >> metis_tac[reduction_def,trans_par_r]
-QED
+QED        
 
 Theorem reduction_TC_par_l:
   ∀p q r conf. (reduction conf)⁺ p q ==> (reduction conf)⁺ (NPar p r) (NPar q r)

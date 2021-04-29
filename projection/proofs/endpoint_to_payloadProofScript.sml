@@ -227,6 +227,26 @@ val compile_network_preservation_com_l = Q.store_thm("compile_network_preservati
   >> asm_exists_tac
   >> simp[] >> metis_tac[])
 
+Theorem compile_network_preservation_com_l_TC:
+  ∀conf d p1 p2 r1 r2 q1 q2.
+    conf.payload_size > 0
+    ∧ q1 ≠ q2
+    ∧ list_trans conf p1
+                        (MAP (λm. LSend q1 m q2) d)
+                        p2
+    ∧ list_trans conf r1
+                        (MAP (λm. LReceive q1 m q2) d)
+                        r2
+    ∧ d ≠ []
+    ==> (reduction conf)^+ (NPar p1 r1) (NPar p2 r2)
+Proof
+  Cases_on ‘d’ >> rw[list_trans_def,EXTEND_RTC_TC_EQN] >>
+  imp_res_tac payloadSemTheory.trans_com_l >>
+  simp [payloadSemTheory.reduction_def] >>
+  goal_assum(drule_at Any) >>
+  metis_tac[compile_network_preservation_com_l]
+QED
+
 val compile_network_preservation_com_r = Q.store_thm("compile_network_preservation_com_r",
   `∀conf d p1 p2 r1 r2 q1 q2.
     conf.payload_size > 0
@@ -247,6 +267,26 @@ val compile_network_preservation_com_r = Q.store_thm("compile_network_preservati
   >> asm_exists_tac
   >> simp[] >> metis_tac[])
 
+Theorem compile_network_preservation_com_r_TC:
+  ∀conf d p1 p2 r1 r2 q1 q2.
+    conf.payload_size > 0
+    ∧ q1 ≠ q2
+    ∧ list_trans conf p1
+                        (MAP (λm. LReceive q1 m q2) d)
+                        p2
+    ∧ list_trans conf r1
+                        (MAP (λm. LSend q1 m q2) d)
+                        r2
+    ∧ d ≠ []
+    ==> (reduction conf)^+ (NPar p1 r1) (NPar p2 r2)
+Proof
+  Cases_on ‘d’ >> rw[list_trans_def,EXTEND_RTC_TC_EQN] >>
+  imp_res_tac payloadSemTheory.trans_com_r >>
+  simp [payloadSemTheory.reduction_def] >>
+  goal_assum(drule_at Any) >>
+  metis_tac[compile_network_preservation_com_r]
+QED
+
 Theorem normalise_queues_FUPDATE_idem[simp]:
   normalise_queues (normalise_queues(q) |+ (p2,d2)) =
   normalise_queues (q|+ (p2,d2))
@@ -259,7 +299,7 @@ Theorem compile_message_preservation_dequeue:
    p1 ≠ p2 /\ conf.payload_size > 0 ∧
    qlk s.queues p1 = compile_message conf d ++ q1
    ==>
-   (reduction conf)^*
+   (reduction conf)^+
     (NEndpoint p2
                s
                (Receive p1 v ds e))
@@ -274,12 +314,13 @@ Proof
   >> PURE_ONCE_REWRITE_TAC[compile_message_def]
   >> simp[]
   >> IF_CASES_TAC >> strip_tac
-  >- (match_mp_tac RTC_SINGLE
+  >- (match_mp_tac (cj 1 TC_RULES)
       >> simp[payloadSemTheory.reduction_def]
       >> drule trans_dequeue_last_payload'
       >> fs[]
       >> rpt(disch_then drule) >> simp[SNOC_APPEND,unpad_pad,final_pad_TAKE])
-  >- (match_mp_tac (RTC_RULES |> SPEC_ALL |> CONJUNCT2)
+  >- (match_mp_tac (TC_RULES |> SPEC_ALL |> CONJUNCT2)
+      >> irule_at (Pos hd) (cj 1 TC_RULES)
       >> fs[pad_not_final] >> first_x_assum drule
       >> disch_then(qspecl_then [`ds ++ [TAKE conf.payload_size d]`,
                     `q1`,`e`,`s with queues := normalise_queues(s.queues |+ (p1,compile_message conf (DROP conf.payload_size d) ++ q1))`,`v`] mp_tac)
@@ -363,13 +404,13 @@ Proof
   Induct_on ‘e’ >>
   rw[compile_endpoint_def,endpointLangTheory.dsubst_def,payloadLangTheory.dsubst_def]
 QED
-        
+
 val compile_network_preservation_trans = Q.store_thm("compile_network_preservation_trans",
   `∀p1 p2 conf.
     conf.payload_size > 0
     ∧ choice_free_network p1
     ∧ reduction p1 p2
-    ==> (reduction conf)^* (compile_network conf p1) (compile_network conf p2)
+    ==> (reduction conf)^+ (compile_network conf p1) (compile_network conf p2)
   `,
   rpt strip_tac
   >> qpat_x_assum `conf.payload_size > 0` mp_tac
@@ -384,14 +425,18 @@ val compile_network_preservation_trans = Q.store_thm("compile_network_preservati
   >> rpt strip_tac >> fs[] >> rveq
   >- ((* trans_com_l *)
       MAP_EVERY imp_res_tac [compile_network_preservation_send,
-                             compile_network_preservation_receive,
-                             compile_network_preservation_com_l]
-      >> simp[compile_network_def])
+                             compile_network_preservation_receive] >>
+      simp[compile_network_def] >>
+      match_mp_tac compile_network_preservation_com_l_TC >>
+      rpt(goal_assum drule) >>
+      simp[compile_message_nonempty])
   >- ((* trans_com_r *)
       MAP_EVERY imp_res_tac [compile_network_preservation_send,
-                             compile_network_preservation_receive,
-                             compile_network_preservation_com_r]
-      >> simp[compile_network_def])
+                             compile_network_preservation_receive] >>
+      simp[compile_network_def] >>
+      match_mp_tac compile_network_preservation_com_r_TC >>
+      rpt(goal_assum drule) >>
+      simp[compile_message_nonempty])
   >- ((*trans_com_choice_l*)
       fs[choice_free_network_def] >> metis_tac[choice_free_network_no_choice])
   >- ((*trans_com_choice_r*)
@@ -419,33 +464,33 @@ val compile_network_preservation_trans = Q.store_thm("compile_network_preservati
       fs[choice_free_network_def,choice_free_endpoint_def])
   >- ((* trans_if_true *)
       fs[compile_network_def,compile_queue_def,compile_endpoint_def,compile_state_def]
-      >> match_mp_tac RTC_SUBSET
+      >> match_mp_tac (cj 1 TC_RULES)
       >> simp[payloadSemTheory.reduction_def]
       >> match_mp_tac payloadSemTheory.trans_if_true
       >> simp[])
   >- ((* trans_if_false *)
       fs[compile_network_def,compile_queue_def,compile_endpoint_def,compile_state_def]
-      >> match_mp_tac RTC_SUBSET
+      >> match_mp_tac (cj 1 TC_RULES)
       >> simp[payloadSemTheory.reduction_def]
       >> match_mp_tac payloadSemTheory.trans_if_false
       >> simp[])
   >- ((* trans_let *)
       fs[compile_network_def,compile_queue_def,compile_endpoint_def,compile_state_def]
-      >> match_mp_tac RTC_SUBSET
+      >> match_mp_tac (cj 1 TC_RULES)
       >> simp[payloadSemTheory.reduction_def]
       >> `EVERY IS_SOME (MAP (FLOOKUP ((<|bindings := s.bindings; funs := []; queues:=compile_queue conf s.queue|> : closure state).bindings)) vl)`
           by(fs[EVERY_MAP])
       >> drule payloadSemTheory.trans_let >> simp[])
   >- ((* trans_par_l *)
       fs[compile_network_def,choice_free_network_def] >> first_x_assum drule
-      >> MATCH_ACCEPT_TAC payloadPropsTheory.reduction_par_l)
+      >> MATCH_ACCEPT_TAC payloadPropsTheory.reduction_TC_par_l)
   >- ((* trans_par_r *)
       fs[compile_network_def,choice_free_network_def] >> first_x_assum drule
-      >> MATCH_ACCEPT_TAC payloadPropsTheory.reduction_par_r)
+      >> MATCH_ACCEPT_TAC payloadPropsTheory.reduction_TC_par_r)
   >- ((* trans_fix *)
       fs[compile_network_def,choice_free_network_def,compile_endpoint_dsubst,
          compile_endpoint_def] >>
-      match_mp_tac RTC_SUBSET >>
+      match_mp_tac (cj 1 TC_RULES) >>
       simp[payloadSemTheory.reduction_def] >>
       rw[Once payloadSemTheory.trans_cases]));
 
@@ -465,7 +510,26 @@ val compile_network_preservation = Q.store_thm("compile_network_preservation",
   >> first_x_assum drule >> strip_tac
   >> fs[GSYM reduction_def]
   >> drule compile_network_preservation_trans >> simp[Once CONJ_SYM]
-  >> rpt(disch_then drule) >> strip_tac >> metis_tac[RTC_RTC]);
+  >> rpt(disch_then drule) >> strip_tac >> metis_tac[TC_RTC,RTC_RTC]);
+
+Theorem compile_network_preservation_TC:
+  ∀conf p1 p2.
+    conf.payload_size > 0
+    ∧ reduction^+ p1 p2 ∧ choice_free_network p1
+    ==> (reduction conf)^+ (compile_network conf p1) (compile_network conf p2)
+Proof
+  strip_tac >> simp[GSYM AND_IMP_INTRO,RIGHT_FORALL_IMP_THM]
+  >> strip_tac
+  >> ho_match_mp_tac TC_INDUCT_LEFT1
+  >> rpt strip_tac
+  >- metis_tac[compile_network_preservation_trans,reduction_def]
+  >> fs[reduction_def]
+  >> imp_res_tac choice_free_trans_pres
+  >> first_x_assum drule >> strip_tac
+  >> fs[GSYM reduction_def]
+  >> drule compile_network_preservation_trans >> simp[Once CONJ_SYM]
+  >> rpt(disch_then drule) >> strip_tac >> metis_tac[cj 2 TC_RULES]
+QED
 
 Theorem qlk_update_eq:
   qlk (q |+ (p1,x)) p2 = if p1 = p2 then x else qlk q p2
