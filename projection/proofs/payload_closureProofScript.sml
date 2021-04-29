@@ -3332,14 +3332,13 @@ Theorem compile_network_preservation_trans:
     ∧ free_fix_names_network p1 = []
     ∧ no_undefined_vars_network p1
     ∧ reduction conf p1 p2
-    ⇒ ∃p3. (reduction conf)^* (compile_network p1) p3 ∧
+    ⇒ ∃p3. (reduction conf)^+ (compile_network p1) p3 ∧
            compile_rel conf p3 (compile_network_alt p2)
 Proof
   rpt strip_tac >>
   drule_all_then strip_assume_tac compile_network_preservation_trans_alt >>
-  goal_assum(resolve_then (Pos hd) mp_tac RTC_RTC) >>
-  goal_assum(resolve_then (Pos hd) mp_tac compile_network_reduction_alt) >>
-  goal_assum(resolve_then (Pos hd) mp_tac RTC_SUBSET) >>
+  irule_at(Pos hd) EXTEND_RTC_TC_RIGHT1 >>
+  irule_at (Pos hd) compile_network_reduction_alt >>
   goal_assum drule >>
   simp[]
 QED
