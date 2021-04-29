@@ -30,7 +30,7 @@ Triviality to_payload_preservation =
   endpoint_to_payloadProofTheory.compile_network_preservation;
 
 Triviality to_closure_preservation =
-  payload_closureProofTheory.compile_network_preservation_alt
+  payload_closureProofTheory.compile_network_preservation_alt;
 
 Theorem endpoints_compile_network_chor:
   ∀s c l. MAP FST (endpointProps$endpoints (compile_network s (c : chor) l)) = l
@@ -2071,6 +2071,68 @@ Proof
   metis_tac[PAIR,FST,SND,dvarsOf_nil_trans]
 QED
 
+Theorem BISIM_REL_reduction_TC:
+  ∀conf q p p'.
+    (reduction conf)^+ p p' ∧ BISIM_REL (trans conf)  p q
+    ⇒ ∃q'. (reduction conf)^+ q q' ∧ BISIM_REL (trans conf) p' q'
+Proof
+  strip_tac
+  \\ ‘∀p p'. (reduction conf)^+ p p'
+             ⇒ ∀q. BISIM_REL (trans conf)  p q
+                   ⇒ ∃q'. (reduction conf)^+ q q' ∧
+                          BISIM_REL (trans conf) p' q'’
+  suffices_by metis_tac[]
+  \\ ho_match_mp_tac TC_INDUCT
+  \\ rw[]
+  >- (gs[payloadSemTheory.reduction_def]
+      \\ drule (BISIM_REL_cases  |> SPEC_ALL |>  EQ_IMP_RULE  |> fst)
+      \\ disch_then (qspec_then ‘LTau’ assume_tac)
+      \\ gs[] \\ pop_assum drule \\ rw []
+      \\ irule_at Any (cj 1 TC_RULES)
+      \\ metis_tac[payloadSemTheory.reduction_def])
+  >- metis_tac [TC_RULES,BISIM_REL_def,BISIM_TRANS]
+QED
+
+Theorem net_end_projection:
+  ∀s c l conf.
+    net_end (compile_network s c l) ⇒ net_end (projection conf s c l)
+Proof
+  rw[projection_def,endpoint_to_choiceTheory.compile_network_def]
+  \\ qmatch_goalsub_rename_tac ‘compile_network_fv fv epn’
+  \\ pop_assum mp_tac
+  \\ Induct_on ‘epn’
+  \\ EVAL_TAC \\ rw [] \\ EVAL_TAC
+  \\ Cases_on ‘e’ \\ gs [net_end_def] \\ EVAL_TAC
+QED
+
+Theorem net_end_eq_projection_nil:
+  ∀s c l conf.
+    net_end (projection conf s c l)
+    ⇒ projection conf s c l = projection conf s Nil l
+Proof
+  rw[projection_def,endpoint_to_choiceTheory.compile_network_def]
+  \\ qmatch_goalsub_rename_tac ‘compile_network_fv fv’
+  \\ qmatch_goalsub_rename_tac ‘compile_network_fv fv' (compile_network s Nil l)’
+  \\ Induct_on ‘l’
+  \\ EVAL_TAC \\ rw [] \\ EVAL_TAC
+  >- (qmatch_goalsub_abbrev_tac ‘nub' ll’
+      \\ ‘ll = []’ suffices_by simp[nub'_def]
+      \\ UNABBREV_ALL_TAC
+      \\ qmatch_goalsub_abbrev_tac ‘written_var_names_endpoint ee’
+      \\ ‘fix_endpoint ee’
+        by (UNABBREV_ALL_TAC
+            \\ qmatch_goalsub_rename_tac ‘fix_endpoint (compile_endpoint ep)’
+            \\ rpt (pop_assum kall_tac)
+            \\ Induct_on ‘ep’ \\ EVAL_TAC \\ rw[])
+      \\ Cases_on ‘ee’
+      \\ gs [payloadLangTheory.net_end_def,
+             compile_endpoint_def,fix_endpoint_def,written_var_names_endpoint_def])
+  >- (qmatch_goalsub_abbrev_tac ‘ee = _’
+      \\ Cases_on ‘ee’
+      \\ gs [payloadLangTheory.net_end_def,
+             compile_endpoint_def,fix_endpoint_def,written_var_names_endpoint_def])
+QED
+
 Theorem projection_deadlock_freedom:
   compile_network_ok s c (procsOf c) ∧ conf.payload_size > 0 ∧
   no_undefined_vars (s,c) ∧ dvarsOf c = [] ∧
@@ -2092,20 +2154,35 @@ Proof
   rpt strip_tac
   >- metis_tac[] >>
   drule proj_has_reduction' >>
-  impl_tac >- cheat >>
+  impl_tac
+  >- (drule dvarsOf_nil_trans_s >>
+      drule no_undefined_vars_trans_s_pres >>
+      drule procsOf_trans_s_SUBSET >>
+      simp[procsOf_all_distinct]) >>
   rw[]
   >- (disj2_tac >>
       gvs[projection_def] >>
       drule_then assume_tac (cj 1 TC_RULES) >>
       drule_at (Pos last) endpoint_to_choiceProofTheory.compile_network_preservation_TC >>
-      cheat
-(*      drule compile_network_preservation_TC >>
-      disch_then(qspecl_then [‘compile_network s' c' (procsOf c)’,‘p2’] mp_tac) >>
-      impl_tac >- cheat >>
-      rw[EXTEND_RTC_TC_EQN] >>
-      pop_assum kall_tac >>
-*)) >>
-  cheat
+      qmatch_goalsub_abbrev_tac ‘var_names_network nn’ >>
+      disch_then (qspec_then ‘gen_fresh_name (var_names_network nn)’ mp_tac) >>
+      impl_tac >- simp[Abbr‘nn’,gen_fresh_name_same,
+                       endpoints_compile_network_chor,procsOf_all_distinct] >>
+      rw[] >>
+      drule endpoint_to_payloadProofTheory.compile_network_preservation_TC >>
+      disch_then drule >> simp[choice_free_network_compile_network_fv] >>
+      rw[] >>
+      drule compile_network_preservation_alt_TC >>
+      impl_tac
+      >- (rw[fix_network_compile_network,Abbr‘nn’]
+          >- (irule_at Any dvarsOf_imp_free_fix_names_network >>
+              metis_tac[FST,SND,dvarsOf_nil_trans_s])
+          >- metis_tac [no_undefined_vars_trans_s_pres,
+                        no_undefined_vars_chor_to_network])>>
+      rw []>>gs[Abbr‘nn’,endpoint_to_choiceTheory.compile_network_def]>>
+      qmatch_asmsub_abbrev_tac ‘BISIM_REL _ nn’>>
+      drule_all BISIM_REL_reduction_TC>>simp[Once TC_CASES1]>>metis_tac[])
+  >- metis_tac[net_end_projection,net_end_eq_projection_nil]
 QED
 
 val _ = export_theory ()
