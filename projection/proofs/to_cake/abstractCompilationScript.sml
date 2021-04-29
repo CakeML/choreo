@@ -65,7 +65,7 @@ Proof
 QED
 
 Definition triR_def:
-  triR R n e1 e2 ⇔ ∃e. NRC R n e1 e ∧ R꙳ e2 e
+  triR R n e1 e2 ⇔ ∃e. NRC R n e1 e ∧ R꙳ e2 e ∧ (n = 0 ⇒ e2 = e)
 End
 
 Definition tcdistance_def:
@@ -125,13 +125,13 @@ Proof
 QED
 
 Theorem triR_step1R:
-  triR R n a b ∧ R b0 b ⇒ triR R n a b0
+  0 < n ∧ triR R n a b ∧ R b0 b ⇒ triR R n a b0
 Proof
   simp[triR_def] >> metis_tac[RTC_RULES]
 QED
 
 Theorem triR_stepsR:
-  R꙳ b0 b ∧ triR R n a b ⇒ triR R n a b0
+  0 < n ∧ R꙳ b0 b ∧ triR R n a b ⇒ triR R n a b0
 Proof
   simp[triR_def] >> metis_tac[RTC_CASES_RTC_TWICE]
 QED
