@@ -93,9 +93,9 @@ QED
  *)
 Theorem break_smallstep_LetNONE:
   stepr꙳ (env0, st0, Exp e1, []) (env, st, Val v, []) ⇒
-  stepr꙳ (env0, st0, Exp (e1 ;; e2), []) (env0, st, Exp e2, [])
+  stepr⁺ (env0, st0, Exp (e1 ;; e2), []) (env0, st, Exp e2, [])
 Proof
-  strip_tac >> irule (cj 2 RTC_RULES) >>
+  strip_tac >> irule EXTEND_RTC_TC >>
   simp[e_step_reln_def, e_step_def, push_def] >>
   drule_then (qspec_then ‘[(Clet NONE () e2,env0)]’ assume_tac)
              smallstep_augment_conts >> gs[] >>
