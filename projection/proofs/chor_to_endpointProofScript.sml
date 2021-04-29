@@ -4048,4 +4048,75 @@ Proof
   \\ asm_exists_tac \\ fs []
 QED
 
+Theorem proj_has_reduction:
+   ∀s c s'' c''.
+    compile_network_ok s c (procsOf c)
+    ∧ dvarsOf c = []
+    ∧ no_undefined_vars (s,c)
+    ==> (∃p2.
+          reduction (compile_network s c (procsOf c)) p2) ∨
+          net_end(compile_network s c (procsOf c))
+Proof
+  Cases_on ‘c’
+  >- (* Nil *) rw[compile_network_gen_def,procsOf_def,net_end_def]
+  >- (rw[procsOf_def,compile_network_gen_def,nub'_def,reduction_def,project_def] >>
+      disj1_tac >>
+      irule_at (Pos hd) trans_par_l >>
+      gvs[no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP] >>
+      Cases_on ‘v = [1w]’
+      >- (irule_at (Pos hd) endpointSemTheory.trans_if_true >>
+          rw[lookup_projectS]) >>
+      irule_at (Pos hd) endpointSemTheory.trans_if_false >>
+      rw[] >>
+      irule_at (Pos hd) lookup_projectS >>
+      simp[])
+  >- (rw[procsOf_def,compile_network_gen_def,nub'_def,reduction_def,project_def] >>
+      disj1_tac >>
+      irule_at (Pos hd) trans_com_l >>
+      irule_at Any trans_send >>
+      gvs[no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP] >>
+      irule_at (Pos hd) lookup_projectS >>
+      simp[] >>
+      irule_at (Pos hd) trans_par_l >>
+      irule_at (Pos hd) trans_enqueue >>
+      simp[])
+  >- (rw[procsOf_def,compile_network_gen_def,nub'_def,reduction_def,project_def] >>
+      disj1_tac >>
+      irule_at (Pos hd) trans_par_l >>
+      irule_at (Pos hd) endpointSemTheory.trans_let >>
+      gvs[no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP,EVERY_MEM,SUBSET_DEF,MEM_MAP,PULL_EXISTS,IS_SOME_EXISTS] >>
+      rw[] >>
+      irule_at (Pos hd) lookup_projectS >>
+      metis_tac[])
+  >- (rw[procsOf_def,compile_network_gen_def,nub'_def,reduction_def,project_def] >>
+      disj1_tac >>
+      irule_at (Pos hd) trans_com_choice_l >>
+      irule_at Any trans_int_choice >>
+      irule_at Any trans_par_l >>
+      Cases_on ‘b’ >> rw[]
+      >- (irule_at Any trans_enqueue_choice_l >> rw [])
+      >- (irule_at Any trans_enqueue_choice_r >> rw []))
+  >- (rw[] >>
+      rename1 ‘compile_network _ _ l’ >>
+      Induct_on ‘l’ >> rw[compile_network_gen_def,net_end_def] >>
+      gvs[project_def] >>
+      rw[]
+      >- (disj1_tac >>
+          simp[reduction_def] >>
+          irule_at Any trans_par_l >>
+          irule_at Any endpointSemTheory.trans_fix)
+      >- (gvs[] >>
+          disj1_tac >>
+          gvs[reduction_def] >>
+          irule_at Any trans_par_r >>
+          goal_assum drule)
+      >- (gvs[] >>
+          disj1_tac >>
+          gvs[reduction_def] >>
+          irule_at Any trans_par_l >>
+          irule_at Any endpointSemTheory.trans_fix)
+      >- (gvs[net_end_def]))
+  >- (gvs[dvarsOf_def])
+QED
+
 val _ = export_theory ()

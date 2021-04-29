@@ -2035,4 +2035,62 @@ Proof
   \\ Cases_on ‘e’ \\ fs [payloadLangTheory.net_end_def]
 QED
 
+Theorem chor_deadlock_freedom':
+  ∀c s c' s'.
+   no_undefined_vars (s,c) ∧
+   no_self_comunication c  ∧
+   dvarsOf c = [] ∧
+   trans_s (s,c) (s',c')
+   ⇒ c' = Nil ∨ ∃τ l s'' c''. trans (s',c') (τ,l) (s'',c'')
+Proof
+  simp[trans_s_def] >>
+  Induct_on ‘RTC’ >>
+  rw[]
+  >- (drule_then drule deadlockFreedomTheory.chor_deadlock_freedom >>
+      rw[not_finish_def,DISJ_EQ_IMP] >>
+      Cases_on ‘∃x. c = Call x’
+      >- gvs[dvarsOf_def] >>
+      gvs[] >>
+      metis_tac[]) >>
+  first_x_assum(match_mp_tac o MP_CANON) >>
+  Cases_on ‘c'''’ >> simp[] >>
+  drule_then drule deadlockFreedomTheory.chor_deadlock_freedom >>
+  impl_tac >-
+   (rw[not_finish_def] >>
+    spose_not_then strip_assume_tac >>
+    gvs[] >>
+    qhdtm_x_assum ‘trans’ (strip_assume_tac o ONCE_REWRITE_RULE[trans_cases]) >>
+    gvs[]) >>
+  strip_tac >>
+  gvs[GSYM trans_s_def] >>
+  conj_tac >- metis_tac[no_undefined_vars_trans_pres] >>  
+  conj_tac >- metis_tac[PAIR,FST,SND,no_self_comunication_trans_pres] >>
+  metis_tac[PAIR,FST,SND,dvarsOf_nil_trans]
+QED
+
+Theorem projection_deadlock_freedom:
+  compile_network_ok s c (procsOf c) ∧ conf.payload_size > 0 ∧
+  no_undefined_vars (s,c) ∧ dvarsOf c = [] ∧
+  (reduction conf)^* (projection conf s c (procsOf c)) epn ∧
+  no_self_comunication c
+  ⇒
+  (∃s. BISIM_REL (trans conf) (projection conf s Nil (procsOf c)) epn)
+  ∨ ∃epn''. reduction conf epn epn''
+Proof
+  rpt strip_tac >>
+  drule projection_reflection >>
+  rpt(disch_then drule) >>
+  rpt strip_tac >>
+  reverse(qpat_x_assum ‘RTC _ _ _’ (strip_assume_tac o REWRITE_RULE[Once RTC_cases]))
+  >- metis_tac[] >>
+  rveq >>
+  drule chor_deadlock_freedom' >>
+  rpt(disch_then drule) >>
+  rpt strip_tac
+  >- metis_tac[] >>
+  rw[DISJ_EQ_IMP] >>
+  pop_assum(qspec_then ‘s'’ assume_tac) >>
+  cheat
+QED
+        
 val _ = export_theory ()
