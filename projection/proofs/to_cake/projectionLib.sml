@@ -619,7 +619,7 @@ struct
              CONV_TAC(LHS_CONV EVAL) >>
              MATCH_ACCEPT_TAC EQ_REFL)
     in
-      compilation_preservation
+      compilation_preservation_top
         |> Q.SPEC ‘FEMPTY’
         |> SPEC chor
         |> SPEC(mk_var("s2",“:string # string |-> word8 list”))
@@ -652,14 +652,14 @@ struct
         |> CONV_RULE(LAND_CONV (PURE_REWRITE_CONV[payload_to_cakemlProofTheory.sem_env_cor_def,env_asm_simps]))
         |> PURE_ONCE_REWRITE_RULE[GSYM AND_IMP_INTRO]
         |> C MP env_asm
-(*        |> CONV_RULE(LAND_CONV(SIMP_CONV
+        |> CONV_RULE(LAND_CONV(SIMP_CONV
                                  (std_ss ++ pred_setLib.PRED_SET_ss)
                                  [payload_to_cakemlProofTheory.pSt_pCd_corr_def,
                                   payload_to_cakemlProofTheory.pFv_def,
                                   payloadLangTheory.state_accfupds,
                                   finite_mapTheory.FLOOKUP_EMPTY,
                                   listTheory.MEM]))
-        |> C MP TRUTH*)
+        |> C MP TRUTH
         |> C MP enc_ok_thm
         |> DISCH_ALL
     end
