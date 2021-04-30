@@ -4508,7 +4508,7 @@ Proof
 QED
 
 
-Theorem simulated_stepr_pushes_forward:
+Theorem simulated_stepr_pushes_forward0:
   simR conf p0 cEnv0 pSt0 EP0 pN0 vs cvs cSt0 ∧
   (∀nd.
      nd ∈ network_nodenames (NEndpoint p0 pSt0 EP0) ⇒
@@ -4698,6 +4698,10 @@ Proof
   irule_at Any (cj 1 NRC |> iffRL) >> simp[] >> conj_tac >- metis_tac[] >>
   simp[nf_def]
 QED
+
+Theorem simulated_stepr_pushes_forward =
+        simulated_stepr_pushes_forward0 |> Q.INST [‘fn’ |-> ‘0’]
+                                        |> GEN_ALL |> SRULE[]
 
 
 Theorem NPar_trans_l_cases_full:
