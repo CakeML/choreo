@@ -2248,6 +2248,143 @@ Termination
   DECIDE_TAC
 End
 
+Definition good_arities_def:
+  good_arities funs e =
+  (consistent_arities e ∧
+   (∀f n. MEM (f,n) (arities e) ⇒
+          ∃vs fs bds e'.
+            ALOOKUP funs f = SOME (Closure vs (fs,bds) e') ∧
+            LENGTH vs = n))
+End
+
+Definition good_arities_closure_def:
+  good_arities_closure fn (Closure vars1 (fs1,bds1) e1) =
+  (good_arities ((fn,Closure vars1 (fs1,bds1) e1)::fs1) e1 ∧
+   EVERY (λ(fn',cl'). good_arities_closure fn' cl') fs1
+  )
+Termination
+  WF_REL_TAC ‘inv_image $< (closure_size o SND)’ >>
+  rw[payloadLangTheory.closure_size_def,MEM_MAP] >>
+  imp_res_tac payloadLangTheory.closure_size_MEM >>
+  DECIDE_TAC
+End
+
+Definition good_arities_network_def:
+  good_arities_network n =
+  EVERY (λ(p,s,e). EVERY (λ(fn,cl). good_arities_closure fn cl) s.funs ∧
+                   good_arities s.funs e) (endpoints n)
+End
+
+Theorem good_arities_network_pres:
+  trans conf n1 α n2 ∧ good_arities_network n1 ∧ letrec_network n1 ⇒ good_arities_network n2
+Proof
+  Induct_on ‘payloadSem$trans’ >>
+  rw[good_arities_network_def,payloadLangTheory.endpoints_def,
+     good_arities_def,arities_def,letrec_network_NPar,
+     consistent_arities_def
+    ] >>
+  gvs[letrec_network_def,payloadLangTheory.endpoints_def,letrec_endpoint_def,MEM_FILTER,PULL_EXISTS,
+      good_arities_closure_def,good_arities_def,consistent_arities_def
+     ] >>
+  rw[]
+  >- (gvs[EVERY_MEM] >>
+      imp_res_tac ALOOKUP_MEM >>
+      res_tac >>
+      fs[good_arities_closure_def,good_arities_def])
+  >- (gvs[EVERY_MEM] >>
+      imp_res_tac ALOOKUP_MEM >>
+      res_tac >>
+      fs[good_arities_closure_def,good_arities_def] >>
+      res_tac >>
+      gvs[])
+  >- (gvs[EVERY_MEM] >>
+      imp_res_tac ALOOKUP_MEM >>
+      res_tac >>
+      fs[good_arities_closure_def,good_arities_def] >>
+      res_tac >>
+      gvs[])
+  >- (gvs[EVERY_MEM] >>
+      imp_res_tac ALOOKUP_MEM >>
+      res_tac >>
+      fs[] >>
+      gvs[good_arities_closure_def,EVERY_MEM])
+  >- (gvs[EVERY_MEM] >>
+      imp_res_tac ALOOKUP_MEM >>
+      res_tac >>
+      fs[] >>
+      gvs[good_arities_closure_def,EVERY_MEM])
+  >- (gvs[EVERY_MEM] >>
+      imp_res_tac ALOOKUP_MEM >>
+      res_tac >>
+      fs[good_arities_closure_def,good_arities_def] >>
+      res_tac >>
+      gvs[])
+  >- (gvs[EVERY_MEM] >>
+      imp_res_tac ALOOKUP_MEM >>
+      res_tac >>
+      fs[good_arities_closure_def,good_arities_def] >>
+      res_tac >>
+      gvs[])
+  >- (gvs[EVERY_MEM] >>
+      imp_res_tac ALOOKUP_MEM >>
+      res_tac >>
+      fs[good_arities_closure_def,good_arities_def] >>
+      res_tac >>
+      gvs[])
+QED
+
+Theorem good_arities_network_reduction_pres:
+  (reduction conf)^* n1 n2 ∧ good_arities_network n1 ∧ letrec_network n1 ⇒ good_arities_network n2
+Proof
+  Induct_on ‘RTC’ >> rw[payloadSemTheory.reduction_def] >>
+  metis_tac[good_arities_network_pres,letrec_network_trans_pres]
+QED
+
+Definition partners_payload_network_def:
+  partners_payload_network n =
+  EVERY (λ(p,s,e). ~MEM p (partners_payload e) ∧
+                   EVERY (λcl. ~MEM p (partners_payload_closure cl)) (MAP SND s.funs)) (endpoints n)
+End
+
+Theorem partners_payload_network_trans_pres:
+  trans conf n1 α n2 ∧ partners_payload_network n1 ∧ letrec_network n1 ⇒ partners_payload_network n2
+Proof
+  Induct_on ‘payloadSem$trans’ >>
+  rw[partners_payload_network_def,payloadLangTheory.endpoints_def,
+     partners_payload_def,letrec_network_NPar,
+     partners_payload_closure_def
+    ] >>
+  gvs[letrec_network_def,letrec_endpoint_def,payloadLangTheory.endpoints_def]
+  >- (gvs[MEM_FLAT,MEM_MAP,PULL_EXISTS,EVERY_MEM] >>
+      metis_tac[])
+  >- (gvs[MEM_FLAT,MEM_MAP,PULL_EXISTS,EVERY_MEM] >>
+      imp_res_tac ALOOKUP_MEM >>
+      res_tac >>
+      fs[partners_payload_closure_def])
+  >- (gvs[MEM_FLAT,MEM_MAP,PULL_EXISTS,EVERY_MEM] >>
+      imp_res_tac ALOOKUP_MEM >>
+      res_tac >>
+      fs[partners_payload_closure_def])
+  >- (gvs[MEM_FLAT,MEM_MAP,PULL_EXISTS,EVERY_MEM] >>
+      imp_res_tac ALOOKUP_MEM >>
+      rpt(first_x_assum drule) >>
+      rw[partners_payload_closure_def,MEM_FLAT,MEM_MAP,PULL_EXISTS])
+  >- (gvs[MEM_FLAT,MEM_MAP,PULL_EXISTS,EVERY_MEM] >>
+      imp_res_tac ALOOKUP_MEM >>
+      rpt(first_x_assum drule) >>
+      rw[partners_payload_closure_def,MEM_FLAT,MEM_MAP,PULL_EXISTS] >>
+      metis_tac[]
+     )
+QED
+
+Theorem partners_payload_reduction_pres:
+  (reduction conf)^* n1 n2 ∧ partners_payload_network n1 ∧ letrec_network n1 ⇒ partners_payload_network n2
+Proof
+  Induct_on ‘RTC’ >> rw[payloadSemTheory.reduction_def] >>
+  imp_res_tac partners_payload_network_trans_pres >>
+  metis_tac[letrec_network_trans_pres]
+QED
+
 Theorem payload_bisim_nil_lemma:
   ∀epn1 epn2.
   BISIM_REL (trans conf) epn1 epn2 ∧
@@ -2272,7 +2409,7 @@ Proof
   pairarg_tac >>
   gvs[] >>
   pop_assum (strip_assume_tac o REWRITE_RULE[MEM_SPLIT]) >>
-  gvs[no_undefined_vars_network_def,letrec_network_def] >> 
+  gvs[no_undefined_vars_network_def,letrec_network_def] >>
   rename1 ‘(p,s,e)’ >>
   Cases_on ‘e’ >>
   gvs[payloadLangTheory.free_var_names_endpoint_def,FDOM_FLOOKUP,letrec_endpoint_def,
@@ -2413,7 +2550,7 @@ Proof
      impl_tac >- rw[EVERY_MEM] >>
      rw[])
   >- ((* FCall: epn2 can do an LTau, but epn1 can't *)
-     gvs[arities_def] >>     
+     gvs[arities_def] >>
      drule_at (Pos last) endpoints_trans_lift >>
      disch_then(resolve_then (Pos hd) mp_tac payloadSemTheory.trans_call) >>
      disch_then drule >>
@@ -2430,6 +2567,152 @@ Proof
      rw[])
 QED
 
+Theorem no_undefined_vars_compile_network_alt:
+  ∀n1.
+    no_undefined_vars_network n1 ∧ free_fix_names_network n1 = [] ⇒
+    no_undefined_vars_network (compile_network_alt n1)
+Proof
+  Induct >> rw[compile_network_alt_def,no_undefined_vars_network_NPar,letrec_network_NPar,
+               payloadLangTheory.free_fix_names_network_def] >>
+  gvs[no_undefined_vars_network_def,payloadLangTheory.endpoints_def,FDOM_FUPDATE_LIST,SUBSET_DEF,
+      letrec_network_def,letrec_endpoint_def] >>
+  rpt strip_tac >>
+  drule_at (Pos last) free_var_names_endpoint_compile_endpoint_NIL >>
+  rw[MEM_MAP,PULL_EXISTS,MEM_FILTER,MEM_nub'] >>
+  metis_tac[]
+QED
+
+Theorem trans_send_final_intermediate:
+  trans conf epn (LSend p d q) epn' ∧
+  EVERY
+    (λ(p,s,e).
+       ∀q. q ∈ FRANGE s.queues ⇒
+           EVERY (λx. final x ∨ intermediate x) q) (endpoints epn) ⇒
+  EVERY
+    (λ(p,s,e).
+       ∀q. q ∈ FRANGE s.queues ⇒
+           EVERY (λx. final x ∨ intermediate x) q) (endpoints epn') ∧
+  (final d ∨ intermediate d)
+Proof
+  Induct_on ‘payloadSem$trans’ >>
+  rw[payloadLangTheory.endpoints_def] >>
+  rw[payloadLangTheory.pad_def,payloadLangTheory.final_def,payloadLangTheory.intermediate_def]
+QED
+
+Theorem trans_receive_final_intermediate:
+  trans conf epn (LReceive p d q) epn' ∧
+  (final d ∨ intermediate d) ∧
+  EVERY
+    (λ(p,s,e).
+       ∀q. q ∈ FRANGE s.queues ⇒
+           EVERY (λx. final x ∨ intermediate x) q) (endpoints epn) ⇒
+  EVERY
+    (λ(p,s,e).
+       ∀q. q ∈ FRANGE s.queues ⇒
+           EVERY (λx. final x ∨ intermediate x) q) (endpoints epn')
+Proof
+  Induct_on ‘payloadSem$trans’ >>
+  rw[payloadLangTheory.endpoints_def] >>
+  gvs[FRANGE_FLOOKUP,FLOOKUP_normalise_queues_FUPDATE,AllCaseEqs(),PULL_EXISTS,
+      payloadLangTheory.qpush_def,
+      FLOOKUP_normalise_queues,payloadLangTheory.qlk_def,payloadLangTheory.fget_def,
+      FLOOKUP_UPDATE
+     ] >>
+  TRY(TOP_CASE_TAC >> simp[]) >>
+  res_tac >> gvs[]
+QED
+
+Theorem final_intermediate_pres:
+  trans conf epn LTau epn' ∧
+  EVERY
+    (λ(p,s,e).
+       ∀q. q ∈ FRANGE s.queues ⇒
+           EVERY (λx. final x ∨ intermediate x) q) (endpoints epn) ⇒
+  EVERY
+    (λ(p,s,e).
+       ∀q. q ∈ FRANGE s.queues ⇒
+           EVERY (λx. final x ∨ intermediate x) q) (endpoints epn')
+Proof
+  Induct_on ‘payloadSem$trans’ >>
+  rw[payloadLangTheory.endpoints_def]
+  >- metis_tac[trans_send_final_intermediate,trans_receive_final_intermediate]
+  >- metis_tac[trans_send_final_intermediate,trans_receive_final_intermediate]
+  >- metis_tac[trans_send_final_intermediate,trans_receive_final_intermediate]
+  >- metis_tac[trans_send_final_intermediate,trans_receive_final_intermediate] >>
+  gvs[FRANGE_FLOOKUP,FLOOKUP_normalise_queues_FUPDATE,AllCaseEqs(),PULL_EXISTS,
+          FLOOKUP_normalise_queues,payloadLangTheory.qlk_def,payloadLangTheory.fget_def] >>
+  res_tac >>
+  gvs[]
+QED
+
+Theorem final_intermediate_reduction:
+  (reduction conf)^* epn epn' ∧
+  EVERY
+    (λ(p,s,e).
+       ∀q. q ∈ FRANGE s.queues ⇒
+           EVERY (λx. final x ∨ intermediate x) q) (endpoints epn) ⇒
+  EVERY
+    (λ(p,s,e).
+       ∀q. q ∈ FRANGE s.queues ⇒
+           EVERY (λx. final x ∨ intermediate x) q) (endpoints epn')
+Proof
+  Induct_on ‘RTC’ >>
+  rw[payloadSemTheory.reduction_def] >>
+  drule_all final_intermediate_pres >>
+  gvs[]
+QED
+
+Theorem partners_payload_network_alt:
+  partners_payload_network n ⇒
+  partners_payload_network (compile_network_alt n)
+Proof
+  Induct_on ‘n’ >>
+  rw[partners_payload_network_def,payloadLangTheory.endpoints_def,
+     compile_network_alt_def] >>
+  gvs[partners_payload_network_def] >>
+  pop_assum kall_tac >>
+  rename1 ‘compile_endpoint l’ >>
+  pop_assum mp_tac >>
+  qid_spec_tac ‘l’ >>
+  Induct_on ‘e’ >>
+  rw[payload_closureTheory.compile_endpoint_def,partners_payload_def] >>
+  TOP_CASE_TAC >> simp[partners_payload_def]
+QED
+
+Definition partnered_network_def:
+  partnered_network n =
+  EVERY (λ(p,s,e). ~MEM p (partners_endpoint e)) (endpoints n)
+End
+
+Theorem partners_payload_network_to_payload:
+  partnered_network n ⇒
+  partners_payload_network (endpoint_to_payload$compile_network conf n)
+Proof
+  Induct_on ‘n’ >>
+  rw[partnered_network_def,partners_payload_network_def,payloadLangTheory.endpoints_def,
+     endpointPropsTheory.endpoints_def,
+     endpoint_to_payloadTheory.compile_network_def,compile_state_def] >>
+  gvs[partnered_network_def,partners_payload_network_def] >>
+  Induct_on ‘e’ >>
+  gvs[partners_endpoint_def,partners_payload_def,endpoint_to_payloadTheory.compile_endpoint_def]
+QED
+
+Theorem partners_choice_network:
+  partnered_network n ⇒
+  partnered_network (endpoint_to_choice$compile_network n)
+Proof
+  simp[endpoint_to_choiceTheory.compile_network_def] >>
+  rename1 ‘compile_network_fv v’ >>
+  Induct_on ‘n’ >>
+  rw[partnered_network_def,
+     endpointPropsTheory.endpoints_def,
+     endpoint_to_choiceTheory.compile_network_fv_def] >>
+  gvs[partnered_network_def] >>
+  Induct_on ‘e’ >>
+  gvs[partners_endpoint_def,endpoint_to_choiceTheory.compile_endpoint_def] >>
+  rw[partners_endpoint_def]
+QED
+
 Theorem projection_deadlock_freedom:
   compile_network_ok s c (procsOf c) ∧ conf.payload_size > 0 ∧
   no_undefined_vars (s,c) ∧ dvarsOf c = [] ∧
@@ -2439,7 +2722,91 @@ Theorem projection_deadlock_freedom:
   EVERY (λ(p,s,e). e = Nil) (endpoints epn)
   ∨ ∃epn''. reduction conf epn epn''
 Proof
-  cheat
+  rpt strip_tac >>
+  drule_all projection_deadlock_freedom_lemma >>
+  reverse strip_tac
+  >- metis_tac[] >>
+  disj1_tac >>
+  drule_then match_mp_tac payload_bisim_nil_lemma >>
+  conj_tac >- simp[] >>
+  conj_asm1_tac
+  >- (drule_then match_mp_tac no_undefined_vars_network_reduction_RTC_pres >>
+      gvs[projection_def] >>
+      match_mp_tac no_undefined_vars_compile_network_alt >>
+      simp[endpoint_to_choiceTheory.compile_network_def,dvarsOf_imp_free_fix_names_network] >>
+      match_mp_tac no_undefined_vars_chor_to_network >>
+      simp[]) >>
+  conj_asm1_tac
+  >- (drule_then match_mp_tac letrec_network_weak_reduction_pres >>
+      simp[projection_def] >>
+      match_mp_tac letrec_network_compile_network_alt >>
+      MATCH_ACCEPT_TAC fix_network_compile_network) >>
+  conj_asm1_tac
+  >- (rpt(pop_assum kall_tac) >>
+      ‘ALL_DISTINCT (procsOf c)’ by(metis_tac[procsOf_all_distinct]) >>
+      rename1 ‘projection _ _ _ l’ >>
+      Induct_on ‘l’ >- EVAL_TAC >>
+      EVAL_TAC >>
+      rw[] >>
+      rpt(pop_assum mp_tac) >>
+      EVAL_TAC >>
+      rw[]) >>
+  conj_asm1_tac >-
+   (drule_then match_mp_tac final_intermediate_reduction >>
+    rpt(pop_assum kall_tac) >>
+    rename1 ‘projection _ _ _ l’ >>
+    simp[projection_def,endpoint_to_choiceTheory.compile_network_def] >>
+    rename1 ‘compile_network_fv fv’ >>
+    Induct_on ‘l’ >> EVAL_TAC >>
+    strip_tac >>
+    pop_assum mp_tac >> EVAL_TAC >>
+    gvs[]) >>
+  conj_asm1_tac >-
+   (drule partners_payload_reduction_pres >>
+    impl_tac
+    >- (reverse conj_tac
+        >- (simp[projection_def] >>
+            match_mp_tac letrec_network_compile_network_alt >>
+            MATCH_ACCEPT_TAC fix_network_compile_network) >>
+        simp[projection_def] >>
+        match_mp_tac partners_payload_network_alt >>
+        match_mp_tac partners_payload_network_to_payload >>
+        match_mp_tac partners_choice_network >>
+        simp[partnered_network_def] >>
+        qpat_x_assum ‘no_self_comunication _’ mp_tac >>
+        rpt(pop_assum kall_tac) >>
+        rename1 ‘compile_network _ _ l’ >>
+        strip_tac >>
+        Induct_on ‘l’ >>
+        rw[compile_network_gen_def,endpointPropsTheory.endpoints_def] >>
+        drule_then MATCH_ACCEPT_TAC MEM_partners_endpoint_project) >>
+    rw[partners_payload_network_def] >>
+    match_mp_tac (MP_CANON EVERY_MONOTONIC) >>
+    first_x_assum (irule_at (Pos last)) >>
+    rw[ELIM_UNCURRY])
+  >- (drule good_arities_network_reduction_pres >>
+      impl_tac
+      >- (reverse conj_tac
+          >- (simp[projection_def] >>
+              match_mp_tac letrec_network_compile_network_alt >>
+              MATCH_ACCEPT_TAC fix_network_compile_network) >>
+          rename1 ‘projection _ _ _ l’ >>
+          rpt(pop_assum kall_tac) >>
+          simp[projection_def,endpoint_to_choiceTheory.compile_network_def] >>
+          qmatch_goalsub_abbrev_tac ‘compile_network_alt n’ >>
+          ‘fix_network n’ by rw[Abbr ‘n’,fix_network_compile_network] >>
+          last_x_assum kall_tac >>
+          Induct_on ‘n’ >>
+          rw[good_arities_network_def,payloadLangTheory.endpoints_def,
+             compile_network_alt_def,fix_network_def] >>
+          gvs[good_arities_network_def,fix_network_def] >>
+          simp[good_arities_def,compile_endpoint_consistent_arities] >>
+          rpt strip_tac >>
+          drule arities_compile_endpoint_IMP >>
+          rw[]) >>
+      simp[good_arities_network_def,good_arities_def] >>
+      match_mp_tac EVERY_MONOTONIC >>
+      rw[ELIM_UNCURRY])
 QED
-        
+
 val _ = export_theory ()
