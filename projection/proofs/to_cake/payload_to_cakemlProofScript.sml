@@ -4565,41 +4565,139 @@ Proof
           irule_at (Pos hd) (cj 2 RTC_RULES) >> gs[to_small_st_def] >>
           first_assum $ irule_at (Pos (el 2)) >> simp[transN_def] >>
           metis_tac[]) >>
-      gs[triR_def, to_small_st_def] >> cheat) >> cheat (*
-
-      >- (Cases_on ‘n < stepc’
-          >- (irule_at Any RTC_SUBSET >> simp[transN_def] >>
-              irule_at Any (DECIDE “p ⇒ q ∨ p”) >> first_assum $ irule_at Any >>
-              first_assum $ irule_at (Pos last) >> metis_tac[RTC_REFL]) >>
-          ‘stepc ≤ n’ by simp[] >>
-          drule_all_then assume_tac (MATCH_MP NRC_same_start stepr_det) >>
-          use_hidden_assum "IH" $ qspecl_then [‘n - stepc’, ‘pN1’] mp_tac >>
-          simp[LEX_DEF_THM] >> simp[to_small_st_def] >>
-          disch_then $ drule_at (Pos last) >>
-          disch_then $ drule >> simp[] >> impl_tac >- metis_tac[] >>
-          disch_then $ qx_choosel_then [‘EP2’, ‘pN2’, ‘pSt2’, ‘cs2’, ‘cEnv2’,
-                                        ‘cSt2’, ‘vs2’, ‘m2’] strip_assume_tac
-          >- (irule_at (Pos hd) (cj 2 RTC_RULES) >>
-              first_assum $ irule_at (Pos (el 2)) >> simp[] >>
+      gs[triR_def, to_small_st_def]
+      >- ((* CML state corresponding to next trans-state is directly reachable
+             with non-zero number of non-FFI steps (could be If, FCall, etc) *)
+          Cases_on ‘fn + n < stepc’
+          >- ((* we are already past the end of the whole sequence *)
+              irule_at (Pos hd) RTC_SUBSET >> simp[transN_def, PULL_EXISTS] >>
+              first_assum $ irule_at (Pos hd) >> simp[] >>
+              irule_at Any (DECIDE “p ⇒ q ∨ p”) >> first_assum $ irule_at Any>>
+              first_assum $ irule_at (Pos hd) >> metis_tac[RTC_REFL]) >>
+          gs[NOT_LESS] >>
+          Cases_on ‘stepc ≤ fn’
+          >- ((* new CML state is inside our non-FFI initial sequence,
+                 apply IH with reduced fn-number *)
+              drule_all_then assume_tac (MATCH_MP NRC_same_start stepr_det) >>
+              use_hidden_assum "IH"
+                (qspecl_then [‘n’, ‘fn - stepc’, ‘pN1’] mp_tac) >>
+              simp[LEX_DEF_THM] >> disch_then drule >> simp[] >>
+              disch_then $ drule_at (Pos last) >> simp[] >>
+              impl_tac >- metis_tac[] >>
+              disch_then (hide "IH'" o SRULE [to_small_st_def]) >>
+              irule_at (Pos hd) (cj 2 RTC_RULES) >>
+              simp[transN_def, PULL_EXISTS, EXISTS_PROD] >>
+              first_assum $ irule_at (Pos hd) >> simp[] >>
               irule_at Any NRC_ADD_I >> first_assum $ irule_at (Pos hd) >>
-              first_assum $ irule_at (Pos hd) >> simp[transN_def] >>
+              unhide_x_assum "IH'"
+                  (qx_choosel_then [‘EP2’, ‘pN2’, ‘pSt2’, ‘cs2’, ‘cEnv2’,
+                                    ‘cSt2’, ‘vs2’, ‘m2’] strip_assume_tac) >>
+              PairCases_on ‘cs2’ >>
+              ntac 3 (first_assum $ irule_at (Pos hd) >> simp[]) >>
               metis_tac[]) >>
+          gs[NOT_LESS_EQUAL] >>
+          (* new CML state is after non-FFI initial sequence, so can apply
+             IH with reduced n and empty non-FFI steps *)
+          unhide_x_assum "IH"
+            (qspecl_then [‘n + fn - stepc’, ‘0’, ‘pN1’] mp_tac) >>
+          simp[LEX_DEF_THM] >> disch_then drule >> simp[] >>
+          impl_tac >- (conj_tac >- metis_tac[] >>
+                       irule_at Any (MATCH_MP NRC_same_start stepr_det) >>
+                       simp[] >> first_assum $ irule_at Any >>
+                       metis_tac[NRC_ADD_I, ADD_COMM]) >>
+          disch_then (hide "IH'" o SRULE [to_small_st_def]) >>
+          irule_at (Pos hd) (cj 2 RTC_RULES) >>
+          simp[transN_def, PULL_EXISTS, EXISTS_PROD] >>
+          first_assum $ irule_at (Pos hd) >> simp[] >>
           irule_at Any NRC_ADD_I >> first_assum $ irule_at (Pos hd) >>
-          irule_at Any (cj 2 RTC_RULES) >>
-          first_assum $ irule_at (Pos (el 2)) >> simp[transN_def] >>
-          metis_tac[ADD_COMM]) >>
-      (* case when c0 and c1 merge at c' *)
-      *)
-
+          unhide_x_assum "IH'"
+             (qx_choosel_then [‘EP2’, ‘pN2’, ‘pSt2’, ‘cs2’, ‘cEnv2’,
+                               ‘cSt2’, ‘vs2’, ‘m2’] strip_assume_tac) >>
+          PairCases_on ‘cs2’  >>
+          ntac 3 (first_assum $ irule_at (Pos hd) >> simp[]) >> metis_tac[]) >>
+      (* CML1 is some non-FFI steps away from common point, but ffi-state has
+         changed, so we are past fn *)
+      ‘fn < stepc’
+        by (CCONTR_TAC >> gs[NOT_LESS] >>
+            drule_all_then assume_tac (MATCH_MP NRC_same_start stepr_det) >>
+            drule NRC_step_iomono >> simp[io_events_mono_def] >>
+            strip_tac >>
+            ‘io_events_mono cSt0.ffi ffi'’ by metis_tac[NRC_step_iomono] >>
+            gs[io_events_mono_def] >> metis_tac[IS_PREFIX_ANTISYM]) >>
+      rename [‘fn < stepc’, ‘NRC _ stepc _ (e',(r',f'),v',k')’,
+              ‘trans _ _ _ (NEndpoint _ _ c1)’,
+              ‘NRC _ fn' (_, _, Exp (compile_endpoint conf vs1 c1), [])
+                         (e',(r',f'),v',k')’] >>
+      Cases_on ‘stepc ≤ fn + n’
+      >- (unhide_x_assum "IH"
+            (qspecl_then [‘fn + n - stepc’, ‘fn'’, ‘pN1’] mp_tac) >>
+          simp[LEX_DEF_THM] >>
+          disch_then (resolve_then Any mp_tac
+                      (MATCH_MP NRC_same_start stepr_det)) >>
+          disch_then drule >>
+          disch_then (resolve_then (Pos hd) mp_tac NRC_ADD_I) >>
+          ntac 2 (disch_then drule >> simp[]) >> impl_tac >- metis_tac[] >>
+          disch_then (hide "IH" o SRULE [to_small_st_def]) >>
+          irule_at (Pos hd) (cj 2 RTC_RULES) >>
+          simp[EXISTS_PROD, transN_def, PULL_EXISTS] >>
+          first_assum $ irule_at (Pos hd) >> simp[] >>
+          irule_at Any NRC_ADD_I >> first_assum $ irule_at (Pos hd) >>
+          unhide_x_assum "IH"
+             (qx_choosel_then [‘EP2’, ‘pN2’, ‘pSt2’, ‘cs2’, ‘cEnv2’,
+                               ‘cSt2’, ‘vs2’, ‘m2’] strip_assume_tac) >>
+          PairCases_on ‘cs2’
+          >- (first_assum $ irule_at (Pos (el 2)) >>
+              first_assum $ irule_at (Pos (el 2)) >> simp[] >>
+              irule_at (Pos hd) (MATCH_MP NRC_same_start stepr_det) >>
+              first_assum $ irule_at (Pos hd) >>
+              irule_at (Pos hd) NRC_ADD_I >>
+              qpat_x_assum ‘NRC stepr _ _ c_ultimate’ assume_tac >>
+              PairCases_on ‘c_ultimate’ >> first_assum $ irule_at (Pos (el 2))>>
+              first_assum $ irule_at (Pos hd) >> simp[] >> conj_tac
+              >- metis_tac[] >>
+              Cases_on ‘m2 ≤ fn'’
+              >- (drule_at_then (Pos (el 3)) drule_all
+                    (MATCH_MP NRC_same_start stepr_det) >>
+                  strip_tac >> simp[RTC_eq_NRC] >>
+                  irule_at (Pos hd) NRC_ADD_I >>
+                  irule_at (Pos hd) NRC_ADD_I >>
+                  first_assum $ irule_at (Pos (el 2)) >>
+                  simp[LEFT_EXISTS_AND_THM, RIGHT_EXISTS_AND_THM] >>
+                  conj_tac >- metis_tac[RTC_eq_NRC] >>
+                  irule_at (Pos hd) (MATCH_MP NRC_same_start stepr_det) >>
+                  qpat_x_assum ‘NRC stepr stepc _ _’ assume_tac >>
+                  first_assum $ irule_at Any >>
+                  irule_at (Pos hd) NRC_ADD_I >> metis_tac[ADD_COMM]) >>
+              gs[NOT_LESS_EQUAL] >>
+              irule (iffRL RTC_CASES_RTC_TWICE) >> first_assum $ irule_at Any >>
+              simp[RTC_eq_NRC] >>
+              irule_at Any (MATCH_MP NRC_same_start stepr_det) >>
+              first_assum $ irule_at (Pos (el 2)) >>
+              irule_at Any (MATCH_MP NRC_same_start stepr_det) >>
+              first_assum $ irule_at (Pos hd) >>
+              Q.REFINE_EXISTS_TAC ‘stepc + m0’ >>
+              irule_at Any NRC_ADD_I >> first_assum $ irule_at (Pos hd) >>
+              simp[] >>
+              irule_at Any (MATCH_MP NRC_same_start stepr_det) >>
+              first_assum $ irule_at (Pos (el 2)) >>
+              first_assum $ irule_at Any >> simp[]) >>
+          first_assum $ irule_at (Pos (el 2)) >> simp[] >>
+          first_assum $ irule_at (Pos (el 2)) >> simp[] >>
+          first_assum $ irule_at Any >> simp[] >>
+          qexists_tac ‘m2 - fn'’ >> simp[] >>
+          reverse conj_tac >- metis_tac[] >>
+          irule (MATCH_MP NRC_same_start stepr_det) >>
+          simp[]) >>
+      gs[NOT_LESS_EQUAL] >>
+      irule_at (Pos hd) RTC_SUBSET >> simp[transN_def, PULL_EXISTS] >>
+      first_assum $ irule_at (Pos hd) >> simp[] >>
+      first_assum $ irule_at (Pos hd) >> simp[] >>
+      first_assum $ irule_at Any >> simp[] >> simp[RTC_eq_NRC] >>
+      metis_tac[]) >>
+  irule_at (Pos hd) RTC_REFL >> first_assum $ irule_at (Pos hd) >> simp[] >>
+  irule_at Any (cj 1 NRC |> iffRL) >> simp[] >> conj_tac >- metis_tac[] >>
+  simp[nf_def]
 QED
-
-
-       
-
-
-
-
-
 
 
 Theorem NPar_trans_l_cases_full:
