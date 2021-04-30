@@ -5544,4 +5544,77 @@ Proof
       \\ simp[])
 QED
 
+Definition deadlock_free_def:
+  deadlock_free conf epn =
+  !epn'. (reduction conf)^* epn epn' ==> EVERY (λ(p,s,e). e = Nil) (endpoints epn') ∨ ∃epn''. reduction conf epn' epn''
+End
+
+Definition terminating_def:
+  terminating conf epn =
+  ∃epn'. (reduction conf)^* epn epn' ∧ ¬∃epn''. reduction conf epn' epn''
+End
+
+Theorem network_finite_deadlock_freedom:
+    REPN n ∧
+    net_has_node n p ∧
+    net_find p n  = SOME (NEndpoint p s  c ) ∧
+    (∀nd. nd ∈ network_nodenames (NEndpoint p s c) ⇒ ffi_has_node nd cSt0.ffi.ffi_state) ∧
+    cpEval_valid conf p env0 s c (net_filter p n) vs cvs cSt0 ∧
+    letrec_network (NPar (NEndpoint p s c) (net_filter p n)) ∧
+    cSt0.ffi.ffi_state = (p,s.queues,net_filter p n) ∧
+    pletrec_vars_ok c ∧
+    EVERY cletrec_vars_ok (MAP SND s.funs) ∧
+    normalised s.queues ∧
+    deadlock_free conf n ∧
+    terminating conf n ⇒
+    ∃env' sst e' l'.
+      stepr꙳
+      (env0, smSt cSt0, Exp (compile_endpoint conf vs c), [])
+      (env', sst, Val (Conv NONE []), [])
+Proof
+  rpt strip_tac >>
+  gvs[terminating_def,deadlock_free_def] >>
+  reverse(first_x_assum (drule_then strip_assume_tac)) >- metis_tac[] >>
+  drule net_find_IS_SOME_reduction_pres >>
+  disch_then(qspec_then ‘p’ mp_tac) >>
+  simp[IS_SOME_EXISTS] >>
+  strip_tac >>
+  drule net_find_NEndpoint >>
+  rpt strip_tac >>
+  rveq >>
+  rename1 ‘net_find _ epn' = SOME(NEndpoint p s' cc)’ >>
+  ‘cc = Nil’
+    by(ntac 2 (pop_assum mp_tac) >>
+       rpt(pop_assum kall_tac) >>
+       Induct_on ‘epn'’ >> gvs[endpoints_def,net_find_def,OPTION_CHOICE_EQUALS_OPTION] >>
+       rw[] >>
+       res_tac) >>
+  rpt strip_tac >>
+  rveq >>
+  pop_assum mp_tac >>
+  drule network_forward_correctness_reduction >>
+  ntac 3 (disch_then drule) >>
+  rpt strip_tac >>
+  first_x_assum drule >>
+  rpt(disch_then(drule_at Any)) >>
+  gvs[] >>
+  disch_then drule >>
+  strip_tac >>
+  qhdtm_x_assum ‘RTC’ mp_tac >>
+  simp[compile_endpoint_def] >>
+  rw[Once RTC_cases]
+  >- (irule_at (Pos hd) RTC_RTC >>
+      goal_assum drule >>
+      irule_at (Pos hd) RTC_SUBSET >>
+      simp[e_step_reln_def,e_step_def,return_def]) >>
+  irule_at (Pos hd) RTC_RTC >>
+  goal_assum drule >>
+  qpat_x_assum ‘stepr _ _’ mp_tac >>
+  simp[e_step_reln_def,e_step_def,return_def] >>
+  strip_tac >> rveq >>
+  pop_assum mp_tac >>
+  rw[Once RTC_cases,e_step_reln_def,e_step_def,return_def,continue_def] >>
+  irule_at (Pos hd) RTC_REFL
+QED
+
 val _ = export_theory ();
