@@ -2133,7 +2133,7 @@ Proof
              compile_endpoint_def,fix_endpoint_def,written_var_names_endpoint_def])
 QED
 
-Theorem projection_deadlock_freedom:
+Theorem projection_deadlock_freedom_lemma:
   compile_network_ok s c (procsOf c) ∧ conf.payload_size > 0 ∧
   no_undefined_vars (s,c) ∧ dvarsOf c = [] ∧
   (reduction conf)^* (projection conf s c (procsOf c)) epn ∧
@@ -2185,4 +2185,261 @@ Proof
   >- metis_tac[net_end_projection,net_end_eq_projection_nil]
 QED
 
+Theorem endpoints_trans_lift:
+  ∀epn2 l1 l2.
+    trans conf (NEndpoint p s e) α (NEndpoint p' s' e') ∧
+    endpoints epn2 = l1 ++ [(p,s,e)] ++ l2 ⇒
+    ∃epn3.
+      trans conf epn2 α epn3 ∧
+      endpoints epn3 = l1 ++ [(p',s',e')] ++ l2
+Proof
+  Induct_on ‘epn2’ >>
+  gvs[payloadLangTheory.endpoints_def] >>
+  rw[APPEND_EQ_APPEND_MID |> CONV_RULE(LHS_CONV SYM_CONV)]
+  >- (res_tac >>
+      irule_at (Pos hd) payloadSemTheory.trans_par_l >>
+      goal_assum drule >>
+      rw[payloadLangTheory.endpoints_def])
+  >- (res_tac >>
+      irule_at (Pos hd) payloadSemTheory.trans_par_r >>
+      goal_assum drule >>
+      rw[payloadLangTheory.endpoints_def]) >>
+  gvs[APPEND_EQ_SING] >>
+  goal_assum drule >>
+  simp[payloadLangTheory.endpoints_def]
+QED
+
+Theorem EVERY_Nil_trans:
+  ∀conf epn1 α epn2.
+    trans conf epn1 α epn2 ∧
+    EVERY (λ(p,s,e). e = Nil) (endpoints epn1)
+    ⇒
+    ∃p d q. α = LReceive p d q ∧ MEM q (MAP FST (endpoints epn1)) ∧
+            EVERY (λ(p,s,e). e = Nil) (endpoints epn2)
+Proof
+  simp[GSYM AND_IMP_INTRO] >>
+  ho_match_mp_tac payloadSemTheory.trans_ind >>
+  rw[payloadLangTheory.endpoints_def] >>
+  metis_tac[]
+QED
+
+(* TODO: move *)
+Definition partners_payload_def:
+  (partners_payload Nil = [])
+∧ (partners_payload (Send p v n e) = p::partners_payload e)
+∧ (partners_payload (Receive p v d e) = p::partners_payload e)
+∧ (partners_payload (IfThen v e1 e2) = partners_payload e1 ++ partners_payload e2)
+∧ (partners_payload (Let v f vl e) = partners_payload e)
+∧ (partners_payload (Fix dv e) = partners_payload e)
+∧ (partners_payload (Call dv) = [])
+∧ (partners_payload (Letrec dv vars e1) = partners_payload e1)
+∧ (partners_payload (FCall dv vars) = [])
+End
+
+Definition partners_payload_closure_def:
+  partners_payload_closure (Closure vars1 (fs1,bds1) e1) =
+  (partners_payload e1 ++
+   FLAT(MAP partners_payload_closure (MAP SND fs1)))
+Termination
+  WF_REL_TAC ‘inv_image $< (closure_size)’ >>
+  rw[payloadLangTheory.closure_size_def,MEM_MAP] >>
+  Cases_on ‘y’ >>
+  imp_res_tac payloadLangTheory.closure_size_MEM >>
+  DECIDE_TAC
+End
+
+Theorem payload_bisim_nil_lemma:
+  ∀epn1 epn2.
+  BISIM_REL (trans conf) epn1 epn2 ∧
+  conf.payload_size > 0 ∧
+  no_undefined_vars_network epn2 ∧
+  letrec_network epn2 ∧
+  EVERY (λ(p,s,e). e = Nil) (endpoints epn1) ∧
+  EVERY (λ(p,s,e). ∀q. q ∈ FRANGE(s.queues) ⇒ EVERY (λx. final x ∨ intermediate x) q) (endpoints epn2) ∧
+  EVERY (λ(p,s,e). ~MEM p (partners_payload e)) (endpoints epn2) ∧
+  EVERY (λ(p,s,e). (∀f n.
+                        MEM (f,n) (arities e) ⇒
+                        ∃vs fs bds e'.
+                          ALOOKUP s.funs f = SOME(Closure vs (fs,bds) e') ∧
+                          LENGTH vs = n
+                   )) (endpoints epn2)
+  ⇒
+  EVERY (λ(p,s,e). e = Nil) (endpoints epn2)
+Proof
+  rw[] >>
+  CCONTR_TAC >>
+  gvs[EVERY_MEM,EXISTS_MEM] >>
+  pairarg_tac >>
+  gvs[] >>
+  pop_assum (strip_assume_tac o REWRITE_RULE[MEM_SPLIT]) >>
+  gvs[no_undefined_vars_network_def,letrec_network_def] >> 
+  rename1 ‘(p,s,e)’ >>
+  Cases_on ‘e’ >>
+  gvs[payloadLangTheory.free_var_names_endpoint_def,FDOM_FLOOKUP,letrec_endpoint_def,
+      DISJ_IMP_THM,FORALL_AND_THM,partners_payload_def]
+  >- ((* Send: epn2 can do an LSend, but epn1 can't; ergo, contradiction*)
+     drule_at (Pos last) endpoints_trans_lift >>
+     rename1 ‘Send _ vv n’ >>
+     rename1 ‘FLOOKUP _ _ = SOME dd’ >>
+     Cases_on ‘LENGTH dd − n > conf.payload_size’
+     >- (disch_then(resolve_then (Pos hd) drule payloadSemTheory.trans_send_intermediate_payload) >>
+         disch_then drule >>
+         disch_then drule >>
+         strip_tac >>
+         gvs[Once BISIM_REL_cases,FORALL_AND_THM] >>
+         last_x_assum drule >>
+         strip_tac >>
+         drule EVERY_Nil_trans >>
+         impl_tac >- rw[EVERY_MEM] >>
+         rw[])
+     >- (disch_then(resolve_then (Pos hd) drule payloadSemTheory.trans_send_last_payload) >>
+         disch_then (drule_at (Pos last)) >>
+         disch_then (qspec_then ‘conf’ mp_tac) >>
+         impl_tac >- fs[] >>
+         strip_tac >>
+         gvs[Once BISIM_REL_cases,FORALL_AND_THM] >>
+         last_x_assum drule >>
+         strip_tac >>
+         drule EVERY_Nil_trans >>
+         impl_tac >- rw[EVERY_MEM] >>
+         rw[]))
+  >- ((* Receive: more involved *)
+      rename1 ‘Receive q d l’ >>
+      Cases_on ‘qlk s.queues q’
+      >- (drule_at (Pos last) endpoints_trans_lift >>
+          disch_then(resolve_then (Pos hd) mp_tac payloadSemTheory.trans_enqueue) >>
+          disch_then(qspecl_then [‘q’,‘[2w]’,‘conf’] mp_tac) >>
+          impl_tac >- simp[] >>
+          strip_tac >>
+          gvs[Once BISIM_REL_cases,FORALL_AND_THM] >>
+          last_x_assum drule >>
+          strip_tac >>
+          drule_at (Pos last) endpoints_trans_lift >>
+          disch_then(resolve_then (Pos hd) mp_tac payloadSemTheory.trans_dequeue_intermediate_payload) >>
+          disch_then(qspecl_then [‘[]’,‘[2w]’,‘conf’] mp_tac) >>
+          impl_tac >- simp[payloadLangTheory.intermediate_def] >>
+          strip_tac >>
+          gvs[Once BISIM_REL_cases,FORALL_AND_THM] >>
+          qpat_x_assum ‘∀l q. trans conf epn3 l q ⇒ _’ drule >>
+          strip_tac >>
+          drule EVERY_Nil_trans >>
+          impl_tac >- (imp_res_tac EVERY_Nil_trans >>
+                       gvs[EVERY_MEM]) >>
+          rw[]) >>
+      rename1 ‘m::_’ >>
+      ‘final m ∨ intermediate m’
+        by(first_x_assum(match_mp_tac o MP_CANON) >>
+           gvs[payloadLangTheory.qlk_def,payloadLangTheory.fget_def,AllCaseEqs(),
+               FRANGE_FLOOKUP,PULL_EXISTS] >>
+           goal_assum drule >> simp[])
+      >- (drule_at (Pos last) endpoints_trans_lift >>
+          disch_then(resolve_then (Pos hd) mp_tac payloadSemTheory.trans_dequeue_last_payload) >>
+          disch_then (drule_at (Pos last)) >>
+          disch_then (drule_at (Pos last)) >>
+          disch_then (qspec_then ‘conf’ mp_tac) >>
+          impl_tac >- simp[] >>
+          strip_tac >>
+          gvs[Once BISIM_REL_cases,FORALL_AND_THM] >>
+          last_x_assum drule >>
+          strip_tac >>
+          drule EVERY_Nil_trans >>
+          impl_tac >- rw[EVERY_MEM] >>
+          rw[])
+      >- (drule_at (Pos last) endpoints_trans_lift >>
+          disch_then(resolve_then (Pos hd) mp_tac payloadSemTheory.trans_dequeue_intermediate_payload) >>
+          disch_then (drule_at (Pos last)) >>
+          disch_then (drule_at (Pos last)) >>
+          disch_then (qspec_then ‘conf’ mp_tac) >>
+          impl_tac >- simp[] >>
+          strip_tac >>
+          gvs[Once BISIM_REL_cases,FORALL_AND_THM] >>
+          last_x_assum drule >>
+          strip_tac >>
+          drule EVERY_Nil_trans >>
+          impl_tac >- rw[EVERY_MEM] >>
+          rw[])
+     )
+  >- ((* IfThen: epn2 can do an LTau, but epn1 can't *)
+     drule_at (Pos last) endpoints_trans_lift >>
+     rename1 ‘IfThen vv’ >>
+     rename1 ‘FLOOKUP _ _ = SOME dd’ >>
+     Cases_on ‘dd = [1w]’
+     >- (rveq >>
+         disch_then(resolve_then (Pos hd) drule payloadSemTheory.trans_if_true) >>
+         disch_then(qspec_then ‘conf’ strip_assume_tac) >>
+         gvs[Once BISIM_REL_cases,FORALL_AND_THM] >>
+         last_x_assum drule >>
+         strip_tac >>
+         drule EVERY_Nil_trans >>
+         impl_tac >- rw[EVERY_MEM] >>
+         rw[])
+     >- (rveq >>
+         disch_then(resolve_then (Pos hd) drule payloadSemTheory.trans_if_false) >>
+         disch_then(qspec_then ‘conf’ strip_assume_tac) >>
+         gvs[Once BISIM_REL_cases,FORALL_AND_THM] >>
+         last_x_assum drule >>
+         strip_tac >>
+         drule EVERY_Nil_trans >>
+         impl_tac >- rw[EVERY_MEM] >>
+         rw[])
+     )
+  >- ((* Let: epn2 can do an LTau, but epn1 can't *)
+     drule_at (Pos last) endpoints_trans_lift >>
+     rename1 ‘Let _ f l’ >>
+     disch_then(resolve_then (Pos hd) mp_tac payloadSemTheory.trans_let) >>
+     disch_then(qspec_then ‘conf’ mp_tac) >>
+     impl_tac
+     >- (gvs[EVERY_MEM,MEM_MAP,PULL_EXISTS,SUBSET_DEF,FDOM_FLOOKUP,IS_SOME_EXISTS]) >>
+     strip_tac >>
+     gvs[Once BISIM_REL_cases,FORALL_AND_THM] >>
+     last_x_assum drule >>
+     strip_tac >>
+     drule EVERY_Nil_trans >>
+     impl_tac >- rw[EVERY_MEM] >>
+     rw[])
+  >- ((* Letrec: epn2 can do an LTau, but epn1 can't *)
+     drule_at (Pos last) endpoints_trans_lift >>
+     rename1 ‘Letrec f vs e’ >>
+     disch_then(resolve_then (Pos hd) mp_tac payloadSemTheory.trans_letrec) >>
+     disch_then(qspec_then ‘conf’ mp_tac) >>
+     impl_tac
+     >- (gvs[EVERY_MEM,MEM_MAP,PULL_EXISTS,SUBSET_DEF,FDOM_FLOOKUP,IS_SOME_EXISTS,
+             arities_def]) >>
+     strip_tac >>
+     gvs[Once BISIM_REL_cases,FORALL_AND_THM] >>
+     last_x_assum drule >>
+     strip_tac >>
+     drule EVERY_Nil_trans >>
+     impl_tac >- rw[EVERY_MEM] >>
+     rw[])
+  >- ((* FCall: epn2 can do an LTau, but epn1 can't *)
+     gvs[arities_def] >>     
+     drule_at (Pos last) endpoints_trans_lift >>
+     disch_then(resolve_then (Pos hd) mp_tac payloadSemTheory.trans_call) >>
+     disch_then drule >>
+     disch_then(qspec_then ‘conf’ mp_tac) >>
+     impl_tac
+     >- (gvs[EVERY_MEM,MEM_MAP,PULL_EXISTS,SUBSET_DEF,FDOM_FLOOKUP,IS_SOME_EXISTS,
+             arities_def]) >>
+     strip_tac >>
+     gvs[Once BISIM_REL_cases,FORALL_AND_THM] >>
+     last_x_assum drule >>
+     strip_tac >>
+     drule EVERY_Nil_trans >>
+     impl_tac >- rw[EVERY_MEM] >>
+     rw[])
+QED
+
+Theorem projection_deadlock_freedom:
+  compile_network_ok s c (procsOf c) ∧ conf.payload_size > 0 ∧
+  no_undefined_vars (s,c) ∧ dvarsOf c = [] ∧
+  (reduction conf)^* (projection conf s c (procsOf c)) epn ∧
+  no_self_comunication c
+  ⇒
+  EVERY (λ(p,s,e). e = Nil) (endpoints epn)
+  ∨ ∃epn''. reduction conf epn epn''
+Proof
+  cheat
+QED
+        
 val _ = export_theory ()
