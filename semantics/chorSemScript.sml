@@ -104,6 +104,8 @@ Definition receiversOf_def:
 ∧ (receiversOf pn (Sel p _ q c)      = if p = pn then nub' (q::receiversOf pn c)
                                        else nub' (receiversOf pn c))
 ∧ receiversOf pn (Let _ p _ _ c)    = nub' (receiversOf pn c)
+∧ receiversOf pn (Fix _ c)    = nub'(receiversOf pn c)
+∧ receiversOf pn (Call _) = []
 End
 
 Definition letfunsOf_def:
@@ -112,6 +114,8 @@ Definition letfunsOf_def:
 ∧ letfunsOf pn (Com p _ q _ c)    = letfunsOf pn c
 ∧ letfunsOf pn (Sel p _ q c)      = letfunsOf pn c
 ∧ letfunsOf pn (Let _ p f _ c)    = (if p = pn then f::letfunsOf pn c else  letfunsOf pn c)
+∧ letfunsOf pn (Fix _ c)    = letfunsOf pn c
+∧ letfunsOf pn (Call _) = []
 End
 
 Inductive lcong:
