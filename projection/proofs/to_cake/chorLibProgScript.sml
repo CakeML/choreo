@@ -13,9 +13,8 @@ val _ = set_grammar_ancestry
    "comms_ffi_eq","comms_ffi_rec_charac","comms_ffi_cons",
    "evaluate_tools", "ckExp_Equiv","termination",
    "ml_translator", "ml_prog", "evaluateProps", "namespace",
-   "semanticPrimitives", "abstractCompilation",
-   "ListProg","payload_to_cakemlProof"];
-
+   "semanticPrimitives","ListProg","payload_to_cakemlProof"];
+    
 val _ = translation_extends "basisProg";
 
 fun get_fun_name trm =
