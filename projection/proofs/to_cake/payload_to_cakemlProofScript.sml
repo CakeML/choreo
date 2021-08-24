@@ -543,12 +543,13 @@ Proof
       rename [‘evaluate s0 env (REVERSE es) = _’] >>
       Cases_on ‘evaluate s0 env (REVERSE es)’ >>
       rename [‘evaluate s0 env (REVERSE es) = (s00,res00)’] >>
-      Cases_on ‘res00’ >> gvs[AllCaseEqs(), dec_clock_def] >>
-      qabbrev_tac ‘d2 = s00.clock - 1 - s.clock’ >>
-      ‘(s00 with clock := s00.clock - 1).clock = s00.clock - 1’ by simp[] >>
-      ‘s.clock ≤ s00.clock - 1’ by metis_tac[evaluate_clock] >>
-      ‘s00.clock = s.clock + d2 + 1’ by simp[Abbr‘d2’] >> gs[] >>
-      first_x_assum (qspec_then ‘ck + d2 + 1’ mp_tac) >> simp[])
+      Cases_on ‘res00’ >> gvs[AllCaseEqs(), dec_clock_def]
+      >- (qabbrev_tac ‘d2 = s00.clock - 1 - s.clock’ >>
+          ‘(s00 with clock := s00.clock - 1).clock = s00.clock - 1’ by simp[] >>
+          ‘s.clock ≤ s00.clock - 1’ by metis_tac[evaluate_clock] >>
+          ‘s00.clock = s.clock + d2 + 1’ by simp[Abbr‘d2’] >> gs[] >>
+          first_x_assum (qspec_then ‘ck + d2 + 1’ mp_tac) >> simp[])
+      >- cheat)
   >- ((* Log *) gvs[AllCaseEqs(), find_evalform ‘Log _ _ _’] >>
       rename [‘evaluate s0 env [e1] = _’] >>
       Cases_on ‘evaluate s0 env [e1]’ >>
@@ -640,12 +641,13 @@ Proof
       rename [‘evaluate s0 env (REVERSE es) = _’] >>
       Cases_on ‘evaluate s0 env (REVERSE es)’ >>
       rename [‘evaluate s0 env (REVERSE es) = (s00,res00)’] >>
-      Cases_on ‘res00’ >> gvs[AllCaseEqs(), dec_clock_def] >>
-      qabbrev_tac ‘d2 = s00.clock - 1 - s.clock’ >>
-      ‘(s00 with clock := s00.clock - 1).clock = s00.clock - 1’ by simp[] >>
-      ‘s.clock ≤ s00.clock - 1’ by metis_tac[evaluate_clock] >>
-      ‘s00.clock = s.clock + d2 + 1’ by simp[Abbr‘d2’] >> gs[] >>
-      first_x_assum (qspec_then ‘ck + d2 + 1’ mp_tac) >> simp[])
+      Cases_on ‘res00’ >> gvs[AllCaseEqs(), dec_clock_def]
+      >- (qabbrev_tac ‘d2 = s00.clock - 1 - s.clock’ >>
+          ‘(s00 with clock := s00.clock - 1).clock = s00.clock - 1’ by simp[] >>
+          ‘s.clock ≤ s00.clock - 1’ by metis_tac[evaluate_clock] >>
+          ‘s00.clock = s.clock + d2 + 1’ by simp[Abbr‘d2’] >> gs[] >>
+          first_x_assum (qspec_then ‘ck + d2 + 1’ mp_tac) >> simp[])
+      >- cheat)
   >- ((* Log *) gvs[AllCaseEqs(), find_evalform ‘Log _ _ _’] >>
       rename [‘evaluate s0 env [e1] = _’] >>
       Cases_on ‘evaluate s0 env [e1]’ >>
@@ -789,7 +791,9 @@ Proof
       Cases_on ‘evaluate s0 env (REVERSE es)’ >> gvs[] >>
       rename [‘evaluate s0 env (REVERSE es) = (s1,res0) ’] >> Cases_on ‘res0’ >>
       gvs[] >> rename [‘evaluate s0 env (REVERSE es) = (s1,_) ’]
-      >- (reverse (Cases_on ‘op = Opapp’) >> simp[] >>
+      >- (Cases_on ‘op = Eval’ >> simp[]
+          >- cheat >>
+          reverse (Cases_on ‘op = Opapp’) >> simp[] >>
           drule_then assume_tac (cj 1 evaluate_clock) >>
           strip_tac
           >- (first_x_assum $ qspec_then ‘ck’ mp_tac >>
@@ -942,8 +946,8 @@ Theorem evaluate_generalise':
 Proof
   rpt strip_tac >>
   drule_then assume_tac (cj 1 evaluate_clock) >> gs[] >>
-  dxrule (evaluate_ffi_intro |> cj 1
-           |> INST_TYPE [beta |-> alpha, alpha |-> “:unit”]) >> simp[] >>
+  dxrule (evaluate_ffi_etc_intro_aux |> cj 1
+           |> INST_TYPE [beta |-> alpha, alpha |-> “:unit”]) >> simp[empty_state_def] >>
   strip_tac >>
   pop_assum (C(resolve_then (Pos hd) mp_tac)
              (cj 1 evaluate_choose_final_clock')) >> simp[] >>
@@ -996,9 +1000,11 @@ Proof
 QED
 
 Theorem evaluate_ffi_intro' =
-  evaluate_ffi_intro  |> cj 1
+  evaluate_ffi_etc_intro_aux |> cj 1
      |> SRULE [GSYM RIGHT_FORALL_IMP_THM]
-     |> CONV_RULE (pull_namedallvar_conv "t")
+     |> GEN_ALL
+     |> CONV_RULE (pull_namedallvar_conv "s0")
+     |> CONV_RULE (pull_namedallvar_conv "s")
      |> Q.SPECL [‘t with <| clock := s.clock; refs := s.refs|>’, ‘s’]
      |> SRULE []
      |> Q.GENL [‘t’, ‘s’]

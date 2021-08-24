@@ -7,10 +7,45 @@ open evaluateTheory
 
 val _ = new_theory "evaluate_tools";
 
+(* Version of evaluate_ffi_etc_intro without existentials *)
+Theorem evaluate_ffi_etc_intro_aux:
+  evaluate s0 env xs = (s1, res) /\
+  (!outcome. res <> Rerr (Rabort (Rffi_error outcome))) /\
+  s1.ffi = s0.ffi /\
+  s1.next_type_stamp = s0.next_type_stamp /\
+  s1.next_exn_stamp = s0.next_exn_stamp /\
+  s0.eval_state = NONE /\
+  res <> Rerr (Rabort Rtype_error) /\
+  s.refs = s0.refs
+  ==>
+  evaluate (s with clock := s0.clock) env xs =
+    (s with <| refs := s1.refs; clock := s1.clock |>, res)
+Proof
+  rw []
+  \\ dxrule_then (qspec_then `s.ffi` mp_tac) (CONJUNCT1 evaluate_ffi_intro)
+  \\ rw []
+  \\ dxrule (CONJUNCT1 evaluate_set_next_stamps)
+  \\ simp []
+  \\ disch_then (qspec_then `s.next_type_stamp` mp_tac o CONJUNCT1)
+  \\ rw []
+  \\ dxrule (CONJUNCT1 evaluate_set_next_stamps)
+  \\ simp []
+  \\ disch_then (qspec_then `s.next_exn_stamp` mp_tac o CONJUNCT2)
+  \\ rw []
+  \\ dxrule (CONJUNCT1 eval_no_eval_simulation)
+  \\ simp []
+  \\ disch_then (qspec_then `s.eval_state` mp_tac)
+  \\ rw []
+  \\ dxrule_then irule (Q.prove (`(evaluate a x y = b) /\ a = c /\ b = d
+    ==> evaluate c x y = d`, rw []))
+  \\ simp [semanticPrimitivesTheory.state_component_equality]
+QED
+
+
 (* Projecting evaluation in empty_state (with arbitrary dynamic memory state) to evaluation in
    any state (with the same dynamic memory state) *)
 Theorem evaluate_generalise:
-  ∀ (cSt: 'ffi semanticPrimitives$state) env exp ck1 ck2 refs' u. 
+  ∀ (cSt: 'ffi semanticPrimitives$state) env exp ck1 ck2 refs' u.
       evaluate (empty_state with <|clock := ck1; refs := cSt.refs|>) env
            [exp] =
          (empty_state with <|clock := ck2; refs := cSt.refs ++ refs'|>,
@@ -38,13 +73,8 @@ Proof
                                       refs   := cSt.refs ++ refs'|>’ >>
   qabbrev_tac ‘e = [exp]’ >>
   qabbrev_tac ‘r = Rval [u] :(v list, v) result’ >>
-  ‘(evaluate s env e = (s',r)) ∧ (s'.ffi = s.ffi) ∧
-    (∀outcome. r ≠ Rerr (Rabort (Rffi_error outcome))) ⇒
-    ∀t : 'ffi semanticPrimitives$state.
-        (t.clock = s.clock) ∧ (t.refs = s.refs) ⇒
-        (evaluate t env e =
-        (t with <|clock := s'.clock; refs := s'.refs|>,r))’
-    by metis_tac[evaluate_ffi_intro] >>
+  drule_then (qspec_then ‘cSt’ mp_tac) (GEN_ALL evaluate_ffi_etc_intro_aux) >>
+  impl_tac >- (UNABBREV_ALL_TAC >> simp[empty_state_def]) >>
   rfs[Abbr ‘s'’, Abbr ‘s’, Abbr ‘r’]
 QED
 
