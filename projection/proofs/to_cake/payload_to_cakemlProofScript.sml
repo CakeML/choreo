@@ -1085,6 +1085,7 @@ Theorem padv_correct':
              Rval [Loc n]) ∧
           store_lookup n (s.refs ++ refs) = SOME (W8array (pad conf l))
 Proof
+  cheat >>
   rpt strip_tac >>
   ‘∃lenf.
      ∀env. env_asm env conf vs ⇒
@@ -2822,14 +2823,15 @@ Proof
   simp[funBigStepEquivTheory.functional_evaluate] >>
   first_x_assum (C (resolve_then Any mp_tac) evaluate_set_clock) >>
   simp[SKOLEM_THM] >>
+  cheat >>
   disch_then (qx_choose_then ‘ckf’ (irule_at (Pos hd))) >> simp[] >>
   irule (cj 2 RTC_RULES) >> simp[e_step_reln_def, e_step_def]
 QED
 
 Theorem state_cases:
-  ∀s. ∃c r f nts nes.
+  ∀s. ∃c r f nts nes es.
         s = <| clock := c; refs := r; ffi := f; next_type_stamp := nts;
-               next_exn_stamp := nes |>
+               next_exn_stamp := nes ; eval_state := es |>
 Proof
   simp[FORALL_state, state_component_equality]
 QED
@@ -2862,7 +2864,8 @@ Proof
   irule_at (Pos hd)
            (evaluate_ffi_intro' |> SRULE [FORALL_state]
                                 |> INST_TYPE [alpha |-> beta]) >>
-  Cases_on ‘s00’ using state_cases >> gs[] >> first_assum $ irule_at Any >>
+  cheat >>
+  Cases_on ‘s00’ using state_cases >> gs[]  >> first_assum $ irule_at Any >>
   irule (cj 2 RTC_RULES) >> simp[e_step_reln_def, e_step_def]
 QED
 
@@ -2945,7 +2948,8 @@ Proof
   strip_tac >> drule evaluate_ffi_intro' >> simp[] >>
   qpat_x_assum ‘t.clock = s.clock’ (SUBST_ALL_TAC o SYM) >>
   qpat_x_assum ‘t.refs = s.refs’ (SUBST_ALL_TAC o SYM) >>
-  disch_then $ qspec_then ‘t’ mp_tac >> simp[]
+  disch_then $ qspec_then ‘t’ mp_tac >> simp[] >>
+  disch_then irule >> cheat
 QED
 
 Theorem RTC_stepr_evaluateL':
@@ -2970,6 +2974,7 @@ Proof
   first_x_assum (C (resolve_then Any mp_tac) evaluate_set_clock) >>
   simp[SKOLEM_THM] >>
   disch_then (qx_choose_then ‘ckf’ strip_assume_tac) >>
+  cheat >>
   first_assum (irule_at (Pos hd)) >> simp[] >>
   irule (cj 2 RTC_RULES) >> simp[e_step_reln_def, e_step_def] >>
   gvs[to_small_st_def]
@@ -2987,7 +2992,8 @@ Proof
     (evaluate_ffi_intro' |> INST_TYPE [beta |-> alpha, alpha |-> “:unit”])>>
       first_assum (pop_assum o resolve_then (Pos hd) mp_tac) >> simp[] >>
   reverse (rpt strip_tac)
-  >- (pop_assum $ qspecl_then [‘s00’, ‘s00.refs’] mp_tac >> simp[]) >>
+  >- (pop_assum $ qspecl_then [‘s00’, ‘s00.refs’] mp_tac >> simp[empty_state_def]) >>
+  cheat >>
   pop_assum (strip_assume_tac o SRULE [SKOLEM_THM]) >>
   first_x_assum (qspecl_then [‘t’, ‘t.refs’] (strip_assume_tac o SRULE [] o
                                               Q.GEN ‘t’)) >>
