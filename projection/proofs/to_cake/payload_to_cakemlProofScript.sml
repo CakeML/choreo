@@ -491,6 +491,23 @@ val do_app_thm =
 
 (* SENDLOOP CORRECTNESS *)
 
+Triviality fix_clock_leq_clock:
+  ∀s e s0 ff.
+    fix_clock s ff = ff ∧
+    ff = (s0,e)
+    ⇒ s0.clock ≤ s.clock
+Proof
+  rpt strip_tac
+  \\ ‘s0 = FST ff’ by gs[] \\ rveq
+  \\ dxrule_all EQ_TRANS \\ rw []
+  \\ cases_on ‘ff’ \\ gs[fix_clock_def]
+  \\ pop_assum mp_tac \\ IF_CASES_TAC \\ gs[]
+  \\ CCONTR_TAC \\ gs[]
+  \\ pop_assum (fn t => pop_assum (assume_tac o ONCE_REWRITE_RULE  [GSYM t]))
+  \\ gs[]
+QED
+
+(* This theorem is not being used! *)
 Theorem evaluate_choose_final_clock:
   (∀(s0:α state) env es s res ck.
      evaluate s0 env es = (s,res) ∧ ck ≤ s.clock ⇒
@@ -549,7 +566,43 @@ Proof
           ‘s.clock ≤ s00.clock - 1’ by metis_tac[evaluate_clock] >>
           ‘s00.clock = s.clock + d2 + 1’ by simp[Abbr‘d2’] >> gs[] >>
           first_x_assum (qspec_then ‘ck + d2 + 1’ mp_tac) >> simp[])
-      >- cheat)
+      >- (qabbrev_tac ‘d2 = s00.clock - s.clock’ >>
+          ‘s.clock ≤ s00.clock’ by
+            (qmatch_asmsub_abbrev_tac ‘result_bind ff _’ >>
+             cases_on ‘ff’ >> gs[] >>
+             ‘q.clock ≤ s00.clock’ by metis_tac [fix_clock_leq_clock,fix_clock_do_eval_res] >>
+             cases_on ‘r’ >> gs[] >> cases_on ‘a'’ >> gs[] >>
+             cases_on ‘q.clock = 0’ >> gs[] >>
+             qmatch_asmsub_abbrev_tac ‘evaluate_decs qq q' r’>>
+             qabbrev_tac ‘ee = evaluate_decs qq q' r’>>
+             PairCases_on ‘ee’ >> gs[] >> cases_on ‘ee1’ >> gs[]
+             >- (qmatch_asmsub_abbrev_tac ‘declare_env ee00 env00’ >>
+                 cases_on ‘declare_env ee00 env00’ >> gs[]
+                 >- (irule LESS_EQ_TRANS >> first_x_assum (irule_at Any) >>
+                     irule LESS_EQ_TRANS >> qexists_tac ‘qq.clock’ >>
+                     reverse conj_tac >- simp[Abbr‘qq’] >>
+                     metis_tac [fix_clock_leq_clock,fix_clock_evaluate])
+                 >- (cases_on ‘x’ >> gs[] >>
+                     irule LESS_EQ_TRANS >> first_x_assum (irule_at Any) >>
+                     irule LESS_EQ_TRANS >> qexists_tac ‘qq.clock’ >>
+                     reverse conj_tac >- simp[Abbr‘qq’] >>
+                     irule LESS_EQ_TRANS >> qexists_tac ‘ee0.clock’ >> gs[] >>
+                     conj_tac >- gs[state_component_equality] >>
+                     metis_tac [fix_clock_leq_clock,fix_clock_evaluate]))
+             >- (cases_on ‘e’ >> gs[]
+                 >- (irule LESS_EQ_TRANS >> first_x_assum (irule_at Any) >>
+                     irule LESS_EQ_TRANS >> qexists_tac ‘qq.clock’ >>
+                     reverse conj_tac >- simp[Abbr‘qq’] >>
+                     irule LESS_EQ_TRANS >> qexists_tac ‘ee0.clock’ >> gs[] >>
+                     conj_tac >- gs[state_component_equality] >>
+                     metis_tac [fix_clock_leq_clock,fix_clock_evaluate])
+                 >- (irule LESS_EQ_TRANS >> first_x_assum (irule_at Any) >>
+                     irule LESS_EQ_TRANS >> qexists_tac ‘qq.clock’ >>
+                     reverse conj_tac >- simp[Abbr‘qq’] >>
+                     metis_tac [fix_clock_leq_clock,fix_clock_evaluate]))) >>
+          ‘s00.clock = s.clock + d2’ by simp[Abbr‘d2’] >> gs[] >>
+          first_x_assum (qspec_then ‘ck + d2’ mp_tac) >> simp[] >>
+          rw[] >> cheat))
   >- ((* Log *) gvs[AllCaseEqs(), find_evalform ‘Log _ _ _’] >>
       rename [‘evaluate s0 env [e1] = _’] >>
       Cases_on ‘evaluate s0 env [e1]’ >>
