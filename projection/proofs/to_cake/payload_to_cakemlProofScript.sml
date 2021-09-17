@@ -507,143 +507,24 @@ Proof
   \\ gs[]
 QED
 
-(* This theorem is not being used! *)
-Theorem evaluate_choose_final_clock:
-  (∀(s0:α state) env es s res ck.
-     evaluate s0 env es = (s,res) ∧ ck ≤ s.clock ⇒
-     evaluate (s0 with clock := s0.clock + ck - s.clock) env es =
-     (s with clock := ck, res)) ∧
-  (∀(s0:α state) (env:v sem_env) (v1:v) (ms:(pat#exp)list) (v2:v) s res ck.
-     evaluate_match s0 env v1 ms v2 = (s,res) ∧ ck ≤ s.clock ⇒
-     evaluate_match (s0 with clock := s0.clock + ck - s.clock) env v1 ms v2 =
-     (s with clock := ck, res))
+Triviality do_eval_res_swap_clock:
+  ∀(s0:α state) s l res ck.
+  do_eval_res l s0 = (s,res)
+  ⇒ do_eval_res l (s0 with clock := ck) = (s with clock := ck,res)
 Proof
-  ho_match_mp_tac evaluate_ind >> rpt strip_tac
-  >- (* nil *) gs[]
-  >- ((* cons *) simp[] >>
-      qpat_x_assum ‘evaluate _ _ _ = _’ mp_tac >> simp[] >>
-      Cases_on ‘evaluate s0 env [e1]’ >> gs[] >>
-      rename [‘evaluate _ _ [_] = (s00,res00)’] >> Cases_on ‘res00’ >> gs[]
-      >- (Cases_on ‘evaluate s00 env (e2::es)’ >>
-          rename1 ‘evaluate s00 env (e2::es) = (s01,r01)’ >>
-          Cases_on ‘r01’ >> gs[] >>
-          qabbrev_tac ‘d2 = s00.clock - s01.clock’ >>
-          qabbrev_tac ‘d1 = s0.clock - s00.clock’ >>
-          ‘s01.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
-          rw[] >> rename [‘s01.clock ≤ s00.clock’] >>
-          ‘ck + d2 ≤ s00.clock’ by simp[Abbr‘d2’] >>
-          first_x_assum drule >> simp[Abbr‘d2’]) >>
-      rw[] >> gs[])
-  >- ((* lit *) gs[])
-  >- ((* raise *) gs[find_evalform ‘Raise _’] >>
-      rename [‘evaluate s0 env [e] = _’] >> rw[] >>
-      Cases_on ‘evaluate s0 env [e]’ >>
-      rename [‘evaluate s0 env [e] = (s,r0)’] >>
-      Cases_on ‘r0’ >> gvs[])
-  >- ((* handle *)
-      gvs[find_evalform ‘Handle _ _’, AllCaseEqs()] >>
-      rename [‘evaluate s0 env [e] = (s00,Rerr (Rraise exn))’,
-              ‘evaluate_match s00 _ _ _ _ = (s, res)’] >>
-      qabbrev_tac ‘d2 = s00.clock - s.clock’ >>
-      qabbrev_tac ‘d1 = s0.clock - s00.clock’ >>
-      ‘s.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
-      ‘ck + d2 ≤ s00.clock’ by simp[Abbr‘d2’] >>
-      first_x_assum drule >> simp[Abbr‘d2’])
-  >- ((* Con *) gs[find_evalform ‘Con _ _’, AllCaseEqs()] >>
-      rename [‘evaluate s0 env (REVERSE es) = _’] >>
-      Cases_on ‘evaluate s0 env (REVERSE es)’ >> gvs[] >>
-      rename [‘evaluate s0 env (REVERSE es) = (s',res')’] >>
-      Cases_on ‘res'’ >> gvs[AllCaseEqs()])
-  >- (* Var *) gs[AllCaseEqs()]
-  >- (* Fun *) gs[AllCaseEqs(), find_evalform ‘Fun _ _’]
-  >- ((* App *) gvs[AllCaseEqs(), find_evalform ‘App _ _’] >>
-      rename [‘evaluate s0 env (REVERSE es) = _’] >>
-      Cases_on ‘evaluate s0 env (REVERSE es)’ >>
-      rename [‘evaluate s0 env (REVERSE es) = (s00,res00)’] >>
-      Cases_on ‘res00’ >> gvs[AllCaseEqs(), dec_clock_def]
-      >- (qabbrev_tac ‘d2 = s00.clock - 1 - s.clock’ >>
-          ‘(s00 with clock := s00.clock - 1).clock = s00.clock - 1’ by simp[] >>
-          ‘s.clock ≤ s00.clock - 1’ by metis_tac[evaluate_clock] >>
-          ‘s00.clock = s.clock + d2 + 1’ by simp[Abbr‘d2’] >> gs[] >>
-          first_x_assum (qspec_then ‘ck + d2 + 1’ mp_tac) >> simp[])
-      >- (qabbrev_tac ‘d2 = s00.clock - s.clock’ >>
-          ‘s.clock ≤ s00.clock’ by
-            (qmatch_asmsub_abbrev_tac ‘result_bind ff _’ >>
-             cases_on ‘ff’ >> gs[] >>
-             ‘q.clock ≤ s00.clock’ by metis_tac [fix_clock_leq_clock,fix_clock_do_eval_res] >>
-             cases_on ‘r’ >> gs[] >> cases_on ‘a'’ >> gs[] >>
-             cases_on ‘q.clock = 0’ >> gs[] >>
-             qmatch_asmsub_abbrev_tac ‘evaluate_decs qq q' r’>>
-             qabbrev_tac ‘ee = evaluate_decs qq q' r’>>
-             PairCases_on ‘ee’ >> gs[] >> cases_on ‘ee1’ >> gs[]
-             >- (qmatch_asmsub_abbrev_tac ‘declare_env ee00 env00’ >>
-                 cases_on ‘declare_env ee00 env00’ >> gs[]
-                 >- (irule LESS_EQ_TRANS >> first_x_assum (irule_at Any) >>
-                     irule LESS_EQ_TRANS >> qexists_tac ‘qq.clock’ >>
-                     reverse conj_tac >- simp[Abbr‘qq’] >>
-                     metis_tac [fix_clock_leq_clock,fix_clock_evaluate])
-                 >- (cases_on ‘x’ >> gs[] >>
-                     irule LESS_EQ_TRANS >> first_x_assum (irule_at Any) >>
-                     irule LESS_EQ_TRANS >> qexists_tac ‘qq.clock’ >>
-                     reverse conj_tac >- simp[Abbr‘qq’] >>
-                     irule LESS_EQ_TRANS >> qexists_tac ‘ee0.clock’ >> gs[] >>
-                     conj_tac >- gs[state_component_equality] >>
-                     metis_tac [fix_clock_leq_clock,fix_clock_evaluate]))
-             >- (cases_on ‘e’ >> gs[]
-                 >- (irule LESS_EQ_TRANS >> first_x_assum (irule_at Any) >>
-                     irule LESS_EQ_TRANS >> qexists_tac ‘qq.clock’ >>
-                     reverse conj_tac >- simp[Abbr‘qq’] >>
-                     irule LESS_EQ_TRANS >> qexists_tac ‘ee0.clock’ >> gs[] >>
-                     conj_tac >- gs[state_component_equality] >>
-                     metis_tac [fix_clock_leq_clock,fix_clock_evaluate])
-                 >- (irule LESS_EQ_TRANS >> first_x_assum (irule_at Any) >>
-                     irule LESS_EQ_TRANS >> qexists_tac ‘qq.clock’ >>
-                     reverse conj_tac >- simp[Abbr‘qq’] >>
-                     metis_tac [fix_clock_leq_clock,fix_clock_evaluate]))) >>
-          ‘s00.clock = s.clock + d2’ by simp[Abbr‘d2’] >> gs[] >>
-          first_x_assum (qspec_then ‘ck + d2’ mp_tac) >> simp[] >>
-          rw[] >> cheat))
-  >- ((* Log *) gvs[AllCaseEqs(), find_evalform ‘Log _ _ _’] >>
-      rename [‘evaluate s0 env [e1] = _’] >>
-      Cases_on ‘evaluate s0 env [e1]’ >>
-      rename [‘evaluate s0 env [e1] = (s00,res00)’] >>
-      Cases_on ‘res00’ >> gvs[AllCaseEqs()] >>
-      ‘s.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
-      first_x_assum (qspec_then ‘ck + (s00.clock - s.clock)’ mp_tac) >>
-      simp[])
-  >- ((* If *) gvs[AllCaseEqs(), find_evalform ‘If _ _ _ ’] >>
-      rename [‘evaluate s0 env [e1] = _’] >>
-      Cases_on ‘evaluate s0 env [e1]’ >>
-      rename [‘evaluate s0 env [e1] = (s00,res00)’] >>
-      Cases_on ‘res00’ >> gvs[AllCaseEqs()] >>
-      ‘s.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
-      first_x_assum (qspec_then ‘ck + (s00.clock - s.clock)’ mp_tac) >>
-      simp[])
-  >- ((* Mat *) gvs[AllCaseEqs(), find_evalform ‘Mat _ _ ’] >>
-      rename [‘evaluate s0 env [e1] = _’] >>
-      Cases_on ‘evaluate s0 env [e1]’ >>
-      rename [‘evaluate s0 env [e1] = (s00,res00)’] >>
-      Cases_on ‘res00’ >> gvs[AllCaseEqs()] >>
-      ‘s.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
-      first_x_assum (qspec_then ‘ck + (s00.clock - s.clock)’ mp_tac) >>
-      simp[])
-  >- ((* Let *) gvs[AllCaseEqs(), find_evalform ‘Let _ _ _’] >>
-      rename [‘evaluate s0 env [e1] = _’] >>
-      Cases_on ‘evaluate s0 env [e1]’ >>
-      rename [‘evaluate s0 env [e1] = (s00,res00)’] >>
-      Cases_on ‘res00’ >> gvs[AllCaseEqs()] >>
-      ‘s.clock ≤ s00.clock’ by metis_tac[evaluate_clock] >>
-      first_x_assum (qspec_then ‘ck + (s00.clock - s.clock)’ mp_tac) >>
-      simp[])
-  >- ((* Letrec *) gvs[AllCaseEqs(), find_evalform ‘Letrec _ _ ’])
-  >- ((* Tannot *) gvs[AllCaseEqs(), find_evalform ‘Tannot _ _ ’])
-  >- ((* Lannot *) gvs[AllCaseEqs(), find_evalform ‘Lannot _ _ ’])
-  >- ((* match [] *) gs[evaluate_def]) >>
-  (* match (cons) *)
-  gvs[evaluate_def,AllCaseEqs()]
+  rw[do_eval_res_def] \\ gs[AllCaseEqs()]
 QED
 
-Theorem evaluate_choose_final_clock':
+Triviality do_eval_res_same_clock:
+  ∀(s0:α state) s l res ck.
+  do_eval_res l s0 = (s,res)
+  ⇒ s0.clock = s.clock
+Proof
+  rw[do_eval_res_def] \\ gs[AllCaseEqs(),state_component_equality]
+QED
+
+
+Theorem evaluate_choose_final_clock:
   (∀(s0:α state) env es s res ck.
      evaluate s0 env es = (s,res) ∧ res ≠ Rerr (Rabort Rtimeout_error) ⇒
      evaluate (s0 with clock := s0.clock + ck - s.clock) env es =
@@ -700,7 +581,42 @@ Proof
           ‘s.clock ≤ s00.clock - 1’ by metis_tac[evaluate_clock] >>
           ‘s00.clock = s.clock + d2 + 1’ by simp[Abbr‘d2’] >> gs[] >>
           first_x_assum (qspec_then ‘ck + d2 + 1’ mp_tac) >> simp[])
-      >- cheat)
+      >- (qabbrev_tac ‘d2 = s00.clock - s.clock’ >>
+          ‘s.clock ≤ s00.clock’ by
+            (qmatch_asmsub_abbrev_tac ‘result_bind ff _’ >>
+             cases_on ‘ff’ >> gs[] >>
+             ‘q.clock ≤ s00.clock’ by metis_tac [fix_clock_leq_clock,fix_clock_do_eval_res] >>
+             cases_on ‘r’ >> gs[] >> cases_on ‘a'’ >> gs[] >>
+             cases_on ‘q.clock = 0’ >> gs[] >>
+             qmatch_asmsub_abbrev_tac ‘evaluate_decs qq q' r’>>
+             qabbrev_tac ‘ee = evaluate_decs qq q' r’>>
+             EVERY_CASE_TAC >> gs [] >> rveq >>
+             irule LESS_EQ_TRANS >> first_x_assum (irule_at Any) >>
+             irule LESS_EQ_TRANS >> qexists_tac ‘qq.clock’ >>
+             conj_tac >> TRY (simp[Abbr‘qq’] >> NO_TAC) >>
+             gs[state_component_equality] >>
+             metis_tac [fix_clock_leq_clock,fix_clock_evaluate]) >>
+          ‘s00.clock = s.clock + d2’ by simp[Abbr‘d2’] >> gs[] >>
+          first_x_assum (qspec_then ‘ck + d2’ mp_tac) >> simp[] >> rw[] >>
+          qmatch_asmsub_abbrev_tac ‘result_bind ff _’ >> cases_on ‘ff’ >> gs[] >>
+          drule_then (qspec_then ‘ck + d2’ assume_tac) do_eval_res_swap_clock >>
+          simp[] >> reverse (cases_on ‘r’) >> gs[]
+          >- (simp[state_component_equality] >>
+              IMP_RES_TAC do_eval_res_same_clock >> gs[]) >>
+          cases_on ‘a'’ >> gs[] >> cases_on ‘q.clock = 0’ >> gs[] >>
+          IF_CASES_TAC >> gs[]
+          >- (IMP_RES_TAC do_eval_res_same_clock >> gs[] >> rveq >>
+              ‘s.clock < q.clock’ by
+                (pop_assum kall_tac >>
+                 qmatch_asmsub_abbrev_tac ‘evaluate_decs qq q' r’>>
+                 EVERY_CASE_TAC >> gs[] >> rveq >> (* 4 cases *)
+                 irule LESS_EQ_LESS_TRANS >> qexists_tac ‘qq.clock’ >>
+                 conj_tac >> TRY (simp[Abbr‘qq’] >> NO_TAC) >>
+                 gs [state_component_equality] >>
+                 metis_tac [fix_clock_leq_clock,fix_clock_evaluate]) >> gs[]) >>
+          qmatch_asmsub_abbrev_tac ‘evaluate_decs qq q' r’ >>
+          cheat)) (* HINT: prove a clock swap theorem for evaluate_decs *)
+                  (* USEFUL THM: evaluate_decs_add_to_clock *)
   >- ((* Log *) gvs[AllCaseEqs(), find_evalform ‘Log _ _ _’] >>
       rename [‘evaluate s0 env [e1] = _’] >>
       Cases_on ‘evaluate s0 env [e1]’ >>
@@ -1003,7 +919,7 @@ Proof
            |> INST_TYPE [beta |-> alpha, alpha |-> “:unit”]) >> simp[empty_state_def] >>
   strip_tac >>
   pop_assum (C(resolve_then (Pos hd) mp_tac)
-             (cj 1 evaluate_choose_final_clock')) >> simp[] >>
+             (cj 1 evaluate_choose_final_clock)) >> simp[] >>
   strip_tac >> reverse eq_tac >> strip_tac
   >- (first_x_assum $
         qspecl_then [‘st with <| clock := ck1; refs := refs|>’,
