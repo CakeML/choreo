@@ -533,9 +533,13 @@ Theorem evaluate_choose_final_clock:
      evaluate_match s0 env v1 ms v2 = (s,res) ∧
      res ≠ Rerr (Rabort Rtimeout_error) ⇒
      evaluate_match (s0 with clock := s0.clock + ck - s.clock) env v1 ms v2 =
+     (s with clock := ck, res)) ∧
+  (∀(s0:α state) env es s res ck.
+     evaluate_decs s0 env es = (s,res) ∧ res ≠ Rerr (Rabort Rtimeout_error) ⇒
+     evaluate_decs (s0 with clock := s0.clock + ck - s.clock) env es =
      (s with clock := ck, res))
 Proof
-  ho_match_mp_tac evaluate_ind >> rpt strip_tac
+  ho_match_mp_tac full_evaluate_ind >> rpt strip_tac
   >- (* nil *) gs[]
   >- ((* cons *) simp[] >>
       qpat_x_assum ‘evaluate _ _ _ = _’ mp_tac >> simp[] >>
@@ -604,19 +608,20 @@ Proof
           >- (simp[state_component_equality] >>
               IMP_RES_TAC do_eval_res_same_clock >> gs[]) >>
           cases_on ‘a'’ >> gs[] >> cases_on ‘q.clock = 0’ >> gs[] >>
-          IF_CASES_TAC >> gs[]
-          >- (IMP_RES_TAC do_eval_res_same_clock >> gs[] >> rveq >>
-              ‘s.clock < q.clock’ by
-                (pop_assum kall_tac >>
-                 qmatch_asmsub_abbrev_tac ‘evaluate_decs qq q' r’>>
-                 EVERY_CASE_TAC >> gs[] >> rveq >> (* 4 cases *)
-                 irule LESS_EQ_LESS_TRANS >> qexists_tac ‘qq.clock’ >>
-                 conj_tac >> TRY (simp[Abbr‘qq’] >> NO_TAC) >>
-                 gs [state_component_equality] >>
-                 metis_tac [fix_clock_leq_clock,fix_clock_evaluate]) >> gs[]) >>
+          ‘s.clock < q.clock’ by
+            (qmatch_asmsub_abbrev_tac ‘evaluate_decs qq q' r’>>
+             EVERY_CASE_TAC >> gs[] >> rveq >> (* 4 cases *)
+             irule LESS_EQ_LESS_TRANS >> qexists_tac ‘qq.clock’ >>
+             conj_tac >> TRY (simp[Abbr‘qq’] >> NO_TAC) >>
+             gs [state_component_equality] >>
+             metis_tac [fix_clock_leq_clock,fix_clock_evaluate]) >>
+          ‘d2 ≠ 0’ by (IMP_RES_TAC do_eval_res_same_clock >> gs[]) >>
+          simp[] >>
           qmatch_asmsub_abbrev_tac ‘evaluate_decs qq q' r’ >>
-          cheat)) (* HINT: prove a clock swap theorem for evaluate_decs *)
-                  (* USEFUL THM: evaluate_decs_add_to_clock *)
+          cases_on ‘evaluate_decs qq q' r’ >> gs[] >>
+          cheat)) (* HINT: Do some smart trick with the IH and the clock *)
+                  (* USEFUL THM: evaluate_decs_add_to_clock             *)
+                  (*             evaluate_decs_set_clock                *)
   >- ((* Log *) gvs[AllCaseEqs(), find_evalform ‘Log _ _ _’] >>
       rename [‘evaluate s0 env [e1] = _’] >>
       Cases_on ‘evaluate s0 env [e1]’ >>
@@ -655,6 +660,7 @@ Proof
   >- ((* match [] *) gs[evaluate_def]) >>
   (* match (cons) *)
   gvs[evaluate_def,AllCaseEqs()]
+  >> cheat (* Rest of the cases *)
 QED
 
 Theorem evaluate_induce_timeout:
