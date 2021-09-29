@@ -725,9 +725,17 @@ Theorem evaluate_induce_timeout:
           (s', Rerr (Rabort Rtimeout_error))) ∧
      (s0.clock - s.clock ≤ ck ⇔
         evaluate_match (s0 with clock := ck) env v1 ms v2 =
+        (s with clock := ck + s.clock - s0.clock, res))) ∧
+  (∀(s0:α state) env es s res ck.
+     evaluate_decs s0 env es = (s,res) ∧ res ≠ Rerr (Rabort Rtimeout_error) ⇒
+     (ck < s0.clock - s.clock ⇔
+        ∃s'. evaluate_decs (s0 with clock := ck) env es =
+             (s', Rerr (Rabort Rtimeout_error))) ∧
+     (s0.clock - s.clock ≤ ck ⇔
+        evaluate_decs (s0 with clock := ck) env es =
         (s with clock := ck + s.clock - s0.clock, res)))
 Proof
-  ho_match_mp_tac evaluate_ind >> rpt conj_tac
+  ho_match_mp_tac full_evaluate_ind >> rpt conj_tac
   >- (* nil *) simp[]
   >- ((* cons *) simp[] >>
       rpt gen_tac >> strip_tac >> rpt gen_tac >>
@@ -810,11 +818,61 @@ Proof
       Cases_on ‘evaluate s0 env (REVERSE es)’ >> gvs[] >>
       rename [‘evaluate s0 env (REVERSE es) = (s1,res0) ’] >> Cases_on ‘res0’ >>
       gvs[] >> rename [‘evaluate s0 env (REVERSE es) = (s1,_) ’]
-      >- (Cases_on ‘op = Eval’ >> simp[]
-          >- cheat >>
-          reverse (Cases_on ‘op = Opapp’) >> simp[] >>
+      >- (Cases_on ‘op = Eval’ >> simp[] >>
           drule_then assume_tac (cj 1 evaluate_clock) >>
           strip_tac
+          >- (gs[] >> first_x_assum $ qspec_then ‘ck’ mp_tac >>
+              ‘s.clock ≤ s1.clock’ by
+                (qmatch_asmsub_abbrev_tac ‘result_bind ff _’ >>
+                 cases_on ‘ff’ >> gs[] >> reverse (cases_on ‘r’) >> gs[]
+                 >- (drule do_eval_res_same_clock >> simp[]) >>
+                 cases_on ‘a'’ >> gs[] >> cases_on ‘q.clock = 0’ >> gs[] >>
+                 qmatch_asmsub_abbrev_tac ‘evaluate_decs qq q' r’>>
+                 qabbrev_tac ‘ee = evaluate_decs qq q' r’>>
+                 EVERY_CASE_TAC >> gs [] >> rveq >> simp[] >>
+                 drule_then assume_tac (cj 3 evaluate_clock) >>
+                 irule LESS_EQ_TRANS >> first_x_assum (irule_at Any) >>
+                 irule LESS_EQ_TRANS >> qexists_tac ‘q.clock’ >>
+                 gs[dec_clock_def] >>
+                 conj_tac >> TRY (simp[Abbr‘qq’] >> NO_TAC) >>
+                 drule_then (simp o single) do_eval_res_same_clock) >>
+              Cases_on ‘ck < s0.clock - s1.clock’ >> simp[PULL_EXISTS] >>
+              strip_tac >> qmatch_asmsub_abbrev_tac ‘result_bind ff _’ >>
+              cases_on ‘ff’ >> gs[] >>
+              drule_then (qspec_then ‘ck + s1.clock - s0.clock’ assume_tac) do_eval_res_swap_clock >>
+              simp[] >> reverse (cases_on ‘r’) >> gs[]
+              >- (simp[state_component_equality] >>
+                  IMP_RES_TAC do_eval_res_same_clock >> gs[]) >>
+              cases_on ‘a'’ >> gs[] >> cases_on ‘q.clock = 0’ >> gs[] >>
+              IF_CASES_TAC
+              >- (gs[NOT_LESS,NOT_LESS_EQUAL] >>
+                  drule_all_then (REWRITE_TAC o single o GSYM) LESS_EQUAL_ANTISYM >> simp[] >>
+                  ‘s.clock < s1.clock’ suffices_by simp[] >>
+                  qmatch_asmsub_abbrev_tac ‘evaluate_decs qq q' r’>>
+                  qabbrev_tac ‘ee = evaluate_decs qq q' r’>>
+                  EVERY_CASE_TAC >> gs [] >> rveq >> simp[] >>
+                  drule_then assume_tac (cj 3 evaluate_clock) >>
+                  irule LESS_EQ_LESS_TRANS >> first_x_assum (irule_at Any) >>
+                  irule LESS_LESS_EQ_TRANS >> qexists_tac ‘q.clock’ >>
+                  gs[dec_clock_def] >>
+                  conj_tac >> TRY (simp[Abbr‘qq’] >> NO_TAC) >>
+                  IMP_RES_TAC do_eval_res_same_clock >> simp[]) >>
+              qmatch_asmsub_abbrev_tac ‘evaluate_decs qq q' r’ >>
+              cases_on ‘evaluate_decs qq q' r’ >> gs[] >>
+              ‘r' ≠ Rerr (Rabort Rtimeout_error)’ by
+                (EVERY_CASE_TAC >> cases_on ‘a'’ >> gs[]) >>
+              ‘q''.clock = s.clock’ by
+                (EVERY_CASE_TAC >> gs[state_component_equality]) >>
+              (* HINT: we would like to use the IH here with clock
+                       matching the one in the goal  *)
+              gs[] >> qabbrev_tac ‘d2 = ck + s1.clock - s0.clock’ >>
+              first_x_assum (qspec_then ‘d2 - 1’ assume_tac) >> gs[] >>
+              (* HINT: The cases should enable one of the "branches" of the IH and
+                       discard one of the branches of the goal *)
+              cases_on ‘d2 < 1 + (qq.clock - s.clock)’ >> gs[NOT_LESS,Abbr‘qq’,dec_clock_def]
+              >- cheat
+              >- cheat) >>
+          reverse (Cases_on ‘op = Opapp’) >> simp[]
           >- (first_x_assum $ qspec_then ‘ck’ mp_tac >>
               Cases_on ‘ck < s0.clock - s1.clock’ >> simp[PULL_EXISTS] >>
               gvs[AllCaseEqs()]) >>
@@ -945,11 +1003,13 @@ Proof
       reverse strip_tac >> simp[] >> gs[])
   >- ((* Tannot *) simp[find_evalform ‘Tannot _ _’, AllCaseEqs()])
   >- ((* Lannot *) simp[find_evalform ‘Lannot _ _’, AllCaseEqs()])
-  >- ((* match [] *) simp[evaluate_def]) >>
-  (* match cons *) simp[evaluate_def,AllCaseEqs()] >> rpt gen_tac  >>
-  strip_tac >> rpt gen_tac >>
-  rename [‘evaluate_match s0 env v1 ms v2 = (s1, res)’] >>
-  reverse (Cases_on ‘res’ >> gs[AllCaseEqs()]) >> strip_tac >> gs[]
+  >- ((* match [] *) simp[evaluate_def])
+  >- ((* match cons *) simp[evaluate_def,AllCaseEqs()] >> rpt gen_tac  >>
+      strip_tac >> rpt gen_tac >>
+      rename [‘evaluate_match s0 env v1 ms v2 = (s1, res)’] >>
+      reverse (Cases_on ‘res’ >> gs[AllCaseEqs()]) >> strip_tac >> gs[])
+  >- ((* decs [] *) simp[evaluate_def]) >>
+  cheat (* 9 Goals left *)
 QED
 
 Theorem evaluate_generalise':
