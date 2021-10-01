@@ -839,14 +839,18 @@ Proof
               Cases_on ‘ck < s0.clock - s1.clock’ >> simp[PULL_EXISTS] >>
               strip_tac >> qmatch_asmsub_abbrev_tac ‘result_bind ff _’ >>
               cases_on ‘ff’ >> gs[] >>
-              drule_then (qspec_then ‘ck + s1.clock - s0.clock’ assume_tac) do_eval_res_swap_clock >>
+              drule_then
+                (qspec_then ‘ck + s1.clock - s0.clock’ assume_tac)
+                do_eval_res_swap_clock >>
               simp[] >> reverse (cases_on ‘r’) >> gs[]
               >- (simp[state_component_equality] >>
                   IMP_RES_TAC do_eval_res_same_clock >> gs[]) >>
               cases_on ‘a'’ >> gs[] >> cases_on ‘q.clock = 0’ >> gs[] >>
               IF_CASES_TAC
               >- (gs[NOT_LESS,NOT_LESS_EQUAL] >>
-                  drule_all_then (REWRITE_TAC o single o GSYM) LESS_EQUAL_ANTISYM >> simp[] >>
+                  drule_all_then
+                    (REWRITE_TAC o single o GSYM)
+                    LESS_EQUAL_ANTISYM >> simp[] >>
                   ‘s.clock < s1.clock’ suffices_by simp[] >>
                   qmatch_asmsub_abbrev_tac ‘evaluate_decs qq q' r’>>
                   qabbrev_tac ‘ee = evaluate_decs qq q' r’>>
@@ -863,15 +867,24 @@ Proof
                 (EVERY_CASE_TAC >> cases_on ‘a'’ >> gs[]) >>
               ‘q''.clock = s.clock’ by
                 (EVERY_CASE_TAC >> gs[state_component_equality]) >>
-              (* HINT: we would like to use the IH here with clock
-                       matching the one in the goal  *)
               gs[] >> qabbrev_tac ‘d2 = ck + s1.clock - s0.clock’ >>
               first_x_assum (qspec_then ‘d2 - 1’ assume_tac) >> gs[] >>
-              (* HINT: The cases should enable one of the "branches" of the IH and
-                       discard one of the branches of the goal *)
-              cases_on ‘d2 < 1 + (qq.clock - s.clock)’ >> gs[NOT_LESS,Abbr‘qq’,dec_clock_def]
-              >- cheat
-              >- cheat) >>
+              cases_on ‘d2 < 1 + (qq.clock - s.clock)’ >>
+              gs[NOT_LESS,Abbr‘qq’,dec_clock_def]
+              >- (‘s.clock ≤ q.clock - 1’ by
+                    (drule_then assume_tac (cj 3 evaluate_clock) >> gs[]) >>
+                  gs[GSYM SUB_LESS_0,NOT_LESS_EQUAL,Abbr‘d2’] >>
+                  irule_at Any LESS_SUB_ADD_LESS >>
+                  IMP_RES_TAC do_eval_res_same_clock >> gs[])
+              >- (‘¬(ck < s0.clock - s.clock)’ by
+                    (gs[NOT_LESS,Abbr‘d2’] >>
+                     IMP_RES_TAC do_eval_res_same_clock >> gs[]) >>
+                  simp[] >> qmatch_goalsub_abbrev_tac ‘aa ∧ bb’ >>
+                  ‘bb’ suffices_by simp[Abbr‘bb’,Abbr‘aa’] >>
+                  pop_assum kall_tac >> qunabbrevl_tac [‘bb’,‘d2’] >>
+                  cases_on ‘r'’ >> gs[] >> EVERY_CASE_TAC >>
+                  gs[state_component_equality] >>
+                  IMP_RES_TAC do_eval_res_same_clock >> gs[])) >>
           reverse (Cases_on ‘op = Opapp’) >> simp[]
           >- (first_x_assum $ qspec_then ‘ck’ mp_tac >>
               Cases_on ‘ck < s0.clock - s1.clock’ >> simp[PULL_EXISTS] >>
@@ -1008,8 +1021,58 @@ Proof
       strip_tac >> rpt gen_tac >>
       rename [‘evaluate_match s0 env v1 ms v2 = (s1, res)’] >>
       reverse (Cases_on ‘res’ >> gs[AllCaseEqs()]) >> strip_tac >> gs[])
-  >- ((* decs [] *) simp[evaluate_def]) >>
-  cheat (* 9 Goals left *)
+  >- ((* decs [] *) simp[evaluate_def])
+  >- ((* decs (cons) *) rpt gen_tac >>
+      strip_tac >> rpt gen_tac >> strip_tac >>
+      gvs[full_evaluate_def,AllCaseEqs()] >>
+      cases_on ‘evaluate_decs s0 env [d1]’ >>
+      rename [‘evaluate_decs s0 env [d1] = (s00,res00)’] >>
+      reverse (cases_on ‘res00’) >> gvs[AllCaseEqs()]
+      >- (first_x_assum (qspec_then ‘ck’ assume_tac) >> gs[] >>
+          cases_on ‘ck < s0.clock -s.clock’ >> gs[]) >>
+      ‘r ≠ Rerr (Rabort Rtimeout_error)’ by
+        (CCONTR_TAC >> gs[combine_dec_result_def]) >> gs[] >>
+      first_x_assum (qspec_then ‘ck’ assume_tac) >> gs[] >>
+      cases_on ‘ck < s0.clock - s00.clock’ >> gs[NOT_LESS,NOT_LESS_EQUAL]
+      >- (irule_at Any LESS_SUB_ADD_LESS >>
+          IMP_RES_TAC (cj 3 evaluate_clock) >> gs[]) >>
+      gs [] >> qabbrev_tac ‘dd2 = ck + s00.clock - s0.clock’ >>
+      first_x_assum (qspec_then ‘dd2’ assume_tac) >> gs[] >>
+      cases_on ‘dd2 < s00.clock - s.clock’ >>
+      gs[combine_dec_result_def,NOT_LESS,NOT_LESS_EQUAL,Abbr‘dd2’])
+  >- ((* Dlet *) rpt gen_tac >>
+      strip_tac >> rpt gen_tac >> strip_tac >>
+      gvs[AllCaseEqs(), find_decsform ‘Dlet _ _ _’] >>
+      cases_on ‘evaluate s0 env [e]’ >>
+      rename [‘evaluate s0 env [e1] = (s00,res00)’] >>
+      Cases_on ‘res00’ >> gvs[AllCaseEqs()] >>
+      (* 4 goals *)
+      first_x_assum (qspec_then ‘ck’ assume_tac) >> gs[]  >>
+      cases_on ‘ck < s0.clock -s.clock’ >> gs[])
+  >- ((* Dletrec *) gvs[AllCaseEqs(), full_evaluate_def])
+  >- ((* Dtype *) rw[] >> gvs[AllCaseEqs(), full_evaluate_def])
+  >- ((* Dtabbrev *) gvs[AllCaseEqs(), full_evaluate_def])
+  >- ((* Denv *) rw[] >> gvs[AllCaseEqs(), full_evaluate_def])
+  >- ((* Dexn *) gvs[AllCaseEqs(), full_evaluate_def])
+  >- ((* Dmod *) rw[] >> gvs[AllCaseEqs(), full_evaluate_def] >>
+      first_x_assum (qspec_then ‘ck’ assume_tac) >> gs[]  >>
+      cases_on ‘ck < s0.clock -s.clock’ >> gs[])
+  >- ((* Dlocal *) rpt gen_tac >>
+      strip_tac >> rpt gen_tac >> strip_tac >>
+      gvs[AllCaseEqs(), find_decsform ‘Dlocal _ _’] >>
+      cases_on ‘evaluate_decs s0 env es’ >>
+      rename [‘evaluate_decs s0 env es = (s00,res00)’] >>
+      reverse (cases_on ‘res00’) >> gvs[AllCaseEqs()]
+      >- (first_x_assum (qspec_then ‘ck’ assume_tac) >> gs[] >>
+          cases_on ‘ck < s0.clock - s.clock’ >> gs[]) >> gs[] >>
+      first_x_assum (qspec_then ‘ck’ assume_tac) >> gs[] >>
+      cases_on ‘ck < s0.clock - s00.clock’ >> gs[NOT_LESS,NOT_LESS_EQUAL]
+      >- (irule_at Any LESS_SUB_ADD_LESS >>
+          IMP_RES_TAC (cj 3 evaluate_clock) >> gs[]) >>
+      gs [] >> qabbrev_tac ‘dd2 = ck + s00.clock - s0.clock’ >>
+      first_x_assum (qspec_then ‘dd2’ assume_tac) >> gs[] >>
+      cases_on ‘dd2 < s00.clock - s.clock’ >>
+      gs[combine_dec_result_def,NOT_LESS,NOT_LESS_EQUAL,Abbr‘dd2’])
 QED
 
 Theorem evaluate_generalise':
