@@ -2589,6 +2589,7 @@ Definition cpEval_valid_def:
     ffi_state_cor conf cpNum pSt pN cSt.ffi.ffi_state ∧
     ffi_wf cSt.ffi.ffi_state ∧
     cSt.ffi.oracle = comms_ffi_oracle conf ∧
+    cSt.eval_state = NONE ∧
     normalised pSt.queues
 End
 Overload simR[local] = “cpEval_valid”
@@ -3541,7 +3542,8 @@ Proof
                 |> INST_TYPE [“:'ffi” |-> “:plffi”]) >>
       pop_assum (irule_at (Pos hd)) >>
       irule_at (Pos hd) (small_big_exp_equiv |> iffRL |> cj 1) >>
-      irule_at (Pos hd) (iffRL bigClockTheory.big_clocked_unclocked_equiv) >>
+      ‘cSt0.eval_state = NONE’ by gs[cpEval_valid_def] >> simp[] >>
+      irule_at Any (iffRL bigClockTheory.big_clocked_unclocked_equiv) >>
       simp[funBigStepEquivTheory.functional_evaluate] >>
       simp[find_evalform‘Letrec _ _’, Excl "evaluate_var",
            Excl "evaluate_opapp"] >>
@@ -3643,7 +3645,6 @@ Proof
       CONV_TAC (pull_namedexvar_conv "ckf2") >> qexists_tac ‘K 0’>> simp[]>>
       simp[continue_def, push_def] >>
       hide_assum "DROP" (qspecl_then [‘ARB’, ‘ARB’] kall_tac) >>
-
       (* now work a bit on right argument *)
       CONV_TAC (pull_namedexvar_conv "be1") >> qexists_tac ‘cEnv0’ >>
       ntac 8 (irule_at Any triR_step1R >>
@@ -3680,7 +3681,6 @@ Proof
                    nsLookup_build_rec_env_sendloop]) >>
       simp[do_opapp_def] >>
       use_hidden_assum "DROP" (assume_tac o cj 5) >> gs[FAstrefsffi] >>
-
       (* back to left side;
          have to show (.., 𝕍 "sendloop", kont = args=DROP n d) -->₃
                       (.., Exp (drop (n+psz) d), kont = call sendloop)
@@ -3768,6 +3768,8 @@ Proof
            continue_def, application_def, do_app_thm,
            to_small_st_def, AllCaseEqs(), PULL_EXISTS] >>
       irule_at (Pos hd) triR_steps1 >>
+      ‘cSt0.eval_state = NONE’ by gs[cpEval_valid_def] >> simp[] >>
+      pop_assum kall_tac >>
       irule_at (Pos hd) RTC_stepr_evaluateL' >> irule_at Any RTC_REFL >>
       dxrule_then assume_tac
                   (INST_TYPE [alpha |-> “:plffi”] eval_rel_intro_ffi) >>
@@ -3818,18 +3820,15 @@ Proof
                    nsLookup_build_rec_env_sendloop]) >>
       simp[do_opapp_def] >>
       (* now have sendloop_code conf p2 on left *)
-
+      (* -- *)
       (* clean up to show we can now apply triR_REFL *)
       simp[payload_size_def] >>
       gs[cpEval_valid_def, EXstrefsffi] >>
       qmatch_goalsub_abbrev_tac ‘triR _ (_, (new_refs, new_ffi), _, _)’ >>
-      map_every (fn (s1,s2) =>
-                   CONV_TAC (pull_namedexvar_conv s1) >>
-                   qexists_tac [QUOTE s2])
-                [("refs", "new_refs"), ("ffi", "new_ffi")] >>
+      CONV_TAC (pull_namedexvar_conv "cSt") >>
+      qexists_tac ‘cSt0 with <| ffi := new_ffi; refs := new_refs |>’ >>
       simp[Abbr‘new_refs’, Abbr‘new_ffi’, DROP_DROP_T] >>
       irule_at (Pos hd) triR_REFL >>
-
       (* symbolic evaluation all done!!!! *)
       simp[LEFT_EXISTS_AND_THM, RIGHT_EXISTS_AND_THM] >>
       qmatch_goalsub_abbrev_tac ‘ffi_wf new_ffi’ >>
@@ -3893,6 +3892,7 @@ Proof
                    SRULE [SKOLEM_THM, FORALL_AND_THM])
                   (convDatumList_correct |> INST_TYPE [alpha |-> “:plffi”]) >>
       first_x_assum $ irule_at (Pos hd) >>
+      qexists_tac ‘ARB with eval_state := NONE’ >>
       simp[continue_def, push_def, Abbr‘ENV’] >>
       ntac 8 (irule_at Any triR_step1 >>
               simp[e_step_def, e_step_reln_def, continue_def, application_def,
@@ -3938,6 +3938,8 @@ Proof
       gs[] >>
       CONV_TAC (pull_namedexvar_conv "newrefs") >> qexists_tac ‘[]’ >> simp[] >>
       first_x_assum $ irule_at (Pos hd) >> simp[continue_def] >>
+      qexists_tac ‘ARB with eval_state := NONE’ >>
+      qexists_tac ‘ARB with eval_state := NONE’ >> simp[] >>
       (* Exp (If (finalv "buff") ... ...) *)
       irule_at Any triR_step1 >>
       simp[e_step_def, e_step_reln_def, push_def, return_def,
@@ -3954,6 +3956,7 @@ Proof
       simp[store_lookup_def, EL_APPEND1, EL_APPEND2] >>
       simp[continue_def, do_if_def] >> ‘d ≠ []’ by (Cases_on‘d’ >> gs[]) >>
       simp[] >>
+      qexists_tac ‘ARB with eval_state := NONE’ >> simp[] >>
       ntac 8 (irule_at Any triR_step1 >>
               simp[e_step_def, e_step_reln_def, push_def, return_def,
                    continue_def, application_def, do_app_thm, store_lookup_def,
@@ -3979,6 +3982,7 @@ Proof
                      evaluate_generalise') >>
       simp[continue_def, push_def] >> irule_at Any LESS_EQ_REFL >>
       first_assum $ irule_at (Pat ‘env_asm _ _’) >> pop_assum kall_tac >>
+      qexists_tac ‘ARB with eval_state := NONE’ >> simp[] >>
       qspec_then ‘cvs’ strip_assume_tac (Q.GEN ‘vs’ $ SRULE [] env_asm_FLAT) >>
       qmatch_goalsub_abbrev_tac ‘triR _ (ENV, _, _, _)’ >>
       pop_assum $ hide "ENV" >> last_x_assum $ drule_then strip_assume_tac >>
@@ -3993,8 +3997,13 @@ Proof
       CONV_TAC (pull_namedexvar_conv "newrefs") >> qexists_tac ‘[]’ >> simp[] >>
       first_x_assum (C (resolve_then (Pos hd) (irule_at Any o iffRL))
                      evaluate_generalise') >> simp[continue_def] >>
-      irule_at Any LESS_EQ_REFL >>
-      simp[EXstrefsffi] >> irule_at (Pos hd) triR_REFL >> simp[] >>
+      qexists_tac ‘ARB with eval_state := NONE’ >> simp[] >>
+      irule_at Any LESS_EQ_REFL >> simp[EXstrefsffi] >>
+      qmatch_goalsub_abbrev_tac ‘triR _ (_, (new_refs, new_ffi), _, _)’ >>
+      CONV_TAC (pull_namedexvar_conv "cSt") >>
+      qexists_tac ‘cSt0 with <| ffi := new_ffi; refs := new_refs |>’ >>
+      simp[Abbr‘new_refs’, Abbr‘new_ffi’] >>
+      irule_at (Pos hd) triR_REFL >> simp[] >>
       (* symbolic evaluation done *)
       simp[LEFT_EXISTS_AND_THM, RIGHT_EXISTS_AND_THM] >> rpt strip_tac (* 9 *)
       >- gs[funs_cpEval_valid_nsBind_ps2cs]
@@ -4058,11 +4067,9 @@ Proof
                     continue_def, application_def, do_app_thm,
                     store_alloc_def, do_opapp_def,
                     nsLookup_build_rec_env_sendloop]) >>
-
       (* do some work on right *)
       (* symbolically evaluate on other side *)
       CONV_TAC (pull_namedexvar_conv "cEnv") >> qexists_tac ‘cEnv0’ >>
-
       ntac 10 (irule_at Any triR_step1R >>
                simp[e_step_def, e_step_reln_def, push_def, return_def,
                     continue_def, application_def, do_app_thm,
@@ -4079,12 +4086,13 @@ Proof
                   |> SRULE [LEFT_FORALL_IMP_THM]
                   |> GEN_ALL
                   |> SRULE [SKOLEM_THM, GSYM RIGHT_EXISTS_IMP_THM]) >>
+      CONV_TAC (pull_namedexvar_conv "s00") >>
+      qexists_tac ‘ARB with eval_state := NONE’ >> simp[] >>
       simp[continue_def, push_def] >>
       simp[EXstrefsffi, REVERSE_SNOC] >>
       ntac 2 (irule_at Any triR_step1R >>
               simp[e_step_reln_def, e_step_def, return_def, continue_def,
                    application_def, do_opapp_def]) >>
-
       (* back to left *)
       irule_at Any triR_steps1 >>
       irule_at (Pos hd) RTC_stepr_fixedstate_evaluateL >>
@@ -4097,6 +4105,8 @@ Proof
                   (convDatumList_correct |> INST_TYPE [alpha |-> “:plffi”]) >>
       first_x_assum $ irule_at (Pos hd) >>
       simp[continue_def, push_def, Abbr‘ENV’] >>
+      CONV_TAC (pull_namedexvar_conv "s00") >>
+      qexists_tac ‘ARB with eval_state := NONE’ >> simp[] >>
       irule_at Any triR_step1 >>
       simp[e_step_def, e_step_reln_def, continue_def, application_def,
            do_app_thm, store_lookup_def, EL_APPEND2, call_FFI_def] >>
@@ -4147,6 +4157,9 @@ Proof
       gs[] >>
       CONV_TAC (pull_namedexvar_conv "newrefs") >> qexists_tac ‘[]’ >> simp[] >>
       first_x_assum $ irule_at (Pos hd) >> simp[continue_def] >>
+      MAP_EVERY (CONV_TAC o pull_namedexvar_conv) ["s0","t"] >>
+      qexists_tac ‘ARB with eval_state := NONE’ >>
+      qexists_tac ‘ARB with eval_state := NONE’ >> simp[] >>
       (* If (finalv "buff") ... *)
       irule_at Any triR_step1 >>
       simp[e_step_def, e_step_reln_def, push_def, return_def,
@@ -4164,6 +4177,8 @@ Proof
       ‘¬final d’ by metis_tac[final_inter_mutexc] >>
       simp[continue_def, do_if_def] >> ‘d ≠ []’ by (Cases_on‘d’ >> gs[]) >>
       simp[] >>
+      CONV_TAC (pull_namedexvar_conv "s00") >> 
+      qexists_tac ‘ARB with eval_state := NONE’ >> simp[] >>
       (* Exp (Letrec [("zerobuf", ...)] ... *)
       qmatch_goalsub_abbrev_tac ‘triR _ (ENV, _, _, _)’ >>
       pop_assum $ hide "ENV" >>
@@ -4188,12 +4203,17 @@ Proof
       disch_then (strip_assume_tac o SRULE [SKOLEM_THM]) >>
       pop_assum $ irule_at Any >> unhide "ENV" >>
       simp[continue_def, Abbr‘ENV’] >> pop_assum kall_tac >>
+      CONV_TAC (pull_namedexvar_conv "s0") >> 
+      qexists_tac ‘ARB with eval_state := NONE’ >> simp[] >>
       ntac 9 (irule_at (Pos hd) triR_step1 >>
               simp[e_step_reln_def, e_step_def, push_def, return_def,
                    do_con_check_def, continue_def, build_conv_def, LTD_CONS,
                    application_def, do_opapp_def]) >>
       simp[unpadv_def, build_rec_env_def, EXstrefsffi] >>
-
+      qmatch_goalsub_abbrev_tac ‘triR _ (_, (_, new_ffi), _, _)’ >>
+      CONV_TAC (pull_namedexvar_conv "cSt") >> 
+      qexists_tac ‘cSt0 with ffi := new_ffi’ >> simp[] >>
+      simp[Abbr‘new_ffi’] >>
       irule_at (Pos hd) triR_REFL >>
       (* symbolic evaluation done! *)
       simp[LEFT_EXISTS_AND_THM, RIGHT_EXISTS_AND_THM,
@@ -4338,6 +4358,8 @@ Proof
       simp[continue_def]>> irule_at (Pos hd) EQ_REFL >>
       CONV_TAC (pull_namedexvar_conv "cSt") >>
       qexists_tac ‘cSt0 with  refs := cSt0.refs ++ refs'’>>
+      CONV_TAC (pull_namedexvar_conv "st") >> 
+      qexists_tac ‘ARB with eval_state := NONE’ >> simp[] >>
       simp[]>>irule_at Any triR_REFL>>
       qexistsl_tac [‘pN0’,‘ck1’]>>simp[]>>
       rpt(conj_tac)  (* 3 *)
@@ -4531,6 +4553,10 @@ Proof
                    ALL_DISTINCT_REVERSE,can_pmatch_all_EVERY,
                    astTheory.pat_bindings_def,MAP_REVERSE,
                    store_alloc_def, do_opapp_def,do_con_check_def,do_if_def])>>
+      CONV_TAC (pull_namedexvar_conv "s00") >> 
+      qexists_tac ‘ARB with eval_state := NONE’ >> simp[] >>
+      CONV_TAC (pull_namedexvar_conv "cSt") >> 
+      qexists_tac ‘cSt0’ >> simp[] >>     
       irule_at Any triR_REFL>>
       qexists_tac‘pN0’>>simp[]>>
       rpt(conj_tac) (* 3 *)
