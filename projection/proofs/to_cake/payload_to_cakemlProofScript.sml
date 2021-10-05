@@ -1174,7 +1174,6 @@ Theorem padv_correct':
              Rval [Loc n]) ∧
           store_lookup n (s.refs ++ refs) = SOME (W8array (pad conf l))
 Proof
-  cheat >>
   rpt strip_tac >>
   ‘∃lenf.
      ∀env. env_asm env conf vs ⇒
@@ -1313,16 +1312,17 @@ Proof
       pop_assum (assume_tac o
                  Q.GEN ‘t’ o
                  SRULE [] o
-                 Q.SPECL [‘t’, ‘ARB with refs := (t:plffi state).refs’]) >>
+                 Q.SPECL [‘t’, ‘ARB with <| refs := (t:plffi state).refs;
+                                            eval_state := NONE |>’]) >>
       first_x_assum
        (C (resolve_then (Pos hd) assume_tac)
         (evaluate_induce_timeout |> cj 1 |> cj 2 |> iffLR)) >>
       gs[] >>
       Q.REFINE_EXISTS_TAC
        ‘(flclk1 (refs2 ++ tkreff refs2) refs2 conf.payload_size
-                <| refs := takerefs|> -
+                <| refs := takerefs; eval_state := NONE|> -
          flclk2 (refs2 ++ tkreff refs2) refs2 conf.payload_size
-                <| refs := takerefs|>) + clk1’ >> simp[] >>
+                <| refs := takerefs; eval_state := NONE|>) + clk1’ >> simp[] >>
       ‘LENGTH AR = conf.payload_size + 1’ by simp[Abbr‘AR’] >>
       simp[find_evalform ‘App _ _’, do_app_thm, store_lookup_def, EL_APPEND2,
            Abbr‘takerefs’, Abbr‘refs2’, EL_APPEND1, copy_array_def,
@@ -1375,7 +1375,8 @@ Proof
       pop_assum (assume_tac o
                  Q.GEN ‘t’ o
                  SRULE [] o
-                 Q.SPECL [‘t’, ‘ARB with refs := (t:plffi state).refs’]) >>
+                 Q.SPECL [‘t’, ‘ARB with <| refs := (t:plffi state).refs;
+                                            eval_state := NONE |>’]) >>
       first_x_assum
        (C (resolve_then (Pos hd) assume_tac)
         (evaluate_induce_timeout |> cj 1 |> cj 2 |> iffLR)) >>
@@ -1383,8 +1384,8 @@ Proof
       simp[find_evalform ‘Let _ _ _’] >>
       Q.REFINE_EXISTS_TAC ‘clk1 + 1’ >> simp[dec_clock_def] >>
       Q.REFINE_EXISTS_TAC ‘
-        (flclk1 <| refs := s.refs ++ [W8array AR]|> -
-         flclk2 <| refs := s.refs ++ [W8array AR]|>) + clk1’ >> simp[] >>
+        (flclk1 <| refs := s.refs ++ [W8array AR]; eval_state := NONE |> -
+         flclk2 <| refs := s.refs ++ [W8array AR]; eval_state := NONE |>) + clk1’ >> simp[] >>
       simp[find_evalform ‘App _ _’, do_app_thm, store_lookup_def, EL_APPEND1,
            EL_APPEND2, opn_lookup_def, integerTheory.INT_LT_SUB_RADD,
            integerTheory.INT_SUB, store_assign_def, store_v_same_type_def,
@@ -1478,7 +1479,8 @@ Proof
   pop_assum (assume_tac o
              Q.GEN ‘t’ o
              SRULE [] o
-             Q.SPECL [‘t’, ‘ARB with refs := (t:plffi state).refs’]) >>
+             Q.SPECL [‘t’, ‘ARB with <| refs := (t:plffi state).refs;
+                                        eval_state := NONE |>’]) >>
   first_x_assum
   (C (resolve_then (Pos hd) assume_tac)
    (evaluate_induce_timeout |> cj 1 |> cj 2 |> iffLR)) >>
@@ -1486,7 +1488,7 @@ Proof
   qmatch_goalsub_abbrev_tac ‘evaluate (s with <| clock := _; refs := RFS |>)’>>
   Q.REFINE_EXISTS_TAC
    ‘clk1 + flclk1 (refs1 ++ tkreff refs1) refs1 conf.payload_size
-                  <| refs := RFS|>’ >> simp[] >>
+                  <| refs := RFS; eval_state := NONE |>’ >> simp[] >>
   simp[find_evalform ‘App _ _’, do_app_thm, copy_array_def, EL_APPEND1,
        EL_APPEND2, store_lookup_def, Abbr‘RFS’, Abbr‘refs1’,
        integerTheory.INT_ADD, store_assign_def, store_v_same_type_def,
@@ -2895,6 +2897,7 @@ Theorem RTC_stepr_evaluateL:
      evaluate (s00 with clock := ckf1 s00) env [e] =
      (s00 with <| clock := ckf2 s00; refs := s00.refs ++ rfn s00|>,
       Rval [vfn s00])) ∧
+  s00.eval_state = NONE ∧
   smallStep$continue (smSt (s00 with refs := s00.refs ++ rfn s00))
                      (vfn s00) cs =
   smallStep$Estep a ∧ stepr꙳ a b ⇒
@@ -2912,7 +2915,6 @@ Proof
   simp[funBigStepEquivTheory.functional_evaluate] >>
   first_x_assum (C (resolve_then Any mp_tac) evaluate_set_clock) >>
   simp[SKOLEM_THM] >>
-  cheat >>
   disch_then (qx_choose_then ‘ckf’ (irule_at (Pos hd))) >> simp[] >>
   irule (cj 2 RTC_RULES) >> simp[e_step_reln_def, e_step_def]
 QED
@@ -2931,6 +2933,7 @@ Theorem FORALL_state = FORALL_state |> INST_TYPE [“:'ffi0” |-> alpha,
 Theorem RTC_stepr_fixedstate_evaluateL0:
   evaluate ((s00 with <| clock := clk1; refs := refs00 |>) : α state) env [e] =
   (s00 with <| clock := clk2; refs := refs01|>, Rval [rval]) ∧
+  s00.eval_state = NONE ∧
   smallStep$continue (refs01, ffi00) rval cs =
   smallStep$Estep a ∧ stepr꙳ a b ⇒
   stepr꙳ (env,(refs00,ffi00 : α ffi_state),Exp e,cs) b
@@ -2953,7 +2956,6 @@ Proof
   irule_at (Pos hd)
            (evaluate_ffi_intro' |> SRULE [FORALL_state]
                                 |> INST_TYPE [alpha |-> beta]) >>
-  cheat >>
   Cases_on ‘s00’ using state_cases >> gs[]  >> first_assum $ irule_at Any >>
   irule (cj 2 RTC_RULES) >> simp[e_step_reln_def, e_step_def]
 QED
@@ -3030,7 +3032,9 @@ QED
 
 Theorem evaluate_ffi_intro'':
   evaluate s env e = (s',r) ∧ s'.ffi = s.ffi ∧
-  (∀outcome. r ≠ Rerr (Rabort (Rffi_error outcome))) ∧ t.refs = s.refs ∧
+  (∀outcome. r ≠ Rerr (Rabort (Rffi_error outcome))) ∧ s'.next_type_stamp = s.next_type_stamp ∧
+  s'.next_exn_stamp = s.next_exn_stamp ∧ s.eval_state = NONE ∧
+  r ≠ Rerr (Rabort Rtype_error) ∧ t.refs = s.refs ∧
   t.clock = s.clock ∧ t' = t with <| refs := s'.refs; clock := s'.clock |> ⇒
   evaluate t env e = (t',r)
 Proof
@@ -3038,7 +3042,7 @@ Proof
   qpat_x_assum ‘t.clock = s.clock’ (SUBST_ALL_TAC o SYM) >>
   qpat_x_assum ‘t.refs = s.refs’ (SUBST_ALL_TAC o SYM) >>
   disch_then $ qspec_then ‘t’ mp_tac >> simp[] >>
-  disch_then irule >> cheat
+  disch_then irule
 QED
 
 Theorem RTC_stepr_evaluateL':
@@ -3054,8 +3058,9 @@ Proof
             |> SIMP_RULE bool_ss [GSYM RIGHT_EXISTS_IMP_THM, SKOLEM_THM]
             |> INST_TYPE [“:'ffi” |-> alpha]) >>
   pop_assum (irule_at (Pos hd)) >> gs[eval_rel_def] >>
-  qabbrev_tac ‘st0 = ARB with <| refs := refs0; ffi := ffi0 |>’ >>
+  qabbrev_tac ‘st0 = ARB with <| refs := refs0; ffi := ffi0 ; eval_state := NONE |>’ >>
   ‘(refs0,ffi0) = smSt st0’ by simp[to_small_st_def, Abbr‘st0’] >> simp[] >>
+  ‘st0.eval_state = NONE’ by simp[Abbr‘st0’] >>
   irule_at (Pos hd) (small_big_exp_equiv |> iffRL |> cj 1) >>
   irule_at Any (iffRL bigClockTheory.big_clocked_unclocked_equiv) >>
   simp[funBigStepEquivTheory.functional_evaluate] >>
@@ -3063,7 +3068,6 @@ Proof
   first_x_assum (C (resolve_then Any mp_tac) evaluate_set_clock) >>
   simp[SKOLEM_THM] >>
   disch_then (qx_choose_then ‘ckf’ strip_assume_tac) >>
-  cheat >>
   first_assum (irule_at (Pos hd)) >> simp[] >>
   irule (cj 2 RTC_RULES) >> simp[e_step_reln_def, e_step_def] >>
   gvs[to_small_st_def]
@@ -3082,9 +3086,9 @@ Proof
       first_assum (pop_assum o resolve_then (Pos hd) mp_tac) >> simp[] >>
   reverse (rpt strip_tac)
   >- (pop_assum $ qspecl_then [‘s00’, ‘s00.refs’] mp_tac >> simp[empty_state_def]) >>
-  cheat >>
   pop_assum (strip_assume_tac o SRULE [SKOLEM_THM]) >>
-  first_x_assum (qspecl_then [‘t’, ‘t.refs’] (strip_assume_tac o SRULE [] o
+  first_x_assum (qspecl_then [‘t’, ‘t.refs’] (strip_assume_tac o
+                                              SRULE [empty_state_def] o
                                               Q.GEN ‘t’)) >>
   pop_assum (C (resolve_then (Pos hd) mp_tac) evaluate_add_to_clock) >> simp[]>>
   pop_assum (C (resolve_then (Pos hd) mp_tac) evaluate_add_to_clock) >> simp[]>>
