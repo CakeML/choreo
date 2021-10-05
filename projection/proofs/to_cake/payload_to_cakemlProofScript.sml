@@ -4177,7 +4177,7 @@ Proof
       ‘¬final d’ by metis_tac[final_inter_mutexc] >>
       simp[continue_def, do_if_def] >> ‘d ≠ []’ by (Cases_on‘d’ >> gs[]) >>
       simp[] >>
-      CONV_TAC (pull_namedexvar_conv "s00") >> 
+      CONV_TAC (pull_namedexvar_conv "s00") >>
       qexists_tac ‘ARB with eval_state := NONE’ >> simp[] >>
       (* Exp (Letrec [("zerobuf", ...)] ... *)
       qmatch_goalsub_abbrev_tac ‘triR _ (ENV, _, _, _)’ >>
@@ -4203,7 +4203,7 @@ Proof
       disch_then (strip_assume_tac o SRULE [SKOLEM_THM]) >>
       pop_assum $ irule_at Any >> unhide "ENV" >>
       simp[continue_def, Abbr‘ENV’] >> pop_assum kall_tac >>
-      CONV_TAC (pull_namedexvar_conv "s0") >> 
+      CONV_TAC (pull_namedexvar_conv "s0") >>
       qexists_tac ‘ARB with eval_state := NONE’ >> simp[] >>
       ntac 9 (irule_at (Pos hd) triR_step1 >>
               simp[e_step_reln_def, e_step_def, push_def, return_def,
@@ -4211,7 +4211,7 @@ Proof
                    application_def, do_opapp_def]) >>
       simp[unpadv_def, build_rec_env_def, EXstrefsffi] >>
       qmatch_goalsub_abbrev_tac ‘triR _ (_, (_, new_ffi), _, _)’ >>
-      CONV_TAC (pull_namedexvar_conv "cSt") >> 
+      CONV_TAC (pull_namedexvar_conv "cSt") >>
       qexists_tac ‘cSt0 with ffi := new_ffi’ >> simp[] >>
       simp[Abbr‘new_ffi’] >>
       irule_at (Pos hd) triR_REFL >>
@@ -4358,7 +4358,7 @@ Proof
       simp[continue_def]>> irule_at (Pos hd) EQ_REFL >>
       CONV_TAC (pull_namedexvar_conv "cSt") >>
       qexists_tac ‘cSt0 with  refs := cSt0.refs ++ refs'’>>
-      CONV_TAC (pull_namedexvar_conv "st") >> 
+      CONV_TAC (pull_namedexvar_conv "st") >>
       qexists_tac ‘ARB with eval_state := NONE’ >> simp[] >>
       simp[]>>irule_at Any triR_REFL>>
       qexistsl_tac [‘pN0’,‘ck1’]>>simp[]>>
@@ -4553,10 +4553,10 @@ Proof
                    ALL_DISTINCT_REVERSE,can_pmatch_all_EVERY,
                    astTheory.pat_bindings_def,MAP_REVERSE,
                    store_alloc_def, do_opapp_def,do_con_check_def,do_if_def])>>
-      CONV_TAC (pull_namedexvar_conv "s00") >> 
+      CONV_TAC (pull_namedexvar_conv "s00") >>
       qexists_tac ‘ARB with eval_state := NONE’ >> simp[] >>
-      CONV_TAC (pull_namedexvar_conv "cSt") >> 
-      qexists_tac ‘cSt0’ >> simp[] >>     
+      CONV_TAC (pull_namedexvar_conv "cSt") >>
+      qexists_tac ‘cSt0’ >> simp[] >>
       irule_at Any triR_REFL>>
       qexists_tac‘pN0’>>simp[]>>
       rpt(conj_tac) (* 3 *)
@@ -5187,7 +5187,9 @@ Theorem smallsteps_oracle_invariant:
 Proof
   Cases_on ‘st’ >> Cases_on ‘st'’ >> gvs[] >> strip_tac >>
   CONV_TAC SYM_CONV >>
-  qspecl_then [‘λx. (SND(FST(SND x))).oracle’,‘stepr’] (match_mp_tac o SIMP_RULE (srw_ss()) [FORALL_PROD]) (MP_CANON(GEN_ALL RTC_lifts_equalities)) >>
+  qspecl_then [‘λx. ffi_state_oracle (SND(FST(SND x)))’,‘stepr’]
+              (match_mp_tac o SIMP_RULE (srw_ss()) [FORALL_PROD])
+                (MP_CANON(GEN_ALL RTC_lifts_equalities)) >>
   first_x_assum(irule_at Any) >>
   rpt strip_tac >>
   drule smallstep_oracle_invariant >>
