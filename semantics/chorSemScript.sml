@@ -17,7 +17,6 @@ Definition freeprocs_def:
 ∧ freeprocs (LTau p n)         = {p}
 ∧ freeprocs (LCom p1 v1 p2 v2) = {p1;p2}
 ∧ freeprocs (LSel p1 b p2)     = {p1;p2}
-∧ freeprocs (LSel p1 b p2)     = {p1;p2}
 ∧ freeprocs (LLet v p f vl)     = {p}
 End
 
