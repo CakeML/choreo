@@ -394,6 +394,7 @@ Theorem compilation_preservation_junkcong:
    net_find p pEPN1  = SOME (NEndpoint p pSt1 pCd1 ) ∧
    cSt1.ffi.oracle = comms_ffi_oracle conf ∧
    cSt1.ffi.ffi_state = (p,pSt1.queues,net_filter p pEPN1) ∧
+   cSt1.eval_state = NONE ∧
    (* payload_to_cakeml assumptions *)
    pSt_pCd_corr conf pSt1 pCd1 ∧
    sem_env_cor conf pSt1 env1 cvs ∧
@@ -500,6 +501,7 @@ Theorem compilation_preservation_junkcong_top:
    net_find p pEPN1  = SOME (NEndpoint p pSt1 pCd1 ) ∧
    cSt1.ffi.oracle = comms_ffi_oracle conf ∧
    cSt1.ffi.ffi_state = (p,pSt1.queues,net_filter p pEPN1) ∧
+   cSt1.eval_state = NONE ∧
    (* payload_to_cakeml assumptions *)
    pSt_pCd_corr conf pSt1 pCd1 ∧
    sem_env_cor conf pSt1 env1 cvs ∧
@@ -606,6 +608,7 @@ Theorem compilation_preservation:
    net_find p pEPN1  = SOME (NEndpoint p pSt1 pCd1 ) ∧
    cSt1.ffi.oracle = comms_ffi_oracle conf ∧
    cSt1.ffi.ffi_state = (p,pSt1.queues,net_filter p pEPN1) ∧
+   cSt1.eval_state = NONE ∧
    (* payload_to_cakeml assumptions *)
    pSt_pCd_corr conf pSt1 pCd1 ∧
    sem_env_cor conf pSt1 env1 cvs ∧
@@ -708,6 +711,7 @@ Theorem compilation_preservation_top:
    net_find p pEPN1  = SOME (NEndpoint p pSt1 pCd1 ) ∧
    cSt1.ffi.oracle = comms_ffi_oracle conf ∧
    cSt1.ffi.ffi_state = (p,pSt1.queues,net_filter p pEPN1) ∧
+   cSt1.eval_state = NONE ∧
    (* payload_to_cakeml assumptions *)
    pSt_pCd_corr conf pSt1 pCd1 ∧
    sem_env_cor conf pSt1 env1 cvs ∧
