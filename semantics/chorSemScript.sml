@@ -147,88 +147,106 @@ val [lcong_sym,lcong_refl,lcong_trans,lcong_reord] =
         (CONJUNCTS lcong_rules) |> map save_thm;
 
 Inductive trans:
+[~com:]
   (* Communication *)
   (∀s v1 p1 v2 p2 d c.
     FLOOKUP s (v1,p1) = SOME d
     ∧ p1 ≠ p2
     ⇒ trans (s,Com p1 v1 p2 v2 c) (LCom p1 v1 p2 v2,[]) (s |+ ((v2,p2),d),c))
 
+∧
+[~sel:]
   (* Selection *)
-∧ (∀s p1 b p2 c.
+  (∀s p1 b p2 c.
     p1 ≠ p2
     ⇒ trans (s,Sel p1 b p2 c) (LSel p1 b p2,[]) (s,c))
 
+∧
+[~let:]
   (* Let *)
-∧ (∀s v p f vl c.
+  (∀s v p f vl c.
     EVERY IS_SOME (MAP (FLOOKUP s) (MAP (λv. (v,p)) vl))
     ⇒ trans (s,Let v p f vl c)
             (LLet v p f vl,[])
             (s |+ ((v,p),f(MAP (THE o FLOOKUP s) (MAP (λv. (v,p)) vl))),c))
 
+∧
+[~if_true:]
   (* If (True) *)
-∧ (∀s v p c1 c2.
+  (∀s v p c1 c2.
     FLOOKUP s (v,p) = SOME [1w]
     ⇒ trans (s,IfThen v p c1 c2) (LTau p v,[]) (s,c1))
 
+∧
+[~if_false:]
   (* If (False) *)
-∧ (∀s v p c1 c2.
+  (∀s v p c1 c2.
     FLOOKUP s (v,p) = SOME w ∧ w ≠ [1w]
     ⇒ trans (s,IfThen v p c1 c2) (LTau p v,[]) (s,c2))
 
   (* Swapping transitions / Structural congruence *)
-∧ (∀s v p c1 c2 s' c1' c2' l l' alpha.
+∧
+[~if_swap:]
+  (∀s v p c1 c2 s' c1' c2' l l' alpha.
     trans (s,c1) (alpha,l) (s',c1')
     ∧ trans (s,c2) (alpha,l') (s',c2')
     ∧ l τ≅ l'
     ∧ p ∉ freeprocs alpha
     ⇒ trans (s,IfThen v p c1 c2) (alpha,l) (s',IfThen v p c1' c2'))
-∧ (∀s c s' c' p1 v1 p2 v2 l alpha.
+∧
+[~com_swap:]
+  (∀s c s' c' p1 v1 p2 v2 l alpha.
     trans (s,c) (alpha,l) (s',c')
     ∧ p1 ∉ freeprocs alpha
     ∧ p2 ∉ freeprocs alpha
-    ⇒ trans (s,Com p1 v1 p2 v2 c) (alpha,l) (s',Com p1 v1 p2 v2 c'))
-∧ (∀s c s' c' p1 b p2 l alpha.
+    ⇒ trans (s,Com p1 v1 p2 v2 c) (alpha,l) (s',Com p1 v1 p2 v2 c')) ∧
+[~sel_swap:]
+  (∀s c s' c' p1 b p2 l alpha.
     trans (s,c) (alpha,l) (s',c')
     ∧ p1 ∉ freeprocs alpha
     ∧ p2 ∉ freeprocs alpha
-    ⇒ trans (s,Sel p1 b p2 c) (alpha,l) (s',Sel p1 b p2 c'))
-∧ (∀s c s' c' p v f vl l alpha.
+    ⇒ trans (s,Sel p1 b p2 c) (alpha,l) (s',Sel p1 b p2 c')) ∧
+[~let_swap:]
+  (∀s c s' c' p v f vl l alpha.
     trans (s,c) (alpha,l) (s',c')
     ∧ p ∉ freeprocs alpha
-    ⇒ trans (s,Let v p f vl c) (alpha,l) (s',Let v p f vl c'))
+    ⇒ trans (s,Let v p f vl c) (alpha,l) (s',Let v p f vl c')) ∧
 
   (* Asynchrony *)
-∧ (∀s c s' c' p1 v1 p2 v2 l alpha.
+[~com_async:]
+  (∀s c s' c' p1 v1 p2 v2 l alpha.
     trans (s,c) (alpha,l) (s',c')
     ∧ p1 ∈ freeprocs alpha
     ∧ written alpha ≠ SOME (v1,p1)
     ∧ p2 ∉ freeprocs alpha
-    ⇒ trans (s,Com p1 v1 p2 v2 c) (alpha,LCom p1 v1 p2 v2::l) (s',Com p1 v1 p2 v2 c'))
+    ⇒ trans (s,Com p1 v1 p2 v2 c) (alpha,LCom p1 v1 p2 v2::l)
+            (s',Com p1 v1 p2 v2 c')) ∧
 
-∧ (∀s c s' c' p1 b p2 l alpha.
+[~sel_async:]
+  (∀s c s' c' p1 b p2 l alpha.
     trans (s,c) (alpha,l) (s',c')
     ∧ p1 ∈ freeprocs alpha
     ∧ p2 ∉ freeprocs alpha
     ⇒ trans (s,Sel p1 b p2 c) (alpha,LSel p1 b p2::l) (s',Sel p1 b p2 c'))
 
    (* Recursion *)
-∧ (∀s c dn.
+∧
+[~fix:]
+  (∀s c dn.
     trans (s,Fix dn c) (LFix,[]) (s,dsubst c dn (Fix dn c)))
 
-∧ (∀s v p c c0.
+∧
+[~fix_if_true:]
+  (∀s v p c c0.
     trans (s,c) (LFix,[]) (s,c')
     ⇒ trans (s,IfThen v p c c0) (LFix,[]) (s,IfThen v p c' c0))
 
-∧ (∀s v p c c0.
+∧
+[~fix_if_false:]
+  (∀s v p c c0.
     trans (s,c) (LFix,[]) (s,c')
     ⇒ trans (s,IfThen v p c0 c) (LFix,[]) (s,IfThen v p c0 c'))
 End
-
-val _ = zip ["trans_com","trans_sel","trans_let","trans_if_true","trans_if_false",
-              "trans_if_swap","trans_com_swap","trans_sel_swap","trans_let_swap",
-              "trans_com_async","trans_sel_async",
-              "trans_fix","trans_fix_if_true","trans_fix_if_false"]
-            (CONJUNCTS trans_rules) |> map save_thm;
 
 Theorem trans_pairind =
   theorem"trans_strongind"
