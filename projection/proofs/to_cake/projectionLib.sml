@@ -646,6 +646,7 @@ struct
         |> eval_assm
         |> eval_assm
         |> eval_assm
+        |> eval_assm
         |> CONV_RULE(LAND_CONV EVAL)
         |> CONV_RULE(LAND_CONV(SIMP_CONV std_ss []))
         |> C MP TRUTH
