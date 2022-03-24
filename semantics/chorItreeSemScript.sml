@@ -2,6 +2,7 @@ open preamble choreoUtilsTheory libTheory
 
 open chorLangTheory itreeTheory iforestTheory llistTheory
 
+(* The type of events *)
 Datatype:
   event = Send proc datum
         | Receive proc
@@ -9,17 +10,23 @@ Datatype:
         | Select proc
 End
 
+
+(* The type of actions *)
 Datatype:
-  action = Ok
-         | Msg datum
-         | Branch bool
+  action = Ok          (* Everything went fine *)
+         | Msg datum   (* An incoming message with a value *)
+         | Branch bool (* A choice of branch *)
 End
 
+(* The type of results  *)
 Datatype:
-  result = Res unit
-         | Error
+  result = Res unit (* We are finish or the environment gave us a useles action *)
+         | Error    (* Something whent wrong *)
 End
 
+(* Filters out all the parts of the choreography that do not concern a
+   the given process
+*)
 Definition chor_filter_def:
   chor_filter p Nil = Nil
 ∧ chor_filter p (Call f) = Call f
@@ -39,6 +46,17 @@ Definition chor_filter_def:
 ∧ chor_filter p (IfThen v q c1 c2) =
   IfThen v q (chor_filter p c1) (chor_filter p c2)
 End
+
+(* Auxiliary functions for dealing with actions.
+   In all cases if a wrong action is given by the environment
+   the Itree simply stops with Nil.
+
+   NOTE: We may need to differentiate this from a choreography
+         that is terminating normally, however, conceptually
+         there is nothing one can do once the environment
+         messes up its response.
+*)
+
 
 Definition chor_itree_if_aux_def[simp]:
   chor_itree_if_aux s l r (Branch b) = (s,if b then l else r)
@@ -78,6 +96,15 @@ Definition chor_itree_aux1_def:
    then if FLOOKUP s v = SOME [1w]
         then Tau' (s,l)
         else Tau' (s,r)
+   (* NOTE: This is weird/wrong as it is not the case that
+            If statement alone cause a Select event, that is what
+            selections do.
+
+            One idea to deal with this is to "zip" the two
+            branches so that either both produce the same events,
+            selections are used to remove a branch, or
+            there is a missmatch and we throw an error.
+    *)
    else if chor_filter p l = chor_filter p r
         then Tau' (s,l)
         else Vis' (Select q) (chor_itree_if_aux s l r))
