@@ -79,4 +79,15 @@ Definition dsubst_def:
       Call dn')
 End
 
+Definition size_chor_def:
+  size_chor Nil                = (1 : num)
+∧ size_chor (Com _ _ _ _ c)    = 1 + size_chor c
+∧ size_chor (Sel _ _ _ c)      = 1 + size_chor c
+∧ size_chor (Let _ _ _ _ c)    = 1 + size_chor c
+∧ size_chor (IfThen _ _ c1 c2) = 1 + size_chor c1 + size_chor c2
+∧ size_chor (Fix dn c)         = 1 + size_chor c
+∧ size_chor (Call dn)          = 1
+End
+
+
 val _ = export_theory ()
