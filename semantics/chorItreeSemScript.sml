@@ -81,9 +81,11 @@ Definition chor_itree_list_def:
 ∧ chor_itree_list p [(s,Fix f c)] = Tau' [(s,dsubst c f (Fix f c))]
 ∧ chor_itree_list p [(s,IfThen v q l r)] =
   (if p = q
-   then if FLOOKUP s v = SOME [1w]
-        then Tau' [(s,l)]
-        else Tau' [(s,r)]
+   then if IS_SOME (FLOOKUP s v)
+        then if FLOOKUP s v = SOME [1w]
+             then Tau' [(s,l)]
+             else Tau' [(s,r)]
+        else Ret' Error
    else chor_itree_list p [(s,l);(s,r)])
 ∧ chor_itree_list p [(s,Com q1 v1 q2 v2 c)] =
   (if p = q1 then
@@ -299,9 +301,11 @@ Theorem chor_itree_def:
 ∧ chor_itree p s (Fix f' c) = Tau (chor_itree p s (dsubst c f' (Fix f' c)))
 ∧ chor_itree p s (IfThen v q l r) =
   (if p = q then
-     if FLOOKUP s v = SOME [1w]
-     then Tau (chor_itree p s l)
-     else Tau (chor_itree p s r)
+     if IS_SOME (FLOOKUP s v)
+     then if FLOOKUP s v = SOME [1w]
+          then Tau (chor_itree p s l)
+          else Tau (chor_itree p s r)
+     else Ret Error
    else chor_itree_merge (chor_itree p s l) (chor_itree p s r))
 ∧ chor_itree p s (Com q1 v1 q2 v2 c) =
   (if p = q1 then

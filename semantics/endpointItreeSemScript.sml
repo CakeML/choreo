@@ -7,6 +7,10 @@ Definition EPERROR:
   EPERROR = Call "ERROR"
 End
 
+Definition EPDONE:
+  EPDONE = Call "DONE"
+End
+
 Definition endpoint_itree_send_aux_def[simp]:
   endpoint_itree_send_aux s e Ok = (s,e)
 ∧ endpoint_itree_send_aux s _ _  = (s,EPERROR)
@@ -19,13 +23,17 @@ End
 
 Definition endpoint_itree_select_aux_def[simp]:
   endpoint_itree_select_aux s l r (Branch b) =
-  (if b then (s,l) else (s,r))
+  (if b
+   then if l = Nil then (s,EPDONE) else (s,l)
+   else if r = Nil then (s,EPDONE) else (s,r))
 ∧ endpoint_itree_select_aux s _ _ _ = (s,EPERROR)
 End
 
 Definition endpoint_itree_aux1_def:
-  endpoint_itree_aux (s,Nil)    = Ret' Done
-∧ endpoint_itree_aux (s,Call f) = Ret' Error
+  endpoint_itree_aux (s,Nil)    = Ret' (Res ())
+∧ endpoint_itree_aux (s,Call f) = (if f = "DONE"
+                                   then Ret' Done
+                                   else Ret' Error)
 ∧ endpoint_itree_aux (s,Let v f vl e) =
     (if EVERY IS_SOME (MAP (FLOOKUP s) vl)
      then Tau' (s |+ (v,f (MAP (THE o FLOOKUP s) vl)),e)
@@ -66,15 +74,17 @@ End
 Definition endpoint_itree_select_def[simp]:
   endpoint_itree_select s l r (Branch b) =
     (if b
-     then endpoint_itree s l
-     else endpoint_itree s r)
+     then if l = Nil then Ret Done else endpoint_itree s l
+     else if r = Nil then Ret Done else endpoint_itree s r)
 ∧ endpoint_itree_select s _ _ _ = Ret Error
 End
 
 Theorem endpoint_itree_def:
 ∀vl v s r p l f' f e b.
-  endpoint_itree s Nil = Ret Done
-∧ endpoint_itree s (Call f') = Ret Error
+  endpoint_itree s Nil = Ret (Res ())
+∧ endpoint_itree s (Call f') = (if f' = "DONE"
+                                then Ret Done
+                                else Ret Error)
 ∧ endpoint_itree s (Let v f vl e) =
     (if EVERY IS_SOME (MAP (FLOOKUP s) vl)
      then
@@ -101,11 +111,13 @@ Proof
   rw[endpoint_itree_aux_def]
   \\ simp[Once itree_unfold,endpoint_itree_aux1_def]
   \\ rw[FUN_EQ_THM]
-  \\ Cases_on ‘x’ \\ simp[endpoint_itree_aux1_def,endpoint_itree_aux_def,EPERROR]
+  \\ Cases_on ‘x’
+  \\ simp[endpoint_itree_aux1_def,endpoint_itree_aux_def,EPERROR,EPDONE]
   \\ simp[Once itree_unfold,endpoint_itree_aux1_def]
   \\ Cases_on ‘b’ \\ simp[]
   \\ irule EQ_SYM
   \\ simp[Once itree_unfold,endpoint_itree_aux1_def]
+  \\ IF_CASES_TAC \\ rw[endpoint_itree_aux1_def]
 QED
 
 val _ = export_theory ()
