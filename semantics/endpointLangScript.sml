@@ -126,4 +126,12 @@ Definition network_nodenames_def[simp]:
   network_nodenames n1 ∪ network_nodenames n2
 End
 
+Definition EPERROR:
+  EPERROR = Call "ERROR"
+End
+
+Definition EPDONE:
+  EPDONE = Call "DONE"
+End
+
 val _ = export_theory ()

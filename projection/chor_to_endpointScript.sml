@@ -69,9 +69,9 @@ Definition project_def:
       IntChoice b p2 <Γ> project proc dvars c
     else if proc = p2 then
       if b then
-        (λx. ExtChoice p1 x Nil) <Γ> project proc dvars c
+        (λx. ExtChoice p1 x EPDONE) <Γ> project proc dvars c
       else
-        ExtChoice p1 Nil <Γ> project proc dvars c
+        ExtChoice p1 EPDONE <Γ> project proc dvars c
    else
      project proc dvars c)
 ∧ (project proc dvars (Fix dn c) =

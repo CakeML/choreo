@@ -2,15 +2,6 @@ open preamble endpointLangTheory itreesTheory itreeCommonTheory
 
 val _ = new_theory "endpointItreeSem";
 
-
-Definition EPERROR:
-  EPERROR = Call "ERROR"
-End
-
-Definition EPDONE:
-  EPDONE = Call "DONE"
-End
-
 Definition endpoint_itree_send_aux_def[simp]:
   endpoint_itree_send_aux s e Ok = (s,e)
 ∧ endpoint_itree_send_aux s _ _  = (s,EPERROR)
@@ -23,9 +14,7 @@ End
 
 Definition endpoint_itree_select_aux_def[simp]:
   endpoint_itree_select_aux s l r (Branch b) =
-  (if b
-   then if l = Nil then (s,EPDONE) else (s,l)
-   else if r = Nil then (s,EPDONE) else (s,r))
+  (if b then (s,l) else (s,r))
 ∧ endpoint_itree_select_aux s _ _ _ = (s,EPERROR)
 End
 
@@ -74,8 +63,8 @@ End
 Definition endpoint_itree_select_def[simp]:
   endpoint_itree_select s l r (Branch b) =
     (if b
-     then if l = Nil then Ret Done else endpoint_itree s l
-     else if r = Nil then Ret Done else endpoint_itree s r)
+     then endpoint_itree s l
+     else endpoint_itree s r)
 ∧ endpoint_itree_select s _ _ _ = Ret Error
 End
 

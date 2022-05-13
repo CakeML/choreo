@@ -25,9 +25,13 @@ Datatype:
            | FCall dvarN (varN list)
 End
 
+DataSize.prove_size_eqs := false;
+
 Datatype:
  closure = Closure (varN list) ((dvarN,closure) alist # (varN |-> datum)) endpoint
 End
+
+DataSize.prove_size_eqs := true;
 
 Datatype:
   network = NNil

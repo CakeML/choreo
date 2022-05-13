@@ -2,26 +2,6 @@ open preamble chorLangTheory itreesTheory itreeCommonTheory
 
 val _ = new_theory "chorItreeSem";
 
-(* The error choreography:
-
-   (1) Projectable choreography should not contain it.
-   (2) It always produces an error result
- *)
-Definition CERROR:
-  CERROR = Call "ERROR"
-End
-
-(* The Finish branch choreography
-
-   (1) Projectable choreography should not contain it.
-   (2) It marks when a branch has been ruled out by selection
-
- *)
-
-Definition CDONE:
-  CDONE = Call "DONE"
-End
-
 (* Auxiliary functions for dealing with actions.
    In all cases if a wrong action is given by the environment
    the Itree simply stops with Nil.
