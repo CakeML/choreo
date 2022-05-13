@@ -1,4 +1,4 @@
-open preamble endpointLangTheory itreeTheory itreeCommonTheory
+open preamble endpointLangTheory itreesTheory itreeCommonTheory
 
 val _ = new_theory "endpointItreeSem";
 

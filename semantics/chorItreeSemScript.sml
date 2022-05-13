@@ -1,4 +1,4 @@
-open preamble chorLangTheory itreeTheory itreeCommonTheory
+open preamble chorLangTheory itreesTheory itreeCommonTheory
 
 val _ = new_theory "chorItreeSem";
 
