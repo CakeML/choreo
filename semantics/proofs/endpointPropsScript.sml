@@ -151,7 +151,7 @@ val reduction_par_l_TC = Q.store_thm("reduction_par_l_TC",
   >> ho_match_mp_tac TC_INDUCT
   >> rpt strip_tac
   >> metis_tac[TC_RULES,reduction_def,trans_par_l]);
-  
+
 val reduction_par_r = Q.store_thm("reduction_par_r",
   `∀p q r. reduction^* p q ==> reduction^* (NPar r p) (NPar r q)`,
   rpt gen_tac
@@ -2020,11 +2020,19 @@ Theorem join_endpoint_trans:
     join_endpoint e1 e2 = SOME e2 /\ join_endpoint e2 e3 = SOME e3
     ==> join_endpoint e1 e3 = SOME e3
 Proof
-  recInduct join_endpoint_ind \\
-  rpt strip_tac \\
-  rename1 `join_endpoint _ ee` \\
-  Cases_on `ee` \\
-  gvs[join_endpoint_def, AllCaseEqs()]
+  recInduct join_endpoint_ind
+  \\ simp[join_endpoint_def]
+  \\ rpt strip_tac
+  \\ rename1 `join_endpoint _ ee`
+  \\ Cases_on `ee`
+  >~ [‘join_endpoint (ExtChoice _ _ _) (ExtChoice _ _ _)’]
+  >- (cases_on ‘join_endpoint e1 e3’    \\ gs[join_endpoint_def] \\ rveq
+      \\ cases_on ‘join_endpoint e2 e4’ \\ gs[join_endpoint_def] \\ rveq
+      \\ cases_on ‘join_endpoint e3 e’  \\ gs[join_endpoint_def] \\ rveq
+      \\ cases_on ‘join_endpoint e4 e0’ \\ gs[join_endpoint_def] \\ rveq
+      (* Causes memory leak if done earlier *)
+      \\ gvs[join_endpoint_def, AllCaseEqs()])
+  \\ gvs[join_endpoint_def, AllCaseEqs()]
 QED
 
 Theorem join_network_trans:
