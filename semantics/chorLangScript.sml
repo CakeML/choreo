@@ -1,4 +1,4 @@
-open preamble;
+open preamble choreoUtilsTheory;
 
 val _ = new_theory "chorLang";
 
@@ -87,6 +87,17 @@ Definition size_chor_def:
 ∧ size_chor (IfThen _ _ c1 c2) = 1 + size_chor c1 + size_chor c2
 ∧ size_chor (Fix dn c)         = 1 + size_chor c
 ∧ size_chor (Call dn)          = 1
+End
+
+(* The set of all processes in a choreography *)
+Definition procsOf_def:
+  procsOf  Nil             = []
+∧ procsOf (IfThen _ p l r) = nub' ([p] ++ procsOf l ++ procsOf r)
+∧ procsOf (Com p _ q _ c)  = nub' ([p;q] ++ procsOf c)
+∧ procsOf (Sel p _ q c)    = nub' ([p;q] ++ procsOf c)
+∧ procsOf (Let _ p _ _ c)  = nub' ([p] ++ procsOf c)
+∧ procsOf (Fix _ c) = nub' (procsOf c)
+∧ procsOf (Call _)         = []
 End
 
 (* The error choreography:

@@ -52,17 +52,6 @@ Definition read_def:
 ∧ read (LLet v p f vl)     = set(MAP (λv. (v,p)) vl)
 End
 
-(* The set of all processes in a choreography *)
-Definition procsOf_def:
-  procsOf  Nil             = []
-∧ procsOf (IfThen _ p l r) = nub' ([p] ++ procsOf l ++ procsOf r)
-∧ procsOf (Com p _ q _ c)  = nub' ([p;q] ++ procsOf c)
-∧ procsOf (Sel p _ q c)    = nub' ([p;q] ++ procsOf c)
-∧ procsOf (Let _ p _ _ c)  = nub' ([p] ++ procsOf c)
-∧ procsOf (Fix _ c) = nub' (procsOf c)
-∧ procsOf (Call _)         = []
-End
-
 (* The set of all free process variables in a choreography *)
 Definition dvarsOf_def:
   dvarsOf  Nil             = []
