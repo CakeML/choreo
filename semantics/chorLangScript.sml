@@ -109,15 +109,4 @@ Definition CERROR:
   CERROR = Call "ERROR"
 End
 
-(* The Finish branch choreography
-
-   (1) Projectable choreography should not contain it.
-   (2) It marks when a branch has been ruled out by selection
-
- *)
-
-Definition CDONE:
-  CDONE = Call "DONE"
-End
-
 val _ = export_theory ()

@@ -19,7 +19,6 @@ Definition chor_itree_list_merge_def:
 ∧ chor_itree_list_merge (Ret' t   ,    Ret' Done)    = Ret' t
 ∧ chor_itree_list_merge (Tau' t   ,    Ret' Done)    = Tau' t
 ∧ chor_itree_list_merge (Vis' e f ,    Ret' Done)    = Vis' e f
-∧ chor_itree_list_merge (Ret' l   ,    Ret' r)       = (if l = r then Ret' l else Ret' Error)
 ∧ chor_itree_list_merge (Tau' l   ,    Tau' r)       = Tau' (l ++ r)
 ∧ chor_itree_list_merge ((Vis' e1 f1),(Vis' e2 f2))  =
   (if e1 = e2
@@ -42,23 +41,23 @@ Definition chor_itree_select_aux_def[simp]:
   chor_itree_select_aux s b1 c (Branch b2) =
   (if (b1 = b2)
    then [(s,c)]
-   else [(s,CDONE)])
+   else [])
 ∧ chor_itree_select_aux s _ _ _ = [(s,CERROR)]
 End
 
 Definition chor_itree_list_def:
   chor_itree_list p [] = Ret' Done
-∧ chor_itree_list p [(s,Nil)]      = Ret' (Res ())
-∧ chor_itree_list p [(s,(Call f))] = (if f = "DONE"
-                                      then Ret' Done
-                                      else Ret' Error)
+∧ chor_itree_list p [(s,Nil)]      = Ret' Done
+∧ chor_itree_list p [(s,(Call f))] = Ret' Error
 ∧ chor_itree_list p [(s,Let v q f vl c)] =
   (if p = q
    then if EVERY IS_SOME (MAP (FLOOKUP s) vl)
         then Tau' [(s |+ (v,f (MAP (THE o FLOOKUP s) vl)), c)]
         else Ret' Error
    else chor_itree_list p [(s,c)])
-∧ chor_itree_list p [(s,Fix f c)] = Tau' [(s,dsubst c f (Fix f c))]
+∧ chor_itree_list p [(s,Fix f c)] = (if MEM p (procsOf c)
+                                     then Tau' [(s,dsubst c f (Fix f c))]
+                                     else Ret' Done)
 ∧ chor_itree_list p [(s,IfThen v q l r)] =
   (if p = q
    then if IS_SOME (FLOOKUP s v)
@@ -101,7 +100,6 @@ Definition chor_itree_merge_aux1_def:
 ∧ chor_itree_merge_aux (Ret t   , Ret Done) = Ret' t
 ∧ chor_itree_merge_aux (Tau t   , Ret Done) = Tau' (Ret Done, t)
 ∧ chor_itree_merge_aux (Vis e f , Ret Done) = Vis' e (λa. (Ret Done, f a))
-∧ chor_itree_merge_aux (Ret l   , Ret r)    = (if l = r then Ret' l else Ret' Error)
 ∧ chor_itree_merge_aux (Tau l   , Tau r)    = Tau' (l,r)
 ∧ chor_itree_merge_aux ((Vis e1 f1),(Vis e2 f2)) =
   (if e1 = e2
@@ -117,25 +115,21 @@ End
 Theorem chor_itree_merge_def:
 ∀t l r e1 f1 e2 f2 e f.
   (* Ret cases *)
-  chor_itree_merge (Ret Done)       t            = t
-∧ chor_itree_merge  t             (Ret Done)     = t
-∧ chor_itree_merge (Ret Error)     t             = Ret Error
-∧ chor_itree_merge  t             (Ret Error)    = Ret Error
-∧ chor_itree_merge (Ret (Res ())) (Ret (Res ())) = Ret (Res ())
+  chor_itree_merge (Ret Done)   t             = t
+∧ chor_itree_merge  t          (Ret Done)     = t
+∧ chor_itree_merge (Ret Error)  t             = Ret Error
+∧ chor_itree_merge  t          (Ret Error)    = Ret Error
+∧ chor_itree_merge (Ret Done)  (Ret Done)     = Ret Done
   (* Tau *)
-∧ chor_itree_merge (Tau l) (Tau r)               = Tau (chor_itree_merge l r)
+∧ chor_itree_merge (Tau l) (Tau r)            = Tau (chor_itree_merge l r)
   (* Vis *)
 ∧ chor_itree_merge (Vis e1 f1) (Vis e2 f2) =
   (if e1 = e2
    then Vis e1 (λa. chor_itree_merge (f1 a) (f2 a))
    else Ret Error)
   (* Error cases *)
-∧ chor_itree_merge (Ret (Res ())) (Tau r)        = Ret Error
-∧ chor_itree_merge (Ret (Res ())) (Vis e f)      = Ret Error
-∧ chor_itree_merge (Tau l)        (Ret (Res ())) = Ret Error
-∧ chor_itree_merge (Tau l)        (Vis e f)      = Ret Error
-∧ chor_itree_merge (Vis e f)      (Ret (Res ())) = Ret Error
-∧ chor_itree_merge (Vis e f)      (Tau l)        = Ret Error
+∧ chor_itree_merge (Tau l)   (Vis e f) = Ret Error
+∧ chor_itree_merge (Vis e f) (Tau l)   = Ret Error
 Proof
   rw[chor_itree_merge_aux_def]
   \\ simp[Once itree_unfold,chor_itree_merge_aux1_def]
@@ -188,7 +182,6 @@ Triviality chor_itree_list_nil:
 Proof
   rw[Once itree_unfold,chor_itree_list_def]
 QED
-
 
 Triviality chor_itree_list_merge_done:
   (∀x. chor_itree_list_merge (x,Ret' Done) = x)
@@ -268,17 +261,17 @@ QED
 
 Theorem chor_itree_def:
 ∀vl v2 v1 v s r q2 q1 q p l f' f c b.
-  chor_itree p s Nil       = Ret (Res ())
-∧ chor_itree p s (Call f')  = (if f' = "DONE"
-                               then Ret Done
-                               else Ret Error)
+  chor_itree p s Nil        = Ret Done
+∧ chor_itree p s (Call f')  = Ret Error
 ∧ chor_itree p s (Let v q f vl c) =
   (if p = q then
      if EVERY IS_SOME (MAP (FLOOKUP s) vl) then
        Tau (chor_itree p (s |+ (v,f (MAP (THE ∘ FLOOKUP s) vl))) c)
      else Ret Error
    else chor_itree p s c)
-∧ chor_itree p s (Fix f' c) = Tau (chor_itree p s (dsubst c f' (Fix f' c)))
+∧ chor_itree p s (Fix f' c) = (if MEM p (procsOf c)
+                               then Tau (chor_itree p s (dsubst c f' (Fix f' c)))
+                               else Ret Done)
 ∧ chor_itree p s (IfThen v q l r) =
   (if p = q then
      if IS_SOME (FLOOKUP s v)
@@ -329,7 +322,7 @@ Proof
   (* Select *)
   \\ Cases_on ‘b ⇔ b'’ \\ simp[]
   >- (irule EQ_SYM \\ simp[Once itree_unfold,chor_itree_list_def])
-  \\ simp[chor_itree_list_def,CDONE]
+  \\ simp[chor_itree_list_def]
 QED
 
 val _ = export_theory ()

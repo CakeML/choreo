@@ -19,10 +19,8 @@ Definition endpoint_itree_select_aux_def[simp]:
 End
 
 Definition endpoint_itree_aux1_def:
-  endpoint_itree_aux (s,Nil)    = Ret' (Res ())
-∧ endpoint_itree_aux (s,Call f) = (if f = "DONE"
-                                   then Ret' Done
-                                   else Ret' Error)
+  endpoint_itree_aux (s,Nil)    = Ret' Done
+∧ endpoint_itree_aux (s,Call f) = Ret' Error
 ∧ endpoint_itree_aux (s,Let v f vl e) =
     (if EVERY IS_SOME (MAP (FLOOKUP s) vl)
      then Tau' (s |+ (v,f (MAP (THE o FLOOKUP s) vl)),e)
@@ -70,10 +68,8 @@ End
 
 Theorem endpoint_itree_def:
 ∀vl v s r p l f' f e b.
-  endpoint_itree s Nil = Ret (Res ())
-∧ endpoint_itree s (Call f') = (if f' = "DONE"
-                                then Ret Done
-                                else Ret Error)
+  endpoint_itree s Nil = Ret Done
+∧ endpoint_itree s (Call f') = Ret Error
 ∧ endpoint_itree s (Let v f vl e) =
     (if EVERY IS_SOME (MAP (FLOOKUP s) vl)
      then
@@ -101,7 +97,7 @@ Proof
   \\ simp[Once itree_unfold,endpoint_itree_aux1_def]
   \\ rw[FUN_EQ_THM]
   \\ Cases_on ‘x’
-  \\ simp[endpoint_itree_aux1_def,endpoint_itree_aux_def,EPERROR,EPDONE]
+  \\ simp[endpoint_itree_aux1_def,endpoint_itree_aux_def,EPERROR]
   \\ simp[Once itree_unfold,endpoint_itree_aux1_def]
   \\ Cases_on ‘b’ \\ simp[]
   \\ irule EQ_SYM

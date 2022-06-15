@@ -130,8 +130,4 @@ Definition EPERROR:
   EPERROR = Call "ERROR"
 End
 
-Definition EPDONE:
-  EPDONE = Call "DONE"
-End
-
 val _ = export_theory ()

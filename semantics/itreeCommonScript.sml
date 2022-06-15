@@ -20,8 +20,7 @@ End
 
 (* The type of results  *)
 Datatype:
-  result = Res unit (* We are finish *)
-         | Done     (* A branch has been prune *)
+  result = Done (* We are finish *)
          | Error    (* Something whent wrong *)
 End
 
