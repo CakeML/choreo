@@ -20,8 +20,9 @@ End
 
 (* The type of results  *)
 Datatype:
-  result = Done (* We are finish *)
-         | Error    (* Something whent wrong *)
+  result = End  (* We are finish *)
+         | Done (* A branch has been prune *)
+         | Error
 End
 
 val _ = export_theory ()

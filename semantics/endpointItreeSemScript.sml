@@ -19,7 +19,7 @@ Definition endpoint_itree_select_aux_def[simp]:
 End
 
 Definition endpoint_itree_aux1_def:
-  endpoint_itree_aux (s,Nil)    = Ret' Done
+  endpoint_itree_aux (s,Nil)    = Ret' End
 ∧ endpoint_itree_aux (s,Call f) = Ret' Error
 ∧ endpoint_itree_aux (s,Let v f vl e) =
     (if EVERY IS_SOME (MAP (FLOOKUP s) vl)
@@ -68,7 +68,7 @@ End
 
 Theorem endpoint_itree_def:
 ∀vl v s r p l f' f e b.
-  endpoint_itree s Nil = Ret Done
+  endpoint_itree s Nil = Ret End
 ∧ endpoint_itree s (Call f') = Ret Error
 ∧ endpoint_itree s (Let v f vl e) =
     (if EVERY IS_SOME (MAP (FLOOKUP s) vl)
