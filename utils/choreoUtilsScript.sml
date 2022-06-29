@@ -201,4 +201,19 @@ Proof
   rveq >> fs[]
 QED
 
+Theorem nub'_FILTER:
+  ∀P l. nub'(FILTER P l) = FILTER P (nub' l)
+Proof
+  Induct_on ‘l’ >> rw[nub'_def,FILTER_FILTER] >>
+  simp[CONJ_SYM] >>
+  rw[FILTER_EQ,EQ_IMP_THM]
+QED
+
+Theorem nub'_idem:
+  ∀l. nub'(nub' l) = nub' l
+Proof
+  Induct >>
+  rw[nub'_def,nub'_FILTER,FILTER_FILTER]
+QED
+
 val _ = export_theory ()
