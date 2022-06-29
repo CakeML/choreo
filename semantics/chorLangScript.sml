@@ -109,4 +109,35 @@ Definition CERROR:
   CERROR = Call "ERROR"
 End
 
+(* The set of all free process variables in a choreography *)
+Definition dvarsOf_def:
+  dvarsOf  Nil             = []
+∧ dvarsOf (IfThen _ p l r) = nub' (dvarsOf l ++ dvarsOf r)
+∧ dvarsOf (Com p _ q _ c)  = nub' (dvarsOf c)
+∧ dvarsOf (Sel p _ q c)    = nub' (dvarsOf c)
+∧ dvarsOf (Let _ p _ _ c)  = nub' (dvarsOf c)
+∧ dvarsOf (Fix dn c) = FILTER ($<> dn) (nub' (dvarsOf c))
+∧ dvarsOf (Call dn)         = [dn]
+End
+
+Definition dprocsOf_def:
+  dprocsOf dvars  Nil             = []
+∧ dprocsOf dvars (IfThen _ p l r) = nub' ([p] ++ dprocsOf dvars l ++ dprocsOf dvars r)
+∧ dprocsOf dvars (Com p _ q _ c)  = nub' ([p;q] ++ dprocsOf dvars c)
+∧ dprocsOf dvars (Sel p _ q c)    = nub' ([p;q] ++ dprocsOf dvars c)
+∧ dprocsOf dvars (Let _ p _ _ c)  = nub' ([p] ++ dprocsOf dvars c)
+∧ dprocsOf dvars (Fix dn c) =
+   nub' (dprocsOf ((dn,[])::dvars) c)
+∧ dprocsOf dvars (Call dn)         =
+   case ALOOKUP dvars dn of
+     NONE => []
+   | SOME procs => procs
+End
+
+Theorem procsOf_all_distinct:
+  ∀c. ALL_DISTINCT (procsOf c)
+Proof
+  Induct_on `c` >> rw [procsOf_def,ALL_DISTINCT,all_distinct_nub']
+QED
+
 val _ = export_theory ()
