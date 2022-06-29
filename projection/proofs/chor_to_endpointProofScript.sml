@@ -92,7 +92,6 @@ Theorem project_ALOOKUP_EQ_strong:
 Proof
   ho_match_mp_tac project_ind >>
   rw[project_def,dprocsOf_def,dvarsOf_def,MEM_nub',MEM_FILTER,PULL_EXISTS,libTheory.the_def] >>
-  TRY (first_x_assum drule_all \\ gs[]) >>
   res_tac >> gs[CaseEq "bool"] >>
   rpt(PURE_TOP_CASE_TAC >> fs[] >> rveq) >>
   gs[libTheory.the_def] >>
@@ -693,10 +692,7 @@ Proof
       PRED_ASSUM is_forall (resolve_then (Pos hd) assume_tac EQ_REFL) >>
       strip_tac >>
       first_x_assum(qspec_then ‘dvars’ mp_tac) >>
-      rw[endpointLangTheory.dsubst_def,chorLangTheory.dsubst_def,
-         project_def,procsOf_def,set_nub',SUBSET_DEF,chor_size_def,
-         EPDONE] >> cheat >>
-      fs[] >> metis_tac[])
+      rw[endpointLangTheory.dsubst_def,chorLangTheory.dsubst_def,project_def,procsOf_def,set_nub',SUBSET_DEF,chor_size_def] >> fs[] >> metis_tac[])
   >- (rename1 ‘chor_size(Fix dn' c')’ >>
       first_x_assum(qspec_then ‘chor_to_endpoint$chor_size c'’ assume_tac) >>
       strip_tac >> fs[chor_size_def] >>
