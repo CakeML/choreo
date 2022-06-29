@@ -11,7 +11,7 @@ Proof
        TOP_CASE_TAC >> fs[EVERY_MEM] >>
        imp_res_tac ALOOKUP_MEM >>
        fs[MEM_MAP,PULL_EXISTS] >>
-       res_tac >> fs[]) >>
+       res_tac >> fs[nub'_def]) >>
   first_x_assum match_mp_tac >> simp[]
 QED
 
@@ -45,7 +45,7 @@ Proof
   rw[dprocsOf_def,procsOf_def,dvarsOf_def,MEM_nub',MEM_FILTER,PULL_EXISTS] >>
   res_tac >> gs[CaseEq "bool"] >>
   TRY(PURE_FULL_CASE_TAC >> fs[]) >>
-  metis_tac[]
+  metis_tac[MEM_nub']
 QED
 
 Theorem dprocsOf_ALOOKUP_EQ:
@@ -71,7 +71,7 @@ Proof
   Induct_on ‘c’ >>
   rw[dprocsOf_def,procsOf_def,dvarsOf_def,MEM_nub',MEM_FILTER,PULL_EXISTS] >>
   res_tac >> gs[CaseEq "bool"] >>
-  TRY(rpt(PURE_FULL_CASE_TAC >> fs[libTheory.the_def]) >> NO_TAC) >>
+  TRY(rpt(PURE_FULL_CASE_TAC >> fs[libTheory.the_def,nub'_def]) >> NO_TAC) >>
   TRY(AP_TERM_TAC >>
       first_x_assum match_mp_tac >>
       rw[] >> NO_TAC) >>
@@ -89,7 +89,7 @@ Proof
   rw[] >>
   res_tac >> gs[CaseEq "bool"] >>
   TRY(last_x_assum match_mp_tac >> rw[] >> NO_TAC) >>
-  TRY(rpt(PURE_FULL_CASE_TAC >> fs[libTheory.the_def]) >> NO_TAC) >>
+  TRY(rpt(PURE_FULL_CASE_TAC >> fs[libTheory.the_def,set_nub',nub'_def]) >> NO_TAC) >>
   metis_tac[]
 QED
 
@@ -104,7 +104,7 @@ Proof
   rw[] >>
   res_tac >> gs[CaseEq "bool"] >>
   TRY(last_x_assum match_mp_tac >> rw[] >> NO_TAC) >>
-  TRY(rpt(PURE_FULL_CASE_TAC >> fs[libTheory.the_def]) >> NO_TAC) >>
+  TRY(rpt(PURE_FULL_CASE_TAC >> fs[libTheory.the_def,set_nub',nub'_def]) >> NO_TAC) >>
   metis_tac[]
 QED
 
@@ -163,10 +163,23 @@ Proof
   match_mp_tac dprocsOf_ALOOKUP_EQ' >> rw[ALOOKUP_FILTER',o_DEF,libTheory.the_def]
 QED
 
+Theorem nub'_procsOf:
+  ∀c. nub'(procsOf c) = procsOf c
+Proof
+  Induct >> rw[procsOf_def,nub'_idem,nub'_FILTER] >> rw[nub'_def]
+QED
+
 Theorem nub'_dvarsOf:
   ∀c. nub'(dvarsOf c) = dvarsOf c
 Proof
   Induct >> rw[dvarsOf_def,nub'_idem,nub'_FILTER] >> rw[nub'_def]
+QED
+
+Theorem nub'_dprocsOf:
+  ∀c dvars. nub'(dprocsOf dvars c) = dprocsOf dvars c
+Proof
+  Induct >> rw[dprocsOf_def,nub'_idem,nub'_FILTER] >> rw[nub'_def]
+  \\ PURE_FULL_CASE_TAC \\ gs[nub'_def,nub'_idem]
 QED
 
 Theorem dprocsOf_MEM_eq:

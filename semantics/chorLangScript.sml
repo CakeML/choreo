@@ -131,7 +131,7 @@ Definition dprocsOf_def:
 ∧ dprocsOf dvars (Call dn)         =
    case ALOOKUP dvars dn of
      NONE => []
-   | SOME procs => procs
+   | SOME procs => nub' procs
 End
 
 Theorem procsOf_all_distinct:
