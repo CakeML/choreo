@@ -321,4 +321,30 @@ Proof
   \\ simp[chor_itree_list_def]
 QED
 
+Definition done_lift_aux1_def:
+  done_lift_aux (Ret Done)  = Ret' End
+∧ done_lift_aux (Ret End)   = Ret' End
+∧ done_lift_aux (Ret Error) = Ret' Error
+∧ done_lift_aux (Tau it)    = Tau' it
+∧ done_lift_aux (Vis e f)   = Vis' e f
+End
+
+Definition done_lift_aux_def:
+  done_lift it = itree_unfold done_lift_aux it
+End
+
+Theorem done_lift_def[simp]:
+∀it f e.
+  done_lift (Ret Done)  = Ret End
+∧ done_lift (Ret End)   = Ret End
+∧ done_lift (Ret Error) = Ret Error
+∧ done_lift (Tau it)    = Tau (done_lift it)
+∧ done_lift (Vis e f)   = Vis e (done_lift o f)
+Proof
+  rw[done_lift_aux_def]
+  \\ simp[Once itree_unfold,done_lift_aux1_def,FUN_EQ_THM,done_lift_aux_def]
+QED
+
+val _ = Parse.overload_on("↑",``done_lift``);
+
 val _ = export_theory ()
