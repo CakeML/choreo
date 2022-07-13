@@ -579,6 +579,96 @@ Proof
   fs [spin] \\ simp [Once itree_unfold]
 QED
 
+(* Better equality *)
+
+CoInductive itree_eqv:
+[~ret:]
+  (x = y ⇒ itree_eqv (Ret x) (Ret y)) ∧
+[~tau:]
+  (itree_eqv l r ⇒ itree_eqv (Tau l) (Tau r)) ∧
+[~vis:]
+    ((∀a. itree_eqv (f a) (g a)) ∧ e1 = e2 ⇒ itree_eqv (Vis e1 f) (Vis e2 g))
+End
+
+
+Theorem itree_eqv_sym:
+  ∀x1 x2. itree_eqv x2 x1 ⇒ itree_eqv x1 x2
+Proof
+  ho_match_mp_tac itree_eqv_coind \\ rw[]
+  \\ gs[Once itree_eqv_cases]
+  \\ metis_tac []
+QED
+
+Theorem itree_eqv_refl:
+  ∀x. itree_eqv x x
+Proof
+  rw[]
+  \\ ho_match_mp_tac (MP_CANON itree_eqv_coind) \\ rw[]
+  \\ qexists_tac ‘$=’ \\ rw[]
+  \\ Cases_on ‘a0’ \\ metis_tac[]
+QED
+
+Theorem itree_eqv_eq:
+  ∀x y. itree_eqv x y ⇔ x = y
+Proof
+  rw[] \\ EQ_TAC \\ gs[itree_eqv_refl]
+  \\ rw[Once itree_bisimulation]
+  \\ qexists_tac ‘itree_eqv’
+  \\ rw[]
+  \\ pop_assum (mp_tac o ONCE_REWRITE_RULE [itree_eqv_cases])
+  \\ rw[itree_distinct]
+QED
+
+Definition itree_eqn_def:
+  itree_eqn 0 x y = T
+∧ itree_eqn n (Ret x) (Ret y) = (x = y)
+∧ itree_eqn (SUC n) (Tau l) (Tau r) = itree_eqn n l r
+∧ itree_eqn (SUC n) (Vis e1 f) (Vis e2 g) = (e1 = e2 ∧ ∀a. itree_eqn n (f a) (g a))
+∧ itree_eqn n _ _ = F
+End
+
+Definition itree_depth_eqv_def:
+  itree_depth_eqv x y = ∀n. itree_eqn n x y
+End
+
+Theorem itree_eqn_refl:
+  ∀n x. itree_eqn n x x
+Proof
+  Induct \\ Cases_on ‘x’ \\ rw[itree_eqn_def]
+QED
+
+Theorem itree_depth_eqv_eq:
+  ∀x y. itree_depth_eqv x y ⇔ x = y
+Proof
+  rw[] \\ EQ_TAC \\ gs[itree_depth_eqv_def,itree_eqn_refl]
+  \\ rw[Once itree_bisimulation]
+  \\ qexists_tac ‘itree_depth_eqv’
+  \\ rw[itree_depth_eqv_def]
+  \\ Cases_on ‘t’ \\ gs[itree_eqn_def] \\ rw[]
+  \\ pop_assum (qspec_then ‘SUC n’ assume_tac)
+  \\ gs[itree_eqn_def]
+QED
+
+Theorem itree_eqn_trans:
+  ∀n a b c.
+    itree_eqn n a b ∧
+    itree_eqn n b c ⇒
+    itree_eqn n a c
+Proof
+  Induct_on ‘n’ \\ rw[itree_eqn_def]
+  \\ Cases_on ‘a’ \\ Cases_on ‘b’ \\ Cases_on ‘c’
+  \\ gs[itree_eqn_def] \\ metis_tac []
+QED
+
+Theorem itree_eqn_sym:
+  ∀n a b. itree_eqn n a b ⇒ itree_eqn n b a
+Proof
+  Induct_on ‘n’ \\ rw[itree_eqn_def]
+  \\ Cases_on ‘a’ \\ Cases_on ‘b’
+  \\ gs[itree_eqn_def] \\ metis_tac []
+QED
+
+(* TODO: Give this equivalence better names *)
 
 (* tidy up theory exports *)
 
