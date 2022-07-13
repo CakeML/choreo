@@ -1,4 +1,4 @@
-open preamble chorSemTheory endpointLangTheory
+open preamble chorLangTheory endpointLangTheory
 
 val _ = new_theory "chor_to_endpoint";
 
