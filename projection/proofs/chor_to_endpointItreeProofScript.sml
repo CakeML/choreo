@@ -121,24 +121,25 @@ Proof
       >- (split_cases \\ split_SOME_case))
   >- base_cases >- base_cases >- base_cases
   >- (rw[]
-      \\ ‘dprocsOf dvars (Fix s' c) = procsOf c’
+      \\ qspecl_then [‘p’,‘dvars’,‘Fix s' c’] mp_tac project_ALOOKUP_EQ_strong
+      \\ simp[] \\ disch_then (qspec_then ‘[]’ assume_tac) \\ gs[]
+      \\ ‘dprocsOf [] (Fix s' c) = procsOf c’
             by (ONCE_REWRITE_TAC [GSYM dprocsOf_empty]
                 \\ simp[dprocsOf_def,nub'_dprocsOf]
                 \\ irule dprocsOf_dvarsOf_empty_cons
                 \\ simp[dvarsOf_def,nub'_dvarsOf])
-      \\ reverse (Cases_on ‘MEM p (dprocsOf dvars (Fix s' c))’)
+      \\ reverse (Cases_on ‘MEM p (dprocsOf [] (Fix s' c))’)
       >- itree_simp
       \\ drule project'_dsubst_commute
       \\ disch_then drule
       \\ disch_then (qspec_then ‘c’ mp_tac)
       \\ impl_tac
-      >- (itree_simp
-          \\ cheat)
+      >- itree_simp
       \\ disch_then (assume_tac o GSYM)
       \\ itree_simp
       \\ irule itree_eqn_trans
       \\ first_x_assum (irule_at Any)
-      \\ qexists_tac ‘dvars’
+      \\ qexists_tac ‘[]’
       \\ simp[itree_eqn_refl]
       \\ irule dvarsOf_dsubst
       \\ itree_simp)
