@@ -90,7 +90,7 @@ Proof
                         \\ Cases_on ‘split_sel p s' c'’
                         \\ TRY (Cases_on ‘x’)
                         \\ TRY (Cases_on ‘x'’)
-                        \\ rw[] \\ gs[chor_itree_merge_idem]
+                        \\ rw[] \\ gs[]
       val base_cases =  itree_simp \\ Cases_on ‘a’ \\ itree_simp
       val split_NONE_case = metis_tac [itree_eqn_trans,itree_eqn_sym,itree_eqn_merge]
       val split_SOME_case = Induct_on ‘c’ \\ Induct_on ‘c'’ \\ itree_simp

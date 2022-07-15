@@ -9,13 +9,13 @@ Definition chor_itree_list_merge_def:
 ∧ chor_itree_list_merge (Ret' t   ,    Ret' Done)    = Ret' t
 ∧ chor_itree_list_merge (Tau' t   ,    Ret' Done)    = Tau' t
 ∧ chor_itree_list_merge (Vis' e f ,    Ret' Done)    = Vis' e f
-∧ chor_itree_list_merge (Ret' l ,      Ret' r)       = (if l = r then Ret' l else Ret' Error)
+∧ chor_itree_list_merge (Ret' l ,      Ret' r)       = (if l = r then Ret' l else Ret' Unproj)
 ∧ chor_itree_list_merge (Tau' l   ,    Tau' r)       = Tau' (l ++ r)
 ∧ chor_itree_list_merge ((Vis' e1 f1),(Vis' e2 f2))  =
   (if e1 = e2
    then Vis' e1 (λa. f1 a ++ f2 a)
-   else Ret' Error)
-∧ chor_itree_list_merge _ = Ret' Error
+   else Ret' Unproj)
+∧ chor_itree_list_merge _ = Ret' Unproj
 End
 
 Definition chor_itree_send_aux_def[simp]:
@@ -91,13 +91,13 @@ Definition chor_itree_merge_aux1_def:
 ∧ chor_itree_merge_aux (Ret t   , Ret Done) = Ret' t
 ∧ chor_itree_merge_aux (Tau t   , Ret Done) = Tau' (Ret Done, t)
 ∧ chor_itree_merge_aux (Vis e f , Ret Done) = Vis' e (λa. (Ret Done, f a))
-∧ chor_itree_merge_aux (Ret l, Ret r)       = (if l = r then Ret' l else Ret' Error)
+∧ chor_itree_merge_aux (Ret l, Ret r)       = (if l = r then Ret' l else Ret' Unproj)
 ∧ chor_itree_merge_aux (Tau l   , Tau r)    = Tau' (l,r)
 ∧ chor_itree_merge_aux ((Vis e1 f1),(Vis e2 f2)) =
   (if e1 = e2
    then Vis' e1 (λa. (f1 a,f2 a))
-   else Ret' Error)
-∧ chor_itree_merge_aux _ = Ret' Error
+   else Ret' Unproj)
+∧ chor_itree_merge_aux _ = Ret' Unproj
 End
 
 Definition chor_itree_merge_aux_def:
@@ -109,23 +109,33 @@ Theorem chor_itree_merge_def:
   (* Ret cases *)
   chor_itree_merge (Ret Done)       t            = t
 ∧ chor_itree_merge  t             (Ret Done)     = t
-∧ chor_itree_merge (Ret Error)     t             = Ret Error
-∧ chor_itree_merge  t             (Ret Error)    = Ret Error
-∧ chor_itree_merge (Ret End) (Ret End) = Ret End
+∧ chor_itree_merge (Ret Unproj)     t            = Ret Unproj
+∧ chor_itree_merge  t             (Ret Unproj)   = Ret Unproj
+∧ chor_itree_merge (Ret Error)    (Ret Error)    = Ret Error
+∧ chor_itree_merge (Ret End)      (Ret End)      = Ret End
   (* Tau *)
 ∧ chor_itree_merge (Tau l) (Tau r)               = Tau (chor_itree_merge l r)
   (* Vis *)
 ∧ chor_itree_merge (Vis e1 f1) (Vis e2 f2) =
   (if e1 = e2
    then Vis e1 (λa. chor_itree_merge (f1 a) (f2 a))
-   else Ret Error)
-  (* Error cases *)
-∧ chor_itree_merge (Ret End) (Tau r)        = Ret Error
-∧ chor_itree_merge (Ret End) (Vis e f)      = Ret Error
-∧ chor_itree_merge (Tau l)        (Ret End) = Ret Error
-∧ chor_itree_merge (Tau l)        (Vis e f) = Ret Error
-∧ chor_itree_merge (Vis e f)      (Ret End) = Ret Error
-∧ chor_itree_merge (Vis e f)      (Tau l)   = Ret Error
+   else Ret Unproj)
+(* Return missmatch *)
+∧ chor_itree_merge (Ret End)   (Ret Error) = Ret Unproj
+∧ chor_itree_merge (Ret Error) (Ret End)   = Ret Unproj
+(* Error missmatch *)
+∧ chor_itree_merge (Ret Error) (Tau r)     = Ret Unproj
+∧ chor_itree_merge (Ret Error) (Vis e f)   = Ret Unproj
+∧ chor_itree_merge (Tau l)     (Ret Error) = Ret Unproj
+∧ chor_itree_merge (Vis e f)   (Ret Error) = Ret Unproj
+(* End missmatch *)
+∧ chor_itree_merge (Ret End)   (Tau r)     = Ret Unproj
+∧ chor_itree_merge (Ret End)   (Vis e f)   = Ret Unproj
+∧ chor_itree_merge (Tau l)     (Ret End)   = Ret Unproj
+∧ chor_itree_merge (Vis e f)   (Ret End)   = Ret Unproj
+(* Other missmatches *)
+∧ chor_itree_merge (Tau l)     (Vis e f)   = Ret Unproj
+∧ chor_itree_merge (Vis e f)   (Tau l)     = Ret Unproj
 Proof
   rw[chor_itree_merge_aux_def]
   \\ simp[Once itree_unfold,chor_itree_merge_aux1_def]
@@ -322,11 +332,12 @@ Proof
 QED
 
 Definition done_lift_aux1_def:
-  done_lift_aux (Ret Done)  = Ret' End
-∧ done_lift_aux (Ret End)   = Ret' End
-∧ done_lift_aux (Ret Error) = Ret' Error
-∧ done_lift_aux (Tau it)    = Tau' it
-∧ done_lift_aux (Vis e f)   = Vis' e f
+  done_lift_aux (Ret Done)   = Ret' End
+∧ done_lift_aux (Ret End)    = Ret' End
+∧ done_lift_aux (Ret Unproj) = Ret' Error
+∧ done_lift_aux (Ret Error)  = Ret' Error
+∧ done_lift_aux (Tau it)     = Tau' it
+∧ done_lift_aux (Vis e f)    = Vis' e f
 End
 
 Definition done_lift_aux_def:
@@ -335,11 +346,12 @@ End
 
 Theorem done_lift_def[simp]:
 ∀it f e.
-  done_lift (Ret Done)  = Ret End
-∧ done_lift (Ret End)   = Ret End
-∧ done_lift (Ret Error) = Ret Error
-∧ done_lift (Tau it)    = Tau (done_lift it)
-∧ done_lift (Vis e f)   = Vis e (done_lift o f)
+  done_lift (Ret Done)   = Ret End
+∧ done_lift (Ret End)    = Ret End
+∧ done_lift (Ret Unproj) = Ret Error
+∧ done_lift (Ret Error)  = Ret Error
+∧ done_lift (Tau it)     = Tau (done_lift it)
+∧ done_lift (Vis e f)    = Vis e (done_lift o f)
 Proof
   rw[done_lift_aux_def]
   \\ simp[Once itree_unfold,done_lift_aux1_def,FUN_EQ_THM,done_lift_aux_def]

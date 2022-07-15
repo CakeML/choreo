@@ -20,9 +20,10 @@ End
 
 (* The type of results  *)
 Datatype:
-  result = End  (* We are finish *)
-         | Done (* A branch has been prune *)
-         | Error
+  result = End     (* We are finish *)
+         | Done    (* A branch has been prune *)
+         | Unproj  (* The choreography is unprojectable *)
+         | Error   (* Runtime error *)
 End
 
 val _ = export_theory ()
