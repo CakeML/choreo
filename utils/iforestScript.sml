@@ -282,25 +282,77 @@ Proof
   \\ first_x_assum drule \\ Cases_on ‘x’ \\ simp[]
 QED
 
-(* If an itree returns in the forest it never does any more actions *)
-Theorem iforest_itree_end:
-  ∀n ψ trace p t.
-    LNTH n (iforest ψ trace) = SOME (p, Res t) ⇒
-      ∀m a. n < m ⇒ LNTH m (iforest ψ trace) ≠ SOME (p,a)
+
+Theorem iforest_cons_cases:
+  ∀ψ trace x xs.
+    iforest ψ trace = x:::xs
+    ⇒ ∃p ll. next_proc ψ trace = SOME (p,ll) ∧
+             ((∃t. x = (p,Res t)   ∧ xs = iforest (iforest_del ψ p) ll) ∨
+              (∃t. x = (p,Int)     ∧ xs = iforest (iforest_set ψ p t) ll) ∨
+              (∃e f. x = (p,Ext e) ∧ xs = iforest (iforest_upd ψ p e f) ll))
+Proof
+  rw[Once iforest_def]
+  \\ Cases_on ‘next_proc ψ trace’ \\ gs[]
+  \\ Cases_on ‘x'’ \\ gs[]
+  \\ drule next_proc_ifores_get_SOME
+  \\ strip_tac \\ gs[]
+  \\ Cases_on ‘i’ \\ gs[iforest_step_def,iforest_act_def]
+  \\ metis_tac []
+QED
+
+Theorem iforest_nth_drop:
+  ∀n ^psi trace p a.
+    LNTH n (iforest ψ trace) = SOME (p,a)
+    ⇒ ∃^psi' trace' i.
+        iforest_get ψ' p = SOME i ∧
+        iforest_act ψ' p i = (p,a) ∧
+        LDROP n (iforest ψ trace) = SOME ((p,a) ::: iforest (iforest_step ψ' p i) trace')
 Proof
   Induct \\ rw[]
-  >- (gs[Once iforest_def] \\ simp[Once iforest_def]
+  >- (Cases_on ‘iforest ψ trace’ \\ gs[LNTH]
+      \\ pop_assum (assume_tac o ONCE_REWRITE_RULE [iforest_def])
       \\ Cases_on ‘next_proc ψ trace’ \\ gs[]
       \\ Cases_on ‘x’ \\ gs[]
-      \\ drule next_proc_ifores_get_SOME \\ rw[] \\ gs[]
-      \\ Cases_on ‘i’ \\ gs[iforest_act_def,iforest_step_def] \\ rveq
-      \\ Cases_on ‘m’ \\ gs[]
-      \\ irule iforest_not_in_forest
-      \\ simp[iforest_itrees_del])
-  >- (gs[iforest_aux_def,LNTH_LUNFOLD,CaseEq"option",CaseEq"prod"] \\ rveq
-      \\ Cases_on ‘tx’
-      \\ first_x_assum drule
-      \\ cheat)
+      \\ drule next_proc_ifores_get_SOME
+      \\ strip_tac \\ gs[]
+      \\ ‘q = p’ by
+        (first_assum (assume_tac o Q.AP_TERM ‘FST’)
+         \\ gs[iforest_act_FST])
+      \\ rveq
+      \\ metis_tac [])
+  \\ gs[LNTH,OPTION_JOIN_EQ_SOME]
+  \\ pop_assum (assume_tac o GSYM)
+  \\ Cases_on ‘iforest ψ trace’
+  \\ gs[] \\ rveq
+  \\ drule iforest_cons_cases
+  \\ rw[]
+  \\ metis_tac []
 QED
+
+(* If an itree returns in the forest it never does any more actions *)
+Theorem iforest_itree_end_aux[local]:
+  ∀n m ψ trace p t a.
+    LNTH n (iforest ψ trace) = SOME (p, Res t) ⇒
+      LNTH (n + SUC m) (iforest ψ trace) ≠ SOME (p,a)
+Proof
+  rw[] \\ drule iforest_nth_drop \\ rw[]
+  \\ simp[LNTH_ADD]
+  \\ Cases_on ‘i’ \\ gs[iforest_act_def] \\ rveq
+  \\ gs[iforest_step_def]
+  \\ irule iforest_not_in_forest
+  \\ simp[iforest_itrees_del]
+QED
+
+Theorem iforest_itrees_end:
+  ∀n m ψ trace p t a.
+    LNTH n (iforest ψ trace) = SOME (p, Res t) ∧ n < m ⇒
+    LNTH m (iforest ψ trace) ≠ SOME (p,a)
+Proof
+  rw[]
+  \\ drule iforest_itree_end_aux \\ rw[]
+  \\ drule LESS_STRONG_ADD \\ rw[]
+  \\ metis_tac []
+QED
+
 
 val _ = export_theory();
