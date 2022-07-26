@@ -41,7 +41,6 @@ val iforest = “ψ  :('a,'e,'p,'r) iforest”
 val psi     = “ψ  :('a,'e,'p,'r) iforest”
 val psi'    = “ψ' :('a,'e,'p,'r) iforest”
 
-
 (* iforest basic operations *)
 
 Definition iforest_get_def:
@@ -329,8 +328,18 @@ Proof
   \\ metis_tac []
 QED
 
+(* A trace of actions which stop producing actions for a process after
+   it reaches a Res(ult)
+ *)
+Definition actions_end_def:
+  actions_end actions =
+  ∀n m p t a.
+    LNTH n actions = SOME (p, Res t) ∧ n < m ⇒
+    LNTH m actions ≠ SOME (p, a)
+End
+
 (* If an itree returns in the forest it never does any more actions *)
-Theorem iforest_itree_end_aux[local]:
+Theorem iforest_actions_end_aux[local]:
   ∀n m ψ trace p t a.
     LNTH n (iforest ψ trace) = SOME (p, Res t) ⇒
       LNTH (n + SUC m) (iforest ψ trace) ≠ SOME (p,a)
@@ -343,16 +352,122 @@ Proof
   \\ simp[iforest_itrees_del]
 QED
 
-Theorem iforest_itrees_end:
-  ∀n m ψ trace p t a.
-    LNTH n (iforest ψ trace) = SOME (p, Res t) ∧ n < m ⇒
-    LNTH m (iforest ψ trace) ≠ SOME (p,a)
+Theorem actions_end_iforest_def:
+  ∀ψ trace. actions_end (iforest ψ trace)
 Proof
-  rw[]
-  \\ drule iforest_itree_end_aux \\ rw[]
+  rw[actions_end_def]
+  \\ drule iforest_actions_end_aux \\ rw[]
   \\ drule LESS_STRONG_ADD \\ rw[]
   \\ metis_tac []
 QED
 
+Definition fair_trace_def:
+  fair_trace procs trace =
+    ∀p. p ∈ procs ⇒ always (λll. ∃n. LNTH n ll = SOME p) trace
+End
+
+Theorem LNTH_exists_LDROP:
+  ∀n l p.
+    LNTH n l = SOME p
+    ⇒ ∃ll. LDROP n l = SOME (p:::ll)
+Proof
+  Induct \\ rw[]
+  >- (Cases_on ‘l’ \\ gs[])
+  \\ gs[LNTH]
+  \\ Cases_on ‘l’ \\ gs[]
+QED
+
+Theorem fair_trace_ldrop_rec:
+  ∀procs trace p.
+    fair_trace procs trace ∧ p ∈ procs ⇒
+      ∃n ll. LDROP n trace = SOME (p ::: ll) ∧ fair_trace procs ll
+Proof
+  rw[fair_trace_def]
+  \\ cases_on ‘trace’ \\ gs[always_thm]
+  \\ first_assum drule \\ strip_tac
+  \\ drule LNTH_LDROP  \\ rw[] \\ gs[]
+  \\ qexists_tac ‘n’
+  \\ Induct_on ‘n’ \\ rw[]
+  \\ drule LNTH_exists_LDROP
+  \\ rw[] \\ gs[] \\ rw[]
+  \\ first_x_assum drule \\ rw[]
+  \\ drule always_DROP
+  \\ disch_then (qspec_then ‘n’ assume_tac)
+  \\ gs[]
+QED
+
+Theorem always_infinite:
+  ∀P l.
+    ¬ P [||] ∧ always P l
+    ⇒ ¬ LFINITE l
+Proof
+  rw[LFINITE_LNTH_NONE]
+  \\ ‘∃x. LNTH n l = SOME x’ by
+    (pop_assum mp_tac
+     \\ qid_spec_tac ‘l’
+     \\ Induct_on ‘n’ \\ rw[]
+     >- gs[Once always_cases]
+     \\ pop_assum mp_tac
+     \\ simp[Once always_cases]
+     \\ rw[] \\ rw[LNTH_THM])
+  \\ gs[]
+QED
+
+Theorem LDROP_APPEN_fromList:
+  ∀l ll.
+    LDROP (LENGTH l) (LAPPEND (fromList l) ll) = SOME ll
+Proof
+  rw[] \\ Induct_on ‘l’ \\ rw[]
+QED
+
+Theorem fair_trace_inifite_proc:
+  ∀procs trace p.
+    fair_trace procs trace ∧ p ∈ procs ⇒
+    ¬ LFINITE (LFILTER (λq. p = q) trace)
+Proof
+  rw[fair_trace_def,LFINITE_LNTH_NONE]
+  \\ first_x_assum drule \\ rw[]
+  \\ ‘∃x. LNTH n (LFILTER (λq. p = q) trace) = SOME x’
+    by (pop_assum mp_tac
+        \\ qid_spec_tac ‘trace’
+        \\ induct_on ‘n’ \\ rw[LNTH_THM]
+        >- (Cases_on ‘LFILTER (λq. p = q) trace’ \\ simp[LNTH_THM]
+            \\ gs[LFILTER_EQ_NIL,every_def]
+            \\ pop_assum mp_tac \\ simp[]
+            \\ gs[Once always_cases]
+            \\ Cases_on ‘n’ \\ gs[]
+            \\ disj2_tac \\ gs[exists_LNTH]
+            \\ metis_tac [])
+        >- (Cases_on ‘LFILTER (λq. p = q) trace’ \\ simp[LNTH_THM]
+            >- (gs[LFILTER_EQ_NIL,every_def]
+                \\ pop_assum mp_tac \\ simp[]
+                \\ pop_assum mp_tac \\ simp[Once always_cases]
+                \\ rw[] \\ Cases_on ‘n'’ \\ gs[]
+                \\ disj2_tac \\ gs[exists_LNTH]
+                \\ metis_tac [])
+            >- (drule LFILTER_EQ_CONS \\ rw[]
+                \\ drule always_DROP
+                \\ disch_then (qspec_then ‘LENGTH l’ assume_tac)
+                \\ first_x_assum irule
+                \\ gs[LDROP_APPEN_fromList])))
+       \\ gs[]
+QED
+
+(* Weak deadlock-freedom states that either the trace of actions goes forever or
+   or that every process reaches a result state
+ *)
+Definition weak_deadlock_freedom_def:
+  weak_deadlock_freedom procs actions =
+    (actions_end actions ∧
+    (¬ LFINITE actions ∨ ∀p. p ∈ procs ⇒ exists (λ(q,a). p = q ∧ ∃t. a = Res t) actions))
+End
+
+Definition strong_deadlock_freedom_def:
+  strong_deadlock_freedom procs actions =
+    (actions_end actions ∧
+     ∀p. p ∈ procs ⇒
+         exists (λ(q,a). p = q ∧ ∃t. a = Res t) actions ∨
+         always (λll. ∃n a. LNTH n ll = SOME (p,a)) actions)
+End
 
 val _ = export_theory();
