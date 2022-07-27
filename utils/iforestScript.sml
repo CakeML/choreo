@@ -9,37 +9,17 @@ Datatype:
   itree_action = Ext 'a | Int | Res 'r
 End
 
-(* An Itree with a action ('a), event ('e), and result ('r) types *)
-val itree  = “itree  : ('a,'e,'r) itree”
-val itree' = “itree' : ('a,'e,'r) itree”
-
-(* A forest is a finite mapping from some kind of identifier to an Itree *)
-val _       = type_abbrev("forest",“:'p |-> ('a,'e,'r) itree”)
-val forest  = “forest   : ('r,'e,'a,'p) forest”
-val forest' = “forest'  : ('r,'e,'a,'p) forest”
-
-(* Given an Itree identifier and an event which action should we perform? *)
-val _    = type_abbrev("act",“:'p -> 'e -> 'a option”)
-val act  = “act  : ('a,'e,'p) act”
-val act' = “act' : ('a,'e,'p) act”
-
-(* Given an (act)ed on Itree and event, how shoudl we update act? *)
-val _    = type_abbrev("upd",“:'p -> 'e -> ('a,'e,'p) act -> ('a,'e,'p) act”)
-val upd  = “upd  : ('a,'e,'p) upd”
-val upd' = “upd' : ('a,'e,'p) upd”
-
 Datatype:
   iforest = <| forest : 'p |-> ('a,'e,'r) itree ;
-               act    : 'p -> 'e -> 'a option;
-               upd    : 'p -> 'e ->
-                        ('p -> 'e -> 'a option) ->
-                         'p -> 'e -> 'a option
-|>
+               st     : 's;
+               act    : 's -> 'p -> 'e -> 'a option;
+               upd    : 's -> 'p -> 'e -> 's;
+            |>
 End
 
-val iforest = “ψ  :('a,'e,'p,'r) iforest”
-val psi     = “ψ  :('a,'e,'p,'r) iforest”
-val psi'    = “ψ' :('a,'e,'p,'r) iforest”
+val iforest = “ψ  :('a,'e,'p,'r,'s) iforest”
+val psi     = “ψ  :('a,'e,'p,'r,'s) iforest”
+val psi'    = “ψ' :('a,'e,'p,'r,'s) iforest”
 
 (* iforest basic operations *)
 
@@ -56,20 +36,20 @@ Definition iforest_del_def:
 End
 
 Definition iforest_upd_act_def:
-  iforest_upd_act ^iforest p e = ψ with act := ψ.upd p e ψ.act
+  iforest_upd_act ^iforest p e = ψ with st := ψ.upd ψ.st p e
 End
 
 Definition iforest_upd_def:
   iforest_upd ^iforest p e f =
-    case ψ.act p e of
+    case ψ.act ψ.st p e of
       NONE   => ψ
-    | SOME a => ψ with <| forest := ψ.forest |+ (p,f a); act := ψ.upd p e ψ.act |>
+    | SOME a => ψ with <| forest := ψ.forest |+ (p,f a); st := ψ.upd ψ.st p e |>
 End
 
 Theorem iforest_upd_alt_def:
 ∀ψ p e f.
-  IS_SOME (ψ.act p e) ⇒
-  iforest_upd ψ p e f = iforest_upd_act (iforest_set ψ p (f (THE (ψ.act p e)))) p e
+  IS_SOME (ψ.act ψ.st p e) ⇒
+  iforest_upd ψ p e f = iforest_upd_act (iforest_set ψ p (f (THE (ψ.act ψ.st p e)))) p e
 Proof
   rw[iforest_upd_def,iforest_set_def,iforest_upd_act_def,IS_SOME_EXISTS]
   \\ simp[]
@@ -83,7 +63,7 @@ Definition iforest_can_act_def:
   iforest_can_act ^iforest p =
   case iforest_get ψ p of
     NONE => F
-  | SOME (Vis e f) => IS_SOME (ψ.act p e)
+  | SOME (Vis e f) => IS_SOME (ψ.act ψ.st p e)
   | _ => T
 End
 
@@ -97,7 +77,7 @@ val trace'  = “trace'  : 'p llist”
 
 Definition next_proc_def:
   next_proc ^iforest trace =
-    case LFILTER (λp. p ∈ iforest_itrees ψ ∧ iforest_can_act ψ p) trace of
+    case LFILTER (iforest_can_act ψ) trace of
       [||] => NONE
     | p:::ll => SOME (p,ll)
 End
@@ -115,6 +95,13 @@ Proof
   \\ rw[iforest_can_act_def]
   \\ Cases_on ‘iforest_get ψ p’
   \\ gs[]
+QED
+
+Theorem iforest_can_act_in_itrees:
+  ∀ψ p. iforest_can_act ψ p ⇒ p ∈ iforest_itrees ψ
+Proof
+  rw[iforest_itrees_def,FDOM_FLOOKUP,iforest_can_act_def,iforest_get_def]
+  \\ EVERY_CASE_TAC \\ gs[]
 QED
 
 Theorem iforest_itrees_del:
@@ -234,7 +221,7 @@ Theorem iforest_itrees_mono_step:
 Proof
   rw[] \\ Cases_on ‘i’ \\ EVAL_TAC
   \\ gs[FDOM_DRESTRICT,iforest_itrees_def]
-  \\ Cases_on ‘ψ.act p a’ \\ gs[]
+  \\ Cases_on ‘ψ.act ψ.st p a’ \\ gs[]
 QED
 
 Theorem not_in_forest_not_in_trace:
@@ -255,7 +242,7 @@ Proof
          by (gs[SUBSET_DEF] \\ CCONTR_TAC \\ gs[])
       \\ gs[next_proc_def,CaseEq"llist"]
       \\ drule LFILTER_EQ_CONS
-      \\ rw[] \\ CCONTR_TAC \\ gs[])
+      \\ rw[] \\ CCONTR_TAC \\ gs [iforest_can_act_in_itrees])
   >- (Cases_on ‘h’ \\ rw[] \\ gs[Once iforest_def]
       \\ Cases_on ‘next_proc ψ' trace’ \\ gs[]
       \\ Cases_on ‘x’ \\ gs[] \\ rveq
@@ -264,8 +251,8 @@ Proof
       \\ irule SUBSET_TRANS \\ first_x_assum (irule_at Any) \\ simp[]
       \\ irule iforest_itrees_mono_step
       \\ gs[next_proc_def,CaseEq"llist"]
-      \\ drule LFILTER_EQ_CONS
-      \\ rw[])
+      \\ drule LFILTER_EQ_CONS \\ rw[]
+      \\ rw[iforest_can_act_in_itrees])
   >- (qexists_tac ‘ψ’ \\ simp[] \\ metis_tac [])
 QED
 
