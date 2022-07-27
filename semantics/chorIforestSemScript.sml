@@ -49,5 +49,4 @@ Definition plant_chor_iforest_def:
   plant_chor_iforest c = chor_iforest FEMPTY (chor_ψ FEMPTY c (procsOf c))
 End
 
-
 val _ = export_theory ()

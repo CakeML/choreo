@@ -76,10 +76,11 @@ val trace   = “trace   : 'p llist”
 val trace'  = “trace'  : 'p llist”
 
 Definition next_proc_def:
-  next_proc ^iforest trace =
-    case LFILTER (iforest_can_act ψ) trace of
+  next_proc ^iforest [||]  = NONE
+∧ next_proc ^iforest (x:::xs) =
+    case LFILTER (iforest_can_act ψ) (x:::xs) of
       [||] => NONE
-    | p:::ll => SOME (p,ll)
+    | p:::ll => SOME (p,xs)
 End
 
 (* Properties of the basic iforest operations *)
@@ -89,7 +90,10 @@ Theorem next_proc_ifores_get_SOME:
     next_proc ψ trace = SOME (p,ll)
     ⇒ ∃i. iforest_get ψ p = SOME i
 Proof
-  rw[next_proc_def]
+  Cases_on ‘trace’ \\ rw[next_proc_def]
+  >- (gs[iforest_can_act_def]
+      \\ Cases_on ‘iforest_get ψ h’
+      \\ gs[])
   \\ gs[CaseEq"llist"]
   \\ drule LFILTER_EQ_CONS
   \\ rw[iforest_can_act_def]
@@ -224,6 +228,20 @@ Proof
   \\ Cases_on ‘ψ.act ψ.st p a’ \\ gs[]
 QED
 
+Theorem next_proc_SOME:
+  ∀ψ trace p r.
+  next_proc ψ trace = SOME (p,r)
+  ⇒ r = THE (LTL trace) ∧ ∃ll. LFILTER (iforest_can_act ψ) trace = p:::ll
+Proof
+  rw[] \\ Cases_on ‘trace’
+  >- gs[next_proc_def]
+  >- (pop_assum mp_tac \\ ONCE_REWRITE_TAC [next_proc_def]
+      \\ CASE_TAC \\ drule LFILTER_EQ_CONS \\ rw[])
+  >- gs[next_proc_def]
+  >- (pop_assum mp_tac \\ ONCE_REWRITE_TAC [next_proc_def]
+      \\ CASE_TAC \\ drule LFILTER_EQ_CONS \\ rw[])
+QED
+
 Theorem not_in_forest_not_in_trace:
   ∀p ^psi trace.
     p ∉ iforest_itrees ψ
@@ -240,7 +258,7 @@ Proof
       \\ gs[iforest_act_FST] \\ rveq
       \\ ‘p ∉ iforest_itrees ψ'’
          by (gs[SUBSET_DEF] \\ CCONTR_TAC \\ gs[])
-      \\ gs[next_proc_def,CaseEq"llist"]
+      \\ drule next_proc_SOME \\ rw[]
       \\ drule LFILTER_EQ_CONS
       \\ rw[] \\ CCONTR_TAC \\ gs [iforest_can_act_in_itrees])
   >- (Cases_on ‘h’ \\ rw[] \\ gs[Once iforest_def]
@@ -250,7 +268,7 @@ Proof
       \\ qexists_tac ‘r'’ \\ simp[]
       \\ irule SUBSET_TRANS \\ first_x_assum (irule_at Any) \\ simp[]
       \\ irule iforest_itrees_mono_step
-      \\ gs[next_proc_def,CaseEq"llist"]
+      \\ drule next_proc_SOME \\ rw[]
       \\ drule LFILTER_EQ_CONS \\ rw[]
       \\ rw[iforest_can_act_in_itrees])
   >- (qexists_tac ‘ψ’ \\ simp[] \\ metis_tac [])
@@ -339,7 +357,7 @@ Proof
   \\ simp[iforest_itrees_del]
 QED
 
-Theorem actions_end_iforest_def:
+Theorem actions_end_iforest:
   ∀ψ trace. actions_end (iforest ψ trace)
 Proof
   rw[actions_end_def]
@@ -456,5 +474,75 @@ Definition strong_deadlock_freedom_def:
          exists (λ(q,a). p = q ∧ ∃t. a = Res t) actions ∨
          always (λll. ∃n a. LNTH n ll = SOME (p,a)) actions)
 End
+
+Theorem iforest_itrees_iforest_step_in:
+  ∀p ψ q i.
+    p ∈ iforest_itrees ψ ∧ p ≠ q
+    ⇒ p ∈ iforest_itrees (iforest_step ψ q i)
+Proof
+  rw[]
+  \\ Cases_on ‘i’
+  \\ gs[iforest_step_def,iforest_del_def,iforest_set_def,iforest_upd_def,iforest_itrees_def]
+  \\ TOP_CASE_TAC \\ gs[]
+QED
+
+Theorem iforest_itrees_iforest_step_mono:
+  ∀p ψ q i.
+    p ∈ iforest_itrees ψ ∧ (∀t. i ≠ Ret t)
+    ⇒ p ∈ iforest_itrees (iforest_step ψ p i)
+Proof
+  rw[]
+  \\ Cases_on ‘i’ \\ gs[]
+  \\ gs[iforest_step_def,iforest_del_def,iforest_set_def,iforest_upd_def,iforest_itrees_def]
+  \\ TOP_CASE_TAC \\ gs[]
+QED
+
+Theorem iforest_itrees_FEMPTY:
+  ∀p ψ.
+    ψ.forest = FEMPTY ⇒ p ∉ iforest_itrees ψ
+Proof
+  rw[iforest_itrees_def]
+QED
+
+Theorem weak_deadlock_freedom_iforest_coind:
+  ∀R.
+    (∀ψ trace.
+       R ψ trace ⇒
+       ψ.forest = FEMPTY ∨
+       (∃p ll i.
+          next_proc ψ trace = SOME (p,ll) ∧
+          iforest_get ψ p = SOME i ∧
+          R  (iforest_step ψ p i) ll)) ⇒
+  ∀ψ trace. R ψ trace
+      ⇒ weak_deadlock_freedom (iforest_itrees ψ) (iforest ψ trace)
+Proof
+  rw[weak_deadlock_freedom_def,actions_end_iforest]
+  \\ Cases_on ‘LFINITE (iforest ψ trace)’ \\ gs[]
+  \\ last_x_assum mp_tac  \\ last_x_assum mp_tac
+  \\ qabbrev_tac ‘actions = iforest ψ trace’
+  \\ ‘actions = iforest ψ trace’ by gs[Abbr‘actions’]
+  \\ pop_assum mp_tac
+  \\ MAP_EVERY qid_spec_tac [‘ψ’,‘trace’]
+  \\ pop_assum kall_tac
+  \\ pop_assum mp_tac
+  \\ qid_spec_tac ‘actions’
+  \\ ho_match_mp_tac LFINITE_STRONG_INDUCTION
+  \\ rw[]
+  >- (first_x_assum drule \\ rw[]
+      \\ gs[Once iforest_def,iforest_itrees_FEMPTY])
+  \\ first_assum drule \\ strip_tac
+  >- gs[iforest_itrees_FEMPTY]
+  \\ qpat_x_assum ‘h:::actions = _’ mp_tac
+  \\ simp[Once iforest_def] \\ rw[]
+  \\ gs[AND_IMP_INTRO]
+  \\ first_x_assum (drule_at_then Any kall_tac)
+  \\ last_x_assum (drule_at Any) \\ rw[]
+  \\ Cases_on ‘p = p'’ \\ gs[]
+  >- (rveq \\ Cases_on ‘∃t. i = Ret t’ \\ gs[iforest_act_def]
+      \\ disj2_tac \\ first_x_assum irule
+      \\ irule iforest_itrees_iforest_step_mono \\ rw[])
+  \\ disj2_tac \\ first_x_assum irule
+  \\ metis_tac [iforest_itrees_iforest_step_in]
+QED
 
 val _ = export_theory();
