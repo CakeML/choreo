@@ -545,4 +545,166 @@ Proof
   \\ metis_tac [iforest_itrees_iforest_step_in]
 QED
 
+Inductive rooted:
+[~can_act:]
+  (∀ψ p. iforest_can_act ψ p  ⇒ rooted ψ p) ∧
+[~one_step:]
+  (∀ψ p q i.
+     ¬iforest_can_act ψ p ∧
+     (* Need this or rooted becomes a tautology *)
+     iforest_can_act ψ q ∧
+     iforest_get ψ q = SOME i ∧
+     rooted (iforest_step ψ p i) p
+     ⇒ rooted ψ p)
+End
+
+Definition all_rooted_def:
+  all_rooted ψ = ∀p. p ∈ iforest_itrees ψ ⇒ rooted ψ p
+End
+
+CoInductive always_rooted:
+[~empty:]
+  (∀ψ. ψ.forest = FEMPTY ⇒ always_rooted ψ) ∧
+[~step:]
+  (∀ψ.
+     all_rooted ψ ∧
+     (∀p i.
+        iforest_can_act ψ p ∧
+        iforest_get ψ p = SOME i
+        ⇒ always_rooted (iforest_step ψ p i))
+     ⇒ always_rooted ψ)
+End
+
+Theorem fair_trace_cons:
+  ∀procs p trace.
+    fair_trace procs (p:::trace) ⇒ fair_trace procs trace
+Proof
+  rw[fair_trace_def]
+QED
+
+Theorem next_proc_fair_trace:
+  ∀ψ procs trace p ll.
+    fair_trace procs trace ∧
+    next_proc ψ trace = SOME (p,ll)
+    ⇒ fair_trace procs ll
+Proof
+  rw[] \\ drule next_proc_SOME
+  \\ rw[] \\ Cases_on ‘trace’ \\ gs[]
+  \\ irule fair_trace_cons
+  \\ metis_tac []
+QED
+
+Theorem fair_trace_procs_subset:
+  ∀procs trace procs'.
+    fair_trace procs trace ∧
+    procs' ⊆ procs
+    ⇒ fair_trace procs' trace
+Proof
+  rw[fair_trace_def] \\ first_x_assum irule
+  \\ gs[SUBSET_DEF]
+QED
+
+Theorem iforest_can_act_imp_next_proc:
+∀ψ p trace.
+  iforest_can_act ψ p ∧
+  fair_trace {p} trace
+  ⇒ ∃p ll. next_proc ψ trace = SOME (p,ll)
+Proof
+  rw[]
+  \\ Cases_on ‘trace’
+  \\ gs[next_proc_def,fair_trace_def]
+  \\ drule iforest_can_act_in_itrees \\ rw[]
+  \\ TOP_CASE_TAC \\ gs[LFILTER_EQ_NIL,every_LNTH]
+  \\ Cases_on ‘n’ \\ gs[]
+  \\ first_x_assum drule \\ rw[]
+QED
+
+Theorem next_proc_imp_iforest_can_act:
+  ∀ψ trace p ll.
+    next_proc ψ trace = SOME (p,ll)
+    ⇒ iforest_can_act ψ p
+Proof
+  rw[]
+  \\ drule next_proc_SOME \\ rw[]
+  \\ drule LFILTER_EQ_CONS \\ rw[]
+QED
+
+Theorem all_rooted_next_proc:
+  ∀ψ procs trace.
+    all_rooted ψ ∧
+    fair_trace procs trace ∧
+    iforest_itrees ψ ⊆ procs ∧
+    ψ.forest ≠ FEMPTY
+    ⇒ ∃p ll. next_proc ψ trace = SOME (p,ll)
+Proof
+  rw[all_rooted_def]
+  \\ dxrule_all fair_trace_procs_subset
+  \\ strip_tac
+  \\ ‘∃p. p ∈ iforest_itrees ψ’ by
+    (gs[iforest_itrees_def]
+     \\ CCONTR_TAC \\ gs[FDOM_F_FEMPTY1])
+  \\ gs[] \\ first_x_assum drule
+  \\ pop_assum kall_tac
+  \\ last_x_assum kall_tac
+  \\ strip_tac
+  \\ last_x_assum mp_tac
+  \\ qid_spec_tac ‘trace’
+  \\ pop_assum mp_tac
+  \\ MAP_EVERY qid_spec_tac [‘p’,‘ψ’]
+  \\ ho_match_mp_tac rooted_ind \\ rw[]
+  >- (irule iforest_can_act_imp_next_proc
+      \\ irule_at Any fair_trace_procs_subset
+      \\ asm_exists_tac \\ simp[]
+      \\ first_assum (irule_at Any)
+      \\ irule iforest_can_act_in_itrees
+      \\ simp[])
+  >- (irule iforest_can_act_imp_next_proc
+      \\ irule_at Any fair_trace_procs_subset
+      \\ asm_exists_tac \\ simp[]
+      \\ first_assum (irule_at Any)
+      \\ irule iforest_can_act_in_itrees
+      \\ simp[])
+QED
+
+Theorem always_rooted_weak_deadlock_freedom:
+  ∀ψ trace procs.
+    fair_trace procs trace ∧
+    iforest_itrees ψ ⊆ procs ∧
+    always_rooted ψ
+    ⇒ weak_deadlock_freedom (iforest_itrees ψ) (iforest ψ trace)
+Proof
+  rw[]
+  \\ irule (MP_CANON weak_deadlock_freedom_iforest_coind)
+  \\ qexists_tac ‘λψ trace. fair_trace procs trace ∧
+                            iforest_itrees ψ ⊆ procs ∧
+                            always_rooted ψ’
+  \\ rw[] \\ ntac 3 (last_x_assum kall_tac)
+  \\ qmatch_goalsub_rename_tac ‘next_proc ψ trace’
+  \\ gs[Once always_rooted_cases]
+  \\ Cases_on ‘ψ.forest = FEMPTY’ \\ gs[]
+  \\ first_x_assum (irule_at Any)
+  \\ drule_all all_rooted_next_proc
+  \\ rw[] \\ first_assum (irule_at Any)
+  \\ drule next_proc_ifores_get_SOME \\ rw[]
+  \\ first_assum (irule_at Any)
+  \\ conj_tac
+  \\ metis_tac [next_proc_imp_iforest_can_act
+               ,next_proc_fair_trace
+               ,iforest_itrees_mono_step
+               ,iforest_can_act_in_itrees
+               ,SUBSET_TRANS
+               ]
+QED
+
+Theorem always_rooted_weak_deadlock_freedom':
+  ∀ψ trace procs.
+    fair_trace (iforest_itrees ψ) trace ∧
+    always_rooted ψ
+    ⇒ weak_deadlock_freedom (iforest_itrees ψ) (iforest ψ trace)
+Proof
+  rw[] \\ irule always_rooted_weak_deadlock_freedom \\ simp[]
+  \\ first_x_assum (irule_at Any)
+  \\ simp[]
+QED
+
 val _ = export_theory();
