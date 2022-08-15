@@ -17,6 +17,13 @@ Datatype:
             |>
 End
 
+Definition non_interference_def:
+  non_interference (act : 's -> 'p -> 'e -> 'a option) (upd : 's -> 'p -> 'e -> 's) =
+  ∀s p1 e1 p2 e2.
+    IS_SOME (act s p1 e1) ∧ p1 ≠ p2
+    ⇒ act s p1 e1 = act (upd s p2 e2) p1 e1
+End
+
 val iforest = “ψ  :('a,'e,'p,'r,'s) iforest”
 val psi     = “ψ  :('a,'e,'p,'r,'s) iforest”
 val psi'    = “ψ' :('a,'e,'p,'r,'s) iforest”
@@ -563,13 +570,67 @@ Inductive rooted:
      ¬iforest_can_act ψ p ∧
      (* Need this or rooted becomes a tautology *)
      iforest_can_act ψ q ∧
-     rooted (iforest_step ψ p) p
+     rooted (iforest_step ψ q) p
      ⇒ rooted ψ p)
 End
 
 Definition all_rooted_def:
   all_rooted ψ = ∀p. p ∈ iforest_itrees ψ ⇒ rooted ψ p
 End
+
+Definition iforest_cong_def:
+  iforest_cong ψ = non_interference ψ.act ψ.upd
+End
+
+Theorem iforest_cong_thm:
+∀ψ p q.
+  iforest_cong ψ ∧ iforest_can_act ψ p ∧ p ≠ q
+  ⇒ iforest_can_act (iforest_step ψ q) p ∧
+    iforest_act ψ p = iforest_act (iforest_step ψ q) p
+Proof
+  rw[iforest_cong_def,non_interference_def]
+  \\ gs[iforest_can_act_def,
+        iforest_step_def,
+        iforest_act_def,
+        iforest_get_def,
+        iforest_del_def,
+        iforest_upd_def,
+        iforest_set_def,
+        DOMSUB_FLOOKUP_THM,
+        FLOOKUP_UPDATE,
+        itree_distinct]
+  \\ EVERY_CASE_TAC
+  \\ gs[DOMSUB_FLOOKUP_THM,
+        FLOOKUP_UPDATE,
+        itree_distinct]
+  \\ rveq
+  \\ metis_tac[]
+QED
+
+Theorem iforest_cong_step:
+∀ψ p i.
+  iforest_cong ψ
+  ⇒ iforest_cong (iforest_step ψ p)
+Proof
+  rw[iforest_cong_def,non_interference_def]
+  \\ gs[iforest_can_act_def,
+        iforest_step_def,
+        iforest_act_def,
+        iforest_get_def,
+        iforest_del_def,
+        iforest_upd_def,
+        iforest_set_def,
+        DOMSUB_FLOOKUP_THM,
+        FLOOKUP_UPDATE,
+        itree_distinct]
+  \\ EVERY_CASE_TAC
+  \\ gs[DOMSUB_FLOOKUP_THM,
+        FLOOKUP_UPDATE,
+        itree_distinct]
+QED
+
+
+
 
 (* TODO:
    This relation does not guarantee that at each step the
