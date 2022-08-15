@@ -108,6 +108,13 @@ Proof
   \\ EVERY_CASE_TAC \\ gs[]
 QED
 
+Theorem iforest_itrees_eq_get:
+  ∀ψ p. p ∉ iforest_itrees ψ ⇔ iforest_get ψ p = NONE
+Proof
+  rw[iforest_itrees_def,iforest_get_def,FDOM_FLOOKUP]
+  \\ Cases_on ‘FLOOKUP ψ.forest p’ \\ rw[]
+QED
+
 Theorem iforest_itrees_del:
   ∀ψ p.
     p ∉ iforest_itrees (iforest_del ψ p)
@@ -116,27 +123,35 @@ Proof
 QED
 
 Definition iforest_step_def:
-  (* If the Itree is done, remove it from the forest *)
-  iforest_step ψ p (Ret t)   = iforest_del ψ p
-  (* If the Itree is in an internal transition simply update it *)
-∧ iforest_step ψ p (Tau t)   = iforest_set ψ p t
-  (* If the Itree returns an event:  *)
-  (* We must likely can act on it (from next_proc)  *)
-  (* So, we update the act function according to upd
-        and record the event to the stream. *)
-∧ iforest_step ψ p (Vis e f) = iforest_upd ψ p e f
+  iforest_step ψ p =
+    case iforest_get ψ p of
+      NONE => ψ
+    (* If the Itree is done, remove it from the forest *)
+    | SOME (Ret t) => iforest_del ψ p
+    (* If the Itree is in an internal transition simply update it *)
+    | SOME (Tau t)      => iforest_set ψ p t
+    (* If the Itree returns an event:  *)
+    (* We must likely can act on it (from next_proc)  *)
+    (* So, we update the act function according to upd
+       and record the event to the stream. *)
+    | SOME (Vis e f) => iforest_upd ψ p e f
 End
 
 Definition iforest_act_def:
-  iforest_act ψ p (Ret t)   = (p,Res t)
-∧ iforest_act ψ p (Tau t)   = (p,Int)
-∧ iforest_act ψ p (Vis e f) = (p,Ext e)
+  iforest_act ψ p =
+    case iforest_get ψ p of
+      | NONE => ARB (* Underspecified *)
+      | SOME (Ret t)   => (p,Res t)
+      | SOME (Tau t)   => (p,Int)
+      | SOME (Vis e f) => (p,Ext e)
 End
 
 Theorem iforest_act_FST:
-  ∀ψ p i. FST (iforest_act ψ p i) = p
+  ∀ψ p. iforest_can_act ψ p ⇒ FST (iforest_act ψ p) = p
 Proof
-  Cases_on ‘i’ \\ gs[iforest_act_def]
+  rw[iforest_act_def,iforest_can_act_def]
+  \\ Cases_on ‘iforest_get ψ p’ \\ gs[]
+  \\ Cases_on ‘x’ \\ gs[]
 QED
 
 (* Folding function to be used with  LUNFOLD *)
@@ -144,10 +159,7 @@ Definition iforest_aux1_def:
   iforest_aux (^iforest,^trace) =
   case next_proc ψ trace of
     NONE => NONE
-  | SOME (p,ll) =>
-      case iforest_get ψ p of
-        NONE   => NONE
-      | SOME i => SOME ((iforest_step ψ p i,ll),iforest_act ψ p i)
+  | SOME (p,ll) => SOME ((iforest_step ψ p,ll),iforest_act ψ p)
 End
 
 (* To create the stream of events we filter out all the NONE element from
@@ -166,26 +178,7 @@ Theorem iforest_def[compute]:
   iforest ^iforest ^trace =
   case next_proc ψ trace of
     NONE => [||]
-  | SOME (p,ll) =>
-      let i = THE (iforest_get ψ p)
-      in iforest_act ψ p i ::: iforest (iforest_step ψ p i) ll
-Proof
-  rw[iforest_aux_def,Once iforest_aux1_def,Once LUNFOLD]
-  \\ Cases_on ‘next_proc ψ trace’ \\ gs[]
-  \\ Cases_on ‘x’ \\ gs[]
-  \\ drule next_proc_ifores_get_SOME \\ rw[]
-  \\ simp[]
-QED
-
-Theorem iforest_alt_def:
-∀ ^iforest ^trace.
-  iforest ^iforest ^trace =
-  case next_proc ψ trace of
-    NONE => [||]
-  | SOME (p,ll) =>
-      case iforest_get ψ p of
-        NONE => [||]
-      | SOME i => iforest_act ψ p i ::: iforest (iforest_step ψ p i) ll
+  | SOME (p,ll) => iforest_act ψ p ::: iforest (iforest_step ψ p) ll
 Proof
   rw[iforest_aux_def,Once iforest_aux1_def,Once LUNFOLD]
   \\ Cases_on ‘next_proc ψ trace’ \\ gs[]
@@ -202,9 +195,8 @@ Theorem iforest_eq:
         (IS_NONE (next_proc ψ trace) ∧ res = [||]) ∨
         (∃p ll i res'.
            next_proc ψ trace = SOME (p,ll) ∧
-           iforest_get ψ p = SOME i ∧
-           res = iforest_act ψ p i:::res' ∧
-           R (iforest_step ψ p i) ll res')) ⇒
+           res = iforest_act ψ p:::res' ∧
+           R (iforest_step ψ p) ll res')) ⇒
     (iforest ψ trace = res)
 Proof
   rw[]
@@ -221,9 +213,12 @@ Proof
 QED
 
 Theorem iforest_itrees_mono_step:
-  ∀i ψ p. p ∈ iforest_itrees ψ ⇒ iforest_itrees (iforest_step ψ p i) ⊆ iforest_itrees ψ
+  ∀i ψ p. p ∈ iforest_itrees ψ ⇒ iforest_itrees (iforest_step ψ p) ⊆ iforest_itrees ψ
 Proof
-  rw[] \\ Cases_on ‘i’ \\ EVAL_TAC
+  rw[iforest_step_def,iforest_itrees_def]
+  \\ Cases_on ‘iforest_get ψ p’
+  \\ gs[] \\ EVAL_TAC
+  \\ Cases_on ‘x’
   \\ gs[FDOM_DRESTRICT,iforest_itrees_def]
   \\ Cases_on ‘ψ.act ψ.st p a’ \\ gs[]
 QED
@@ -242,6 +237,16 @@ Proof
       \\ CASE_TAC \\ drule LFILTER_EQ_CONS \\ rw[])
 QED
 
+Theorem next_proc_imp_iforest_can_act:
+  ∀ψ trace p ll.
+    next_proc ψ trace = SOME (p,ll)
+    ⇒ iforest_can_act ψ p
+Proof
+  rw[]
+  \\ drule next_proc_SOME \\ rw[]
+  \\ drule LFILTER_EQ_CONS \\ rw[]
+QED
+
 Theorem not_in_forest_not_in_trace:
   ∀p ^psi trace.
     p ∉ iforest_itrees ψ
@@ -255,7 +260,8 @@ Proof
       \\ Cases_on ‘next_proc ψ' trace’ \\ gs[]
       \\ Cases_on ‘x’ \\ gs[] \\ rveq
       \\ first_x_assum (assume_tac o Q.AP_TERM ‘FST’)
-      \\ gs[iforest_act_FST] \\ rveq
+      \\ drule next_proc_imp_iforest_can_act \\ rw[]
+      \\ drule iforest_act_FST \\ rw[] \\ rveq
       \\ ‘p ∉ iforest_itrees ψ'’
          by (gs[SUBSET_DEF] \\ CCONTR_TAC \\ gs[])
       \\ drule next_proc_SOME \\ rw[]
@@ -264,7 +270,8 @@ Proof
   >- (Cases_on ‘h’ \\ rw[] \\ gs[Once iforest_def]
       \\ Cases_on ‘next_proc ψ' trace’ \\ gs[]
       \\ Cases_on ‘x’ \\ gs[] \\ rveq
-      \\ disj1_tac \\ qexists_tac ‘iforest_step ψ' q' (THE (iforest_get ψ' q'))’
+      \\ disj1_tac
+      \\ qexists_tac ‘iforest_step ψ' q'’
       \\ qexists_tac ‘r'’ \\ simp[]
       \\ irule SUBSET_TRANS \\ first_x_assum (irule_at Any) \\ simp[]
       \\ irule iforest_itrees_mono_step
@@ -286,7 +293,6 @@ Proof
   \\ first_x_assum drule \\ Cases_on ‘x’ \\ simp[]
 QED
 
-
 Theorem iforest_cons_cases:
   ∀ψ trace x xs.
     iforest ψ trace = x:::xs
@@ -307,10 +313,9 @@ QED
 Theorem iforest_nth_drop:
   ∀n ^psi trace p a.
     LNTH n (iforest ψ trace) = SOME (p,a)
-    ⇒ ∃^psi' trace' i.
-        iforest_get ψ' p = SOME i ∧
-        iforest_act ψ' p i = (p,a) ∧
-        LDROP n (iforest ψ trace) = SOME ((p,a) ::: iforest (iforest_step ψ' p i) trace')
+    ⇒ ∃^psi' trace'.
+        iforest_act ψ' p = (p,a) ∧
+        LDROP n (iforest ψ trace) = SOME ((p,a) ::: iforest (iforest_step ψ' p) trace')
 Proof
   Induct \\ rw[]
   >- (Cases_on ‘iforest ψ trace’ \\ gs[LNTH]
@@ -321,7 +326,8 @@ Proof
       \\ strip_tac \\ gs[]
       \\ ‘q = p’ by
         (first_assum (assume_tac o Q.AP_TERM ‘FST’)
-         \\ gs[iforest_act_FST])
+         \\ drule next_proc_imp_iforest_can_act \\ rw[]
+         \\ drule iforest_act_FST \\ rw[])
       \\ rveq
       \\ metis_tac [])
   \\ gs[LNTH,OPTION_JOIN_EQ_SOME]
@@ -351,8 +357,11 @@ Theorem iforest_actions_end_aux[local]:
 Proof
   rw[] \\ drule iforest_nth_drop \\ rw[]
   \\ simp[LNTH_ADD]
-  \\ Cases_on ‘i’ \\ gs[iforest_act_def] \\ rveq
-  \\ gs[iforest_step_def]
+  \\ gs[iforest_act_def,iforest_step_def]
+  \\ Cases_on ‘iforest_get ψ' p’ \\ gs[]
+  >- (irule iforest_not_in_forest
+      \\ simp[iforest_itrees_eq_get])
+  \\ Cases_on ‘x’ \\ gs[]
   \\ irule iforest_not_in_forest
   \\ simp[iforest_itrees_del]
 QED
@@ -478,21 +487,23 @@ End
 Theorem iforest_itrees_iforest_step_in:
   ∀p ψ q i.
     p ∈ iforest_itrees ψ ∧ p ≠ q
-    ⇒ p ∈ iforest_itrees (iforest_step ψ q i)
+    ⇒ p ∈ iforest_itrees (iforest_step ψ q)
 Proof
-  rw[]
-  \\ Cases_on ‘i’
+  rw[iforest_step_def]
+  \\ Cases_on ‘iforest_get ψ q’ \\ gs[]
+  \\ Cases_on ‘x’
   \\ gs[iforest_step_def,iforest_del_def,iforest_set_def,iforest_upd_def,iforest_itrees_def]
   \\ TOP_CASE_TAC \\ gs[]
 QED
 
 Theorem iforest_itrees_iforest_step_mono:
-  ∀p ψ q i.
-    p ∈ iforest_itrees ψ ∧ (∀t. i ≠ Ret t)
-    ⇒ p ∈ iforest_itrees (iforest_step ψ p i)
+  ∀p ψ q.
+    p ∈ iforest_itrees ψ ∧ (∀t. iforest_get ψ p ≠ SOME (Ret t))
+    ⇒ p ∈ iforest_itrees (iforest_step ψ p)
 Proof
-  rw[]
-  \\ Cases_on ‘i’ \\ gs[]
+  rw[iforest_step_def]
+  \\ Cases_on ‘iforest_get ψ p’ \\ gs[]
+  \\ Cases_on ‘x’
   \\ gs[iforest_step_def,iforest_del_def,iforest_set_def,iforest_upd_def,iforest_itrees_def]
   \\ TOP_CASE_TAC \\ gs[]
 QED
@@ -511,8 +522,7 @@ Theorem weak_deadlock_freedom_iforest_coind:
        ψ.forest = FEMPTY ∨
        (∃p ll i.
           next_proc ψ trace = SOME (p,ll) ∧
-          iforest_get ψ p = SOME i ∧
-          R  (iforest_step ψ p i) ll)) ⇒
+          R  (iforest_step ψ p) ll)) ⇒
   ∀ψ trace. R ψ trace
       ⇒ weak_deadlock_freedom (iforest_itrees ψ) (iforest ψ trace)
 Proof
@@ -538,7 +548,7 @@ Proof
   \\ first_x_assum (drule_at_then Any kall_tac)
   \\ last_x_assum (drule_at Any) \\ rw[]
   \\ Cases_on ‘p = p'’ \\ gs[]
-  >- (rveq \\ Cases_on ‘∃t. i = Ret t’ \\ gs[iforest_act_def]
+  >- (rveq \\ Cases_on ‘∃t. iforest_get ψ p = SOME (Ret t)’ \\ gs[iforest_act_def]
       \\ disj2_tac \\ first_x_assum irule
       \\ irule iforest_itrees_iforest_step_mono \\ rw[])
   \\ disj2_tac \\ first_x_assum irule
@@ -549,12 +559,11 @@ Inductive rooted:
 [~can_act:]
   (∀ψ p. iforest_can_act ψ p  ⇒ rooted ψ p) ∧
 [~one_step:]
-  (∀ψ p q i.
+  (∀ψ p q.
      ¬iforest_can_act ψ p ∧
      (* Need this or rooted becomes a tautology *)
      iforest_can_act ψ q ∧
-     iforest_get ψ q = SOME i ∧
-     rooted (iforest_step ψ p i) p
+     rooted (iforest_step ψ p) p
      ⇒ rooted ψ p)
 End
 
@@ -562,16 +571,20 @@ Definition all_rooted_def:
   all_rooted ψ = ∀p. p ∈ iforest_itrees ψ ⇒ rooted ψ p
 End
 
+(* TODO:
+   This relation does not guarantee that at each step the
+   path of actions that lead to can_act is preserved
+  *)
+
 CoInductive always_rooted:
 [~empty:]
   (∀ψ. ψ.forest = FEMPTY ⇒ always_rooted ψ) ∧
 [~step:]
   (∀ψ.
      all_rooted ψ ∧
-     (∀p i.
-        iforest_can_act ψ p ∧
-        iforest_get ψ p = SOME i
-        ⇒ always_rooted (iforest_step ψ p i))
+     (∀p.
+        iforest_can_act ψ p
+        ⇒ always_rooted (iforest_step ψ p))
      ⇒ always_rooted ψ)
 End
 
@@ -617,16 +630,6 @@ Proof
   \\ TOP_CASE_TAC \\ gs[LFILTER_EQ_NIL,every_LNTH]
   \\ Cases_on ‘n’ \\ gs[]
   \\ first_x_assum drule \\ rw[]
-QED
-
-Theorem next_proc_imp_iforest_can_act:
-  ∀ψ trace p ll.
-    next_proc ψ trace = SOME (p,ll)
-    ⇒ iforest_can_act ψ p
-Proof
-  rw[]
-  \\ drule next_proc_SOME \\ rw[]
-  \\ drule LFILTER_EQ_CONS \\ rw[]
 QED
 
 Theorem all_rooted_next_proc:
@@ -686,8 +689,6 @@ Proof
   \\ drule_all all_rooted_next_proc
   \\ rw[] \\ first_assum (irule_at Any)
   \\ drule next_proc_ifores_get_SOME \\ rw[]
-  \\ first_assum (irule_at Any)
-  \\ conj_tac
   \\ metis_tac [next_proc_imp_iforest_can_act
                ,next_proc_fair_trace
                ,iforest_itrees_mono_step
