@@ -474,11 +474,11 @@ Proof
        \\ gs[]
 QED
 
-(* Weak deadlock-freedom states that either the trace of actions goes forever or
+(* deadlock-freedom states that either the trace of actions goes forever or
    or that every process reaches a result state
  *)
-Definition weak_deadlock_freedom_def:
-  weak_deadlock_freedom procs actions =
+Definition deadlock_freedom_def:
+  deadlock_freedom procs actions =
     (actions_end actions ∧
     (¬ LFINITE actions ∨ ∀p. p ∈ procs ⇒ exists (λ(q,a). p = q ∧ ∃t. a = Res t) actions))
 End
@@ -522,7 +522,7 @@ Proof
   rw[iforest_itrees_def]
 QED
 
-Theorem weak_deadlock_freedom_iforest_coind:
+Theorem deadlock_freedom_iforest_coind:
   ∀R.
     (∀ψ trace.
        R ψ trace ⇒
@@ -531,9 +531,9 @@ Theorem weak_deadlock_freedom_iforest_coind:
           next_proc ψ trace = SOME (p,ll) ∧
           R  (iforest_step ψ p) ll)) ⇒
   ∀ψ trace. R ψ trace
-      ⇒ weak_deadlock_freedom (iforest_itrees ψ) (iforest ψ trace)
+      ⇒ deadlock_freedom (iforest_itrees ψ) (iforest ψ trace)
 Proof
-  rw[weak_deadlock_freedom_def,actions_end_iforest]
+  rw[deadlock_freedom_def,actions_end_iforest]
   \\ Cases_on ‘LFINITE (iforest ψ trace)’ \\ gs[]
   \\ last_x_assum mp_tac  \\ last_x_assum mp_tac
   \\ qabbrev_tac ‘actions = iforest ψ trace’
@@ -730,15 +730,15 @@ Proof
       \\ simp[])
 QED
 
-Theorem always_rooted_weak_deadlock_freedom:
+Theorem always_rooted_deadlock_freedom:
   ∀ψ trace procs.
     fair_trace procs trace ∧
     iforest_itrees ψ ⊆ procs ∧
     always_rooted ψ
-    ⇒ weak_deadlock_freedom (iforest_itrees ψ) (iforest ψ trace)
+    ⇒ deadlock_freedom (iforest_itrees ψ) (iforest ψ trace)
 Proof
   rw[]
-  \\ irule (MP_CANON weak_deadlock_freedom_iforest_coind)
+  \\ irule (MP_CANON deadlock_freedom_iforest_coind)
   \\ qexists_tac ‘λψ trace. fair_trace procs trace ∧
                             iforest_itrees ψ ⊆ procs ∧
                             always_rooted ψ’
@@ -758,13 +758,13 @@ Proof
                ]
 QED
 
-Theorem always_rooted_weak_deadlock_freedom':
+Theorem always_rooted_deadlock_freedom':
   ∀ψ trace procs.
     fair_trace (iforest_itrees ψ) trace ∧
     always_rooted ψ
-    ⇒ weak_deadlock_freedom (iforest_itrees ψ) (iforest ψ trace)
+    ⇒ deadlock_freedom (iforest_itrees ψ) (iforest ψ trace)
 Proof
-  rw[] \\ irule always_rooted_weak_deadlock_freedom \\ simp[]
+  rw[] \\ irule always_rooted_deadlock_freedom \\ simp[]
   \\ first_x_assum (irule_at Any)
   \\ simp[]
 QED
