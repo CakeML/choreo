@@ -516,7 +516,7 @@ Proof
     rw []
     \\ Q.ABBREV_TAC `l' = p::q::FILTER (λx. p ≠ x ∧ q ≠ x) l`
     \\ `ALL_DISTINCT l`
-       by metis_tac [ALL_DISTINCT_PERM,chorSemTheory.procsOf_all_distinct]
+       by metis_tac [ALL_DISTINCT_PERM,chorLangTheory.procsOf_all_distinct]
     \\ `ALL_DISTINCT l'`
        by rw [Abbr `l'`,ALL_DISTINCT,MEM_FILTER,FILTER_ALL_DISTINCT]
     \\ `MEM p l ∧ MEM q l`
@@ -729,7 +729,7 @@ Proof
     rw []
     \\ Q.ABBREV_TAC `l' = p::q::FILTER (λx. p ≠ x ∧ q ≠ x) l`
     \\ `ALL_DISTINCT l`
-       by metis_tac [ALL_DISTINCT_PERM,chorSemTheory.procsOf_all_distinct]
+       by metis_tac [ALL_DISTINCT_PERM,chorLangTheory.procsOf_all_distinct]
     \\ `ALL_DISTINCT l'`
        by rw [Abbr `l'`,ALL_DISTINCT,MEM_FILTER,FILTER_ALL_DISTINCT]
     \\ `MEM p l ∧ MEM q l`

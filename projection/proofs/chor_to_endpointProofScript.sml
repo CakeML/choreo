@@ -3,7 +3,7 @@ open preamble choreoUtilsTheory chorLangTheory
               endpointSemTheory endpointPropsTheory
               endpointCongTheory chorSemTheory chorPropsTheory
               endpointConfluenceTheory chorConfluenceTheory
-              chorSyncPropsTheory;
+              chorSyncPropsTheory chorLangPropsTheory chor_to_endpointPropsTheory;
 
 val _ = new_theory "chor_to_endpointProof";
 
@@ -2148,7 +2148,7 @@ Proof
   rw []
   \\ drule SUBSET_PERM_exists_APPEND
   \\ disch_then (qspec_then ‘procsOf c’ mp_tac)
-  \\ simp [chorSemTheory.procsOf_all_distinct]
+  \\ simp [chorLangTheory.procsOf_all_distinct]
   \\ rw []
   \\ irule PERM_chor_compile_network_reduction
   \\ qexists_tac ‘xs ++ procsOf c’

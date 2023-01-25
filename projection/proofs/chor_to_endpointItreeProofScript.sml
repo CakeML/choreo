@@ -1,6 +1,6 @@
 open preamble
 
-open itreeTauTheory itreeCommonTheory choreoUtilsTheory
+open itreeTauTheory itreePropsTheory itreeCommonTheory choreoUtilsTheory
 open chorLangTheory chorLangPropsTheory chorItreeSemTheory
 open endpointLangTheory endpointItreeSemTheory
 open chor_to_endpointTheory chor_to_endpointPropsTheory

@@ -202,7 +202,7 @@ Theorem split_sel_dvarsOf:
     split_sel h p c = SOME (b,r)
     ⇒ dvarsOf r = dvarsOf c
 Proof
-  Induct \\ rw [split_sel_def,dvarsOf_def,nub'_dvarsOf]
+  Induct \\ rw [split_sel_def,chorLangTheory.dvarsOf_def,chorLangPropsTheory.nub'_dvarsOf]
   \\ metis_tac []
 QED
 
@@ -213,8 +213,10 @@ Triviality dvarsOf_imp_free_fix_names_endpoint_aux:
     ⇒ MEM x (dvarsOf c)
 Proof
   ho_match_mp_tac project_ind \\ rw [] \\ pop_assum mp_tac
-  \\ EVAL_TAC \\ gs [dvarsOf_def,nub'_nil,nub'_dvarsOf,procsOf_def,MEM_nub']
-  \\ EVERY_CASE_TAC \\ gs [nub'_dvarsOf,project_def,procsOf_def,MEM_nub']
+  \\ EVAL_TAC
+  \\ gs [chorLangTheory.dvarsOf_def,chorLangPropsTheory.nub'_nil,
+         chorLangPropsTheory.nub'_dvarsOf,chorLangTheory.procsOf_def,MEM_nub']
+  \\ EVERY_CASE_TAC \\ gs [chorLangPropsTheory.nub'_dvarsOf,project_def,chorLangTheory.procsOf_def,MEM_nub']
   \\ EVAL_TAC \\ simp []
   \\ TRY (rw [] \\ metis_tac [split_sel_dvarsOf] \\ NO_TAC)
   \\ rw [MEM_FILTER]
@@ -280,7 +282,8 @@ Proof
       >- (pop_assum mp_tac \\ EVAL_TAC \\ simp [])
       >- (EVAL_TAC \\ gs []
           \\ EVERY_CASE_TAC
-          \\ gs [nub'_dvarsOf,project_def,procsOf_def,MEM_nub',no_undefined_vars_def,free_variables_def]
+          \\ gs [chorLangPropsTheory.nub'_dvarsOf,project_def,
+                 chorLangTheory.procsOf_def,MEM_nub',no_undefined_vars_def,free_variables_def]
           \\ EVAL_TAC \\ gs []
           >- (gs [DELETE_SUBSET_INSERT]
               \\ first_x_assum (qspec_then ‘s |+ ((c,p2),ARB)’ assume_tac)
@@ -303,7 +306,8 @@ Proof
           \\ simp [])
       >- (EVAL_TAC \\ gs []
           \\ EVERY_CASE_TAC
-          \\ gs [nub'_dvarsOf,project_def,procsOf_def,MEM_nub',no_undefined_vars_def,free_variables_def]
+          \\ gs [chorLangPropsTheory.nub'_dvarsOf,project_def,chorLangTheory.procsOf_def,
+                 MEM_nub',no_undefined_vars_def,free_variables_def]
           \\ EVAL_TAC \\ gs []
           >- (gs [DELETE_SUBSET_INSERT]
               \\ first_x_assum (qspec_then ‘s |+ ((h',p1),ARB)’ assume_tac)
@@ -328,7 +332,7 @@ Proof
           \\ gs [])
       >- (EVAL_TAC \\ gs []
           \\ EVERY_CASE_TAC
-          \\ gs [nub'_dvarsOf,project_def,procsOf_def,MEM_nub',no_undefined_vars_def,free_variables_def]
+          \\ gs [chorLangPropsTheory.nub'_dvarsOf,project_def,chorLangTheory.procsOf_def,MEM_nub',no_undefined_vars_def,free_variables_def]
           \\ EVAL_TAC \\ gs []
           \\ TRY (gs [MAP_KEYS_def,SUBSET_DEF]
                   \\ simp [FDOM_DRESTRICT]
@@ -341,7 +345,7 @@ Proof
           \\ rw [])
       >- (EVAL_TAC \\ gs []
           \\ EVERY_CASE_TAC
-          \\ gs [nub'_dvarsOf,project_def,procsOf_def,MEM_nub',no_undefined_vars_def,free_variables_def]
+          \\ gs [chorLangPropsTheory.nub'_dvarsOf,project_def,chorLangTheory.procsOf_def,MEM_nub',no_undefined_vars_def,free_variables_def]
           \\ EVAL_TAC \\ gs []
           \\ first_x_assum drule
           \\ rw [LIST_TO_SET_FILTER]
@@ -349,7 +353,7 @@ Proof
           \\ simp [])
       \\ EVAL_TAC \\ gs []
       \\ EVERY_CASE_TAC
-      \\ gs [nub'_dvarsOf,project_def,procsOf_def,MEM_nub',no_undefined_vars_def,free_variables_def]
+      \\ gs [chorLangPropsTheory.nub'_dvarsOf,project_def,chorLangTheory.procsOf_def,MEM_nub',no_undefined_vars_def,free_variables_def]
       \\ EVAL_TAC \\ gs [])
   \\ gs [no_undefined_vars_network_def]
   \\ pop_assum mp_tac
@@ -381,7 +385,7 @@ Proof
   \\ qmatch_goalsub_abbrev_tac ‘junkcong {fv}’
   \\ disch_then (qspec_then ‘fv’ mp_tac)
   \\ impl_tac \\ rw []
-  >- rw [Abbr‘to_epn’,endpoints_compile_network_chor,procsOf_all_distinct]
+  >- rw [Abbr‘to_epn’,endpoints_compile_network_chor,chorLangTheory.procsOf_all_distinct]
   >- rw [Abbr‘fv’,gen_fresh_name_same]
   \\ fs [projection_def,endpoint_to_choiceTheory.compile_network_def]
   \\ drule_then assume_tac junkcong_sym \\  asm_exists_tac
@@ -440,7 +444,7 @@ QED
 Theorem variables_IN_procsOF:
   x ∈ variables c ⇒ MEM (SND x) (procsOf c)
 Proof
-  Induct_on ‘c’ >> rw[procsOf_def,variables_def,MEM_nub',MEM_MAP] >> rw[]
+  Induct_on ‘c’ >> rw[chorLangTheory.procsOf_def,variables_def,MEM_nub',MEM_MAP] >> rw[]
 QED
 
 Theorem project'_variables_eq:
@@ -459,7 +463,7 @@ Proof
    metis_tac[split_sel_variables,IN_DEF] >-
    metis_tac[split_sel_variables,IN_DEF] >>
   CCONTR_TAC >> gs [] >> dxrule variables_IN_procsOF >>
-  strip_tac >> dxrule procsOf_dprocsOf_MEM >>
+  strip_tac >> dxrule chorLangPropsTheory.procsOf_dprocsOf_MEM >>
   gs [] >> metis_tac []
 QED
 
@@ -1418,7 +1422,7 @@ Theorem MEM_partners_endpoint_imp_procsOf:
     ⇒ MEM x (procsOf c)
 Proof
   Induct
-  \\ rw [procsOf_def,
+  \\ rw [chorLangTheory.procsOf_def,
          chor_to_endpointTheory.project_def,
          partners_endpoint_def,
          nub'_def]
@@ -1641,13 +1645,13 @@ Proof
   >- rw [endpoints_compile_network_choice_aux,
          endpoints_compile_network_chor,
          endpoints_compile_network_payload,
-         procsOf_all_distinct]
+         chorLangTheory.procsOf_all_distinct]
   \\ asm_exists_tac \\ simp[]
   \\ first_assum (mp_then Any mp_tac from_payload_reflection)
   \\ impl_tac \\ rw []
   >- (rw [endpoints_compile_network_choice_aux,
          endpoints_compile_network_chor,
-         procsOf_all_distinct])
+         chorLangTheory.procsOf_all_distinct])
   >- (rw [choice_free_network_compile_network_fv,
           endpoint_to_choiceTheory.compile_network_def])
   \\ fs [endpoint_to_choiceTheory.compile_network_def]
@@ -1656,7 +1660,7 @@ Proof
   >- (rw [gen_fresh_name_same,
           endpoints_compile_network_chor,
           closed_network_from_chor,
-          procsOf_all_distinct,
+          chorLangTheory.procsOf_all_distinct,
           endpoints_ok_compile_network,
           MEM_partners_endpoint_project]
       \\ qmatch_goalsub_abbrev_tac ‘MAP _ l’
@@ -1664,13 +1668,13 @@ Proof
       \\ Induct_on ‘l’ \\ rw [])
   \\ rw []
   \\ first_assum (mp_then Any mp_tac from_endpoint_reflection)
-  \\ rw [] \\ fs[procsOf_all_distinct]
+  \\ rw [] \\ fs[chorLangTheory.procsOf_all_distinct]
   \\ first_assum (mp_then Any mp_tac to_choice_preservation)
   \\ qmatch_asmsub_abbrev_tac ‘junkcong {fv}’
   \\ disch_then (qspec_then ‘fv’ mp_tac)
   \\ impl_tac
   >- metis_tac [endpoints_compile_network_chor,
-                procsOf_all_distinct,
+                chorLangTheory.procsOf_all_distinct,
                 endpoint_names_reduction,
                 Abbr‘fv’,
                 gen_fresh_name_same,
@@ -1740,7 +1744,7 @@ Proof
         endpoints_compile_network_chor,
         endpoints_compile_network_payload,
         payload_closureProofTheory.compile_network_endpoints,
-        procsOf_all_distinct]) >>
+        chorLangTheory.procsOf_all_distinct]) >>
   strip_tac >>
   goal_assum dxrule >>
   unabbrev_all_tac >>
@@ -1886,8 +1890,9 @@ Proof
   >- (gs[payloadSemTheory.reduction_def]
       \\ drule (BISIM_REL_cases  |> SPEC_ALL |>  EQ_IMP_RULE  |> fst)
       \\ disch_then (qspec_then ‘LTau’ assume_tac)
-      \\ gs[] \\ pop_assum drule \\ rw []
-      \\ last_x_assum drule \\ rw[]
+      \\ gs[]
+      \\ first_x_assum drule \\ rw[]
+      \\ rw[] \\ last_x_assum drule \\ rw[]
       \\ pop_assum (irule_at Any)
       \\ irule RTC_TRANS
       \\ metis_tac[payloadSemTheory.reduction_def])
@@ -2052,7 +2057,7 @@ Proof
   >- (drule_then drule deadlockFreedomTheory.chor_deadlock_freedom >>
       rw[not_finish_def,DISJ_EQ_IMP] >>
       Cases_on ‘∃x. c = Call x’
-      >- gvs[dvarsOf_def] >>
+      >- gvs[chorLangTheory.dvarsOf_def] >>
       gvs[] >>
       metis_tac[]) >>
   first_x_assum(match_mp_tac o MP_CANON) >>
@@ -2087,7 +2092,7 @@ Proof
   >- (gs[payloadSemTheory.reduction_def]
       \\ drule (BISIM_REL_cases  |> SPEC_ALL |>  EQ_IMP_RULE  |> fst)
       \\ disch_then (qspec_then ‘LTau’ assume_tac)
-      \\ gs[] \\ pop_assum drule \\ rw []
+      \\ gs[] \\ first_x_assum drule \\ rw []
       \\ irule_at Any (cj 1 TC_RULES)
       \\ metis_tac[payloadSemTheory.reduction_def])
   >- metis_tac [TC_RULES,BISIM_REL_def,BISIM_TRANS]
@@ -2158,7 +2163,7 @@ Proof
   >- (drule dvarsOf_nil_trans_s >>
       drule no_undefined_vars_trans_s_pres >>
       drule procsOf_trans_s_SUBSET >>
-      simp[procsOf_all_distinct]) >>
+      simp[chorLangTheory.procsOf_all_distinct]) >>
   rw[]
   >- (disj2_tac >>
       gvs[projection_def] >>
@@ -2167,7 +2172,7 @@ Proof
       qmatch_goalsub_abbrev_tac ‘var_names_network nn’ >>
       disch_then (qspec_then ‘gen_fresh_name (var_names_network nn)’ mp_tac) >>
       impl_tac >- simp[Abbr‘nn’,gen_fresh_name_same,
-                       endpoints_compile_network_chor,procsOf_all_distinct] >>
+                       endpoints_compile_network_chor,chorLangTheory.procsOf_all_distinct] >>
       rw[] >>
       drule endpoint_to_payloadProofTheory.compile_network_preservation_TC >>
       disch_then drule >> simp[choice_free_network_compile_network_fv] >>
@@ -2743,7 +2748,7 @@ Proof
       MATCH_ACCEPT_TAC fix_network_compile_network) >>
   conj_asm1_tac
   >- (rpt(pop_assum kall_tac) >>
-      ‘ALL_DISTINCT (procsOf c)’ by(metis_tac[procsOf_all_distinct]) >>
+      ‘ALL_DISTINCT (procsOf c)’ by(metis_tac[chorLangTheory.procsOf_all_distinct]) >>
       rename1 ‘projection _ _ _ l’ >>
       Induct_on ‘l’ >- EVAL_TAC >>
       EVAL_TAC >>
