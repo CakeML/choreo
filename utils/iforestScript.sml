@@ -1,5 +1,5 @@
 open HolKernel Parse boolLib bossLib preamble;
-open llistTheory optionTheory itreesTheory finite_mapTheory;
+open llistTheory optionTheory itreeTauTheory finite_mapTheory;
 
 val _ = new_theory "iforest";
 
