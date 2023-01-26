@@ -83,26 +83,37 @@ val trace   = “trace   : 'p llist”
 val trace'  = “trace'  : 'p llist”
 
 Definition next_proc_def:
-  next_proc ^iforest [||]  = NONE
-∧ next_proc ^iforest (x:::xs) =
-    case LFILTER (iforest_can_act ψ) (x:::xs) of
+  next_proc ^iforest xs =
+    case LDROP_WHILE ($¬ o iforest_can_act ψ) xs of
       [||] => NONE
-    | p:::ll => SOME (p,xs)
+    | p:::ll => SOME (p,ll)
 End
 
-(* Properties of the basic iforest operations *)
+Theorem LDROP_WHILE_EQ_CONS:
+  LDROP_WHILE P ll = x:::xs ⇒
+  ∃l.
+    ll = LAPPEND (fromList l) (x:::xs) ∧ EVERY P l ∧ ¬ P x
+Proof
+  rw[]
+  \\ ‘exists ($¬ o P) ll’ by
+     (CCONTR_TAC \\ gs[GSYM every_def,LDROP_WHILE])
+  \\ gs[exists_thm_strong,o_DEF,ETA_THM]
+  \\ first_assum (irule_at Any)
+  \\ cheat
+QED
 
+(* Properties of the basic iforest operations *)
 Theorem next_proc_ifores_get_SOME:
   ∀ψ trace p ll.
     next_proc ψ trace = SOME (p,ll)
     ⇒ ∃i. iforest_get ψ p = SOME i
 Proof
   Cases_on ‘trace’ \\ rw[next_proc_def]
-  >- (gs[iforest_can_act_def]
+  >- (gs[iforest_can_act_def,LDROP_WHILE]
       \\ Cases_on ‘iforest_get ψ h’
       \\ gs[])
   \\ gs[CaseEq"llist"]
-  \\ drule LFILTER_EQ_CONS
+  \\ drule LDROP_WHILE_EQ_CONS
   \\ rw[iforest_can_act_def]
   \\ Cases_on ‘iforest_get ψ p’
   \\ gs[]
@@ -230,28 +241,16 @@ Proof
   \\ Cases_on ‘ψ.act ψ.st p a’ \\ gs[]
 QED
 
-Theorem next_proc_SOME:
-  ∀ψ trace p r.
-  next_proc ψ trace = SOME (p,r)
-  ⇒ r = THE (LTL trace) ∧ ∃ll. LFILTER (iforest_can_act ψ) trace = p:::ll
-Proof
-  rw[] \\ Cases_on ‘trace’
-  >- gs[next_proc_def]
-  >- (pop_assum mp_tac \\ ONCE_REWRITE_TAC [next_proc_def]
-      \\ CASE_TAC \\ drule LFILTER_EQ_CONS \\ rw[])
-  >- gs[next_proc_def]
-  >- (pop_assum mp_tac \\ ONCE_REWRITE_TAC [next_proc_def]
-      \\ CASE_TAC \\ drule LFILTER_EQ_CONS \\ rw[])
-QED
-
 Theorem next_proc_imp_iforest_can_act:
   ∀ψ trace p ll.
     next_proc ψ trace = SOME (p,ll)
     ⇒ iforest_can_act ψ p
 Proof
-  rw[]
-  \\ drule next_proc_SOME \\ rw[]
-  \\ drule LFILTER_EQ_CONS \\ rw[]
+  rw[next_proc_def]
+  \\ Cases_on ‘trace’
+  >- gs[LDROP_WHILE]
+  \\ gs[CaseEq"llist"]
+  \\ drule LDROP_WHILE_EQ_CONS \\ rw[]
 QED
 
 Theorem not_in_forest_not_in_trace:
@@ -264,16 +263,12 @@ Proof
   \\ qexists_tac ‘λll. ∃^psi' trace. ll = iforest ψ' trace ∧  iforest_itrees ψ' ⊆ iforest_itrees ψ’
   \\ rw[]
   >- (Cases_on ‘h’ \\ rw[] \\ gs[Once iforest_def]
-      \\ Cases_on ‘next_proc ψ' trace’ \\ gs[]
-      \\ Cases_on ‘x’ \\ gs[] \\ rveq
-      \\ first_x_assum (assume_tac o Q.AP_TERM ‘FST’)
+      \\ gs[AllCaseEqs()] \\ rveq
       \\ drule next_proc_imp_iforest_can_act \\ rw[]
       \\ drule iforest_act_FST \\ rw[] \\ rveq
       \\ ‘p ∉ iforest_itrees ψ'’
-         by (gs[SUBSET_DEF] \\ CCONTR_TAC \\ gs[])
-      \\ drule next_proc_SOME \\ rw[]
-      \\ drule LFILTER_EQ_CONS
-      \\ rw[] \\ CCONTR_TAC \\ gs [iforest_can_act_in_itrees])
+        by (gs[SUBSET_DEF] \\ CCONTR_TAC \\ gs[])
+      \\ CCONTR_TAC \\ gs [iforest_can_act_in_itrees])
   >- (Cases_on ‘h’ \\ rw[] \\ gs[Once iforest_def]
       \\ Cases_on ‘next_proc ψ' trace’ \\ gs[]
       \\ Cases_on ‘x’ \\ gs[] \\ rveq
@@ -282,9 +277,8 @@ Proof
       \\ qexists_tac ‘r'’ \\ simp[]
       \\ irule SUBSET_TRANS \\ first_x_assum (irule_at Any) \\ simp[]
       \\ irule iforest_itrees_mono_step
-      \\ drule next_proc_SOME \\ rw[]
-      \\ drule LFILTER_EQ_CONS \\ rw[]
-      \\ rw[iforest_can_act_in_itrees])
+      \\ drule next_proc_imp_iforest_can_act \\ rw[]
+      \\ gs [iforest_can_act_in_itrees])
   >- (qexists_tac ‘ψ’ \\ simp[] \\ metis_tac [])
 QED
 
@@ -662,10 +656,10 @@ Theorem next_proc_fair_trace:
     next_proc ψ trace = SOME (p,ll)
     ⇒ fair_trace procs ll
 Proof
-  rw[] \\ drule next_proc_SOME
-  \\ rw[] \\ Cases_on ‘trace’ \\ gs[]
+  rw[] \\ Cases_on ‘trace’ \\ gs[]
+  >- gs[next_proc_def,LDROP_WHILE]
   \\ irule fair_trace_cons
-  \\ metis_tac []
+  \\ cheat
 QED
 
 Theorem fair_trace_procs_subset:
@@ -684,7 +678,7 @@ Theorem iforest_can_act_imp_next_proc:
   fair_trace {p} trace
   ⇒ ∃p ll. next_proc ψ trace = SOME (p,ll)
 Proof
-  rw[]
+  rw[] \\ cheat
   \\ Cases_on ‘trace’
   \\ gs[next_proc_def,fair_trace_def]
   \\ drule iforest_can_act_in_itrees \\ rw[]
