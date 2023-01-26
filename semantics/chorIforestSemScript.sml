@@ -1,4 +1,4 @@
-open preamble chorLangTheory
+open preamble chorLangTheory choreoUtilsTheory
      itreeTauTheory iforestTheory itreeCommonTheory
      chorItreeSemTheory
 
@@ -38,18 +38,14 @@ Definition chor_iforest_upd_def[simp]:
 ∧ chor_iforest_upd s p (Select q)   = message_drop s p q
 End
 
-Definition procs_s_def:
-  procs_s p s = MAP_KEYS (λx. FST x) (DRESTRICT s (λx. SND x = p))
-End
-
 Definition chor_forest_def:
-  chor_forest c []         = FEMPTY
-∧ chor_forest c (p::procs) = (chor_forest c procs) |+ (p,chor_itree p FEMPTY c)
+  chor_forest c s []         = FEMPTY
+∧ chor_forest c s (p::procs) = (chor_forest c s procs) |+ (p,chor_itree p (projectS p s) c)
 End
 
 Definition chor_iforest_def:
-  chor_iforest c = <| forest := chor_forest c (procsOf c);
-                      st     := FEMPTY;
+  chor_iforest c s q = <| forest := chor_forest c s (procsOf c);
+                      st     := q;
                       upd    := chor_iforest_upd;
                       act    := chor_iforest_act;
                    |>
