@@ -106,10 +106,15 @@ Theorem LDROP_WHILE_EQ_CONS:
 Proof
   rw[]
   \\ ‘exists ($¬ o P) ll’ by
-     (CCONTR_TAC \\ gs[GSYM every_def,LDROP_WHILE])
+    (CCONTR_TAC \\ gs[GSYM every_def,LDROP_WHILE])
   \\ gs[exists_thm_strong,o_DEF,ETA_THM]
   \\ first_assum (irule_at Any)
-  \\ cheat
+  \\ drule LTAKE_IMP_LDROP \\ strip_tac \\ gs[]
+  \\ ‘x:::xs = a:::t’ suffices_by gs[]
+  \\ gs[] \\ rveq
+  \\ qpat_x_assum ‘LTAKE _ _ = _’ kall_tac
+  \\ qpat_x_assum ‘LDROP _ _ = _’ kall_tac
+  \\ Induct_on ‘l’ \\ rw[] \\ gs[LDROP_WHILE,fromList_def]
 QED
 
 (* Properties of the basic iforest operations *)
@@ -716,11 +721,9 @@ Proof
   \\ CCONTR_TAC \\ gs[]
   \\ qmatch_asmsub_abbrev_tac ‘ll ≠ _’
   \\ Cases_on ‘ll’ \\ gs[]
-  \\ cheat
-  \\ drule iforest_can_act_in_itrees \\ rw[]
-  \\ TOP_CASE_TAC \\ gs[LFILTER_EQ_NIL,every_LNTH]
-  \\ Cases_on ‘n’ \\ gs[]
-  \\ first_x_assum drule \\ rw[]
+  \\ drule LDROP_WHILE_EQ_NIL
+  \\ disch_then (drule o ONCE_REWRITE_RULE [every_LNTH])
+  \\ rw[]
 QED
 
 Theorem all_rooted_next_proc:
