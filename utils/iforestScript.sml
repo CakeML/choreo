@@ -89,6 +89,16 @@ Definition next_proc_def:
     | p:::ll => SOME (p,ll)
 End
 
+
+Theorem LDROP_WHILE_EQ_NIL:
+  LDROP_WHILE P ll = [||] ⇒ every P ll
+Proof
+  qid_spec_tac ‘ll’
+  \\ ho_match_mp_tac every_strong_coind \\ rw[]
+  \\ gs[LDROP_WHILE]
+  \\ Cases_on ‘P h’ \\ gs[]
+QED
+
 Theorem LDROP_WHILE_EQ_CONS:
   LDROP_WHILE P ll = x:::xs ⇒
   ∃l.
@@ -650,6 +660,26 @@ Proof
   rw[fair_trace_def]
 QED
 
+Theorem fair_trace_append:
+  ∀procs p ys xs.
+    fair_trace procs (LAPPEND (fromList xs) ys) ⇒
+    fair_trace procs ys
+Proof
+  Induct_on ‘xs’ \\ rw[fair_trace_def]
+QED
+
+Theorem next_proc_SOME:
+  ∀ψ trace p ll.
+    next_proc ψ trace = SOME (p,ll) ⇒
+    ∃l. trace = LAPPEND (fromList l) (p:::ll) ∧ iforest_can_act ψ p
+Proof
+  rw[next_proc_def] \\ Cases_on ‘trace’
+  >- gs[LDROP_WHILE]
+  \\ gs[CaseEq"llist"]
+  \\ drule LDROP_WHILE_EQ_CONS \\ rw[]
+  \\ metis_tac []
+QED
+
 Theorem next_proc_fair_trace:
   ∀ψ procs trace p ll.
     fair_trace procs trace ∧
@@ -659,7 +689,9 @@ Proof
   rw[] \\ Cases_on ‘trace’ \\ gs[]
   >- gs[next_proc_def,LDROP_WHILE]
   \\ irule fair_trace_cons
-  \\ cheat
+  \\ drule next_proc_SOME \\ rw[]
+  \\ gs[] \\ drule fair_trace_append
+  \\ rw[] \\ asm_exists_tac \\ simp[]
 QED
 
 Theorem fair_trace_procs_subset:
@@ -678,9 +710,13 @@ Theorem iforest_can_act_imp_next_proc:
   fair_trace {p} trace
   ⇒ ∃p ll. next_proc ψ trace = SOME (p,ll)
 Proof
-  rw[] \\ cheat
+  rw[]
   \\ Cases_on ‘trace’
-  \\ gs[next_proc_def,fair_trace_def]
+  \\ gs[next_proc_def,fair_trace_def,CaseEq"llist"]
+  \\ CCONTR_TAC \\ gs[]
+  \\ qmatch_asmsub_abbrev_tac ‘ll ≠ _’
+  \\ Cases_on ‘ll’ \\ gs[]
+  \\ cheat
   \\ drule iforest_can_act_in_itrees \\ rw[]
   \\ TOP_CASE_TAC \\ gs[LFILTER_EQ_NIL,every_LNTH]
   \\ Cases_on ‘n’ \\ gs[]
