@@ -334,27 +334,39 @@ QED
 Definition done_lift_aux1_def:
   done_lift_aux (Ret Done)   = Ret' End
 ∧ done_lift_aux (Ret End)    = Ret' End
-∧ done_lift_aux (Ret Unproj) = Ret' Error
+∧ done_lift_aux (Ret Unproj) = Ret' ARB
 ∧ done_lift_aux (Ret Error)  = Ret' Error
 ∧ done_lift_aux (Tau it)     = Tau' it
 ∧ done_lift_aux (Vis e f)    = Vis' e f
 End
 
 Definition done_lift_aux_def:
-  done_lift it = itree_unfold done_lift_aux it
+  done_lift it =
+    (case it of
+      Ret Unproj => Ret ARB
+    | _ => itree_unfold done_lift_aux it)
 End
 
 Theorem done_lift_def[simp]:
 ∀it f e.
   done_lift (Ret Done)   = Ret End
 ∧ done_lift (Ret End)    = Ret End
-∧ done_lift (Ret Unproj) = Ret Error
+∧ done_lift (Ret Unproj) = Ret ARB (* Can't occur *)
 ∧ done_lift (Ret Error)  = Ret Error
 ∧ done_lift (Tau it)     = Tau (done_lift it)
 ∧ done_lift (Vis e f)    = Vis e (done_lift o f)
 Proof
   rw[done_lift_aux_def]
   \\ simp[Once itree_unfold,done_lift_aux1_def,FUN_EQ_THM,done_lift_aux_def]
+  >-(Cases_on ‘it’ \\ simp[] \\ Cases_on ‘x’
+     \\ simp[Once itree_unfold,done_lift_aux1_def]
+     \\ simp[Once itree_unfold,done_lift_aux1_def])
+  >- (rw[] \\ Cases_on ‘f x’ \\  simp[Once itree_unfold,done_lift_aux1_def]
+      >- (Cases_on ‘x'’ \\ simp[]
+          \\ simp[Once itree_unfold,done_lift_aux1_def]
+          \\ simp[Once itree_unfold,done_lift_aux1_def])
+      >- (qmatch_goalsub_abbrev_tac ‘Tau it’ \\ simp[Once itree_unfold,done_lift_aux1_def])
+      >- (qmatch_goalsub_abbrev_tac ‘Vis _ it’ \\ simp[Once itree_unfold,done_lift_aux1_def]))
 QED
 
 val _ = Parse.overload_on("↑",``done_lift``);
