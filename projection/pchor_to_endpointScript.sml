@@ -1,9 +1,9 @@
-open preamble pchorLangTheory endpointLangTheory endpointPropsTheory
+open preamble pchorLangTheory endpointLangTheory
 
 val _ = new_theory "pchor_to_endpoint";
 
 val _ = set_grammar_ancestry
-  ["chorLang","endpointProps","endpointLang","pchorLang"];
+  ["chorLang","endpointLang","pchorLang"];
 
 
 Definition split_sel_def:

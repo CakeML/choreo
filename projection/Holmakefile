@@ -3,7 +3,7 @@ CAKEDIR = ../../cakeml
 endif
 
 INCLUDES = $(CAKEDIR)/misc $(CAKEDIR)/semantics \
-           $(CHOREODIR)/semantics $(CHOREODIR)/semantics/proofs
+	   $(CHOREODIR)/semantics
 
 all: $(DEFAULT_TARGETS)
 .PHONY: all
