@@ -229,4 +229,113 @@ Proof
   rw[SET_EQ_SUBSET,SUBSET_DEF,MEM_FILTER,MEM_nub'] >> fs[]
 QED
 
+Definition free_variables_def:
+  (free_variables (Nil) = {}) /\
+  (free_variables (Call _) = {}) /\
+  (free_variables (IfThen v p c1 c2) = {(v,p)} ∪ (free_variables c1 ∪ free_variables c2)) /\
+  (free_variables (Com p1 v1 p2 v2 c) = {(v1,p1)} ∪ (free_variables c DELETE (v2,p2))) /\
+  (free_variables (Let v p f vl c) = set(MAP (λv. (v,p)) vl) ∪ (free_variables c DELETE (v,p))) /\
+  (free_variables (Sel p b q c) = free_variables c) /\
+  (free_variables (Fix x c) = free_variables c)
+End
+
+Definition defined_vars_def:
+  defined_vars (s,c) = FDOM s
+End
+
+Definition no_undefined_vars_def:
+  no_undefined_vars (s,c) = (free_variables c ⊆ FDOM s)
+End
+
+(* dsubst resulting free variables are bounded by the original free variables of c and c' *)
+Theorem dsubst_subset_free_variables:
+  ∀c c' dn.
+    free_variables (dsubst c dn c') ⊆ free_variables c ∪ free_variables c'
+Proof
+  rw []
+  \\ Induct_on ‘c’ \\ rw [free_variables_def,dsubst_def]
+  \\ fs [free_variables_def,dsubst_def]
+  >- (irule SUBSET_TRANS \\ asm_exists_tac \\ fs []
+      \\ fs [SUBSET_DEF])
+  >- (irule SUBSET_TRANS \\ asm_exists_tac \\ fs []
+      \\ fs [SUBSET_DEF] \\ rw [] \\ metis_tac [])
+  \\ fs [SUBSET_DEF] \\ rw [] \\ metis_tac []
+QED
+
+(* dsubst can only add more free variables *)
+Theorem free_variables_subset_dsubst:
+  ∀c c' dn.
+    free_variables c ⊆ free_variables (dsubst c dn c')
+Proof
+  rw []
+  \\ Induct_on ‘c’ \\ rw [free_variables_def,dsubst_def]
+  \\ fs [SUBSET_DEF]
+QED
+
+(* free_variables are the same if we are trying to substitute the same program *)
+Theorem free_variables_dsubst_eq:
+  ∀c dn. free_variables (dsubst c dn c) = free_variables c
+Proof
+  rw [] \\ irule SUBSET_ANTISYM
+  \\ metis_tac [free_variables_subset_dsubst,
+                dsubst_subset_free_variables,
+                UNION_IDEMPOT]
+QED
+
+(* free_variables are the same if we are trying to substitute the same program *)
+Theorem free_variables_dsubst_eq_Fix:
+  ∀c x y. free_variables (dsubst c x (Fix y c)) = free_variables c
+Proof
+  rw [] \\ irule SUBSET_ANTISYM
+  \\ metis_tac [free_variables_subset_dsubst,
+                dsubst_subset_free_variables,
+                free_variables_def,
+                UNION_IDEMPOT]
+QED
+
+(* If there are no undefined variables no lookup into
+   the state should fail (give NONE)
+*)
+Theorem no_undefined_FLOOKUP:
+  (∀p v s c q x. no_undefined_vars (s,Com p v q x c)
+    ⇒ ∃x. FLOOKUP s (v,p) = SOME x)
+∧ (∀p v s c c1 c2. no_undefined_vars (s,IfThen v p c1 c2)
+    ⇒ ∃x. FLOOKUP s (v,p) = SOME x)
+∧ (∀p l s c v f. no_undefined_vars (s,Let v p f l c)
+    ⇒ EVERY IS_SOME (MAP (FLOOKUP s) (MAP (λv. (v,p)) l)))
+Proof
+  rw [no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP]
+  \\ Induct_on ‘l’ \\ fs [] \\ rw [FDOM_FLOOKUP] \\ rw [IS_SOME_DEF]
+QED
+
+(* MP-friendly version of no_undefined_FLOOKUP *)
+val t_list = no_undefined_FLOOKUP |> CONJUNCTS
+
+Theorem no_undefined_FLOOKUP_if  = el 2 t_list
+Theorem no_undefined_FLOOKUP_com = el 1 t_list
+Theorem no_undefined_FLOOKUP_let = el 3 t_list
+
+(* Ensure no self communication of a choreography *)
+Definition no_self_comunication_def:
+  no_self_comunication (Com p _ q _ c)   = (p ≠ q ∧ no_self_comunication c)
+∧ no_self_comunication (Sel p _ q c)     = (p ≠ q ∧ no_self_comunication c)
+∧ no_self_comunication (IfThen _ _ c c') = (no_self_comunication c ∧
+                                            no_self_comunication c')
+∧ no_self_comunication (Let _ _ _ _ c)   = no_self_comunication c
+∧ no_self_comunication (Fix _ c)         = no_self_comunication c
+∧ no_self_comunication _                 = T
+End
+
+Theorem no_self_comunication_dsubst:
+  ∀c c' dn.
+    no_self_comunication c ∧ no_self_comunication c'
+    ⇒ no_self_comunication (dsubst c dn c')
+Proof
+  rw [] \\ Induct_on ‘c’
+  \\ rw [no_self_comunication_def,dsubst_def]
+  \\ fs [no_self_comunication_def,dsubst_def]
+QED
+
+
+
 val _ = export_theory ()
