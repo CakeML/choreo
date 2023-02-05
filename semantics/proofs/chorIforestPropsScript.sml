@@ -2,6 +2,8 @@ open preamble choreoUtilsTheory chorLangTheory chorLangPropsTheory
      itreeTauTheory iforestTheory itreeCommonTheory
      chorItreeSemTheory chorIforestSemTheory
 
+open chor_to_endpointTheory; (* Required for projectability criteria *)
+
 val _ = new_theory "chorIforestProps";
 
 Theorem chor_ifores_nil_imp_procsOf_nil:
@@ -171,6 +173,54 @@ Proof
   \\ fs [iforest_act_def, iforest_can_act_def]
   \\ Cases_on ‘iforest_get (chor_iforest c st q) p’ \\ fs []
   \\ Cases_on ‘x’ \\ gvs []
+QED
+
+Theorem chor_iforest_itrees_eq_procOf:
+  ∀c st q. iforest_itrees (chor_iforest c st q) = set (procsOf c)
+Proof
+  rw[chor_iforest_def,iforest_itrees_def]
+  \\ qmatch_goalsub_rename_tac ‘set ll’
+  \\ Induct_on ‘ll’ \\ rw[chor_forest_def]
+QED
+
+val _ = Parse.add_infix("<ψ>",480,Parse.LEFT);
+
+val _ = Parse.overload_on("<ψ>",``λifst pit. iforest_set ifst (FST pit) (SND pit)``);
+
+Theorem chor_iforest_split:
+  ∀c p st q.
+    MEM p (procsOf c) ⇒
+        chor_iforest c st q = chor_iforest c st q <ψ> (p,chor_itree p (projectS p st) c)
+Proof
+  rw[chor_iforest_def,iforest_set_def] \\ qmatch_asmsub_rename_tac ‘MEM _ ll’
+  \\ Induct_on ‘ll’ \\ rw[chor_forest_def] \\ rw[FUPDATE_EQ]
+  \\ metis_tac [FUPDATE_COMMUTES]
+QED
+
+(* rooted_can_act *)
+
+Theorem chor_iforest_all_rooted:
+  ∀c st q.
+    no_undefined_vars (st,c) ∧
+    no_self_comunication c ∧
+    compile_network_ok st c (procsOf c)
+    ⇒ all_rooted (chor_iforest c st q)
+Proof
+  simp[all_rooted_def,chor_iforest_itrees_eq_procOf]
+  \\ Induct \\ rw[]
+  (* Nil *)
+  >- gs[procsOf_def]
+  (* If *)
+  >- (drule chor_iforest_split \\ disch_then (ONCE_REWRITE_TAC o single)
+     \\ gs[procsOf_def,nub'_def,nub'_procsOf,nub'_APPEND] \\ rveq
+      >- (irule rooted_can_act
+          \\ drule no_undefined_FLOOKUP_if
+          \\ rw[no_undefined_FLOOKUP_if,FLOOKUP_UPDATE
+                ,iforest_can_act_def,iforest_get_def,iforest_set_def
+                ,chor_iforest_def,chor_forest_def,chor_itree_def
+                ,procsOf_def,nub'_def,nub'_procsOf,nub'_APPEND])
+      \\ cheat)
+  \\ cheat
 QED
 
 Theorem chor_iforest_deadlock_freedom:
