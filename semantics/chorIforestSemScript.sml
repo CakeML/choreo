@@ -44,10 +44,10 @@ Definition chor_forest_def:
 End
 
 Definition chor_iforest_def:
-  chor_iforest c s q = <| forest := chor_forest c s (procsOf c);
-                      st     := q;
-                      upd    := chor_iforest_upd;
-                      act    := chor_iforest_act;
+  chor_iforest c s = <| forest := chor_forest c s (procsOf c);
+                        st     := FEMPTY;
+                        upd    := chor_iforest_upd;
+                        act    := chor_iforest_act;
                    |>
 End
 

@@ -7,8 +7,8 @@ open chor_to_endpointTheory; (* Required for projectability criteria *)
 val _ = new_theory "chorIforestProps";
 
 Theorem chor_ifores_nil_imp_procsOf_nil:
-  ∀c s q trace.
-    iforest (chor_iforest c s q) trace = [||] ∧
+  ∀c s trace.
+    iforest (chor_iforest c s) trace = [||] ∧
     fair_trace (set (procsOf c)) trace ⇒
     procsOf c = []
 Proof
@@ -113,9 +113,9 @@ Proof
 QED
 
 Theorem iforest_can_act_exists:
-  ∀c p s q.
+  ∀c p s.
      p ∈ set(procsOf c) ⇒
-     ∃p'. p' ∈ set(procsOf c) ∧ iforest_can_act (chor_iforest c s q) p'
+     ∃p'. p' ∈ set(procsOf c) ∧ iforest_can_act (chor_iforest c s) p'
 Proof
   let fun chor_tac t = qexists_tac t \\ simp[]
       \\ rw[ iforest_can_act_def,chor_iforest_def
@@ -176,7 +176,7 @@ Proof
 QED
 
 Theorem chor_iforest_itrees_eq_procOf:
-  ∀c st q. iforest_itrees (chor_iforest c st q) = set (procsOf c)
+  ∀c st. iforest_itrees (chor_iforest c st) = set (procsOf c)
 Proof
   rw[chor_iforest_def,iforest_itrees_def]
   \\ qmatch_goalsub_rename_tac ‘set ll’
@@ -188,9 +188,9 @@ val _ = Parse.add_infix("<ψ>",480,Parse.LEFT);
 val _ = Parse.overload_on("<ψ>",``λifst pit. iforest_set ifst (FST pit) (SND pit)``);
 
 Theorem chor_iforest_split:
-  ∀c p st q.
+  ∀c p st.
     MEM p (procsOf c) ⇒
-        chor_iforest c st q = chor_iforest c st q <ψ> (p,chor_itree p (projectS p st) c)
+        chor_iforest c st = chor_iforest c st <ψ> (p,chor_itree p (projectS p st) c)
 Proof
   rw[chor_iforest_def,iforest_set_def] \\ qmatch_asmsub_rename_tac ‘MEM _ ll’
   \\ Induct_on ‘ll’ \\ rw[chor_forest_def] \\ rw[FUPDATE_EQ]
@@ -204,7 +204,7 @@ Theorem chor_iforest_all_rooted:
     no_undefined_vars (st,c) ∧
     no_self_comunication c ∧
     compile_network_ok st c (procsOf c)
-    ⇒ all_rooted (chor_iforest c st q)
+    ⇒ all_rooted (chor_iforest c st)
 Proof
   simp[all_rooted_def,chor_iforest_itrees_eq_procOf]
   \\ Induct \\ rw[]
@@ -224,9 +224,9 @@ Proof
 QED
 
 Theorem chor_iforest_deadlock_freedom:
-  ∀procs c s q.
+  ∀procs c s.
     fair_trace (set (procsOf c)) procs
-    ⇒ deadlock_freedom (set (procsOf c)) (iforest (chor_iforest c s q) procs)
+    ⇒ deadlock_freedom (set (procsOf c)) (iforest (chor_iforest c s) procs)
 Proof
   simp [deadlock_freedom_def]
   \\ rpt gen_tac \\ strip_tac
