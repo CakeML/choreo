@@ -1908,15 +1908,6 @@ Proof
   metis_tac[trans_ln_trans_ln]
 QED
 
-Theorem compile_network_ok_project_ok:
-  !s c pn. compile_network_ok s c pn <=> (!p. MEM p pn ==> project_ok p [] c)
-Proof
-  simp[EQ_IMP_THM,FORALL_AND_THM] >> conj_tac >>
-  Induct_on `pn` >>
-  rw[compile_network_gen_def] >> simp[] >>
-  res_tac
-QED
-
 Theorem chor_size_cut_sel_upto:
   !p c. chor_to_endpoint$chor_size (cut_sel_upto p c) <= chor_to_endpoint$chor_size c
 Proof

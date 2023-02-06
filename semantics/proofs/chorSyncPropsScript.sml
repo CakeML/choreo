@@ -1,5 +1,5 @@
 open preamble choreoUtilsTheory
-     chorSemTheory chorLangTheory
+     chorSemTheory chorLangTheory chorLangPropsTheory
      chorPropsTheory chorConfluenceTheory;
 
 (*  syncronoush  choreograhies *)

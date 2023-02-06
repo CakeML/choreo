@@ -92,9 +92,9 @@ Proof
   \\ rw [chor_to_endpointTheory.compile_network_gen_def
         ,epn_rcong_rules]
   >- (MAP_EVERY Q.ABBREV_TAC
-       [ `s1 = <|bindings := chor_to_endpoint$projectS x s; queue := []|>`
+       [ `s1 = <|bindings := choreoUtils$projectS x s; queue := []|>`
        , `n1 = (project' x [] c)`
-       , `s2 = <|bindings := chor_to_endpoint$projectS y s; queue := []|>`
+       , `s2 = <|bindings := choreoUtils$projectS y s; queue := []|>`
        , `n2 = (project' y [] c)`
        , `n3 = compile_network s ^chor l`
        , `n4 = compile_network s ^chor l'`]
@@ -334,7 +334,7 @@ QED
 Theorem chor_compile_network_MEM_elem:
    ∀p s e c s' l.
     MEM (p,s',e) (endpoints (compile_network s ^chor l))
-    ⇒ s' = <|bindings := chor_to_endpoint$projectS p s; queue := []|>
+    ⇒ s' = <|bindings := choreoUtils$projectS p s; queue := []|>
       ∧ e = project' p [] ^chor
 Proof
   rpt GEN_TAC
@@ -358,7 +358,7 @@ Proof
   >- fs [chor_to_endpointTheory.compile_network_gen_def,endpoints_def,MEM]
   >- (fs [chor_to_endpointTheory.compile_network_gen_def,endpoints_def,MEM] \\ fs []
      \\ Q.ABBREV_TAC `h_ep =
-           NEndpoint h <| bindings := chor_to_endpoint$projectS h s';
+           NEndpoint h <| bindings := choreoUtils$projectS h s';
                           queue    := [] |> (project' h [] ^chor)`
      \\ ho_match_mp_tac epn_rcong_trans
      \\ Q.EXISTS_TAC `NPar h_ep

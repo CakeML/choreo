@@ -171,4 +171,13 @@ Proof
         , FLOOKUP_UPDATE]
 QED
 
+Theorem compile_network_ok_project_ok:
+  !s c pn. compile_network_ok s c pn <=> (!p. MEM p pn ==> project_ok p [] c)
+Proof
+  simp[EQ_IMP_THM,FORALL_AND_THM] >> conj_tac >>
+  Induct_on `pn` >>
+  rw[compile_network_gen_def] >> simp[] >>
+  res_tac
+QED
+
 val _ = export_theory ()
