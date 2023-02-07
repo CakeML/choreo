@@ -1,5 +1,5 @@
 open preamble choreoUtilsTheory chorLangTheory chorLangPropsTheory
-     itreeTauTheory iforestTheory itreeCommonTheory
+     itreeTauTheory iforestTheory itreeCommonTheory itreePropsTheory
      chorItreeSemTheory chorIforestSemTheory
 
 open chor_to_endpointTheory; (* Required for projectability criteria *)
@@ -159,52 +159,89 @@ Proof
 QED
 
 (* rooted_can_act *)
-val chor_thms = [ dsubst_def,project_def
-                  , chor_itree_merge_def
-                  , nub'_APPEND
-                  , nub'_dvarsOf
-                  , dvarsOf_def
-                  , procsOf_def
-                  , split_sel_def
-                  , chor_itree_def
-                  , dsubst_def
-                  , dprocsOf_def
-                  , nub'_dprocsOf ]
+val itree_thms = [ dsubst_def,project_def
+                 , chor_itree_merge_def
+                 , nub'_APPEND
+                 , nub'_dvarsOf
+                 , nub'_def
+                 , nub'_procsOf
+                 , dvarsOf_def
+                 , procsOf_def
+                 , split_sel_def
+                 , itree_el_def
+                 , itree_eqn_def
+                 , itree_eqn_refl
+                 , itree_eqn_sym
+                 , itree_depth_eqv_def
+                 , chor_itree_def
+                 , dsubst_def
+                 , dprocsOf_def
+                 , no_undefined_FLOOKUP
+                 , nub'_dprocsOf]
+
+val itree_simp = rw itree_thms \\ gs itree_thms
 
 val iforest_thm = [ iforest_can_act_def
+                  , iforest_itrees_def
                   , iforest_get_def
                   , iforest_set_def
+                  , iforest_step_def
+                  , iforest_upd_def
                   , FLOOKUP_UPDATE
                   , chor_iforest_def
                   , chor_forest_def
                   , chor_itree_def
+                  , libTheory.the_def
                   ]
 
-val iforest_simp = rw iforest_thm \\ gs iforest_thm
+val iforest_simp = rw (iforest_thm @ itree_thms) \\ gs (iforest_thm @ itree_thms)
 
-val chor_simp = rw chor_thms \\ gs chor_thms
+Triviality project_split_eq:
+  ∀ c c' p dvars.
+    project' p dvars c = project' p dvars c' ∧
+    project_ok p dvars c = project_ok p dvars c' ⇒
+    project p dvars c = project p dvars c'
+Proof
+  rw[] \\ qmatch_goalsub_abbrev_tac ‘a = b’
+  \\ Cases_on ‘a’ \\ Cases_on ‘b’
+  \\ gs[]
+QED
+
+Theorem no_undefined_vars_simps:
+  (∀s p x q y c.
+     no_undefined_vars (s, Com p x q y c) ⇒
+     no_undefined_vars (s |+ ((y,q),THE(FLOOKUP s (x,p))), c)) ∧
+  (∀s p b q c.
+     no_undefined_vars (s, Sel p b q c) ⇒ no_undefined_vars (s,c)) ∧
+  (∀s p v c1 c2.
+     no_undefined_vars (s, IfThen v p c1 c2) ⇒
+     no_undefined_vars (s, c1) ∧ no_undefined_vars (s, c2))
+Proof
+  rw[no_undefined_vars_def,free_variables_def,SUBSET_INSERT_DELETE]
+QED
+
+Theorem no_undefined_vars_com = CONJUNCTS no_undefined_vars_simps |> el 1
+Theorem no_undefined_vars_sel = CONJUNCTS no_undefined_vars_simps |> el 2
+Theorem no_undefined_vars_if  = CONJUNCTS no_undefined_vars_simps |> el 3
+
+Theorem rooted_step:
+  ∀ψ p q.
+    iforest_can_act ψ q ∧ rooted (iforest_step ψ q) p ⇒ rooted ψ p
+Proof
+  rw[] \\ Cases_on ‘iforest_can_act ψ p’
+  \\ metis_tac[rooted_rules]
+QED
 
 Theorem chor_iforest_all_rooted:
-  ∀c st q.
+  ∀c st.
     no_undefined_vars (st,c) ∧
-    no_self_comunication c ∧
-    compile_network_ok st c (procsOf c)
+    no_self_comunication c
     ⇒ all_rooted (chor_iforest c st)
 Proof
-  let
-      val split_cases = chor_simp
-                        \\ Cases_on ‘split_sel p s c0’
-                        \\ Cases_on ‘split_sel p s c'’
-                        \\ TRY (Cases_on ‘x’)
-                        \\ TRY (Cases_on ‘x'’)
-                        \\ rw[] \\ gs[]
-  in
   simp[all_rooted_def,chor_iforest_itrees_eq_procOf]
-  \\ rw[compile_network_ok_project_ok]
-  \\ first_x_assum drule
-  \\ Cases_on ‘c’ \\ rw[]
+  \\ Induct \\ rw[]
   (* Nil *)
-  >- chor_simp
+  >- iforest_simp
   (* If *)
   >- (drule chor_iforest_split \\ disch_then (ONCE_REWRITE_TAC o single)
       \\ gs[procsOf_def,nub'_def,nub'_procsOf,nub'_APPEND] \\ rveq
@@ -212,15 +249,45 @@ Proof
           \\ drule no_undefined_FLOOKUP_if
           \\ iforest_simp)
       >- (drule (MEM_FILTER |> SPEC_ALL |> EQ_IMP_RULE |> fst |> GEN_ALL) \\ rw[]
-          \\ chor_simp
-          \\ split_cases
-          >- (FULL_CASE_TAC \\ gs[] \\ cheat)
-          >- (FULL_CASE_TAC \\ gs[]
-              \\ FULL_CASE_TAC \\ gs[]
-              \\ cheat))
+          \\ iforest_simp \\ cheat)
       >- cheat)
+  (* Com *)
+  >- (iforest_simp
+      >-(irule rooted_can_act \\ iforest_simp)
+      >-(irule rooted_one_step
+         \\ conj_tac >- iforest_simp
+         \\ qexists_tac ‘s2’
+         \\ iforest_simp
+         \\ irule rooted_can_act
+         \\ iforest_simp)
+      >- (irule rooted_step
+          \\ qexists_tac ‘s2’
+          \\ conj_tac >- iforest_simp
+          \\ iforest_simp
+          \\ irule rooted_step
+          \\ qexists_tac ‘s0’
+          \\ conj_tac >- iforest_simp
+          \\ iforest_simp
+          \\ drule no_undefined_vars_com \\ strip_tac
+          \\ first_x_assum drule
+          \\ disch_then (qspec_then ‘p’ mp_tac)
+          \\ impl_tac
+          >- gs[MEM_FILTER,nub'_procsOf,no_self_comunication_def]
+          \\ iforest_simp
+          \\ cheat)
+      >- (drule no_undefined_FLOOKUP_com \\ rw[]
+          \\ drule lookup_projectS \\ rw[])
+      >- (drule no_undefined_FLOOKUP_com \\ rw[]
+          \\ drule lookup_projectS \\ rw[])
+      >- (drule no_undefined_FLOOKUP_com \\ rw[]
+          \\ drule lookup_projectS \\ rw[])
+      >-(irule rooted_can_act \\ iforest_simp)
+      >- gs[no_self_comunication_def]
+      >- (drule no_undefined_FLOOKUP_com \\ rw[]
+          \\ drule lookup_projectS \\ rw[])
+      >- (drule no_undefined_FLOOKUP_com \\ rw[]
+          \\ drule lookup_projectS \\ rw[]))
   \\ cheat
-  end
 QED
 
 Theorem chor_iforest_always_rooted:
