@@ -185,6 +185,7 @@ val iforest_thm = [ iforest_can_act_def
                   , iforest_itrees_def
                   , iforest_get_def
                   , iforest_set_def
+                  , iforest_del_def
                   , iforest_step_def
                   , iforest_upd_def
                   , FLOOKUP_UPDATE
@@ -192,9 +193,9 @@ val iforest_thm = [ iforest_can_act_def
                   , chor_forest_def
                   , chor_itree_def
                   , libTheory.the_def
-                  ]
+                  ] @ itree_thms
 
-val iforest_simp = rw (iforest_thm @ itree_thms) \\ gs (iforest_thm @ itree_thms)
+val iforest_simp = rw iforest_thm \\ gs iforest_thm
 
 Triviality project_split_eq:
   ∀ c c' p dvars.
@@ -232,8 +233,51 @@ Proof
   \\ metis_tac[rooted_rules]
 QED
 
+Theorem chor_forest_st_idem:
+  ∀c s p x v l.
+    ¬ MEM p l ⇒
+    chor_forest c (s |+ ((x,p),v)) l = chor_forest c s l
+Proof
+  rw[] \\ Induct_on ‘l’ \\ rw[chor_forest_def]
+  \\ first_x_assum drule \\ rw[projectS_def]
+QED
+
+Theorem chor_forest_com_idem:
+  ∀c s p q x y l.
+  ¬ MEM p l ∧ ¬ MEM q l
+  ⇒ chor_forest (Com p x q y c) s l = chor_forest c s l
+Proof
+  rw[] \\ Induct_on ‘l’ \\ rw[chor_forest_def]
+  \\ first_x_assum (drule_then drule) \\ rw[]
+  \\ rw[chor_itree_def]
+QED
+
+Theorem chor_forest_FUPDATE:
+  ∀c s l p it.
+    chor_forest c s l |+ (p,it) = chor_forest c s (FILTER (λy. p ≠ y) l) |+ (p,it)
+Proof
+  rw [] \\ Induct_on ‘l’ \\ rw[chor_forest_def]
+  >- metis_tac [FUPDATE_COMMUTES]
+  \\ rw[FUPDATE_EQ]
+QED
+
+Theorem chor_forest_FDOM:
+  ∀c s l.
+    FDOM (chor_forest c s l) = set l
+Proof
+  rw [] \\ Induct_on ‘l’ \\ rw[chor_forest_def]
+QED
+
+
+Theorem MEM_procsOf_chor_itree:
+  ∀c p s. ¬ MEM p (procsOf c) ∧ dvarsOf c = [] ⇒ chor_itree p s c = Ret End
+Proof
+  rw[] \\ Induct_on ‘c’ \\ itree_simp \\ gs[MEM_FILTER,chor_itree_merge_def]
+QED
+
 Theorem chor_iforest_all_rooted:
   ∀c st.
+    dvarsOf c = [] ∧
     no_undefined_vars (st,c) ∧
     no_self_comunication c
     ⇒ all_rooted (chor_iforest c st)
@@ -252,41 +296,135 @@ Proof
           \\ iforest_simp \\ cheat)
       >- cheat)
   (* Com *)
-  >- (iforest_simp
-      >-(irule rooted_can_act \\ iforest_simp)
-      >-(irule rooted_one_step
-         \\ conj_tac >- iforest_simp
-         \\ qexists_tac ‘s2’
-         \\ iforest_simp
-         \\ irule rooted_can_act
-         \\ iforest_simp)
-      >- (irule rooted_step
-          \\ qexists_tac ‘s2’
-          \\ conj_tac >- iforest_simp
-          \\ iforest_simp
-          \\ irule rooted_step
-          \\ qexists_tac ‘s0’
-          \\ conj_tac >- iforest_simp
-          \\ iforest_simp
-          \\ drule no_undefined_vars_com \\ strip_tac
-          \\ first_x_assum drule
-          \\ disch_then (qspec_then ‘p’ mp_tac)
-          \\ impl_tac
-          >- gs[MEM_FILTER,nub'_procsOf,no_self_comunication_def]
-          \\ iforest_simp
-          \\ cheat)
+  >- (rw iforest_thm
+      >-(gs[procsOf_def,nub'_def] \\ rveq
+         >-(irule rooted_can_act \\ iforest_simp)
+         >-(irule rooted_one_step
+            \\ conj_tac >- iforest_simp
+            \\ qexists_tac ‘s2’
+            \\ iforest_simp
+            \\ irule rooted_can_act
+            \\ iforest_simp)
+         >- (irule rooted_step
+             \\ qexists_tac ‘s2’
+             \\ conj_tac >- iforest_simp
+             \\ rw iforest_thm
+             \\ irule rooted_step
+             \\ qexists_tac ‘s0’
+             \\ conj_tac >- iforest_simp
+             \\ rw iforest_thm
+             \\ drule no_undefined_vars_com \\ strip_tac
+             \\ gs[dvarsOf_def,nub'_dvarsOf]
+             \\ first_x_assum drule
+             \\ disch_then (qspec_then ‘p’ mp_tac)
+             \\ impl_tac
+             >- gs[MEM_FILTER,nub'_procsOf,no_self_comunication_def]
+             \\ Cases_on ‘MEM s0 (procsOf c)’
+             \\ Cases_on ‘MEM s2 (procsOf c)’
+             >- (dxrule chor_iforest_split \\ disch_then (ONCE_REWRITE_TAC o single)
+                 \\ dxrule chor_iforest_split \\ disch_then (ONCE_REWRITE_TAC o single)
+                 \\ iforest_simp \\ iforest_simp
+                 \\ pop_assum (assume_tac o ONCE_REWRITE_RULE [chor_forest_FUPDATE])
+                 \\ gs [FILTER_FILTER,MEM_FILTER]
+                 \\ gs [FUPDATE_COMMUTES]
+                 \\ qpat_assum ‘s2 ≠ s0’ (assume_tac o GSYM)
+                 \\ dxrule_then (fn t => pop_assum (assume_tac o ONCE_REWRITE_RULE [t])) FUPDATE_COMMUTES
+                 \\ pop_assum (assume_tac o ONCE_REWRITE_RULE [chor_forest_FUPDATE])
+                 \\ gs[FILTER_FILTER]
+                 \\ qmatch_asmsub_abbrev_tac ‘rooted a p’
+                 \\ qmatch_goalsub_abbrev_tac ‘rooted b p’
+                 \\ ‘b = a’ suffices_by simp []
+                 \\ UNABBREV_ALL_TAC
+                 \\ simp[iforest_component_equality]
+                 \\ qmatch_goalsub_abbrev_tac ‘a1 |+ b1 |+ c1 = a2 |+ b2 |+ c2’
+                 \\ ‘a1 = a2 ∧ b1 = b2 ∧ c1 = c2’ suffices_by simp[]
+                 \\ UNABBREV_ALL_TAC \\ rw[]
+                 >- (rw [chor_forest_com_idem,chor_forest_st_idem,MEM_FILTER]
+                     \\ AP_TERM_TAC
+                     \\ rw [FILTER_EQ]
+                     \\ metis_tac [])
+                 >- rw[projectS_def]
+                 >- metis_tac[projectS_fupdate,no_undefined_FLOOKUP_com,lookup_projectS])
+             >- (gs[FUPDATE_COMMUTES]
+                 \\ dxrule chor_iforest_split \\ disch_then (ONCE_REWRITE_TAC o single)
+                 \\ iforest_simp
+                 \\ pop_assum (assume_tac o ONCE_REWRITE_RULE [chor_forest_FUPDATE])
+                 \\ drule MEM_procsOf_chor_itree \\ rw[]
+                 \\ irule rooted_step
+                 \\ qexists_tac ‘s2’
+                 \\ conj_tac >- iforest_simp
+                 \\ iforest_simp
+                 \\ gs [FILTER_FILTER,MEM_FILTER,DOMSUB_FUPDATE_NEQ]
+                 \\ qmatch_asmsub_abbrev_tac ‘rooted a p’
+                 \\ qmatch_goalsub_abbrev_tac ‘rooted b p’
+                 \\ ‘b = a’ suffices_by simp []
+                 \\ UNABBREV_ALL_TAC
+                 \\ simp[iforest_component_equality]
+                 \\ qmatch_goalsub_abbrev_tac ‘a1 |+ b1 = a2 |+ b2’
+                 \\ ‘a1 = a2 ∧ b1 = b2’ suffices_by simp[]
+                 \\ UNABBREV_ALL_TAC \\ rw[]
+                 >- (rw [chor_forest_com_idem,chor_forest_st_idem,MEM_FILTER]
+                     \\ irule EQ_TRANS \\ irule_at Any DOMSUB_NOT_IN_DOM
+                     \\ rw[chor_forest_FDOM,MEM_FILTER]
+                     \\ AP_TERM_TAC
+                     \\ rw[FILTER_EQ] \\ metis_tac [])
+                 >- (metis_tac[projectS_fupdate,no_undefined_FLOOKUP_com,lookup_projectS]))
+             >- (gs[FUPDATE_COMMUTES]
+                 \\ dxrule chor_iforest_split \\ disch_then (ONCE_REWRITE_TAC o single)
+                 \\ iforest_simp
+                 \\ pop_assum (assume_tac o ONCE_REWRITE_RULE [chor_forest_FUPDATE])
+                 \\ drule MEM_procsOf_chor_itree \\ rw[]
+                 \\ irule rooted_step
+                 \\ qexists_tac ‘s0’
+                 \\ conj_tac >- iforest_simp
+                 \\ iforest_simp
+                 \\ gs [FILTER_FILTER,MEM_FILTER,DOMSUB_FUPDATE_NEQ]
+                 \\ qmatch_asmsub_abbrev_tac ‘rooted a p’
+                 \\ qmatch_goalsub_abbrev_tac ‘rooted b p’
+                 \\ ‘b = a’ suffices_by simp []
+                 \\ UNABBREV_ALL_TAC
+                 \\ simp[iforest_component_equality]
+                 \\ qmatch_goalsub_abbrev_tac ‘a1 |+ b1 = a2 |+ b2’
+                 \\ ‘a1 = a2 ∧ b1 = b2’ suffices_by simp[]
+                 \\ UNABBREV_ALL_TAC \\ rw[]
+                 >- (rw [chor_forest_com_idem,chor_forest_st_idem,MEM_FILTER]
+                     \\ irule EQ_TRANS \\ irule_at Any DOMSUB_NOT_IN_DOM
+                     \\ rw[chor_forest_FDOM,MEM_FILTER]
+                     \\ AP_TERM_TAC
+                     \\ rw[FILTER_EQ] \\ metis_tac [])
+                 >- rw[projectS_def])
+             >- (gs[FUPDATE_COMMUTES]
+                 \\ qpat_assum ‘¬MEM s0 _’ (mp_then Any mp_tac MEM_procsOf_chor_itree)
+                 \\ disch_then (simp o single)
+                 \\ qpat_assum ‘¬MEM s2 _’ (mp_then Any mp_tac MEM_procsOf_chor_itree)
+                 \\ disch_then (simp o single)
+                 \\ rw[]
+                 \\ irule rooted_step
+                 \\ qexists_tac ‘s0’
+                 \\ iforest_simp
+                 \\ gs [DOMSUB_FUPDATE_NEQ]
+                 \\ irule rooted_step
+                 \\ qexists_tac ‘s2’
+                 \\ iforest_simp
+                 \\ gs [FILTER_FILTER,MEM_FILTER]
+                 \\ qmatch_asmsub_abbrev_tac ‘rooted a p’
+                 \\ qmatch_goalsub_abbrev_tac ‘rooted b p’
+                 \\ ‘b = a’ suffices_by simp []
+                 \\ UNABBREV_ALL_TAC
+                 \\ simp[iforest_component_equality]
+                 \\ rw [chor_forest_com_idem,chor_forest_st_idem,MEM_FILTER]
+                 \\ irule EQ_TRANS \\ irule_at Any DOMSUB_NOT_IN_DOM
+                 \\ rw[chor_forest_FDOM,MEM_FILTER]
+                 \\ irule EQ_TRANS \\ irule_at Any DOMSUB_NOT_IN_DOM
+                 \\ rw[chor_forest_FDOM,MEM_FILTER]
+                 \\ AP_TERM_TAC
+                 \\ rw[FILTER_EQ_ID,EVERY_MEM]
+                 \\ CCONTR_TAC \\ gs[])))
       >- (drule no_undefined_FLOOKUP_com \\ rw[]
-          \\ drule lookup_projectS \\ rw[])
-      >- (drule no_undefined_FLOOKUP_com \\ rw[]
-          \\ drule lookup_projectS \\ rw[])
-      >- (drule no_undefined_FLOOKUP_com \\ rw[]
-          \\ drule lookup_projectS \\ rw[])
-      >-(irule rooted_can_act \\ iforest_simp)
+          \\ drule lookup_projectS \\ gs[])
       >- gs[no_self_comunication_def]
       >- (drule no_undefined_FLOOKUP_com \\ rw[]
-          \\ drule lookup_projectS \\ rw[])
-      >- (drule no_undefined_FLOOKUP_com \\ rw[]
-          \\ drule lookup_projectS \\ rw[]))
+          \\ drule lookup_projectS \\ gs[]))
   \\ cheat
 QED
 
