@@ -441,8 +441,8 @@ Inductive to_chor_forest:
 [~init:]
   (∀c s. to_chor_forest c (chor_iforest c s)) ∧
 [~step:]
-  (∀c.
-     (iforest_itrees ψ ≠ {}) ∧
+  (∀c p.
+     MEM p (procsOf c) ∧ iforest_can_act ψ p ∧
      (∀p. p ∈ iforest_itrees ψ ⇒ to_chor_forest c (iforest_step ψ p)) ⇒
      to_chor_forest c ψ)
 End
@@ -468,6 +468,45 @@ Proof
   >- (Cases_on ‘p ∈ iforest_itrees (chor_iforest c s)’
       >- fs[iforest_step_to_chor_forest,chor_iforest_itrees_eq_procOf]
       >- (iforest_simp \\ simp[FLOOKUP_DEF]))
+QED
+
+Theorem iforest_steps_IMP_Res:
+  ∀f s res.
+    iforest_steps f s res ⇒
+    ∀c p.
+      set (procsOf c) ⊆ s ∧ to_chor_forest c f ∧ MEM p (procsOf c) ⇒
+      EXISTS (λ(q,a). p = q ∧ ∃t. a = Res t) res
+Proof
+  Induct_on ‘iforest_steps’ \\ rpt strip_tac
+  >- (gvs [SUBSET_DEF]
+      \\ fs [Once to_chor_forest_cases]
+      >- metis_tac [iforest_can_act_exists]
+      \\ metis_tac [])
+  \\ gvs []
+  \\ rewrite_tac [METIS_PROVE [] “b ∨ c ⇔ ~b ⇒ c”]
+  \\ strip_tac
+  \\ first_x_assum irule
+  \\ irule_at Any SUBSET_TRANS
+  \\ first_x_assum $ irule_at $ Pos $ el 2
+  \\ irule_at Any iforest_step_preserves_to_chor_forest
+  \\ first_x_assum $ irule_at $ Pos hd \\ fs []
+QED
+
+Theorem chor_iforest_deadlock_freedom:
+  ∀procs c s.
+    fair_trace (set (procsOf c)) procs
+    ⇒ deadlock_freedom (set (procsOf c)) (iforest (chor_iforest c s) procs)
+Proof
+  simp [deadlock_freedom_def]
+  \\ rpt gen_tac \\ strip_tac
+  \\ conj_asm1_tac
+  >- cheat (* actions_end (iforest (chor_iforest ...)) *)
+  \\ CCONTR_TAC \\ fs []
+  \\ drule_all LFINITE_iforest
+  \\ strip_tac \\ fs [exists_fromList]
+  \\ drule iforest_steps_IMP_Res \\ simp []
+  \\ irule_at Any to_chor_forest_init
+  \\ first_x_assum $ irule_at Any \\ fs []
 QED
 
 Theorem chor_iforest_always_rooted:
