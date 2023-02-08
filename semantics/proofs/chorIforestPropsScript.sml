@@ -199,6 +199,7 @@ val iforest_thm = [ iforest_can_act_def
                   ] @ itree_thms
 
 val iforest_simp = rw iforest_thm \\ gs iforest_thm
+fun iforest_tac t = rw (iforest_thm @ t) \\ gs (iforest_thm @ t)
 
 Triviality project_split_eq:
   ∀ c c' p dvars.
@@ -453,10 +454,17 @@ End
 
 Theorem iforest_step_to_chor_forest:
   ∀c s p.
+    (* dvarsOf c = [] ∧ *)
+    (* no_undefined_vars (s,c) ∧ *)
+    (* no_self_comunication c ∧ *)
     MEM p (procsOf c) ⇒
     to_chor_forest (iforest_step (chor_iforest c s) p)
 Proof
-  cheat
+  Induct \\ rw[]
+  >- iforest_simp
+  >- cheat (* If *)
+  >- (gs[procsOf_def,nub'_def,nub'_APPEND,nub'_procsOf,dvarsOf_def] \\ cheat)
+  \\ cheat
 QED
 
 Theorem iforest_step_skip:
@@ -543,10 +551,32 @@ Definition finally_empty_def:
     ∀ψ'. iforest_run ψ ψ' ⇒ iforest_itrees ψ' = ∅
 End
 
+Theorem from_chor_finally_empty:
+  from_chor_forest c ψ ⇒ finally_empty ψ
+Proof
+  rw[finally_empty_def]
+  \\ last_x_assum mp_tac
+  \\ qid_spec_tac ‘c’
+  \\ pop_assum mp_tac
+  \\ MAP_EVERY qid_spec_tac [‘ψ'’,‘ψ’]
+  \\ ho_match_mp_tac iforest_run_ind
+  \\ rw[]
+  >- (last_x_assum mp_tac
+      \\ pop_assum mp_tac
+      \\ MAP_EVERY qid_spec_tac [‘ψ’,‘c’]
+      \\ ho_match_mp_tac from_chor_forest_ind
+      \\ rw[]
+      >- cheat (* Should be true *)
+      >- cheat) (* Not true *)
+  >- (first_x_assum irule
+      \\ irule_at Any from_chor_forest_step
+      \\ metis_tac [])
+QED
+
 Theorem finally_empty_chor_iforest:
   finally_empty (chor_iforest c s)
 Proof
-  cheat
+  metis_tac[from_chor_finally_empty,from_chor_forest_init]
 QED
 
 Theorem finally_empty_thm:
