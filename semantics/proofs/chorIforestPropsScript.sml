@@ -527,6 +527,77 @@ Proof
   \\ fs [chor_iforest_itrees_eq_procOf]
 QED
 
+Inductive iforest_run:
+  (∀ψ.
+    (∀p. ¬iforest_can_act ψ p) ⇒
+    iforest_run ψ ψ) ∧
+  (∀ψ p res.
+    iforest_can_act ψ p ∧
+    iforest_run (iforest_step ψ p) res ⇒
+    iforest_run ψ res)
+End
+
+Definition finally_empty_def:
+  finally_empty ψ ⇔
+    (* every terminating run results in an empty forest *)
+    ∀ψ'. iforest_run ψ ψ' ⇒ iforest_itrees ψ' = ∅
+End
+
+Theorem finally_empty_chor_iforest:
+  finally_empty (chor_iforest c s)
+Proof
+  cheat
+QED
+
+Theorem finally_empty_thm:
+  ∀f res.
+    iforest_steps f res ⇒
+    ∀c p.
+      finally_empty f ∧ p ∈ iforest_itrees f ⇒
+      EXISTS (λ(q,a). p = q ∧ ∃t. a = Res t) res
+Proof
+  Induct_on ‘iforest_steps’ \\ rpt strip_tac
+  >- (fs [finally_empty_def]
+      \\ first_x_assum $ qspec_then ‘f’ mp_tac
+      \\ impl_tac >- simp [Once iforest_run_cases]
+      \\ fs [EXTENSION] \\ pop_assum $ irule_at Any)
+  \\ gvs []
+  \\ rewrite_tac [METIS_PROVE [] “b ∨ c ⇔ ~b ⇒ c”]
+  \\ strip_tac
+  \\ first_x_assum irule
+  \\ conj_tac
+  >-
+   (fs [finally_empty_def] \\ rw []
+    \\ first_x_assum irule
+    \\ simp [Once iforest_run_cases]
+    \\ metis_tac [])
+  \\ pairarg_tac \\ fs []
+  \\ iforest_simp \\ fs [FLOOKUP_DEF]
+  \\ Cases_on ‘p' = q’ \\ gvs []
+  \\ every_case_tac \\ gvs [iforest_get_def,FLOOKUP_DEF]
+  \\ CCONTR_TAC \\ gvs []
+  \\ gvs [iforest_act_def,iforest_get_def,FLOOKUP_DEF]
+QED
+
+Theorem chor_iforest_deadlock_freedom:
+  ∀procs c s.
+    fair_trace (set (procsOf c)) procs
+    ⇒ deadlock_freedom (set (procsOf c)) (iforest (chor_iforest c s) procs)
+Proof
+  simp [deadlock_freedom_def]
+  \\ rpt gen_tac \\ strip_tac
+  \\ conj_asm1_tac
+  >- simp [iforestTheory.actions_end_iforest]
+  \\ CCONTR_TAC \\ fs []
+  \\ ‘fair_trace (iforest_itrees (chor_iforest c s)) procs’ by
+        fs [chor_iforest_itrees_eq_procOf]
+  \\ drule_all LFINITE_iforest
+  \\ strip_tac \\ fs [exists_fromList]
+  \\ drule finally_empty_thm \\ simp []
+  \\ first_x_assum $ irule_at Any \\ fs []
+  \\ fs [chor_iforest_itrees_eq_procOf,finally_empty_chor_iforest]
+QED
+
 Theorem chor_iforest_always_rooted:
   ∀c st.
     no_undefined_vars (st,c) ∧
