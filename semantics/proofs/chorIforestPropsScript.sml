@@ -428,6 +428,48 @@ Proof
   \\ cheat
 QED
 
+Inductive from_chor_forest:
+[~init:]
+  (∀c s. from_chor_forest c (chor_iforest c s)) ∧
+[~step:]
+  (∀c p.
+      from_chor_forest c ψ ⇒
+      from_chor_forest c (iforest_step ψ p))
+End
+
+Inductive to_chor_forest:
+[~init:]
+  (∀c s. to_chor_forest c (chor_iforest c s)) ∧
+[~step:]
+  (∀c.
+     (iforest_itrees ψ ≠ {}) ∧
+     (∀p. p ∈ iforest_itrees ψ ⇒ to_chor_forest c (iforest_step ψ p)) ⇒
+     to_chor_forest c ψ)
+End
+
+Theorem iforest_step_to_chor_forest:
+  ∀c s p.
+    MEM p (procsOf c) ⇒
+    to_chor_forest c (iforest_step (chor_iforest c s) p)
+Proof
+  cheat
+QED
+
+Theorem iforest_step_preserves_to_chor_forest:
+  ∀c ψ. to_chor_forest c ψ ⇒ to_chor_forest c (iforest_step ψ p)
+Proof
+  rw[]
+  \\ first_assum mp_tac
+  \\ simp_tac std_ss [Once to_chor_forest_cases] \\ reverse (rw[])
+  >- (Cases_on ‘p ∈ iforest_itrees ψ’
+      >- metis_tac []
+      >- (gs[iforest_itrees_def]
+          \\ rw[iforest_step_def,iforest_get_def,FLOOKUP_DEF]))
+  >- (Cases_on ‘p ∈ iforest_itrees (chor_iforest c s)’
+      >- fs[iforest_step_to_chor_forest,chor_iforest_itrees_eq_procOf]
+      >- (iforest_simp \\ simp[FLOOKUP_DEF]))
+QED
+
 Theorem chor_iforest_always_rooted:
   ∀c st.
     no_undefined_vars (st,c) ∧
