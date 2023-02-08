@@ -50,13 +50,13 @@ end
 QED
 
 Inductive iforest_steps:
-  (∀ψ s.
-    (∀p. p ∈ s ⇒ ¬iforest_can_act ψ p) ⇒
-    iforest_steps ψ s []) ∧
-  (∀ψ s p res.
+  (∀ψ.
+    (∀p. ¬iforest_can_act ψ p) ⇒
+    iforest_steps ψ []) ∧
+  (∀ψ p res.
     iforest_can_act ψ p ∧
-    iforest_steps (iforest_step ψ p) s res ⇒
-    iforest_steps ψ s (iforest_act ψ p::res))
+    iforest_steps (iforest_step ψ p) res ⇒
+    iforest_steps ψ (iforest_act ψ p::res))
 End
 
 Triviality LNTH_every:
@@ -67,17 +67,16 @@ Proof
 QED
 
 Theorem LFINITE_iforest:
-  LFINITE (iforest f trace) ∧ fair_trace s trace ⇒
+  LFINITE (iforest f trace) ∧ fair_trace (iforest_itrees f) trace ⇒
   ∃res.
     iforest f trace = fromList res ∧
-    iforest_steps f s res
+    iforest_steps f res
 Proof
   strip_tac
   \\ dxrule LFINITE_IMP_fromList
   \\ strip_tac \\ fs []
   \\ pop_assum mp_tac
   \\ pop_assum mp_tac
-  \\ qid_spec_tac ‘s’
   \\ qid_spec_tac ‘trace’
   \\ qid_spec_tac ‘f’
   \\ qid_spec_tac ‘l’
@@ -89,6 +88,7 @@ Proof
    (gvs [next_proc_def,AllCaseEqs()] \\ rw []
     \\ dxrule iforestTheory.LDROP_WHILE_EQ_NIL
     \\ gvs [fair_trace_def] \\ rw [] \\ CCONTR_TAC \\ fs []
+    \\ imp_res_tac iforest_can_act_in_itrees
     \\ last_x_assum drule
     \\ once_rewrite_tac [llistTheory.always_cases]
     \\ once_rewrite_tac [llistTheory.always_cases]
@@ -101,9 +101,12 @@ Proof
   \\ gvs [next_proc_def,AllCaseEqs()]
   \\ irule_at (Pos hd) (METIS_PROVE [] “T ⇒ x = x”) \\ fs []
   \\ last_x_assum $ irule_at Any
-  \\ pop_assum $ irule_at Any
+  \\ last_x_assum $ irule_at Any
   \\ drule iforestTheory.LDROP_WHILE_EQ_CONS
   \\ strip_tac \\ gvs []
+  \\ irule fair_trace_procs_subset
+  \\ irule_at Any iforest_itrees_mono_step \\ fs []
+  \\ imp_res_tac iforest_can_act_in_itrees \\ fs []
 QED
 
 Theorem exists_fromList:
@@ -459,7 +462,10 @@ QED
 Theorem iforest_step_skip:
   ¬iforest_can_act ψ p ⇒ iforest_step ψ p = ψ
 Proof
-  cheat
+  fs [iforest_can_act_def,iforest_step_def,AllCaseEqs()]
+  \\ Cases_on ‘iforest_get ψ p’ \\ fs []
+  \\ Cases_on ‘x’ \\ fs []
+  \\ fs [iforest_upd_def]
 QED
 
 Theorem iforest_step_preserves_to_chor_forest:
@@ -476,10 +482,10 @@ Proof
 QED
 
 Theorem iforest_steps_IMP_Res:
-  ∀f s res.
-    iforest_steps f s res ⇒
+  ∀f res.
+    iforest_steps f res ⇒
     ∀c p.
-      s = UNIV ∧ to_chor_forest f ∧ p ∈ iforest_itrees f ⇒
+      to_chor_forest f ∧ p ∈ iforest_itrees f ⇒
       EXISTS (λ(q,a). p = q ∧ ∃t. a = Res t) res
 Proof
   Induct_on ‘iforest_steps’ \\ rpt strip_tac
@@ -511,13 +517,14 @@ Proof
   \\ conj_asm1_tac
   >- simp [iforestTheory.actions_end_iforest]
   \\ CCONTR_TAC \\ fs []
+  \\ ‘fair_trace (iforest_itrees (chor_iforest c s)) procs’ by
+        fs [chor_iforest_itrees_eq_procOf]
   \\ drule_all LFINITE_iforest
   \\ strip_tac \\ fs [exists_fromList]
   \\ drule iforest_steps_IMP_Res \\ simp []
   \\ irule_at Any to_chor_forest_init
   \\ first_x_assum $ irule_at Any \\ fs []
   \\ fs [chor_iforest_itrees_eq_procOf]
-  \\ cheat
 QED
 
 Theorem chor_iforest_always_rooted:
