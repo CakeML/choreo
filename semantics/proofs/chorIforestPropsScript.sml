@@ -279,6 +279,102 @@ Proof
   rw[] \\ Induct_on ‘c’ \\ itree_simp \\ gs[MEM_FILTER,chor_itree_merge_def]
 QED
 
+Theorem iforest_step_update:
+  p ≠ q ⇒
+  iforest_step (f with forest := f.forest |+ (p,i)) q =
+  iforest_step f q with forest := (iforest_step f q).forest |+ (p,i)
+Proof
+  iforest_simp >>
+  rpt(PURE_FULL_CASE_TAC >> gvs[]) >>
+  rw[iforest_component_equality,fmap_eq_flookup,DOMSUB_FLOOKUP_THM,FLOOKUP_UPDATE] >>
+  rw[]
+QED
+
+Theorem rooted_Vis_switch_cont:
+  ∀f p a g h.
+  rooted f p ∧
+  FLOOKUP f.forest p = SOME(Vis a g)
+  ⇒
+  rooted (f with forest := f.forest |+ (p,Vis a h)) p
+Proof
+  Induct_on ‘rooted’ >>
+  rw[]
+  >- (match_mp_tac rooted_can_act >>
+      iforest_simp)
+  >- (‘p ≠ q’ by metis_tac[] >>
+      match_mp_tac rooted_one_step >>
+      qexists_tac ‘q’ >>
+      conj_tac >- iforest_simp >>
+      conj_tac >- iforest_simp >>
+      simp[iforest_step_update] >>
+      first_x_assum match_mp_tac >>
+      qexists_tac ‘g’ >>
+      iforest_simp >>
+      rpt(PURE_TOP_CASE_TAC >> gvs[]) >>
+      simp[DOMSUB_FLOOKUP_THM,FLOOKUP_UPDATE])
+QED
+
+Theorem rooted_merge:
+  ∀t1 t2 f p g h.
+   FLOOKUP f.forest p = SOME(chor_itree_merge t1 t2) ∧
+   rooted (f with forest := f.forest |+ (p,t1)) p ∧
+   rooted (f with forest := f.forest |+ (p,t2)) p
+   ⇒
+   rooted f p
+Proof
+  Cases
+  >- (rename1 ‘Ret x’ >> Cases_on ‘x’ >>
+      Cases
+      >- (rename1 ‘Ret x’ >> Cases_on ‘x’ >>
+          rw[chor_itree_merge_def] >>
+          match_mp_tac rooted_can_act >>
+          iforest_simp) >>
+      rw[chor_itree_merge_def]
+      >~ [‘FLOOKUP _.forest _ = SOME (Vis _ _)’]
+      >- (pop_assum mp_tac >>
+          match_mp_tac(DECIDE “(A = B) ⇒ (A ⇒ B)”) >>
+          rpt(AP_TERM_TAC ORELSE AP_THM_TAC) >>
+          rw[iforest_component_equality,fmap_eq_flookup,FLOOKUP_UPDATE] >>
+          rw[] >> rw[])
+      >~ [‘FLOOKUP _.forest _ = SOME (chor_itree_merge _ _)’]
+      >- (Cases_on ‘x’ >> gvs[chor_itree_merge_def] >>
+          match_mp_tac rooted_can_act >>
+          iforest_simp) >>
+      match_mp_tac rooted_can_act >>
+      iforest_simp)
+  >- (Cases
+      >- (rename1 ‘Ret x’ >> Cases_on ‘x’ >>
+          rw[chor_itree_merge_def] >>
+          match_mp_tac rooted_can_act >>
+          iforest_simp) >>
+      rw[chor_itree_merge_def] >>
+      match_mp_tac rooted_can_act >>
+      iforest_simp)
+  >- (Cases
+      >- (rename1 ‘Ret x’ >> Cases_on ‘x’ >>
+          rw[chor_itree_merge_def]
+          >~ [‘FLOOKUP _.forest _ = SOME (Vis _ _)’]
+          >- (qpat_x_assum ‘rooted (_ with forest := _.forest |+ (_,Vis _ _)) _’ mp_tac >>
+              match_mp_tac(DECIDE “(A = B) ⇒ (A ⇒ B)”) >>
+              rpt(AP_TERM_TAC ORELSE AP_THM_TAC) >>
+              rw[iforest_component_equality,fmap_eq_flookup,FLOOKUP_UPDATE] >>
+              rw[] >> rw[]) >>
+          match_mp_tac rooted_can_act >>
+          iforest_simp) >>
+      rw[chor_itree_merge_def]
+      >~ [‘FLOOKUP _.forest _ = SOME (Vis _ _)’]
+      >- (drule rooted_Vis_switch_cont >>
+          simp[FLOOKUP_UPDATE] >>
+          rename1 ‘FLOOKUP f.forest p = SOME (Vis a cont)’ >> (* destructive rename*)
+          disch_then (qspec_then ‘cont’ mp_tac) >>
+          match_mp_tac(DECIDE “(A = B) ⇒ (A ⇒ B)”) >>
+          rpt(AP_TERM_TAC ORELSE AP_THM_TAC) >>
+          rw[iforest_component_equality,fmap_eq_flookup,FLOOKUP_UPDATE] >>
+          rw[] >> rw[]) >>
+      match_mp_tac rooted_can_act >>
+      iforest_simp)
+QED
+
 Theorem chor_iforest_all_rooted:
   ∀c st.
     dvarsOf c = [] ∧
@@ -297,7 +393,20 @@ Proof
           \\ drule no_undefined_FLOOKUP_if
           \\ iforest_simp)
       >- (drule (MEM_FILTER |> SPEC_ALL |> EQ_IMP_RULE |> fst |> GEN_ALL) \\ rw[]
-          \\ iforest_simp \\ cheat)
+          \\ iforest_simp
+          >- (gvs[no_self_comunication_def]
+              \\ imp_res_tac (cj 3 no_undefined_vars_simps)
+              \\ last_x_assum $ drule_all_then assume_tac
+              \\ reverse $ Cases_on ‘MEM p (procsOf c')’
+              >- (gvs[MEM_procsOf_chor_itree]
+                  \\
+                  match_mp_tac rooted_merge >>
+                  simp[FLOOKUP_UPDATE] >>
+                  irule_at (Pos hd) EQ_REFL >>
+                  cheat)
+              \\ cheat)
+          >- cheat
+          >- gvs[no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP,lookup_projectS'])
       >- cheat)
   (* Com *)
   >- (rw iforest_thm
