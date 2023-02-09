@@ -506,13 +506,31 @@ Definition iforest_chor_upd_act_def:
   iforest_chor_upd_act ψ = (ψ.act = chor_iforest_act ∧ ψ.upd = chor_iforest_upd)
 End
 
-Theorem iforest_chor_upd_act_cong:
+Theorem iforest_chor_upd_act_iforest_cong:
   ∀ψ. iforest_chor_upd_act ψ ⇒ iforest_cong ψ
 Proof
   rw[iforest_chor_upd_act_def,iforest_cong_def,non_interference_def]
-  \\ gvs[IS_SOME_DEF] \\ cheat
+  \\ gvs[IS_SOME_EXISTS]
+  \\ Cases_on ‘e1’ \\ Cases_on ‘e2’
+  \\ gvs[FLOOKUP_UPDATE,CaseEq"option",CaseEq"list",DOMSUB_FLOOKUP_NEQ,FUPDATE_COMMUTES]
+  \\ TRY (IF_CASES_TAC \\ gs[libTheory.the_def] \\ NO_TAC)
+  \\ TRY (CASE_TAC \\ gs[]
+          \\ CASE_TAC \\ gs[DOMSUB_FLOOKUP_NEQ]
+          \\ CASE_TAC \\ gs[DOMSUB_FLOOKUP_NEQ,FLOOKUP_UPDATE] \\ NO_TAC)
 QED
 
+Theorem iforest_cong_can_act_step:
+  ∀ψ p q.
+    iforest_cong ψ ∧
+    p ≠ q ∧
+    iforest_can_act ψ p ⇒
+    iforest_can_act (iforest_step ψ q) p
+Proof
+  rw[iforest_cong_def,non_interference_def]
+  \\ iforest_simp \\ EVERY_CASE_TAC
+  \\ gvs[DOMSUB_FLOOKUP_NEQ,FLOOKUP_UPDATE]
+  \\ metis_tac []
+QED
 
 Theorem iforest_chor_act_swap:
   ∀ψ p q.
@@ -573,6 +591,12 @@ Definition iforest_steps_def:
                               else NONE
 End
 
+Theorem iforest_chor_upd_act_step_idem:
+  ∀ψ p. iforest_chor_upd_act ψ ⇔ iforest_chor_upd_act (iforest_step ψ p)
+Proof
+  iforest_tac [iforest_chor_upd_act_def] \\ EVERY_CASE_TAC \\ gvs[]
+QED
+
 Theorem iforest_steps_chor_swap:
   ∀l p ψ ψ'.
     iforest_chor_upd_act ψ ∧
@@ -583,7 +607,18 @@ Theorem iforest_steps_chor_swap:
     iforest_steps (p::l) ψ = SOME (iforest_step ψ' p)
 Proof
   Induct \\ rw[iforest_steps_def]
-  \\ cheat
+  >- (drule iforest_chor_upd_act_iforest_cong \\ strip_tac
+      \\ qpat_x_assum ‘_ ≠ _’ (assume_tac o GSYM)
+      \\ drule_all iforest_cong_can_act_step
+      \\ simp[])
+  \\ drule_all_then (mp_tac o GSYM) iforest_chor_act_swap
+  \\ rw[]
+  \\ qsuff_tac ‘iforest_steps (p::l) (iforest_step ψ h) =
+      SOME (iforest_step ψ' p)’
+  >- simp[iforest_steps_def]
+  \\ metis_tac [ iforest_chor_upd_act_step_idem
+               , iforest_cong_can_act_step
+               , iforest_chor_upd_act_iforest_cong]
 QED
 
 Inductive from_chor_forest:
@@ -628,17 +663,6 @@ Proof
   cheat
 QED
 
-Theorem MEM_split:
-  ∀x l. MEM x l ⇒ ∃l1 l2. l = l1 ++ x::l2 ∧ ¬MEM x l1
-Proof
-  Induct_on ‘l’ \\ fs [] \\ rw []
-  >- (qexists_tac ‘[]’ \\ fs [])
-  \\ res_tac \\ gvs []
-  \\ Cases_on ‘x = h’ \\ gvs []
-  >- (qexists_tac ‘[]’ \\ fs [])
-  \\ qexists_tac ‘h::l1’ \\ gvs []
-QED
-
 Theorem iforest_steps_APPEND:
   iforest_steps (x++y) ψ = SOME ψ' ⇔
     ∃ψ''. iforest_steps x ψ = SOME ψ'' ∧ iforest_steps y ψ'' = SOME ψ'
@@ -664,11 +688,10 @@ Proof
       \\ drule chor_steps_chor
       \\ fs[] \\ strip_tac
       \\ qexists_tac ‘l ++ l'’
-      \\ ONCE_REWRITE_TAC [GSYM APPEND]
-      \\ gs[iforest_steps_APPEND]
-      \\ irule_at Any EQ_REFL)
-  >- (drule MEM_split \\ rw[]
-      \\ qexists_tac ‘l1++l2’
+      \\ metis_tac [GSYM APPEND,iforest_steps_APPEND])
+  >- (pop_assum (mp_tac o ONCE_REWRITE_RULE [MEM_SPLIT_APPEND_first])
+      \\ rw[]
+      \\ qexists_tac ‘pfx++sfx’
       \\ qexistsl_tac [‘c’,‘s’]
       \\ ONCE_REWRITE_TAC [GSYM APPEND]
       \\ REWRITE_TAC [iforest_steps_APPEND]
