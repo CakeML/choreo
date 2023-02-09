@@ -828,14 +828,14 @@ QED
 Theorem iforest_chor_upd_act_chor_iforest:
   iforest_chor_upd_act (chor_iforest c s)
 Proof
-  cheat
+  iforest_tac [iforest_chor_upd_act_def]
 QED
 
 Theorem iforest_chor_upd_act_iforest_step:
   iforest_chor_upd_act s ⇒
   iforest_chor_upd_act (iforest_step s p)
 Proof
-  cheat
+  simp[iforest_chor_upd_act_step_idem]
 QED
 
 Theorem ifrest_run_inv:
