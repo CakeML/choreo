@@ -375,6 +375,16 @@ Proof
       iforest_simp)
 QED
 
+Theorem chor_itree_merge_Ret_End:
+  chor_itree_merge it (Ret End) =
+  if it = Ret End ∨ it = Ret Done then Ret End
+  else Ret Unproj
+Proof
+  Cases_on ‘it’ >> rw[] >> rw[chor_itree_merge_def] >>
+  rename1 ‘Ret x’ >> Cases_on ‘x’ >>
+  gvs[chor_itree_merge_def]
+QED
+
 Theorem chor_iforest_all_rooted:
   ∀c st.
     dvarsOf c = [] ∧
@@ -399,11 +409,16 @@ Proof
               \\ last_x_assum $ drule_all_then assume_tac
               \\ reverse $ Cases_on ‘MEM p (procsOf c')’
               >- (gvs[MEM_procsOf_chor_itree]
-                  \\ match_mp_tac rooted_merge
-                  \\ simp[FLOOKUP_UPDATE]
-                  \\ irule_at (Pos hd) EQ_REFL                  
-                  \\ cheat)
-              \\ cheat)
+                  \\ rw[chor_itree_merge_Ret_End]
+                  \\ match_mp_tac rooted_can_act
+                  \\ simp[iforest_can_act_def,iforest_get_def,FLOOKUP_UPDATE])
+              \\ last_x_assum $ drule_all_then assume_tac
+              \\ rw[Once rooted_cases]
+              \\ rw[DISJ_EQ_IMP]
+              \\ qexists_tac ‘s’
+              \\ iforest_simp
+              \\ cheat
+              )
           >- cheat
           >- gvs[no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP,lookup_projectS'])
       >- cheat)
