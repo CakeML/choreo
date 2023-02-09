@@ -399,11 +399,10 @@ Proof
               \\ last_x_assum $ drule_all_then assume_tac
               \\ reverse $ Cases_on ‘MEM p (procsOf c')’
               >- (gvs[MEM_procsOf_chor_itree]
-                  \\
-                  match_mp_tac rooted_merge >>
-                  simp[FLOOKUP_UPDATE] >>
-                  irule_at (Pos hd) EQ_REFL >>
-                  cheat)
+                  \\ match_mp_tac rooted_merge
+                  \\ simp[FLOOKUP_UPDATE]
+                  \\ irule_at (Pos hd) EQ_REFL                  
+                  \\ cheat)
               \\ cheat)
           >- cheat
           >- gvs[no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP,lookup_projectS'])
