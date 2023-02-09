@@ -555,6 +555,90 @@ Proof
   \\ cheat
 QED
 
+Definition iforest_chor_upd_act_def:
+  iforest_chor_upd_act ψ = (ψ.act = chor_iforest_act ∧ ψ.upd = chor_iforest_upd)
+End
+
+Theorem iforest_chor_upd_act_cong:
+  ∀ψ. iforest_chor_upd_act ψ ⇒ iforest_cong ψ
+Proof
+  rw[iforest_chor_upd_act_def,iforest_cong_def,non_interference_def]
+  \\ gvs[IS_SOME_DEF]
+QED
+
+
+Theorem iforest_chor_act_swap:
+  ∀ψ p q.
+    iforest_chor_upd_act ψ ∧
+    p ≠ q ∧
+    iforest_can_act ψ p ∧
+    iforest_can_act ψ q ⇒
+    (iforest_step (iforest_step ψ q) p) = (iforest_step (iforest_step ψ p) q)
+Proof
+  iforest_simp \\ EVERY_CASE_TAC
+  \\ gvs [iforest_component_equality,DOMSUB_FLOOKUP,DOMSUB_FLOOKUP_NEQ,DOMSUB_FLOOKUP_THM,FLOOKUP_UPDATE]
+  \\ TRY (rw [fmap_eq_flookup,DOMSUB_FLOOKUP,DOMSUB_FLOOKUP_NEQ,DOMSUB_FLOOKUP_THM,FLOOKUP_UPDATE]
+          \\ IF_CASES_TAC \\ rw[] \\ NO_TAC)
+  \\ gs[iforest_chor_upd_act_def]
+  >- (Cases_on ‘a’ \\ Cases_on ‘a'’
+      \\ gvs[FLOOKUP_UPDATE,CaseEq"option",CaseEq"list",DOMSUB_FLOOKUP_NEQ]
+      \\ Cases_on ‘xs’ \\ gvs[FLOOKUP_UPDATE,DOMSUB_FLOOKUP_NEQ])
+  >- (Cases_on ‘a’ \\ Cases_on ‘a'’
+      \\ gvs[FLOOKUP_UPDATE,CaseEq"option",CaseEq"list",DOMSUB_FLOOKUP_NEQ]
+      \\ TRY (Cases_on ‘s = p ∧ q = s'’ \\ gvs[] \\ NO_TAC)
+      \\ Cases_on ‘xs’ \\ gvs[FLOOKUP_UPDATE,DOMSUB_FLOOKUP_NEQ])
+  >- (Cases_on ‘a’ \\ Cases_on ‘a'’
+      \\ gvs[FLOOKUP_UPDATE,CaseEq"option",CaseEq"list",DOMSUB_FLOOKUP_NEQ]
+      \\ TRY (Cases_on ‘s' = q ∧ p = s’ \\ gvs[] \\ NO_TAC)
+      \\ Cases_on ‘xs''’ \\ gvs[FLOOKUP_UPDATE,DOMSUB_FLOOKUP_NEQ])
+  >- (Cases_on ‘a’ \\ Cases_on ‘a'’
+      \\ gvs[FLOOKUP_UPDATE,CaseEq"option",CaseEq"list",DOMSUB_FLOOKUP_NEQ,FUPDATE_COMMUTES]
+      >- (Cases_on ‘s = p ∧ q = s'’ \\ gvs[libTheory.the_def]
+          >-(Cases_on ‘xs'’ \\ gvs[libTheory.the_def,FLOOKUP_UPDATE])
+          >- (Cases_on ‘xs’
+              \\ gvs[libTheory.the_def,FLOOKUP_UPDATE,DOMSUB_FUPDATE_NEQ,DOMSUB_FLOOKUP_NEQ,FUPDATE_COMMUTES]
+              \\ metis_tac []))
+      \\ TRY (Cases_on ‘s = p ∧ q = s'’ \\ gvs[libTheory.the_def]
+              >-(Cases_on ‘xs'’ \\ gvs[libTheory.the_def,FLOOKUP_UPDATE])
+              >- (Cases_on ‘xs’
+                  \\ gvs[libTheory.the_def,FLOOKUP_UPDATE,DOMSUB_FUPDATE_NEQ
+                        ,DOMSUB_FLOOKUP_NEQ,FUPDATE_COMMUTES]
+                  \\ metis_tac [])
+              \\ NO_TAC)
+      \\ TRY (Cases_on ‘s' = q ∧ p = s’ \\ gvs[libTheory.the_def]
+              >-(Cases_on ‘xs’ \\ gvs[libTheory.the_def,FLOOKUP_UPDATE])
+              >- (Cases_on ‘xs’
+                  \\ gvs[libTheory.the_def,FLOOKUP_UPDATE
+                         ,DOMSUB_FUPDATE_NEQ,DOMSUB_FLOOKUP_NEQ,FUPDATE_COMMUTES]
+                  \\ metis_tac [])
+              \\ NO_TAC)
+      \\ TRY (Cases_on ‘xs’ \\ gvs[DOMSUB_FLOOKUP_NEQ,FLOOKUP_UPDATE]
+              \\ Cases_on ‘xs'’ \\  gvs[DOMSUB_FLOOKUP_NEQ,FLOOKUP_UPDATE]
+              \\ rw [fmap_eq_flookup,DOMSUB_FLOOKUP,DOMSUB_FLOOKUP_NEQ,DOMSUB_FLOOKUP_THM,FLOOKUP_UPDATE]
+              \\ IF_CASES_TAC \\ rw[]
+              \\ NO_TAC))
+QED
+
+Definition iforest_steps_def:
+  iforest_steps [] ψ      = SOME ψ
+  ∧ iforest_steps (p::xs) ψ = if iforest_can_act ψ p
+                              then iforest_steps xs (iforest_step ψ p)
+                              else NONE
+End
+
+Theorem iforest_steps_chor_swap:
+  ∀l p ψ ψ'.
+    iforest_chor_upd_act ψ ∧
+    ¬MEM p l ∧
+    iforest_can_act ψ p ∧
+    iforest_steps l ψ = SOME ψ'
+    ⇒
+    iforest_steps (p::l) ψ = SOME (iforest_step ψ' p)
+Proof
+  Induct \\ rw[iforest_steps_def]
+  \\ cheat
+QED
+
 Inductive from_chor_forest:
 [~init:]
   (∀c s. from_chor_forest c (chor_iforest c s)) ∧
@@ -575,11 +659,73 @@ Inductive to_chor_forest:
      to_chor_forest ψ)
 End
 
+Inductive todo_for_chor:
+[~init:]
+  (∀c s.
+     todo_for_chor [] (chor_iforest c s)) ∧
+[~todo:]
+  (∀ψ p l.
+     todo_for_chor l (iforest_step ψ p) ∧ iforest_can_act ψ p ⇒
+           todo_for_chor (p::l) ψ)
+End
+
+Definition todo_chor_def:
+  todo_chor l ψ =
+  ∃c s. iforest_steps l ψ = SOME (chor_iforest c s)
+End
+
+Theorem chor_steps_chor:
+  iforest_step (chor_iforest c s) p = ψ ⇒
+  ∃l c' s'. iforest_steps l ψ = SOME (chor_iforest c' s')
+Proof
+  cheat
+QED
+
+Theorem MEM_split:
+  ∀x l. MEM x l ⇒ ∃l1 l2. l = l1 ++ x::l2 ∧ ¬MEM x l1
+Proof
+  cheat
+QED
+
+Theorem iforest_steps_APPEND:
+  iforest_steps (x++y) ψ = SOME ψ' ⇔
+    ∃ψ''. iforest_steps x ψ = SOME ψ'' ∧ iforest_steps y ψ'' = SOME ψ'
+Proof
+  cheat
+QED
+
+Theorem todo_chor_iforest_step:
+  iforest_chor_upd_act ψ ∧
+  todo_chor l ψ ∧
+  iforest_can_act ψ p
+  ⇒ ∃l'. todo_chor l' (iforest_step ψ p)
+Proof
+  rw[todo_chor_def]
+  \\ qsuff_tac ‘∃l' c s. iforest_steps (p::l') ψ = SOME (chor_iforest c s)’
+  >- fs[iforest_steps_def]
+  \\ reverse (Cases_on ‘MEM p l’)
+  >- (drule_all iforest_steps_chor_swap \\ rw[]
+      \\ ‘∃y. iforest_step (chor_iforest c s) p = y’ by simp[]
+      \\ drule chor_steps_chor
+      \\ fs[] \\ strip_tac
+      \\ qexists_tac ‘l ++ l'’
+      \\ cheat)
+  >- (drule MEM_split \\ rw[]
+      \\ qexists_tac ‘l1++l2’
+      \\ qexistsl_tac [‘c’,‘s’]
+      \\ ONCE_REWRITE_TAC [GSYM APPEND]
+      \\ REWRITE_TAC [iforest_steps_APPEND]
+      \\ gs[iforest_steps_APPEND]
+      \\ drule_all iforest_steps_chor_swap
+      \\ strip_tac \\ fs[]
+      \\ gvs[iforest_steps_def])
+
+
+
+QED
+
 Theorem iforest_step_to_chor_forest:
   ∀c s p.
-    (* dvarsOf c = [] ∧ *)
-    (* no_undefined_vars (s,c) ∧ *)
-    (* no_self_comunication c ∧ *)
     MEM p (procsOf c) ⇒
     to_chor_forest (iforest_step (chor_iforest c s) p)
 Proof

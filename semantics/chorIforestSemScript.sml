@@ -34,7 +34,7 @@ End
 
 Definition chor_iforest_upd_def[simp]:
   chor_iforest_upd s p (Send q d)   = message_add s q p d
-∧ chor_iforest_upd s p (Choose q b) = message_add s p q (if b then [1w] else [0w])
+∧ chor_iforest_upd s p (Choose q b) = message_add s q p (if b then [1w] else [0w])
 ∧ chor_iforest_upd s p (Receive q)  = message_drop s p q
 ∧ chor_iforest_upd s p (Select q)   = message_drop s p q
 End
