@@ -140,55 +140,6 @@ val compile_network_ok_project_ok = Q.store_thm("compile_network_ok_project_ok",
   \\ metis_tac []
 );
 
-val compile_network_ok_dest_sel = Q.store_thm("compile_network_ok_dest_sel",
-  `∀s c l p b q.
-    compile_network_ok s (Sel p b q c) l
-    ⇒ compile_network_ok s c l`,
-  Induct_on `l`
-  \\ rw [compile_network_gen_def,project_def]
-  \\ metis_tac []
-);
-
-Theorem compile_network_ok_dest_sel':
-  ∀s c l p b q.
-    compile_network_ok s (Sel p b q c) l
-    ⇒ (p <> q \/ (~MEM p l /\ ~MEM q l))
-Proof
-  Induct_on `l`
-  \\ rw [compile_network_gen_def,project_def]
-  \\ metis_tac []
-QED
-
-Theorem compile_network_ok_selI:
-  ∀s c l p b q.
-    compile_network_ok s c l /\ (p <> q \/ (~MEM p l /\ ~MEM q l))
-    ⇒ compile_network_ok s (Sel p b q c) l
-Proof
-  Induct_on `l`
-  \\ rw [compile_network_gen_def,project_def]
-  \\ metis_tac[]
-QED
-
-Theorem compile_network_ok_dest_com:
-  ∀s p1 v1 p2 v2 c l.
-    compile_network_ok s (Com p1 v1 p2 v2 c) l
-    ⇒ compile_network_ok (s |+ ((v2,p2),d)) c l
-Proof
-  Induct_on `l`
-  \\ rw [compile_network_gen_def,project_def]
-  \\ metis_tac []
-QED
-
-Theorem compile_network_ok_dest_com_asynch:
-  ∀s p1 v1 p2 v2 c l.
-    compile_network_ok s (Com p1 v1 p2 v2 c) l
-    ⇒ compile_network_ok s c l
-Proof
-  Induct_on `l`
-  \\ rw [compile_network_gen_def,project_def]
-  \\ metis_tac []
-QED
-
 val project_if_l_eq = Q.store_thm("project_if_l_eq",
   `∀v p q dvars c1 c2.
     project_ok q dvars (IfThen v p c1 c2)
@@ -567,16 +518,6 @@ Definition catchup_of_def:
   (catchup_of (LTau p ps) c = cut_sel_upto p c) ∧
   catchup_of _ c = c
 End
-
-Theorem compile_network_ok_subset:
-  ∀s c ps qs.
-  compile_network_ok s c qs ∧ set ps ⊆ set qs ⇒
-  compile_network_ok s c ps
-Proof
-  Induct_on ‘ps’ >>
-  rw[compile_network_gen_def] >- imp_res_tac compile_network_ok_project_ok >>
-  res_tac
-QED
 
 Theorem trans_ln_catchup_of:
   ∀p τ.
