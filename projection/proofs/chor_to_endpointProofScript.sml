@@ -69,27 +69,6 @@ val trans_let_gen = Q.store_thm("trans_let_gen",
   rw [endpointSemTheory.trans_let]
 );
 
-val cut_sel_upto_def = Define`
-  cut_sel_upto p (Sel p1 b p2 c) =
-    (if p = p1 then
-       cut_sel_upto p c
-     else
-       Sel p1 b p2 c)
-∧ cut_sel_upto p c = c
-`;
-
-Theorem dvarsOf_cut_sel_upto:
-  ∀p c. dvarsOf(cut_sel_upto p c) = dvarsOf c
-Proof
-  strip_tac >> Induct >> rw[dvarsOf_def,cut_sel_upto_def,nub'_dvarsOf] >> simp[]
-QED
-
-Theorem free_variables_cut_sel_upto:
-  ∀p c. free_variables(cut_sel_upto p c) = free_variables c
-Proof
-  strip_tac >> Induct >> rw[free_variables_def,cut_sel_upto_def] >> simp[]
-QED
-
 (* TODO: move *)
 Theorem dvarsOf_nil_trans:
   ∀s c α l s' c'.

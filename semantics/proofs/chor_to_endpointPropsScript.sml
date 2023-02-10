@@ -1179,4 +1179,25 @@ Proof
   res_tac
 QED
 
+Definition cut_sel_upto_def:
+  cut_sel_upto p (Sel p1 b p2 c) =
+    (if p = p1 then
+       cut_sel_upto p c
+     else
+       Sel p1 b p2 c)
+  ∧ cut_sel_upto p c = c
+End
+
+Theorem dvarsOf_cut_sel_upto:
+  ∀p c. dvarsOf(cut_sel_upto p c) = dvarsOf c
+Proof
+  strip_tac >> Induct >> rw[dvarsOf_def,cut_sel_upto_def,nub'_dvarsOf] >> simp[]
+QED
+
+Theorem free_variables_cut_sel_upto:
+  ∀p c. free_variables(cut_sel_upto p c) = free_variables c
+Proof
+  strip_tac >> Induct >> rw[free_variables_def,cut_sel_upto_def] >> simp[]
+QED
+
 val _ = export_theory ()
