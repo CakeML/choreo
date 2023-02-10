@@ -789,6 +789,15 @@ Proof
   iforest_simp \\ every_case_tac \\ gvs[]
 QED
 
+Theorem chor_forest_perm:
+  ∀l l'. PERM l l' ∧ ALL_DISTINCT l ⇒ chor_forest c s l = chor_forest c s l'
+Proof
+  Induct_on ‘PERM’ \\
+  rw[chor_forest_def] \\
+  rw[fmap_eq_flookup,FLOOKUP_UPDATE] \\ rw[] \\
+  metis_tac[ALL_DISTINCT_PERM]
+QED
+
 Theorem chor_steps_chor:
   ∀c s ψ p.
     dvarsOf c = [] ∧
@@ -1107,7 +1116,59 @@ Proof
       \\ gvs[lookup_projectS']
       \\ res_tac
       \\ gvs[])
-  \\ cheat
+  >- cheat
+  >- (qexists_tac ‘FILTER (λx. x ≠ p) (procsOf (Fix s c))’
+      \\ qmatch_goalsub_abbrev_tac ‘a1 = _’
+      \\ ‘a1 = iforest_steps (p::FILTER (λx. x ≠ p) (procsOf (Fix s c))) (chor_iforest (Fix s c) s')’
+        by(unabbrev_all_tac
+           \\ simp[iforest_steps_def]
+           \\ iforest_simp
+           \\ gvs[FLOOKUP_chor_forest,chor_itree_def])
+      \\ simp[]
+      \\ ntac 2 $ pop_assum kall_tac
+      \\ last_x_assum kall_tac
+      \\ qexistsl_tac [‘dsubst c s (Fix s c)’,‘s'’]
+      \\ qmatch_goalsub_abbrev_tac ‘iforest_steps a1’
+      \\ ‘ALL_DISTINCT a1’
+         by(unabbrev_all_tac
+            \\ gvs[MEM_FILTER]
+            \\ match_mp_tac FILTER_ALL_DISTINCT
+            \\ simp[procsOf_all_distinct])
+      \\ simp[chor_iforest_def]
+      \\ ‘PERM (procsOf (dsubst c s (Fix s c))) (procsOf (Fix s c))’
+        by(match_mp_tac PERM_ALL_DISTINCT
+           \\ rw[procsOf_all_distinct,EQ_IMP_THM,set_procsOf_dsubst_eq,procsOf_def,set_nub'])
+      \\ drule chor_forest_perm
+      \\ rw[procsOf_all_distinct]
+      \\ ‘PERM (procsOf (Fix s c)) a1’
+        by(unabbrev_all_tac \\ match_mp_tac PERM_ALL_DISTINCT
+           \\ rw[procsOf_all_distinct,EQ_IMP_THM,set_procsOf_dsubst_eq,procsOf_def,set_nub',MEM_FILTER,MEM_nub']
+           \\ gvs[procsOf_def,MEM_nub'])
+      \\ qpat_abbrev_tac ‘f1 = chor_forest (Fix _ _) _ _’
+      \\ ‘f1 = f1 ⊌ chor_forest (dsubst c s (Fix s c)) s' (FILTER (λx. ¬MEM x a1) (procsOf (Fix s c)))’
+         by(rw[Abbr ‘f1’,Abbr ‘a1’,fmap_eq_flookup,FLOOKUP_chor_forest] \\
+            rw[FLOOKUP_FUNION,FLOOKUP_chor_forest,MEM_FILTER])
+      \\ pop_assum (SUBST_TAC o single)
+      \\ qunabbrev_tac ‘f1’
+      \\ drule chor_forest_perm
+      \\ simp[GSYM PULL_FORALL]
+      \\ impl_tac >- simp[procsOf_all_distinct]
+      \\ disch_then $ REWRITE_TAC o single o Once
+      \\ ntac 3 $ pop_assum kall_tac
+      \\ ‘set a1 ⊆ set(procsOf(Fix s c))’
+         by(rw[Abbr ‘a1’] \\ gvs[procsOf_def,MEM_nub',SUBSET_DEF,MEM_FILTER])
+      \\ qpat_x_assum ‘MEM _ _’ kall_tac
+      \\ qpat_x_assum ‘Abbrev _’ kall_tac
+      \\ Induct_on ‘a1’
+      >- rw[iforest_steps_def,chor_forest_def]
+      \\ rw[iforest_can_act_def,iforest_get_def,FLOOKUP_FUNION,FLOOKUP_chor_forest,FLOOKUP_UPDATE,chor_itree_def,iforest_step_def,chor_forest_def,iforest_steps_def,iforest_set_def,iforest_del_def]
+      \\ gvs[]
+      \\ qpat_x_assum ‘_ = SOME _’ $ REWRITE_TAC o single o GSYM
+      \\ AP_TERM_TAC
+      \\ rw[iforest_component_equality,fmap_eq_flookup,iforest_can_act_def,iforest_get_def,FLOOKUP_FUNION,FLOOKUP_chor_forest,FLOOKUP_UPDATE,chor_itree_def,iforest_step_def,chor_forest_def,iforest_steps_def,iforest_set_def,iforest_del_def,MEM_FILTER]
+      \\ rw[]
+      \\ gvs[procsOf_def,MEM_nub',set_nub'])
+  >- gvs[dvarsOf_def]
 QED
 
 Theorem iforest_steps_APPEND:
