@@ -101,14 +101,6 @@ Proof
   fs[]
 QED
 
-val compile_network_eq_all_project = Q.store_thm("compile_network_eq_all_project",
-  `∀c c' s l. compile_network_ok s c l
-    ∧ (∀p. MEM p l ⇒ project' p [] c = project' p [] c')
-    ⇒ compile_network s c l = compile_network s c' l`,
-  Induct_on `l`
-  \\ rw [compile_network_gen_def,project_def]
-);
-
 val compile_network_ok_project_ok = Q.store_thm("compile_network_ok_project_ok",
   `∀s c l p.
     compile_network_ok s c l
@@ -150,56 +142,6 @@ val project_if_r_eq = Q.store_thm("project_if_r_eq",
   \\ TRY (qpat_x_assum `(_,_) = project _ _ _` (ASSUME_TAC o GSYM))
   \\ every_case_tac
   \\ rw []
-);
-
-val compile_network_if_l_eq = Q.store_thm("compile_network_if_l_eq",
-  `∀s v p c1 c2 l.
-    compile_network_ok s (IfThen v p c1 c2) l
-    ∧ ¬MEM p l
-    ∧ (∀b q c'. c1 ≠ Sel p b q c')
-    ⇒ compile_network s (IfThen v p c1 c2) l = compile_network s c1 l`,
-  rw []
-  \\ ho_match_mp_tac compile_network_eq_all_project
-  \\ rw []
-  \\ imp_res_tac compile_network_ok_project_ok
-  \\ ho_match_mp_tac project_if_l_eq
-  \\ rw []
-  \\ Cases_on `p = p'`
-  \\ fs []
-);
-
-val compile_network_if_l = Q.store_thm("compile_network_if_l",
-  `∀s v p c1 c2 l.
-    compile_network_ok s (IfThen v p c1 c2) l
-    ⇒ compile_network_ok s c1 l`,
-  Induct_on `l` >> rw[compile_network_gen_def,project_def]
-  >> every_case_tac >> fs[]
-  >> first_x_assum drule >> strip_tac >> fs[]
-  >> metis_tac[split_sel_project_ok]);
-
-val compile_network_if_r = Q.store_thm("compile_network_if_r",
-  `∀s v p c1 c2 l.
-    compile_network_ok s (IfThen v p c1 c2) l
-    ⇒ compile_network_ok s c2 l`,
-  Induct_on `l` >> rw[compile_network_gen_def,project_def]
-  >> every_case_tac >> fs[]
-  >> first_x_assum drule >> strip_tac >> fs[]
-  >> metis_tac[split_sel_project_ok]);
-
-val compile_network_if_r_eq = Q.store_thm("compile_network_if_r_eq",
-  `∀s v p c1 c2 l.
-    compile_network_ok s (IfThen v p c1 c2) l
-    ∧ ¬MEM p l
-    ∧ (∀b p2 c'. c2 ≠ Sel p b p2 c')
-    ⇒ compile_network s (IfThen v p c1 c2) l = compile_network s c2 l`,
-  rw []
-  \\ ho_match_mp_tac compile_network_eq_all_project
-  \\ rw []
-  \\ imp_res_tac compile_network_ok_project_ok
-  \\ ho_match_mp_tac project_if_r_eq
-  \\ rw []
-  \\ Cases_on `p = p'`
-  \\ fs []
 );
 
 val FST_endpoints_compile_network = Q.store_thm("FST_endpoints_compile_network",
