@@ -830,14 +830,116 @@ Proof
   metis_tac[ALL_DISTINCT_PERM]
 QED
 
-Theorem iforest_steps_APPEND:
-  iforest_steps (x++y) ψ = SOME ψ' ⇔
-    ∃ψ''. iforest_steps x ψ = SOME ψ'' ∧ iforest_steps y ψ'' = SOME ψ'
+(* Equivalently, we could do a coinductive characterisation of error-free itrees *)
+Inductive itree_has_error:
+  itree_has_error (Ret Error) ∧
+  (∀t. itree_has_error t ⇒ itree_has_error (Tau t)) ∧
+  ∀f x l. (itree_has_error(f x) ⇒ itree_has_error (Vis l f))
+End
+
+Definition forest_has_error_def:
+  forest_has_error f =
+  ∃k p. FLOOKUP f k = SOME p ∧ itree_has_error p
+End
+
+Theorem iforest_no_error_step_pres:
+  ¬forest_has_error i.forest ⇒
+  ¬forest_has_error (iforest_step i p).forest
 Proof
-  qid_spec_tac ‘ψ’
-  \\ Induct_on ‘x’ \\ fs [iforest_steps_def]
-  \\ rw [] \\ eq_tac \\ rw []
-  \\ res_tac \\ fs []
+  iforest_simp \\
+  Cases_on ‘FLOOKUP i.forest p’ \\
+  gvs[] \\
+  rename1 ‘itree_CASE x’ \\ Cases_on ‘x’ \\
+  gvs[forest_has_error_def,DOMSUB_FLOOKUP_THM,FLOOKUP_UPDATE]
+  THEN1 metis_tac[]
+  THEN1 (rw[] \\ res_tac \\
+         pop_assum $ mp_tac o SIMP_RULE std_ss [Once itree_has_error_cases] \\ rw[]) \\
+  Cases_on ‘i.act i.st p a’ \\
+  rw[FLOOKUP_UPDATE] \\
+  res_tac \\
+  pop_assum $ mp_tac o SIMP_RULE std_ss [Once itree_has_error_cases] \\ rw[]
+QED
+
+Theorem chor_itree_merge_Error:
+  ∀t1 t2.
+    chor_itree_merge t1 t2 = Ret Error ⇔ (t1 = Ret Error ∧ t2 = Ret Error) ∨
+                                         (t1 = Ret Done ∧ t2 = Ret Error) ∨
+                                         (t1 = Ret Error ∧ t2 = Ret Done)
+Proof
+  Cases_on ‘t1’ \\ Cases_on ‘t2’ \\
+  rw[chor_itree_merge_def] \\
+  TRY $ Cases_on ‘x’ \\ TRY $ Cases_on ‘x'’ \\
+  gvs[chor_itree_merge_def]
+QED
+
+Theorem project_ok_ifL:
+  project_ok q dvars (IfThen v p c1 c2) ⇒ project_ok q dvars c1
+Proof
+  rw[project_def] \\
+  every_case_tac \\
+  gvs[] \\
+  metis_tac[split_sel_project_ok]
+QED
+
+Theorem project_ok_ifR:
+  project_ok q dvars (IfThen v p c1 c2) ⇒ project_ok q dvars c2
+Proof
+  rw[project_def] \\
+  every_case_tac \\
+  gvs[] \\
+  metis_tac[split_sel_project_ok2]
+QED
+        
+Theorem error_free_chor_itree:
+  project_ok p [] c ∧
+  dvarsOf c = [] ∧
+  no_undefined_vars (s,c) ∧
+  no_self_comunication c ∧
+  itree_has_error (chor_itree p (projectS p s) c) ⇒ F
+Proof
+  qpat_abbrev_tac ‘t = chor_itree _ _ _’ \\
+  rpt strip_tac \\
+  last_x_assum $ mp_tac o PURE_REWRITE_RULE [markerTheory.Abbrev_def] \\
+  rpt $ last_x_assum mp_tac \\
+  MAP_EVERY qid_spec_tac $ rev [‘t’,‘c’,‘s’] \\
+  Induct_on ‘itree_has_error’ \\
+  rpt strip_tac \\
+  pop_assum (assume_tac o GSYM)
+  THEN1 (rpt(pop_assum mp_tac) \\ qid_spec_tac ‘s’ \\
+         Induct_on ‘c’ \\ rw[] \\
+         gvs[AllCaseEqs(),chor_itree_def,no_undefined_vars_def,
+             free_variables_def,SUBSET_DEF,SF DNF_ss,FDOM_FLOOKUP,
+             GSYM lookup_projectS',EXISTS_MEM,MEM_MAP,
+             dvarsOf_def,nub'_nil,no_self_comunication_def] \\
+         res_tac \\
+         gvs[chor_itree_merge_Error] \\
+         rw[] \\
+         imp_res_tac project_ok_ifL \\
+         imp_res_tac project_ok_ifR \\
+         gvs[]
+         THEN1 (gvs[project_def] \\
+                every_case_tac \\ gvs[] \\
+                last_x_assum (qspec_then ‘s' |+ ((s,s0),v)’ mp_tac) \\
+                impl_tac THEN1 rw[FLOOKUP_UPDATE] \\
+                simp[fupdate_projectS])
+         THEN1 (spose_not_then strip_assume_tac \\
+                res_tac \\ gvs[])
+         THEN1 (gvs[project_def] \\
+                every_case_tac \\ gvs[] \\
+                last_x_assum (qspec_then ‘s' |+ ((s0,s),v)’ mp_tac) \\
+                impl_tac THEN1 rw[FLOOKUP_UPDATE] \\ 
+                simp[fupdate_projectS]) \\
+         gvs[project_def] \\
+         every_case_tac \\ gvs[]) \\
+  cheat
+(*  THEN1 (Cases_on ‘c’ \\
+         gvs[AllCaseEqs(),chor_itree_def,no_undefined_vars_def,
+             free_variables_def,SUBSET_DEF,SF DNF_ss,FDOM_FLOOKUP,
+             GSYM lookup_projectS',EXISTS_MEM,MEM_MAP,
+             dvarsOf_def,nub'_nil] \\
+        )
+  itree_simp \\ gvs[
+  *)  
 QED
 
 Theorem iforest_steps_middle_swap:
