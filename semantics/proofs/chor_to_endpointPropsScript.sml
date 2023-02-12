@@ -1200,12 +1200,58 @@ Proof
   strip_tac >> Induct >> rw[free_variables_def,cut_sel_upto_def] >> simp[]
 QED
 
-val compile_network_if_l_eq = Q.store_thm("compile_network_if_l_eq",
-  `∀s v p c1 c2 l.
+Theorem compile_network_eq_all_project:
+   ∀c c' s l. compile_network_ok s c l
+    ∧ (∀p. MEM p l ⇒ project' p [] c = project' p [] c')
+    ⇒ compile_network s c l = compile_network s c' l
+Proof
+  Induct_on `l`
+  \\ rw [compile_network_gen_def,project_def]
+QED
+
+Theorem project_if_l_eq:
+   ∀v p q dvars c1 c2.
+    project_ok q dvars (IfThen v p c1 c2)
+    ∧ p ≠ q
+    ∧ (∀b t c'. c1 ≠ Sel p b t c')
+    ⇒ project' q dvars (IfThen v p c1 c2) = project' q dvars c1
+Proof
+  Cases_on `c1`
+  \\ rw [project_def,cut_sel_upto_def,split_sel_def]
+  \\ fs [project_def,cut_sel_upto_def,split_sel_def]
+  \\ TRY (qpat_x_assum `(_,_) = project _ _ _` (ASSUME_TAC o GSYM))
+  \\ rfs []
+  \\ fs []
+  \\ TRY (qpat_x_assum `(_,_) = project _ _ _` (ASSUME_TAC o GSYM))
+  \\ every_case_tac
+  \\ rw []
+QED
+
+Theorem project_if_r_eq:
+   ∀v p dvars q c1 c2.
+    project_ok q dvars (IfThen v p c1 c2)
+    ∧ p ≠ q
+    ∧ (∀b t c'. c2 ≠ Sel p b t c')
+    ⇒ project' q dvars (IfThen v p c1 c2) = project' q dvars c2
+Proof
+  Cases_on `c2`
+  \\ rw [project_def,cut_sel_upto_def,split_sel_def]
+  \\ fs [project_def,cut_sel_upto_def,split_sel_def]
+  \\ TRY (qpat_x_assum `(_,_) = project _ _ _` (ASSUME_TAC o GSYM))
+  \\ rfs []
+  \\ fs []
+  \\ TRY (qpat_x_assum `(_,_) = project _ _ _` (ASSUME_TAC o GSYM))
+  \\ every_case_tac
+  \\ rw []
+QED
+
+Theorem compile_network_if_l_eq:
+   ∀s v p c1 c2 l.
     compile_network_ok s (IfThen v p c1 c2) l
     ∧ ¬MEM p l
     ∧ (∀b q c'. c1 ≠ Sel p b q c')
-    ⇒ compile_network s (IfThen v p c1 c2) l = compile_network s c1 l`,
+    ⇒ compile_network s (IfThen v p c1 c2) l = compile_network s c1 l
+Proof
   rw []
   \\ ho_match_mp_tac compile_network_eq_all_project
   \\ rw []
@@ -1214,7 +1260,7 @@ val compile_network_if_l_eq = Q.store_thm("compile_network_if_l_eq",
   \\ rw []
   \\ Cases_on `p = p'`
   \\ fs []
-);
+QED
 
 Theorem compile_network_if_l:
   ∀s v p c1 c2 l.
@@ -1224,7 +1270,7 @@ Proof
   Induct_on `l` >> rw[compile_network_gen_def,project_def]
   >> every_case_tac >> fs[]
   >> first_x_assum drule >> strip_tac >> fs[]
-  >> metis_tac[split_sel_project_ok]);
+  >> metis_tac[split_sel_project_ok]
 QED
 
 Theorem compile_network_if_r:
@@ -1236,15 +1282,6 @@ Proof
   >> every_case_tac >> fs[]
   >> first_x_assum drule >> strip_tac >> fs[]
   >> metis_tac[split_sel_project_ok]
-QED
-
-Theorem compile_network_eq_all_project:
-   ∀c c' s l. compile_network_ok s c l
-    ∧ (∀p. MEM p l ⇒ project' p [] c = project' p [] c')
-    ⇒ compile_network s c l = compile_network s c' l
-Proof
-  Induct_on `l`
-  \\ rw [compile_network_gen_def,project_def]
 QED
 
 Theorem compile_network_if_r_eq:
@@ -1263,7 +1300,5 @@ Proof
   \\ Cases_on `p = p'`
   \\ fs []
 QED
-
-
 
 val _ = export_theory ()

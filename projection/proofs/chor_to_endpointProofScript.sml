@@ -111,39 +111,6 @@ val compile_network_ok_project_ok = Q.store_thm("compile_network_ok_project_ok",
   \\ metis_tac []
 );
 
-val project_if_l_eq = Q.store_thm("project_if_l_eq",
-  `∀v p q dvars c1 c2.
-    project_ok q dvars (IfThen v p c1 c2)
-    ∧ p ≠ q
-    ∧ (∀b t c'. c1 ≠ Sel p b t c')
-    ⇒ project' q dvars (IfThen v p c1 c2) = project' q dvars c1`,
-  Cases_on `c1`
-  \\ rw [project_def,cut_sel_upto_def,split_sel_def]
-  \\ fs [project_def,cut_sel_upto_def,split_sel_def]
-  \\ TRY (qpat_x_assum `(_,_) = project _ _ _` (ASSUME_TAC o GSYM))
-  \\ rfs []
-  \\ fs []
-  \\ TRY (qpat_x_assum `(_,_) = project _ _ _` (ASSUME_TAC o GSYM))
-  \\ every_case_tac
-  \\ rw []);
-
-val project_if_r_eq = Q.store_thm("project_if_r_eq",
-  `∀v p dvars q c1 c2.
-    project_ok q dvars (IfThen v p c1 c2)
-    ∧ p ≠ q
-    ∧ (∀b t c'. c2 ≠ Sel p b t c')
-    ⇒ project' q dvars (IfThen v p c1 c2) = project' q dvars c2`,
-  Cases_on `c2`
-  \\ rw [project_def,cut_sel_upto_def,split_sel_def]
-  \\ fs [project_def,cut_sel_upto_def,split_sel_def]
-  \\ TRY (qpat_x_assum `(_,_) = project _ _ _` (ASSUME_TAC o GSYM))
-  \\ rfs []
-  \\ fs []
-  \\ TRY (qpat_x_assum `(_,_) = project _ _ _` (ASSUME_TAC o GSYM))
-  \\ every_case_tac
-  \\ rw []
-);
-
 val FST_endpoints_compile_network = Q.store_thm("FST_endpoints_compile_network",
   `∀s c l. MAP FST (endpoints (compile_network s c l)) = l`,
   Induct_on `l`
