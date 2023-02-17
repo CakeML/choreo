@@ -1028,7 +1028,11 @@ QED
 Theorem cut_sel_upto_idem:
   ∀c. cut_sel_upto (@p. ¬MEM p (procsOf c)) c = c
 Proof
-  cheat
+  strip_tac \\ SELECT_ELIM_TAC \\ conj_tac
+  >- metis_tac[IN_INFINITE_NOT_FINITE,FINITE_LIST_TO_SET,INFINITE_LIST_UNIV] \\
+  strip_tac \\
+  Induct_on ‘c’ \\
+  rw[cut_sel_upto_def,procsOf_def,MEM_nub']
 QED
 
 Theorem chor_steps_chor':
