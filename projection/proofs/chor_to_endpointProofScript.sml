@@ -1532,19 +1532,6 @@ Proof
    \\ metis_tac[RTC_RTC]
 QED
 
-Theorem no_self_comunication_cut_sel_upto:
-  !p c. no_self_comunication c ==> no_self_comunication(cut_sel_upto p c)
-Proof
-  Induct_on `c` >> rw[cut_sel_upto_def,no_self_comunication_def]
-QED
-
-Theorem no_undefined_vars_cut_sel_upto:
-  !p c. no_undefined_vars (s,c) ==> no_undefined_vars(s,cut_sel_upto p c)
-Proof
-  Induct_on `c` >> rw[cut_sel_upto_def,no_undefined_vars_def,free_variables_def] >>
-  metis_tac[no_undefined_vars_def]
-QED
-
 Theorem no_self_comunication_catchup_of:
   ∀p τ.
   no_self_comunication p ⇒

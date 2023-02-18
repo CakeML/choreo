@@ -1301,4 +1301,25 @@ Proof
   \\ fs []
 QED
 
+Theorem no_self_comunication_cut_sel_upto:
+  !p c. no_self_comunication c ==> no_self_comunication(cut_sel_upto p c)
+Proof
+  Induct_on `c` >> rw[cut_sel_upto_def,no_self_comunication_def]
+QED
+
+Theorem no_undefined_vars_cut_sel_upto:
+  !p c. no_undefined_vars (s,c) ==> no_undefined_vars(s,cut_sel_upto p c)
+Proof
+  Induct_on `c` >> rw[cut_sel_upto_def,no_undefined_vars_def,free_variables_def] >>
+  metis_tac[no_undefined_vars_def]
+QED
+
+Theorem compile_network_ok_cut_sel_upto:
+  ∀c s p l.
+    compile_network_ok s c l ⇒ compile_network_ok s (cut_sel_upto p c) l
+Proof
+  Induct \\ rw[cut_sel_upto_def]
+  \\ metis_tac [compile_network_ok_dest_sel]
+QED
+
 val _ = export_theory ()
