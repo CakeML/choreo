@@ -775,7 +775,10 @@ End
 
 Definition todo_chor_def:
   todo_chor l ψ =
-  ∃c s. iforest_steps l ψ = SOME (chor_iforest c s)
+  ∃c s. iforest_steps l ψ = SOME (chor_iforest c s) ∧
+        dvarsOf c = [] ∧ no_undefined_vars (s,c) ∧
+        no_self_comunication c ∧
+        compile_network_ok s c (procsOf c)
 End
 
 Theorem MEM_iforest_step_idem:
@@ -2106,7 +2109,7 @@ Theorem chor_steps_chor_no_error:
               no_self_comunication c' ∧
               compile_network_ok s' c' (procsOf c')
 Proof
- cheat
+  cheat
 QED
 
 Theorem ae_error_free_chor_iforest:
@@ -2154,12 +2157,14 @@ Theorem todo_chor_iforest_step:
   ⇒ ∃l'. todo_chor l' (iforest_step ψ p)
 Proof
   rw[todo_chor_def]
-  \\ qsuff_tac ‘∃l' c s. iforest_steps (p::l') ψ = SOME (chor_iforest c s)’
+  \\ qsuff_tac ‘∃l' c s. iforest_steps (p::l') ψ = SOME (chor_iforest c s) ∧
+                         dvarsOf c = [] ∧ no_undefined_vars (s,c) ∧ no_self_comunication c ∧
+                         compile_network_ok s c (procsOf c)’
   >- fs[iforest_steps_def]
   \\ reverse (Cases_on ‘MEM p l’)
   >- (drule_all iforest_steps_chor_swap \\ rw[]
       \\ ‘∃y. iforest_step (chor_iforest c s) p = y’ by simp[]
-      \\ drule chor_steps_chor
+      \\ drule_all chor_steps_chor
       \\ fs[] \\ strip_tac
       \\ qexists_tac ‘l ++ l'’
       \\ metis_tac [GSYM APPEND,iforest_steps_APPEND])
@@ -2174,82 +2179,6 @@ Proof
       \\ strip_tac \\ fs[]
       \\ gvs[iforest_steps_def])
 QED
-
-(*
-Theorem iforest_step_to_chor_forest:
-  ∀c s p.
-    MEM p (procsOf c) ⇒
-    to_chor_forest (iforest_step (chor_iforest c s) p)
-Proof
-  Induct \\ rw[]
-  >- iforest_simp
-  >- cheat (* If *)
-  >- (gs[procsOf_def,nub'_def,nub'_APPEND,nub'_procsOf,dvarsOf_def] \\ cheat)
-  \\ cheat
-QED
-*)
-
-
-(*
-Theorem iforest_step_preserves_to_chor_forest:
-  ∀ψ. to_chor_forest ψ ⇒ to_chor_forest (iforest_step ψ p)
-Proof
-  rw[]
-  \\ first_assum mp_tac
-  \\ simp_tac std_ss [Once to_chor_forest_cases] \\ reverse (rw[])
-  >- (Cases_on ‘iforest_can_act ψ p’
-      \\ metis_tac [iforest_step_skip])
-  >- (Cases_on ‘p ∈ iforest_itrees (chor_iforest c s)’
-      >- fs[iforest_step_to_chor_forest,chor_iforest_itrees_eq_procOf]
-      >- (iforest_simp \\ simp[FLOOKUP_DEF]))
-QED
-
-Theorem iforest_steps_IMP_Res:
-  ∀f res.
-    iforest_steps f res ⇒
-    ∀c p.
-      to_chor_forest f ∧ p ∈ iforest_itrees f ⇒
-      EXISTS (λ(q,a). p = q ∧ ∃t. a = Res t) res
-Proof
-  Induct_on ‘iforest_steps’ \\ rpt strip_tac
-  >- (gvs [SUBSET_DEF]
-      \\ fs [Once to_chor_forest_cases] \\ gvs []
-      \\ gvs [chor_iforest_itrees_eq_procOf]
-      \\ metis_tac [iforest_can_act_exists])
-  \\ gvs []
-  \\ rewrite_tac [METIS_PROVE [] “b ∨ c ⇔ ~b ⇒ c”]
-  \\ strip_tac
-  \\ first_x_assum irule
-  \\ irule_at Any iforest_step_preserves_to_chor_forest
-  \\ fs []
-  \\ pairarg_tac \\ fs []
-  \\ iforest_simp \\ fs [FLOOKUP_DEF]
-  \\ Cases_on ‘p' = q’ \\ gvs []
-  \\ every_case_tac \\ gvs [iforest_get_def,FLOOKUP_DEF]
-  \\ CCONTR_TAC \\ gvs []
-  \\ gvs [iforest_act_def,iforest_get_def,FLOOKUP_DEF]
-QED
-
-Theorem chor_iforest_deadlock_freedom:
-  ∀procs c s.
-    fair_trace (set (procsOf c)) procs
-    ⇒ deadlock_freedom (set (procsOf c)) (iforest (chor_iforest c s) procs)
-Proof
-  simp [deadlock_freedom_def]
-  \\ rpt gen_tac \\ strip_tac
-  \\ conj_asm1_tac
-  >- simp [iforestTheory.actions_end_iforest]
-  \\ CCONTR_TAC \\ fs []
-  \\ ‘fair_trace (iforest_itrees (chor_iforest c s)) procs’ by
-        fs [chor_iforest_itrees_eq_procOf]
-  \\ drule_all LFINITE_iforest
-  \\ strip_tac \\ fs [exists_fromList]
-  \\ drule iforest_steps_IMP_Res \\ simp []
-  \\ irule_at Any to_chor_forest_init
-  \\ first_x_assum $ irule_at Any \\ fs []
-  \\ fs [chor_iforest_itrees_eq_procOf]
-QED
-*)
 
 Inductive iforest_run:
   (∀ψ.
@@ -2266,30 +2195,6 @@ Definition finally_empty_def:
     (* every terminating run results in an empty forest *)
     ∀ψ'. iforest_run ψ ψ' ⇒ iforest_itrees ψ' = ∅
 End
-
-(*
-Theorem from_chor_finally_empty:
-  from_chor_forest c ψ ⇒ finally_empty ψ
-Proof
-  rw[finally_empty_def]
-  \\ last_x_assum mp_tac
-  \\ qid_spec_tac ‘c’
-  \\ pop_assum mp_tac
-  \\ MAP_EVERY qid_spec_tac [‘ψ'’,‘ψ’]
-  \\ ho_match_mp_tac iforest_run_ind
-  \\ rw[]
-  >- (last_x_assum mp_tac
-      \\ pop_assum mp_tac
-      \\ MAP_EVERY qid_spec_tac [‘ψ’,‘c’]
-      \\ ho_match_mp_tac from_chor_forest_ind
-      \\ rw[]
-      >- cheat (* Should be true *)
-      >- cheat) (* Not true *)
-  >- (first_x_assum irule
-      \\ irule_at Any from_chor_forest_step
-      \\ metis_tac [])
-QED
-*)
 
 Theorem ifrest_run_inv:
   ∀s t.
@@ -2313,6 +2218,9 @@ Proof
 QED
 
 Theorem finally_empty_chor_iforest:
+  dvarsOf c = [] ∧ no_undefined_vars (s,c) ∧
+  no_self_comunication c ∧
+  compile_network_ok s c (procsOf c) ⇒
   finally_empty (chor_iforest c s)
 Proof
   rw [finally_empty_def]
@@ -2320,6 +2228,7 @@ Proof
   \\ disch_then $ qspec_then ‘[]’ irule
   \\ fs [todo_chor_def,iforest_steps_def,iforest_chor_upd_act_chor_iforest]
   \\ irule_at Any EQ_REFL
+  \\ simp[]
 QED
 
 Inductive iforest_steps:
@@ -2407,6 +2316,9 @@ QED
 
 Theorem chor_iforest_deadlock_freedom:
   ∀procs c s.
+    dvarsOf c = [] ∧ no_undefined_vars (s,c) ∧
+    no_self_comunication c ∧
+    compile_network_ok s c (procsOf c) ∧
     fair_trace (set (procsOf c)) procs
     ⇒ deadlock_freedom (set (procsOf c)) (iforest (chor_iforest c s) procs)
 Proof
