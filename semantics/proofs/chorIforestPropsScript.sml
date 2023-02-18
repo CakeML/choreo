@@ -930,7 +930,6 @@ Proof
 QED
 
 Theorem chor_itree_not_error:
-  project_ok p [] c ∧
   dvarsOf c = [] ∧
   no_undefined_vars (s,c) ∧
   no_self_comunication c ∧
@@ -1796,6 +1795,59 @@ Proof
   \\ asm_exists_tac \\ simp[]
   \\ qexistsl_tac [‘p’,‘@p. ¬MEM p (procsOf c)’]
   \\ simp[cut_sel_upto_idem]
+QED
+
+Theorem chor_steps_chor_no_error:
+  ∀c s ψ p.
+    dvarsOf c = [] ∧
+    no_undefined_vars (s,c) ∧
+    no_self_comunication c ∧
+    compile_network_ok s c (procsOf c) ∧
+    iforest_step (chor_iforest c s) p = ψ ⇒
+    ∃l c' s'. iforest_steps_no_error l ψ = SOME (chor_iforest c' s') ∧
+              dvarsOf c' = [] ∧ no_undefined_vars (s',c') ∧
+              no_self_comunication c' ∧
+              compile_network_ok s' c' (procsOf c')
+Proof
+ cheat
+QED
+
+Theorem ae_error_free_chor_iforest:
+  ∀p ψ c s.
+    dvarsOf c = [] ∧
+    no_undefined_vars (s,c) ∧
+    no_self_comunication c ∧
+    compile_network_ok s c (procsOf c) ∧
+    ψ = chor_iforest c s ⇒
+    ae_error_free p ψ
+Proof
+  Ho_Rewrite.PURE_REWRITE_TAC[LEFT_FORALL_IMP_THM] >>
+  strip_tac >>
+  ho_match_mp_tac ae_error_free_coind >> rw[]
+  >- (rw[FLOOKUP_chor_forest,iforest_get_def,chor_iforest_def] >>
+      metis_tac[chor_itree_not_error,compile_network_ok_project_ok]) >>
+  drule chor_steps_chor_no_error >> ntac 3 $ disch_then drule >>
+  disch_then $ qspecl_then [‘iforest_step (chor_iforest c s) p'’,‘p'’] mp_tac >>
+  simp[] >>
+  strip_tac >>
+  first_assum $ irule_at $ Pos hd >>
+  irule_at (Pos last) EQ_REFL >>
+  simp[]
+QED
+
+Theorem chor_iforest_steps_no_error:
+    dvarsOf c = [] ∧
+    no_undefined_vars (s,c) ∧
+    no_self_comunication c ∧
+    compile_network_ok s c (procsOf c) ∧
+    iforest_steps l (chor_iforest c s) = SOME ψ ⇒
+    iforest_get ψ p ≠ SOME(Ret Error)
+Proof
+  rpt strip_tac >>
+  ‘ae_error_free p (chor_iforest c s)’ by metis_tac[ae_error_free_chor_iforest] >>
+  drule_at (Pos last) iforest_steps_no_error >>
+  simp[iforest_chor_upd_act_chor_iforest] >>
+  metis_tac[]
 QED
 
 Theorem todo_chor_iforest_step:
