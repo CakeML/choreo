@@ -1433,6 +1433,18 @@ Proof
   rw[cut_sel_upto_def,procsOf_def,MEM_nub']
 QED
 
+val chor_inv_tac = (gvs[dvarsOf_def,nub'_dvarsOf,no_self_comunication_def]
+                    \\ TRY (drule compile_network_ok_dest_com' \\ strip_tac)
+                    \\ TRY (drule compile_network_ok_dest_let \\ strip_tac)
+                    \\ TRY (drule compile_network_ok_dest_sel \\ strip_tac)
+                    \\ TRY (drule no_undefined_vars_com \\ strip_tac)
+                    \\ TRY (drule no_undefined_vars_Let \\ strip_tac)
+                    \\ TRY (drule no_undefined_vars_sel \\ strip_tac)
+                    \\ gvs[lookup_projectS']
+                    \\ irule compile_network_ok_subset
+                    \\ first_x_assum (irule_at Any)
+                    \\ rw[procsOf_def,set_nub',SUBSET_INSERT_RIGHT])
+
 Theorem chor_steps_chor':
   ∀c s ψ p p0.
     dvarsOf c = [] ∧
@@ -1440,13 +1452,17 @@ Theorem chor_steps_chor':
     no_self_comunication c ∧
     compile_network_ok s c (procsOf c) ∧
     iforest_step (chor_iforest (cut_sel_upto p0 c) s) p = ψ ⇒
-    ∃l c' s'. iforest_steps l ψ = SOME (chor_iforest c' s')
+    ∃l c' s'. iforest_steps l ψ = SOME (chor_iforest c' s') ∧
+              dvarsOf c' = [] ∧ no_undefined_vars (s',c') ∧
+              no_self_comunication c' ∧
+              compile_network_ok s' c' (procsOf c')
 Proof
   rw[]
   \\ rpt (pop_assum mp_tac \\ simp [AND_IMP_INTRO])
   \\ MAP_EVERY qid_spec_tac [‘s’,‘p’,‘p0’,‘c’]
   \\ Induct_on ‘c’ \\ rw[cut_sel_upto_def]
-  >- (qexistsl_tac [‘[]’,‘Nil’] \\ iforest_tac[iforest_steps_def])
+  >- (qexistsl_tac [‘[]’,‘Nil’] \\ iforest_tac[iforest_steps_def]
+      \\ rw[no_undefined_vars_def,free_variables_def,compile_network_gen_def])
   >- (drule no_undefined_FLOOKUP_if \\ rw[]
       \\ rename1 ‘chor_iforest (IfThen v q c1 c2) _’
       \\ rename1 ‘chor_iforest _ s’
@@ -1470,9 +1486,10 @@ Proof
                       \\ pop_assum (irule_at Any)
                       \\ rw[procsOf_def,set_nub',SUBSET_INSERT_RIGHT]))
               \\ rw[]
-              \\ pop_assum (irule_at Any)
+              \\ pop_assum (irule_at Any) \\ simp[]
               \\ drule iforest_steps_chor_true
               \\ disch_then drule \\ rw[]
+              \\ first_x_assum (irule_at Any)
               \\ first_x_assum (irule_at Any)
               (* Should be true from something along the lines of:
                  ‘split_sel p q c = NONE ⇒ ¬MEM sel_path q c’
@@ -1489,8 +1506,9 @@ Proof
                       \\ pop_assum (irule_at Any)
                       \\ rw[procsOf_def,set_nub',SUBSET_INSERT_RIGHT]))
               \\ rw[]
-              \\ pop_assum (irule_at Any)
+              \\ pop_assum (irule_at Any) \\ simp[]
               \\ drule_all iforest_steps_chor_false \\ rw[]
+              \\ first_x_assum (irule_at Any)
               \\ first_x_assum (irule_at Any)
               (* Should be true from something along the lines of:
                  ‘split_sel p q c = NONE ⇒ ¬MEM sel_path q c’
@@ -1499,10 +1517,34 @@ Proof
       >- (Cases_on ‘x = [1w]’ \\ gvs[]
           >- (drule_all iforest_steps_chor_true \\ rw[]
               \\ gvs[Once iforest_steps_def]
-              \\ first_x_assum (irule_at Any))
+              \\ first_x_assum (irule_at Any)
+              \\ drule no_undefined_vars_if
+              \\ drule compile_network_if_l
+              \\ gvs[dvarsOf_def,nub'_APPEND,nub'_dvarsOf,no_self_comunication_def,
+                     no_undefined_vars_cut_sel_upto,dvarsOf_cut_sel_upto,
+                     no_self_comunication_cut_sel_upto]
+              \\ rpt strip_tac
+              \\ irule compile_network_ok_subset
+              \\ drule compile_network_ok_cut_sel_upto
+              \\ disch_then (qspec_then ‘p’ (irule_at Any))
+              \\ irule SUBSET_TRANS
+              \\ irule_at Any procsOf_cut_sel_upto
+              \\ rw[procsOf_def,set_nub',SUBSET_INSERT_RIGHT])
           >- (drule_all iforest_steps_chor_false \\ rw[]
               \\ gvs[Once iforest_steps_def]
-              \\ first_x_assum (irule_at Any))))
+              \\ first_x_assum (irule_at Any)
+              \\ drule no_undefined_vars_if
+              \\ drule compile_network_if_r
+              \\ gvs[dvarsOf_def,nub'_APPEND,nub'_dvarsOf,no_self_comunication_def,
+                     no_undefined_vars_cut_sel_upto,dvarsOf_cut_sel_upto,
+                     no_self_comunication_cut_sel_upto]
+              \\ rpt strip_tac
+              \\ irule compile_network_ok_subset
+              \\ drule compile_network_ok_cut_sel_upto
+              \\ disch_then (qspec_then ‘p’ (irule_at Any))
+              \\ irule SUBSET_TRANS
+              \\ irule_at Any procsOf_cut_sel_upto
+              \\ rw[procsOf_def,set_nub',SUBSET_INSERT_RIGHT])))
   >~[‘cut_sel_upto p0 c’]
   >- (first_x_assum irule
       \\ gvs[dvarsOf_def,nub'_dvarsOf,no_self_comunication_def,nub'_APPEND,nub'_def]
@@ -1538,7 +1580,8 @@ Proof
                   \\ irule compile_network_ok_subset
                   \\ pop_assum (irule_at Any)
                   \\ rw[set_nub',SUBSET_INSERT_RIGHT]))
-          \\ rw[] \\ pop_assum (irule_at Any)
+          \\ rw[] \\ pop_assum (irule_at Any) \\ simp[]
+          \\ first_x_assum (irule_at Any)
           \\ reverse (rw iforest_thm)
           \\ gvs[IS_SOME_EXISTS,no_self_comunication_def]
           >- (drule lookup_projectS \\ rw[])
@@ -1581,6 +1624,8 @@ Proof
           \\ Cases_on ‘MEM s0 (procsOf c)’
           \\ gs[]
           >- (qexistsl_tac [‘[s0]’,‘c’,‘s' |+ ((s,s0),x)’]
+              \\ reverse conj_tac
+              >- chor_inv_tac
               \\ iforest_steps_eval
               \\ dxrule_then (ONCE_REWRITE_TAC o single) chor_forest_split
               \\ ‘MEM p (FILTER (λy. y ≠ s0) (procsOf c))’ by simp[MEM_FILTER]
@@ -1588,6 +1633,8 @@ Proof
               \\ split_updates_tac
               \\ forest_chor_tail_tac)
           >- (qexistsl_tac [‘[s0;s0]’,‘c’,‘s' |+ ((s,s0),x)’]
+              \\ reverse conj_tac
+              >- chor_inv_tac
               \\ gs[dvarsOf_def,nub'_dvarsOf]
               \\ drule_all_then assume_tac MEM_procsOf_chor_itree
               \\ iforest_steps_eval
@@ -1595,6 +1642,8 @@ Proof
               \\ split_updates_tac
               \\ forest_chor_tail_tac)
           >- (qexistsl_tac [‘[s0;p]’,‘c’,‘s' |+ ((s,s0),x)’]
+              \\ reverse conj_tac
+              >- chor_inv_tac
               \\ gs[dvarsOf_def,nub'_dvarsOf]
               \\ drule_all_then assume_tac MEM_procsOf_chor_itree
               \\ iforest_steps_eval
@@ -1602,6 +1651,8 @@ Proof
               \\ split_updates_tac
               \\ forest_chor_tail_tac)
           >- (qexistsl_tac [‘[s0;p;s0]’,‘c’,‘s' |+ ((s,s0),x)’]
+              \\ reverse conj_tac
+              >- chor_inv_tac
               \\ gs[dvarsOf_def,nub'_dvarsOf]
               \\ qpat_assum ‘¬MEM p _’ (mp_then Any (drule_all_then assume_tac) MEM_procsOf_chor_itree)
               \\ qpat_assum ‘¬MEM s0 _’ (mp_then Any (drule_all_then assume_tac) MEM_procsOf_chor_itree)
@@ -1611,6 +1662,8 @@ Proof
           \\ Cases_on ‘MEM p (procsOf c)’
           \\ gs[]
           >- (qexistsl_tac [‘[s2;p]’,‘c’,‘s' |+ ((s,p),x)’]
+              \\ reverse conj_tac
+              >- chor_inv_tac
               \\ iforest_steps_eval
               \\ dxrule_then (ONCE_REWRITE_TAC o single) chor_forest_split
               \\ ‘MEM s2 (FILTER (λy. y ≠ p) (procsOf c))’ by simp[MEM_FILTER]
@@ -1618,6 +1671,8 @@ Proof
               \\ split_updates_tac
               \\ forest_chor_tail_tac)
           >- (qexistsl_tac [‘[s2;p;p]’,‘c’,‘s' |+ ((s,p),x)’]
+              \\ reverse conj_tac
+              >- chor_inv_tac
               \\ gs[dvarsOf_def,nub'_dvarsOf]
               \\ drule_all_then assume_tac MEM_procsOf_chor_itree
               \\ iforest_steps_eval
@@ -1625,6 +1680,8 @@ Proof
               \\ split_updates_tac
               \\ forest_chor_tail_tac)
           >- (qexistsl_tac [‘[s2;p;s2]’,‘c’,‘s' |+ ((s,p),x)’]
+              \\ reverse conj_tac
+              >- chor_inv_tac
               \\ gs[dvarsOf_def,nub'_dvarsOf]
               \\ drule_all_then assume_tac MEM_procsOf_chor_itree
               \\ iforest_steps_eval
@@ -1632,6 +1689,8 @@ Proof
               \\ split_updates_tac
               \\ forest_chor_tail_tac)
           >- (qexistsl_tac [‘[s2;p;s2;p]’,‘c’,‘s' |+ ((s,p),x)’]
+              \\ reverse conj_tac
+              >- chor_inv_tac
               \\ gs[dvarsOf_def,nub'_dvarsOf]
               \\ qpat_assum ‘¬MEM p _’ (mp_then Any (drule_all_then assume_tac) MEM_procsOf_chor_itree)
               \\ qpat_assum ‘¬MEM s2 _’ (mp_then Any (drule_all_then assume_tac) MEM_procsOf_chor_itree)
@@ -1647,6 +1706,8 @@ Proof
       >- (Cases_on ‘MEM p (procsOf c)’
           >- (qexistsl_tac [‘[]’,‘c’,
                             ‘s' |+ ((s0,p),f (MAP (THE ∘ FLOOKUP (projectS p s')) l))’]
+              \\ reverse conj_tac
+              >- chor_inv_tac
               \\ last_x_assum kall_tac
               \\ simp[iforest_steps_def]
               \\ iforest_simp
@@ -1660,7 +1721,9 @@ Proof
               \\ res_tac
               \\ gvs[])
           \\ qexistsl_tac [‘[p]’,‘c’,
-                            ‘s' |+ ((s0,p),f (MAP (THE ∘ FLOOKUP (projectS p s')) l))’]
+                           ‘s' |+ ((s0,p),f (MAP (THE ∘ FLOOKUP (projectS p s')) l))’]
+          \\ reverse conj_tac
+          >- chor_inv_tac
           \\ last_x_assum kall_tac
           \\ simp[iforest_steps_def]
           \\ iforest_simp
@@ -1680,7 +1743,9 @@ Proof
       >- (dep_rewrite.DEP_ONCE_REWRITE_TAC [MEM_iforest_step_idem]
           \\ conj_tac >- (CCONTR_TAC \\ gvs[procsOf_def,MEM_nub'])
           \\ qexistsl_tac [‘[]’,‘c’,
-                           ‘s' |+ ((s0,p),f (MAP (THE ∘ FLOOKUP (projectS p s')) l))’]
+                           ‘s' |+ ((s0,q),f (MAP (THE ∘ FLOOKUP (projectS q s')) l))’]
+          \\ reverse conj_tac
+          >- chor_inv_tac
           \\ last_x_assum kall_tac
           \\ simp[iforest_steps_def]
           \\ iforest_simp
@@ -1695,7 +1760,7 @@ Proof
           \\ gvs[])
       \\ gvs $ MEM_FILTER::no_self_comunication_def::itree_thms
       \\ Q.REFINE_EXISTS_TAC ‘q::_’
-      \\ simp[iforest_steps_def,GSYM PULL_EXISTS]
+      \\ simp[iforest_steps_def,GSYM CONJ_ASSOC,GSYM PULL_EXISTS]
       \\ conj_asm1_tac
       >- (last_x_assum kall_tac
           \\ rw[FLOOKUP_chor_forest,chor_itree_def]
@@ -1767,7 +1832,7 @@ Proof
                \\ gvs[chor_itree_def])
           \\ simp[]
           \\ Q.REFINE_EXISTS_TAC ‘q::_’
-          \\ simp[iforest_steps_def,GSYM PULL_EXISTS]
+          \\ simp[iforest_steps_def,GSYM CONJ_ASSOC,GSYM PULL_EXISTS]
           \\ conj_asm1_tac
           >- (match_mp_tac $ cj 1 iforest_cong_thm
               \\ conj_tac
@@ -1830,7 +1895,8 @@ Proof
                      \\ irule compile_network_ok_subset
                      \\ pop_assum (irule_at Any)
                      \\ rw[set_nub',SUBSET_INSERT_RIGHT]))
-             \\ rw[] \\ pop_assum (irule_at Any)
+             \\ rw[] \\ pop_assum (irule_at Any) \\ simp[]
+             \\ first_x_assum (irule_at Any)
              \\ reverse (rw iforest_thm)
              \\ gvs[IS_SOME_EXISTS,no_self_comunication_def]
              \\ Cases_on ‘MEM q1 (procsOf c)’
@@ -1869,6 +1935,8 @@ Proof
           \\ Cases_on ‘MEM q2 (procsOf c)’
           \\ gs[]
           >- (qexistsl_tac [‘[q2]’,‘c’,‘s’]
+              \\ reverse conj_tac
+              >- chor_inv_tac
               \\ iforest_steps_eval
               \\ dxrule_then (ONCE_REWRITE_TAC o single) chor_forest_split
               \\ ‘MEM p (FILTER (λy. y ≠ q2) (procsOf c))’ by simp[MEM_FILTER]
@@ -1876,6 +1944,8 @@ Proof
               \\ split_updates_tac
               \\ forest_chor_tail_tac)
           >- (qexistsl_tac [‘[q2;q2]’,‘c’,‘s’]
+              \\ reverse conj_tac
+              >- chor_inv_tac
               \\ gs[dvarsOf_def,nub'_dvarsOf]
               \\ drule_all_then assume_tac MEM_procsOf_chor_itree
               \\ iforest_steps_eval
@@ -1883,6 +1953,8 @@ Proof
               \\ split_updates_tac
               \\ forest_chor_tail_tac)
           >- (qexistsl_tac [‘[q2;p]’,‘c’,‘s’]
+              \\ reverse conj_tac
+              >- chor_inv_tac
               \\ gs[dvarsOf_def,nub'_dvarsOf]
               \\ drule_all_then assume_tac MEM_procsOf_chor_itree
               \\ iforest_steps_eval
@@ -1890,6 +1962,8 @@ Proof
               \\ split_updates_tac
               \\ forest_chor_tail_tac)
           >- (qexistsl_tac [‘[q2;p;q2]’,‘c’,‘s’]
+              \\ reverse conj_tac
+              >- chor_inv_tac
               \\ gs[dvarsOf_def,nub'_dvarsOf]
               \\ qpat_assum ‘¬MEM p _’ (mp_then Any (drule_all_then assume_tac) MEM_procsOf_chor_itree)
               \\ qpat_assum ‘¬MEM q2 _’ (mp_then Any (drule_all_then assume_tac) MEM_procsOf_chor_itree)
@@ -1899,6 +1973,8 @@ Proof
           \\ Cases_on ‘MEM p (procsOf c)’
           \\ gs[]
           >- (qexistsl_tac [‘[q1;p]’,‘c’,‘s’]
+              \\ reverse conj_tac
+              >- chor_inv_tac
               \\ iforest_steps_eval
               \\ dxrule_then (ONCE_REWRITE_TAC o single) chor_forest_split
               \\ ‘MEM q1 (FILTER (λy. y ≠ p) (procsOf c))’ by simp[MEM_FILTER]
@@ -1907,6 +1983,8 @@ Proof
               \\ split_updates_tac
               \\ forest_chor_tail_tac)
           >- (qexistsl_tac [‘[q1;p;p]’,‘c’,‘s’]
+              \\ reverse conj_tac
+              >- chor_inv_tac
               \\ gs[dvarsOf_def,nub'_dvarsOf]
               \\ drule_all_then assume_tac MEM_procsOf_chor_itree
               \\ iforest_steps_eval
@@ -1914,6 +1992,8 @@ Proof
               \\ split_updates_tac
               \\ forest_chor_tail_tac)
           >- (qexistsl_tac [‘[q1;p;q1]’,‘c’,‘s’]
+              \\ reverse conj_tac
+              >- chor_inv_tac
               \\ gs[dvarsOf_def,nub'_dvarsOf]
               \\ drule_all_then assume_tac MEM_procsOf_chor_itree
               \\ iforest_steps_eval
@@ -1921,6 +2001,8 @@ Proof
               \\ split_updates_tac
               \\ forest_chor_tail_tac)
           >- (qexistsl_tac [‘[q1;p;q1;p]’,‘c’,‘s’]
+              \\ reverse conj_tac
+              >- chor_inv_tac
               \\ gs[dvarsOf_def,nub'_dvarsOf]
               \\ qpat_assum ‘¬MEM p _’ (mp_then Any (drule_all_then assume_tac) MEM_procsOf_chor_itree)
               \\ qpat_assum ‘¬MEM q1 _’ (mp_then Any (drule_all_then assume_tac) MEM_procsOf_chor_itree)
@@ -1947,6 +2029,15 @@ Proof
             \\ gvs[MEM_FILTER]
             \\ match_mp_tac FILTER_ALL_DISTINCT
             \\ simp[procsOf_all_distinct])
+      \\ reverse conj_tac
+      >- (gvs[dvarsOf_dsubst,free_variables_dsubst_eq_Fix,
+              no_undefined_vars_def,free_variables_def,
+              no_self_comunication_def,no_self_comunication_dsubst]
+          \\ irule compile_network_ok_subset
+          \\ simp[GSYM dsubst_procsOf_set_eq_Fix]
+          \\ gs[procsOf_def,nub'_procsOf]
+          \\ irule_at Any compile_network_ok_dsubt
+          \\ simp[] \\ asm_exists_tac \\ simp[])
       \\ simp[chor_iforest_def]
       \\ ‘PERM (procsOf (dsubst c s (Fix s c))) (procsOf (Fix s c))’
         by(match_mp_tac PERM_ALL_DISTINCT
@@ -1991,7 +2082,10 @@ Theorem chor_steps_chor:
     no_self_comunication c ∧
     compile_network_ok s c (procsOf c) ∧
     iforest_step (chor_iforest c s) p = ψ ⇒
-    ∃l c' s'. iforest_steps l ψ = SOME (chor_iforest c' s')
+    ∃l c' s'. iforest_steps l ψ = SOME (chor_iforest c' s') ∧
+              dvarsOf c' = [] ∧ no_undefined_vars (s',c') ∧
+              no_self_comunication c' ∧
+              compile_network_ok s' c' (procsOf c')
 Proof
   rw[]
   \\ irule chor_steps_chor'
