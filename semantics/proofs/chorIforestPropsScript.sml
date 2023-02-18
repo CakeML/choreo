@@ -1208,15 +1208,110 @@ Definition sel_path_def:
 ∧ sel_path _ _ = []
 End
 
+Theorem project_ok_MEM_not_nil:
+  MEM x (procsOf c) ∧
+  project_ok x [] c ⇒
+  project' x [] c ≠ Nil
+Proof
+  Induct_on ‘c’ >>
+  rw[procsOf_def,project_def,MEM_nub',dprocsOf_nil,dprocsOf_empty] >>
+  rpt(PURE_FULL_CASE_TAC >> gvs[])
+QED
+
+Definition consumes_sel_path_def:
+  consumes_sel_path p q (Sel p1 b p2 c1) s it =
+  (if p1 = p ∧ p2 = q then
+    ∃f. (it = Vis (Select p1) f) ∧
+        consumes_sel_path p q c1 s (f (Branch b))
+   else if p1 = p then
+     consumes_sel_path p q c1 s it
+   else
+     it = chor_itree q s (Sel p1 b p2 c1)
+    ) ∧
+  consumes_sel_path p q c1 s it = (it = chor_itree q s c1)
+End
+
+Theorem iforest_steps_chor_true_lemma:
+  ∀procs q c1 ψ todo_list.
+    iforest_chor_upd_act ψ ∧
+    ψ.st = FEMPTY ∧
+    compile_network_ok s c1 procs ∧
+    iforest_get ψ q = SOME(chor_itree q (projectS q s) c1) ∧
+    todo_list = FILTER ($≠ q) (sel_path q c1) ∧
+    set(procsOf c1) ⊆ set procs ∧
+    ALL_DISTINCT procs ∧
+    (∀p. MEM p procs ∧ p ≠ q ⇒ ∃t. iforest_get ψ p = SOME t ∧ consumes_sel_path q p c1 (projectS p s) t) ⇒
+    ∃ψ'. iforest_steps (sel_path q c1) ψ = SOME ψ' ∧
+         iforest_chor_upd_act ψ' ∧ ψ'.st = FEMPTY ∧
+         ∀p. MEM p procs ⇒ iforest_get ψ' p = SOME(chor_itree p (projectS p s) (cut_sel_upto q c1))
+Proof
+  strip_tac >>
+  simp[iforest_get_def] >>
+  recInduct sel_path_ind >> rw[sel_path_def]
+  >- (gvs[procsOf_def,set_nub',consumes_sel_path_def] >>
+      imp_res_tac compile_network_ok_dest_sel' >>
+      imp_res_tac compile_network_ok_dest_sel >>
+      qpat_assum ‘iforest_chor_upd_act _’ (strip_assume_tac o REWRITE_RULE[iforest_chor_upd_act_def]) >>
+      simp[SimpL ``$/\``, iforest_steps_def,iforest_can_act_def,chor_itree_def,IS_SOME_EXISTS,iforest_step_def,iforest_upd_def,FLOOKUP_UPDATE,iforest_get_def,libTheory.the_def] >>
+      first_assum drule >>
+      impl_tac >- simp[] >>
+      strip_tac >>
+      gvs[] >>
+      simp[FLOOKUP_UPDATE] >>
+      qmatch_goalsub_abbrev_tac ‘iforest_steps _ ψ'’ >>
+      last_x_assum(qspec_then ‘ψ'’ mp_tac) >>
+      impl_tac >-
+       (simp[Abbr ‘ψ'’,iforest_chor_upd_act_def,FLOOKUP_UPDATE] >>
+        rw[cut_sel_upto_def] >>
+        gvs[] >>
+        first_x_assum drule_all >>
+        strip_tac >>
+        gvs[]) >>
+      simp[cut_sel_upto_def]) >>
+  simp[cut_sel_upto_def,iforest_steps_def] >>
+  rpt strip_tac >>
+  rename1 ‘MEM _ procs ∧ _ ≠ qq’ >>
+  rename1 ‘FLOOKUP _ pp’ >>
+  Cases_on ‘pp = qq’ >- simp[] >>
+  res_tac >>
+  gvs[consumes_sel_path_def]
+QED
+
 Theorem iforest_steps_chor_true:
   ∀c1 c2.
     FLOOKUP s (v,q) = SOME [1w] ∧
-    compile_network_ok s (IfThen v q c1 c2) (procsOf (IfThen v q c1 c2))
+    compile_network_ok s (IfThen v q c1 c2) (procsOf (IfThen v q c1 c2)) ∧
+    no_self_comunication c1 ∧
+    no_self_comunication c2
     ⇒ ∃l. iforest_steps (q::sel_path q c1++l) (chor_iforest (IfThen v q c1 c2) s) =
       SOME (chor_iforest (cut_sel_upto q c1) s) ∧ (∀x. MEM x l ⇒ MEM x (q::sel_path q c1))
 Proof
-  Induct \\ rw[cut_sel_upto_def,sel_path_def]
-  \\ cheat
+  rpt strip_tac >>
+  simp[iforest_steps_def,iforest_can_act_def,iforest_get_def] >>
+  simp[Once chor_iforest_def] >>
+  simp[FLOOKUP_chor_forest,procsOf_def,MEM_nub',chor_itree_def,IS_SOME_EXISTS,
+       GSYM lookup_projectS',
+       iforest_step_def,iforest_get_def] >>
+  simp[Once chor_iforest_def] >>
+  simp[Once chor_iforest_def] >>
+  simp[FLOOKUP_chor_forest,procsOf_def,MEM_nub',chor_itree_def,IS_SOME_EXISTS,
+       GSYM lookup_projectS',iforest_step_def,iforest_get_def] >>
+  simp[iforest_set_def] >>
+  simp[iforest_steps_APPEND,PULL_EXISTS] >>
+  qmatch_goalsub_abbrev_tac ‘iforest_steps _ ψ’ >>
+  qspecl_then [‘procsOf(IfThen v q c1 c2)’,‘q’,‘c1’,‘ψ’] mp_tac iforest_steps_chor_true_lemma >>
+  simp[] >>
+  impl_tac >-
+   (simp[Abbr ‘ψ’,iforest_chor_upd_act_def,chor_iforest_def] >>
+    conj_tac
+    >- (gvs[compile_network_ok_project_ok] >> rw[] >> res_tac >> imp_res_tac project_ok_ifL) >>
+    simp[iforest_get_def,FLOOKUP_chor_forest,FLOOKUP_UPDATE,procsOf_def,set_nub',
+         all_distinct_nub',SUBSET_DEF,SF DNF_ss] >>
+    rpt strip_tac >>
+    cheat) >>
+  strip_tac >>
+  simp[] >>
+  cheat
 QED
 
 Theorem iforest_steps_chor_false:
