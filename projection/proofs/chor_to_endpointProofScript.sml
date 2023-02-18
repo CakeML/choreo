@@ -504,82 +504,6 @@ Proof
      fs[dprocsOf_MEM_eq])
 QED
 
-Triviality dsubst_subset_procsOf:
-  ∀c dn c'.
-    set (procsOf (dsubst c dn c')) ⊆ set (procsOf c) ∪ set (procsOf c')
-Proof
-  rw []
-  \\ Induct_on ‘c’ \\ rw [procsOf_def,chorLangTheory.dsubst_def,set_nub']
-  \\ irule SUBSET_TRANS \\ asm_exists_tac \\ fs []
-  \\ fs [SUBSET_DEF]
-QED
-
-Triviality procsOf_subset_dsubst:
-  ∀c dn c'.
-    set (procsOf c) ⊆ set (procsOf (dsubst c dn c'))
-Proof
-  rw []
-  \\ Induct_on ‘c’ \\ rw [procsOf_def,chorLangTheory.dsubst_def,set_nub']
-  \\ fs [SUBSET_DEF]
-QED
-
-Theorem dsubst_procsOf_set_eq:
-  ∀c dn. set (procsOf c) = set (procsOf (dsubst c dn c))
-Proof
-  rw [] \\ irule SUBSET_ANTISYM
-  \\ metis_tac [procsOf_subset_dsubst,
-                dsubst_subset_procsOf,
-                UNION_IDEMPOT]
-QED
-
-Theorem dsubst_procsOf_set_eq_Fix:
-  ∀c x y. set (procsOf c) = set (procsOf (dsubst c x (Fix y c)))
-Proof
-  rw [] \\ irule SUBSET_ANTISYM
-  \\ metis_tac [procsOf_subset_dsubst,
-                dsubst_subset_procsOf,
-                procsOf_def,
-                set_nub',
-                UNION_IDEMPOT]
-QED
-
-Theorem procsOf_dsubst_MEM_eq:
-  ∀c p x y. MEM p (procsOf c) ⇔ MEM p (procsOf (dsubst c x (Fix y c)))
-Proof
-  rw []
-  \\ qspecl_then [‘c’,‘x’,‘y’] (assume_tac) dsubst_procsOf_set_eq_Fix
-  \\ pop_assum (assume_tac o Q.AP_TERM ‘(λx. p IN x)’) \\ fs []
-QED
-
-Theorem procsOf_dsubst_MEM =
-  SPEC_ALL procsOf_dsubst_MEM_eq
-  |> EQ_IMP_RULE
-  |> fst
-  |> GEN_ALL
-
-Theorem dsubst_procsOf_MEM =
-  SPEC_ALL procsOf_dsubst_MEM_eq
-  |> EQ_IMP_RULE
-  |> snd
-  |> GEN_ALL
-
-Theorem procsOf_dsubst_not_MEM_eq =
-  “¬MEM p (procsOf (c : chorLang$chor))”
-  |> ONCE_REWRITE_CONV [procsOf_dsubst_MEM_eq]
-  |> GEN_ALL
-
-Theorem procsOf_dsubst_not_MEM =
-  SPEC_ALL procsOf_dsubst_not_MEM_eq
-  |> EQ_IMP_RULE
-  |> fst
-  |> GEN_ALL
-
-Theorem dsubst_procsOf_not_MEM =
-  SPEC_ALL procsOf_dsubst_not_MEM_eq
-  |> EQ_IMP_RULE
-  |> snd
-  |> GEN_ALL
-
 Theorem project_nonmember_nil:
   ∀p c.
   ~MEM p (procsOf c) ⇒ project' p [] c = Nil
@@ -1738,14 +1662,6 @@ Proof
   Induct_on `c1` >> rw[cut_sel_upto_def] >>
   fs[project_def] >>
   every_case_tac >> fs[]
-QED
-
-Theorem procsOf_cut_sel_upto:
-  !p c1.
-  set(procsOf(cut_sel_upto p c1)) ⊆ set(procsOf c1)
-Proof
-  Induct_on `c1` >> rw[cut_sel_upto_def,procsOf_def,set_nub'] >>
-  fs[SUBSET_DEF] >> metis_tac[]
 QED
 
 Theorem compile_network_project:

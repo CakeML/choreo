@@ -1100,6 +1100,34 @@ Proof
       TOP_CASE_TAC >> fs[] >> rw[endpointLangTheory.dsubst_def,chorLangTheory.dsubst_def])
 QED
 
+Theorem project_ok_dsubst:
+  ∀dn c proc.
+    dvarsOf(Fix dn c) = [] ∧
+    project_ok proc [] (Fix dn c) ⇒
+    project_ok proc [] (dsubst c dn (Fix dn c))
+Proof
+  rpt strip_tac >>
+  drule_then drule project'_dsubst_commute >>
+  disch_then(qspec_then ‘c’ mp_tac) >>
+  impl_tac
+  >- (rw[] >>
+      fs[project_def] >>
+      every_case_tac >> fs[] >>
+      dep_rewrite.DEP_ONCE_REWRITE_TAC[project_nonmember_nil_lemma] >>
+      fs[dvarsOf_def,dprocsOf_MEM_eq,FILTER_EQ_NIL,EVERY_MEM,MEM_nub',SUBSET_DEF]) >>
+  rw[]
+QED
+
+Theorem compile_network_ok_dsubt:
+  ∀l c dn s.
+    dvarsOf (Fix dn c) = [] ∧
+    compile_network_ok s (Fix dn c) l ⇒
+    compile_network_ok s (dsubst c dn (Fix dn c)) l
+Proof
+  Induct \\ rw[compile_network_gen_def]
+  \\ metis_tac [project_ok_dsubst]
+QED
+
 Theorem project'_dsubst_commute_nil:
   ∀dn c proc c'.
     dvarsOf(Fix dn c) = [] ∧
@@ -1153,6 +1181,26 @@ Theorem compile_network_ok_dest_com:
   ∀s p1 v1 p2 v2 c l.
     compile_network_ok s (Com p1 v1 p2 v2 c) l
     ⇒ compile_network_ok (s |+ ((v2,p2),d)) c l
+Proof
+  Induct_on `l`
+  \\ rw [compile_network_gen_def,project_def]
+  \\ metis_tac []
+QED
+
+Theorem compile_network_ok_dest_com':
+  ∀s s' p1 v1 p2 v2 c l.
+    compile_network_ok s (Com p1 v1 p2 v2 c) l
+    ⇒ compile_network_ok s' c l
+Proof
+  Induct_on `l`
+  \\ rw [compile_network_gen_def,project_def]
+  \\ metis_tac []
+QED
+
+Theorem compile_network_ok_dest_let:
+  ∀l s s' v p f lv c.
+    compile_network_ok s (Let v p f lv c) l
+    ⇒ compile_network_ok s' c l
 Proof
   Induct_on `l`
   \\ rw [compile_network_gen_def,project_def]
@@ -1321,5 +1369,109 @@ Proof
   Induct \\ rw[cut_sel_upto_def]
   \\ metis_tac [compile_network_ok_dest_sel]
 QED
+
+Theorem procsOf_cut_sel_upto:
+  !p c1.
+  set(procsOf(cut_sel_upto p c1)) ⊆ set(procsOf c1)
+Proof
+  Induct_on `c1` >> rw[cut_sel_upto_def,procsOf_def,set_nub'] >>
+  fs[SUBSET_DEF] >> metis_tac[]
+QED
+
+Theorem dvarsOf_dsubst:
+∀c fn c'.
+  dvarsOf (Fix fn c) = [] ∧
+  dvarsOf c' = []
+  ⇒ dvarsOf (dsubst c fn c') = []
+Proof
+  rw[]
+  \\ drule set_dvarsOf_dsubst_eq
+  \\ disch_then (qspecl_then [‘c’,‘fn’] assume_tac)
+  \\ gs[dvarsOf_def,nub'_dvarsOf]
+  \\ mp_tac list_to_set_diff
+  \\ qspecl_then [‘[fn]’,‘dvarsOf c’] assume_tac list_to_set_diff
+  \\ gs[] \\ pop_assum kall_tac
+  \\ qmatch_asmsub_abbrev_tac ‘FILTER l vars = []’
+  \\ qmatch_asmsub_abbrev_tac ‘set (FILTER r vars)’
+  \\ ‘FILTER r vars = FILTER l vars’ by
+    (UNABBREV_ALL_TAC \\ gs[FILTER_EQ] \\ metis_tac [])
+  \\ gs[]
+QED
+
+Triviality dsubst_subset_procsOf:
+  ∀c dn c'.
+    set (procsOf (dsubst c dn c')) ⊆ set (procsOf c) ∪ set (procsOf c')
+Proof
+  rw []
+  \\ Induct_on ‘c’ \\ rw [procsOf_def,chorLangTheory.dsubst_def,set_nub']
+  \\ irule SUBSET_TRANS \\ asm_exists_tac \\ fs []
+  \\ fs [SUBSET_DEF]
+QED
+
+Triviality procsOf_subset_dsubst:
+  ∀c dn c'.
+    set (procsOf c) ⊆ set (procsOf (dsubst c dn c'))
+Proof
+  rw []
+  \\ Induct_on ‘c’ \\ rw [procsOf_def,chorLangTheory.dsubst_def,set_nub']
+  \\ fs [SUBSET_DEF]
+QED
+
+Theorem dsubst_procsOf_set_eq:
+  ∀c dn. set (procsOf c) = set (procsOf (dsubst c dn c))
+Proof
+  rw [] \\ irule SUBSET_ANTISYM
+  \\ metis_tac [procsOf_subset_dsubst,
+                dsubst_subset_procsOf,
+                UNION_IDEMPOT]
+QED
+
+Theorem dsubst_procsOf_set_eq_Fix:
+  ∀c x y. set (procsOf c) = set (procsOf (dsubst c x (Fix y c)))
+Proof
+  rw [] \\ irule SUBSET_ANTISYM
+  \\ metis_tac [procsOf_subset_dsubst,
+                dsubst_subset_procsOf,
+                procsOf_def,
+                set_nub',
+                UNION_IDEMPOT]
+QED
+
+Theorem procsOf_dsubst_MEM_eq:
+  ∀c p x y. MEM p (procsOf c) ⇔ MEM p (procsOf (dsubst c x (Fix y c)))
+Proof
+  rw []
+  \\ qspecl_then [‘c’,‘x’,‘y’] (assume_tac) dsubst_procsOf_set_eq_Fix
+  \\ pop_assum (assume_tac o Q.AP_TERM ‘(λx. p IN x)’) \\ fs []
+QED
+
+Theorem procsOf_dsubst_MEM =
+  SPEC_ALL procsOf_dsubst_MEM_eq
+  |> EQ_IMP_RULE
+  |> fst
+  |> GEN_ALL
+
+Theorem dsubst_procsOf_MEM =
+  SPEC_ALL procsOf_dsubst_MEM_eq
+  |> EQ_IMP_RULE
+  |> snd
+  |> GEN_ALL
+
+Theorem procsOf_dsubst_not_MEM_eq =
+  “¬MEM p (procsOf (c : chorLang$chor))”
+  |> ONCE_REWRITE_CONV [procsOf_dsubst_MEM_eq]
+  |> GEN_ALL
+
+Theorem procsOf_dsubst_not_MEM =
+  SPEC_ALL procsOf_dsubst_not_MEM_eq
+  |> EQ_IMP_RULE
+  |> fst
+  |> GEN_ALL
+
+Theorem dsubst_procsOf_not_MEM =
+  SPEC_ALL procsOf_dsubst_not_MEM_eq
+  |> EQ_IMP_RULE
+  |> snd
+  |> GEN_ALL
 
 val _ = export_theory ()

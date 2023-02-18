@@ -57,26 +57,6 @@ Definition closed_dvars:
        ALOOKUP dvars dn = SOME procs ⇒ set procs ⊆ set (procsOf c))
 End
 
-Theorem dvarsOf_dsubst:
-∀c fn c'.
-  dvarsOf (Fix fn c) = [] ∧
-  dvarsOf c' = []
-  ⇒ dvarsOf (dsubst c fn c') = []
-Proof
-  rw[]
-  \\ drule set_dvarsOf_dsubst_eq
-  \\ disch_then (qspecl_then [‘c’,‘fn’] assume_tac)
-  \\ gs[dvarsOf_def,nub'_dvarsOf]
-  \\ mp_tac list_to_set_diff
-  \\ qspecl_then [‘[fn]’,‘dvarsOf c’] assume_tac list_to_set_diff
-  \\ gs[] \\ pop_assum kall_tac
-  \\ qmatch_asmsub_abbrev_tac ‘FILTER l vars = []’
-  \\ qmatch_asmsub_abbrev_tac ‘set (FILTER r vars)’
-  \\ ‘FILTER r vars = FILTER l vars’ by
-    (UNABBREV_ALL_TAC \\ gs[FILTER_EQ] \\ metis_tac [])
-  \\ gs[]
-QED
-
 Theorem chor_to_endpoint_itree_eq:
   ∀p dvars c s.
     dvarsOf c = [] ∧
