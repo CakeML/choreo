@@ -1218,6 +1218,17 @@ Proof
   rpt(PURE_FULL_CASE_TAC >> gvs[])
 QED
 
+Theorem project_NOT_MEM_nil:
+  ¬MEM x (procsOf c) ∧ dvarsOf c = [] ⇒
+  project x [] c = (T,Nil)
+Proof
+  Induct_on ‘c’ >>
+  rw[procsOf_def,project_def,MEM_nub',dprocsOf_nil,dprocsOf_empty,dvarsOf_def,nub'_nil] >>
+  rpt(PURE_FULL_CASE_TAC >> gvs[]) >>
+  imp_res_tac split_sel_nonproc_NONE >>
+  gvs[]
+QED
+
 Definition consumes_sel_path_def:
   consumes_sel_path p q (Sel p1 b p2 c1) s it =
   (if p1 = p ∧ p2 = q then
@@ -1277,12 +1288,99 @@ Proof
   gvs[consumes_sel_path_def]
 QED
 
+Theorem chor_itree_merge_id:
+  chor_itree_merge t t = t
+Proof
+  simp[Once itree_bisimulation] >>
+  qexists_tac ‘λt1 t2. t1 = chor_itree_merge t2 t2 ∨ t1 = t2’ >>
+  rw[] >>
+  Cases_on ‘t’ >> gvs[chor_itree_merge_def] >>
+  rename1 ‘chor_itree_merge(Ret ret)’ >> Cases_on ‘ret’ >> gvs[chor_itree_merge_def]
+QED
+
+Theorem chor_itree_project_eq:
+  ∀s p dvars c1 c2.
+    project p [] c1 = project p [] c2 ⇒
+    chor_itree p s c1 = chor_itree p s c2
+Proof
+  cheat
+QED
+
+Theorem consumes_path_self:
+  ∀p q c1 s.
+    p ≠ q ⇒ consumes_sel_path p q c1 s (chor_itree q s c1)
+Proof
+  ntac 2 strip_tac >>
+  Induct_on ‘c1’ >> rw[consumes_sel_path_def] >>
+  gvs[chor_itree_def]
+QED
+
+Theorem chor_itree_merge_split_sel:
+  ∀p q c1 b r.
+    p ≠ q ∧
+    split_sel p q c1 = SOME (b,r) ⇒
+    chor_itree p s c1 = chor_itree p s (Sel q b p r)
+Proof
+  recInduct split_sel_ind >>
+  rw[split_sel_def] >>
+  gvs[chor_itree_def]
+QED
+
+Theorem consumes_sel_merge_split_sel:
+  ∀p q c1 b r.
+    p ≠ q ∧
+    split_sel p q c1 = SOME (b,r) ⇒
+    consumes_sel_path q p c1 s (Vis (Select q) f) = consumes_sel_path q p r s (f (Branch b))
+Proof
+  recInduct split_sel_ind >>
+  rw[split_sel_def] >>
+  gvs[consumes_sel_path_def]
+QED
+
+Theorem consumes_sel_path_true:
+  compile_network_ok s (IfThen v q c1 c2) (procsOf (IfThen v q c1 c2)) ∧
+  p ≠ q ∧
+  dvarsOf (IfThen v q c1 c2) = [] ∧
+  FLOOKUP s (v,q) = SOME [1w] ⇒
+  consumes_sel_path q p c1 (projectS p s) (chor_itree p (projectS p s) (IfThen v q c1 c2))
+Proof
+  rw[compile_network_ok_project_ok] >>
+  ‘project_ok p [] (IfThen v q c1 c2)’
+    by(Cases_on ‘MEM p (procsOf (IfThen v q c1 c2))’
+       >- res_tac >>
+       drule project_NOT_MEM_nil >>
+       simp[dvarsOf_def]) >>
+  last_x_assum kall_tac >>
+  gvs[project_def] >>
+  rpt(PURE_FULL_CASE_TAC >> gvs[]) >>
+  simp[chor_itree_def]
+  >- (imp_res_tac chor_itree_project_eq >>
+      pop_assum $ assume_tac o GSYM >>
+      simp[chor_itree_merge_id] >>
+      Cases_on ‘c1’ >> gvs[consumes_sel_path_def,split_sel_def] >>
+      rw[] >>
+      gvs[chor_itree_def] >>
+      simp[consumes_path_self])
+  >- (imp_res_tac chor_itree_project_eq >>
+      pop_assum $ assume_tac o GSYM >>
+      simp[chor_itree_merge_id] >>
+      Cases_on ‘c1’ >> gvs[consumes_sel_path_def,split_sel_def] >>
+      rw[] >>
+      gvs[chor_itree_def] >>
+      simp[consumes_path_self])
+  >- (imp_res_tac chor_itree_merge_split_sel >>
+      simp[chor_itree_def,chor_itree_merge_def] >>
+      drule_all consumes_sel_merge_split_sel >>
+      strip_tac >>
+      simp[chor_itree_merge_def] >>
+      simp[consumes_path_self])
+QED
+
 Theorem iforest_steps_chor_true:
   ∀c1 c2.
     FLOOKUP s (v,q) = SOME [1w] ∧
-    compile_network_ok s (IfThen v q c1 c2) (procsOf (IfThen v q c1 c2)) ∧
-    no_self_comunication c1 ∧
-    no_self_comunication c2
+    dvarsOf (IfThen v q c1 c2) = [] ∧
+    compile_network_ok s (IfThen v q c1 c2) (procsOf (IfThen v q c1 c2))
     ⇒ ∃l. iforest_steps (q::sel_path q c1++l) (chor_iforest (IfThen v q c1 c2) s) =
       SOME (chor_iforest (cut_sel_upto q c1) s) ∧ (∀x. MEM x l ⇒ MEM x (q::sel_path q c1))
 Proof
@@ -1308,7 +1406,7 @@ Proof
     simp[iforest_get_def,FLOOKUP_chor_forest,FLOOKUP_UPDATE,procsOf_def,set_nub',
          all_distinct_nub',SUBSET_DEF,SF DNF_ss] >>
     rpt strip_tac >>
-    cheat) >>
+    match_mp_tac consumes_sel_path_true >> simp[]) >>
   strip_tac >>
   simp[] >>
   cheat
