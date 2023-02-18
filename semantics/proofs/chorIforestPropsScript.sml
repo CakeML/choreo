@@ -891,6 +891,16 @@ Proof
   metis_tac[ALL_DISTINCT_PERM]
 QED
 
+Theorem iforest_steps_APPEND:
+  iforest_steps (x++y) ψ = SOME ψ' ⇔
+    ∃ψ''. iforest_steps x ψ = SOME ψ'' ∧ iforest_steps y ψ'' = SOME ψ'
+Proof
+  qid_spec_tac ‘ψ’
+  \\ Induct_on ‘x’ \\ fs [iforest_steps_def]
+  \\ rw [] \\ eq_tac \\ rw []
+  \\ res_tac \\ fs []
+QED
+
 Theorem chor_itree_merge_Error:
   ∀t1 t2.
     chor_itree_merge t1 t2 = Ret Error ⇔ (t1 = Ret Error ∧ t2 = Ret Error) ∨
