@@ -1084,9 +1084,11 @@ Theorem iforest_steps_chor_true_lemma:
     todo_list = FILTER ($≠ q) (sel_path q c1) ∧
     set(procsOf c1) ⊆ set procs ∧
     ALL_DISTINCT procs ∧
+    FDOM(ψ.forest) = set procs ∧
     (∀p. MEM p procs ∧ p ≠ q ⇒ ∃t. iforest_get ψ p = SOME t ∧ consumes_sel_path q p c1 (projectS p s) t) ⇒
     ∃ψ'. iforest_steps (sel_path q c1) ψ = SOME ψ' ∧
          iforest_chor_upd_act ψ' ∧ ψ'.st = FEMPTY ∧
+         FDOM(ψ'.forest) = set procs ∧
          ∀p. MEM p procs ⇒ iforest_get ψ' p = SOME(chor_itree p (projectS p s) (cut_sel_upto q c1))
 Proof
   strip_tac >>
@@ -1108,6 +1110,7 @@ Proof
        (simp[Abbr ‘ψ'’,iforest_chor_upd_act_def,FLOOKUP_UPDATE] >>
         rw[cut_sel_upto_def] >>
         gvs[] >>
+        simp[SET_EQ_SUBSET,SUBSET_DEF] >>
         first_x_assum drule_all >>
         strip_tac >>
         gvs[]) >>
@@ -1209,6 +1212,50 @@ Proof
       simp[consumes_path_self])
 QED
 
+Theorem iforest_steps_cleanup_DRESTRICT:
+  ∀l ψ.
+    ALL_DISTINCT l ∧
+    (∀p. MEM p l ⇒ iforest_get ψ p = SOME(Ret End)) ⇒
+    iforest_steps l ψ = SOME(ψ with forest := DRESTRICT ψ.forest (COMPL(set l)))
+Proof
+  Induct >>
+  rw[iforest_steps_def]
+  >- rw[iforest_component_equality,fmap_eq_flookup,FLOOKUP_DRESTRICT]
+  >- simp[iforest_can_act_def] >>
+  simp[iforest_step_def,iforest_del_def] >>
+  last_x_assum(dep_rewrite.DEP_ONCE_REWRITE_TAC o single) >>
+  simp[iforest_get_def,DOMSUB_FLOOKUP_THM] >>
+  rw[iforest_component_equality,fmap_eq_flookup,FLOOKUP_DRESTRICT,
+     DOMSUB_FLOOKUP_THM] >>
+  metis_tac[iforest_get_def]
+QED
+
+Theorem compile_network_ok_procsOf_if:
+  compile_network_ok s (IfThen v q c1 c2) (procsOf (IfThen v q c1 c2)) ∧
+  dvarsOf(IfThen v q c1 c2) = [] ⇒
+  set(procsOf c2) DIFF {q} = set(procsOf c1) DIFF {q}
+Proof
+  spose_not_then strip_assume_tac >>
+  gvs[SET_EQ_SUBSET,SUBSET_DEF,dvarsOf_def,nub'_nil] >>
+  drule_all_then strip_assume_tac project_NOT_MEM_nil >>
+  gvs[compile_network_ok_project_ok,procsOf_def,MEM_nub',SF DNF_ss] >>
+  res_tac >>
+  imp_res_tac project_ok_ifL >>
+  imp_res_tac project_ok_ifR >>
+  drule_then drule project_ok_MEM_not_nil >>
+  strip_tac >>
+  gvs[project_def] >>
+  every_case_tac >> gvs[] >>
+  imp_res_tac split_sel_nonproc_NONE >> gvs[]
+QED
+
+Theorem procsOf_cut:
+  set(procsOf c1) = set(sel_path q c1) ∪ set(procsOf(cut_sel_upto q c1))
+Proof
+  Induct_on ‘c1’ >> rw[sel_path_def,cut_sel_upto_def,procsOf_def,set_nub'] >>
+  gvs[SET_EQ_SUBSET,SUBSET_DEF]
+QED
+
 Theorem iforest_steps_chor_true:
   ∀c1 c2.
     FLOOKUP s (v,q) = SOME [1w] ∧
@@ -1238,11 +1285,38 @@ Proof
     >- (gvs[compile_network_ok_project_ok] >> rw[] >> res_tac >> imp_res_tac project_ok_ifL) >>
     simp[iforest_get_def,FLOOKUP_chor_forest,FLOOKUP_UPDATE,procsOf_def,set_nub',
          all_distinct_nub',SUBSET_DEF,SF DNF_ss] >>
+    conj_tac >- rw[SET_EQ_SUBSET,SUBSET_DEF,chor_forest_FDOM,MEM_nub'] >>
     rpt strip_tac >>
     match_mp_tac consumes_sel_path_true >> simp[]) >>
   strip_tac >>
   simp[] >>
-  cheat
+  qexists_tac ‘FILTER (λx. ¬MEM x (procsOf(cut_sel_upto q c1))) (nub'(q::sel_path q c1))’ >>
+  reverse conj_tac >- simp[MEM_FILTER,MEM_nub'] >>
+  qmatch_goalsub_abbrev_tac ‘FILTER _ a1’ >>
+  dep_rewrite.DEP_ONCE_REWRITE_TAC[iforest_steps_cleanup_DRESTRICT] >>
+  conj_tac
+  >- (simp[Abbr ‘a1’,FILTER_ALL_DISTINCT,all_distinct_nub'] >>
+      rw[MEM_FILTER,MEM_nub'] >>
+      gvs[procsOf_def,MEM_nub',SF DNF_ss] >>
+      gvs[dvarsOf_def,nub'_nil] >>
+      metis_tac[MEM_procsOf_chor_itree,dvarsOf_cut_sel_upto,procsOf_cut,IN_UNION]) >>
+  simp[chor_iforest_def,iforest_component_equality] >>
+  gvs[iforest_chor_upd_act_def,iforest_get_def] >>
+  rw[fmap_eq_flookup,FLOOKUP_DRESTRICT,chor_forest_def,Abbr ‘a1’] >>
+  simp[MEM_FILTER,MEM_nub',FLOOKUP_chor_forest] >>
+  ‘∀x. MEM x (procsOf(cut_sel_upto q c1)) ⇒ MEM x (procsOf (IfThen v q c1 c2))’
+    by(rpt strip_tac >>
+       simp[procsOf_def,MEM_nub'] >>
+       metis_tac[procsOf_cut,IN_UNION]) >>
+  rw[] >>
+  simp[flookup_thm] >>
+  gvs[] >>
+  simp[procsOf_def,MEM_nub'] >>
+  reverse conj_asm1_tac
+  >- (drule_all compile_network_ok_procsOf_if >>
+      rw[SET_EQ_SUBSET,SUBSET_DEF] >>
+      metis_tac[]) >>
+  metis_tac[procsOf_cut,IN_UNION]
 QED
 
 Theorem iforest_steps_chor_false:
