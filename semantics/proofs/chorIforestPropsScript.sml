@@ -630,6 +630,14 @@ Definition iforest_steps_def:
                               else NONE
 End
 
+Definition iforest_steps_no_error_def:
+  iforest_steps_no_error [] ψ      = SOME ψ
+  ∧ iforest_steps_no_error (p::xs) ψ = if iforest_can_act ψ p ∧ iforest_get ψ p ≠ SOME(Ret Error)
+                              then
+                                iforest_steps_no_error xs (iforest_step ψ p)
+                              else NONE
+End
+
 Theorem iforest_chor_upd_act_step_idem:
   ∀ψ p. iforest_chor_upd_act ψ ⇔ iforest_chor_upd_act (iforest_step ψ p)
 Proof
@@ -677,6 +685,59 @@ Proof
   \\ qsuff_tac ‘iforest_steps (p::l) (iforest_step ψ h) =
       SOME (iforest_step ψ' p)’
   >- simp[iforest_steps_def]
+  \\ metis_tac [ iforest_chor_upd_act_step_idem
+               , iforest_cong_can_act_step
+               , iforest_chor_upd_act_iforest_cong]
+QED
+
+Theorem iforest_get_iforest_step:
+  h ≠ p ⇒ iforest_get(iforest_step ψ h) p = iforest_get ψ p
+Proof
+  iforest_simp >>
+  every_case_tac >> gvs[FLOOKUP_UPDATE,DOMSUB_FLOOKUP_THM]
+QED
+
+Theorem iforest_steps_no_error_APPEND:
+  ∀ps qs ψ ψ'.
+    iforest_steps_no_error (ps ++ qs) ψ =
+    case iforest_steps_no_error ps ψ of
+      NONE => NONE
+    | SOME ψ' => iforest_steps_no_error qs ψ'
+Proof
+  Induct >> rw[iforest_steps_no_error_def]
+QED
+
+Theorem iforest_chor_upd_act_steps_no_error_pres:
+  ∀ψ l ψ'.
+    iforest_chor_upd_act ψ ∧ iforest_steps_no_error l ψ = SOME ψ' ⇒
+    iforest_chor_upd_act ψ'
+Proof
+  Induct_on ‘l’ >> rw[iforest_steps_no_error_def,AllCaseEqs()] >>
+  simp[] >> metis_tac[iforest_chor_upd_act_step_idem]
+QED
+
+Theorem iforest_steps_no_error_chor_swap:
+  ∀l p ψ ψ'.
+    iforest_chor_upd_act ψ ∧
+    ¬MEM p l ∧
+    iforest_can_act ψ p ∧
+    iforest_get ψ p ≠ SOME(Ret Error) ∧
+    iforest_steps_no_error l ψ = SOME ψ'
+    ⇒
+    iforest_steps_no_error (p::l) ψ = SOME (iforest_step ψ' p)
+Proof
+  Induct \\ rw[iforest_steps_no_error_def]
+  >- (drule iforest_chor_upd_act_iforest_cong \\ strip_tac
+      \\ qpat_x_assum ‘_ ≠ _’ (assume_tac o GSYM)
+      \\ metis_tac[iforest_cong_can_act_step])
+  \\ drule_all_then (mp_tac o GSYM) iforest_chor_act_swap
+  \\ rw[]
+  >- (last_x_assum kall_tac \\ iforest_simp \\ every_case_tac \\ gvs[FLOOKUP_UPDATE,DOMSUB_FLOOKUP_THM])
+  \\ ‘iforest_get (iforest_step ψ h) p ≠ SOME (Ret Error)’
+    by(rw[iforest_get_iforest_step])
+  \\ qsuff_tac ‘iforest_steps_no_error (p::l) (iforest_step ψ h) =
+      SOME (iforest_step ψ' p)’
+  >- simp[iforest_steps_no_error_def]
   \\ metis_tac [ iforest_chor_upd_act_step_idem
                , iforest_cong_can_act_step
                , iforest_chor_upd_act_iforest_cong]
@@ -860,14 +921,6 @@ Proof
   metis_tac[split_sel_project_ok]
 QED
 
-Theorem no_undefined_vars_FUPDATE_IMP:
-  no_undefined_vars(s |+ x,c) ⇒ no_undefined_vars (s,c)
-Proof
-  Cases_on ‘x’ \\
-  gvs[no_undefined_vars_def,FDOM_FUPDATE,SUBSET_DEF] \\
-  metis_tac[]  
-QED
-
 Theorem no_undefined_vars_Let:
   no_undefined_vars (s,Let p v f l c) ⇒
   no_undefined_vars (s |+ ((p,v),x),c)
@@ -875,7 +928,7 @@ Proof
   rw[no_undefined_vars_def,free_variables_def,SUBSET_DEF,MEM_MAP, PULL_EXISTS, SF DNF_ss] \\
   metis_tac[]
 QED
-        
+
 Theorem chor_itree_not_error:
   project_ok p [] c ∧
   dvarsOf c = [] ∧
@@ -922,6 +975,149 @@ Proof
   \\ gvs[iforest_chor_upd_act_iforest_step,iforest_steps_def]
   \\ irule iforest_cong_can_act_step
   \\ gs[iforest_steps_def,iforest_chor_upd_act_iforest_cong]
+QED
+
+Theorem iforest_step_no_error:
+  ∀ψ p l ψ' p'.
+    iforest_steps_no_error l ψ = SOME ψ' ∧ iforest_get ψ' p' ≠ SOME(Ret Error) ⇒
+    iforest_get ψ p' ≠ SOME(Ret Error)
+Proof
+  rw[] >>
+  spose_not_then strip_assume_tac >>
+  rename1 ‘iforest_steps_no_error _ ψ''’ >>
+  rpt $ pop_assum mp_tac >>
+  qid_spec_tac ‘ψ''’ >>
+  Induct_on ‘l’ >>
+  rpt strip_tac >>
+  gvs[iforest_steps_no_error_def] >>
+  last_x_assum drule >>
+  strip_tac >>
+  gvs[iforest_step_def] >>
+  (* yuck *)
+  every_case_tac >>
+  gvs[iforest_del_def,iforest_set_def,iforest_upd_def,iforest_get_def,DOMSUB_FLOOKUP_THM,FLOOKUP_UPDATE] >>
+  every_case_tac >> gvs[FLOOKUP_UPDATE] >>
+  every_case_tac >> gvs[FLOOKUP_UPDATE]
+QED
+
+CoInductive ae_error_free:
+  iforest_get ψ p ≠ SOME(Ret Error) ∧
+  (∀p'. ∃l ψ'. iforest_steps_no_error l (iforest_step ψ p') = SOME ψ' ∧ ae_error_free p ψ')
+  ⇒ ae_error_free p ψ
+End
+
+Theorem iforest_can_act_iforest_steps:
+  ∀ψ' p l ψ.
+  iforest_cong ψ ∧
+  ¬MEM p l ∧
+  iforest_can_act ψ p ∧
+  iforest_steps l ψ = SOME ψ' ⇒ iforest_can_act ψ' p
+Proof
+  ntac 2 strip_tac >>
+  Induct >>
+  rw[iforest_steps_def] >> simp[] >>
+  last_x_assum match_mp_tac >>
+  first_x_assum $ irule_at $ Pos last >>
+  simp[iforest_cong_step,iforest_cong_can_act_step]
+QED
+
+Theorem iforest_can_act_iforest_steps_no_error:
+  ∀ψ' p l ψ.
+  iforest_cong ψ ∧
+  ¬MEM p l ∧
+  iforest_can_act ψ p ∧
+  iforest_steps_no_error l ψ = SOME ψ' ⇒ iforest_can_act ψ' p
+Proof
+  ntac 2 strip_tac >>
+  Induct >>
+  rw[iforest_steps_no_error_def] >> simp[] >>
+  last_x_assum match_mp_tac >>
+  first_x_assum $ irule_at $ Pos last >>
+  simp[iforest_cong_step,iforest_cong_can_act_step]
+QED
+
+Theorem iforest_steps_no_error_innocuous_step:
+  ∀l ψ p.
+    ¬MEM p l ∧
+    iforest_chor_upd_act ψ ∧
+    iforest_can_act ψ p ∧
+    iforest_steps_no_error l ψ = SOME ψ' ⇒
+    iforest_steps_no_error l (iforest_step ψ p) = SOME (iforest_step ψ' p)
+Proof
+  Induct >> rw[iforest_steps_no_error_def]
+  >- (last_x_assum kall_tac >> simp[iforest_cong_can_act_step,iforest_chor_upd_act_iforest_cong])
+  >- (last_x_assum kall_tac >> iforest_simp >> every_case_tac >> gvs[DOMSUB_FLOOKUP_THM,FLOOKUP_UPDATE]) >>
+  dep_rewrite.DEP_ONCE_REWRITE_TAC[iforest_chor_act_swap] >>
+  simp[] >>
+  last_x_assum match_mp_tac >>
+  simp[GSYM iforest_chor_upd_act_step_idem,iforest_cong_can_act_step,iforest_chor_upd_act_iforest_cong]
+QED
+
+Theorem iforest_compose_steps:
+  ∀l' l ψ ψ'' ψ'.
+    iforest_chor_upd_act ψ ∧
+    iforest_steps l' ψ = SOME ψ'' ∧
+    iforest_steps_no_error l ψ = SOME ψ' ⇒
+    ∃l'' l''' ψ'''. (LENGTH l'' ≤ LENGTH l' ∧ iforest_steps l'' ψ' = SOME ψ''' ∧
+                ((iforest_get ψ'' q = SOME(Ret Error)) ⇒ (iforest_get ψ''' q = SOME(Ret Error))))
+Proof
+  Induct >>
+  rw[iforest_steps_def]
+  >- metis_tac[iforest_step_no_error] >>
+  rename1 ‘iforest_can_act _ p’ >>
+  reverse $ Cases_on ‘MEM p l’
+  >- (‘iforest_steps_no_error l (iforest_step ψ p) = SOME (iforest_step ψ' p)’
+        by(match_mp_tac iforest_steps_no_error_innocuous_step >> simp[]) >>
+      first_x_assum $ drule_at $ Pos last >>
+      disch_then $ drule_at $ Pos last >>
+      impl_tac >- simp[GSYM iforest_chor_upd_act_step_idem] >>
+      strip_tac >>
+      rename1 ‘LENGTH ml ≤ _’ >>
+      qexists_tac ‘p::ml’ >>
+      simp[iforest_steps_def] >>
+      metis_tac[iforest_can_act_iforest_steps_no_error,iforest_chor_upd_act_iforest_cong]) >>
+  gvs[Once MEM_SPLIT_APPEND_first] >>
+  rename1 ‘ (ls1 ++ [p] ++ ls2)’ >>
+  gvs[iforest_steps_no_error_APPEND,AllCaseEqs(),iforest_steps_no_error_def] >>
+  ‘iforest_get ψ p ≠ SOME (Ret Error)’
+    by metis_tac[iforest_step_no_error] >>
+  drule_all iforest_steps_no_error_chor_swap >>
+  rw[iforest_steps_no_error_def] >>
+  last_x_assum(qspecl_then [‘ls1 ++ ls2’,‘iforest_step ψ p’] mp_tac) >>
+  simp[iforest_steps_no_error_APPEND,AllCaseEqs(),GSYM iforest_chor_upd_act_step_idem] >>
+  strip_tac >>
+  rename1 ‘LENGTH ml ≤ _’ >>
+  qexists_tac ‘ml’ >>
+  simp[]
+QED
+
+Theorem iforest_steps_no_error:
+  ∀l' ψ p' ψ''.
+    iforest_chor_upd_act ψ ∧
+    iforest_steps l' ψ = SOME ψ'' ∧
+    ae_error_free p' ψ ⇒
+    iforest_get ψ'' p' ≠ SOME(Ret Error)
+Proof
+  strip_tac >>
+  Induct_on ‘LENGTH l'’ using COMPLETE_INDUCTION >>
+  Cases >>
+  rw[iforest_steps_def] >> simp[]
+  >- gvs[Once ae_error_free_cases] >>
+  rename1 ‘iforest_step ψ q’ >>
+  qhdtm_x_assum ‘ae_error_free’ $ strip_assume_tac o REWRITE_RULE[Once ae_error_free_cases] >>
+  first_x_assum $ qspec_then ‘q’ strip_assume_tac >>
+  ‘iforest_chor_upd_act (iforest_step ψ q)’ by simp[GSYM iforest_chor_upd_act_step_idem] >>
+  drule_all iforest_compose_steps >>
+  disch_then $ qspec_then ‘p'’ strip_assume_tac >>
+  rename1 ‘LENGTH ml ≤ LENGTH _’ >>
+  last_x_assum(qspec_then ‘LENGTH ml’ mp_tac) >>
+  impl_tac >- simp[] >>
+  disch_then(qspec_then ‘ml’ mp_tac) >>
+  impl_tac >- simp[] >>
+  disch_then $ drule_at (Pat ‘_ = _’) >>
+  disch_then $ drule_at $ Pos last >>
+  impl_tac >- metis_tac[iforest_chor_upd_act_steps_no_error_pres] >>
+  simp[] >> metis_tac[]
 QED
 
 val forest_chor_tail_tac = (TRY (rw [chor_forest_com_idem,
@@ -1878,6 +2074,7 @@ Proof
   \\ first_x_assum $ irule_at Any \\ fs []
   \\ fs [chor_iforest_itrees_eq_procOf,finally_empty_chor_iforest]
 QED
+
 
 (*
 Theorem chor_iforest_always_rooted:
