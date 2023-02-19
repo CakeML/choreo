@@ -1134,22 +1134,112 @@ Proof
   rename1 ‘chor_itree_merge(Ret ret)’ >> Cases_on ‘ret’ >> gvs[chor_itree_merge_def]
 QED
 
-Theorem chor_itree_project_eq:
-  ∀s p dvars c1 c2.
-    project p [] c1 = project p [] c2 ⇒
-    chor_itree p s c1 = chor_itree p s c2
+Theorem itree_eqn_chor_itree_merge:
+  ∀n x l r.
+    itree_eqn n x l ∧
+    itree_eqn n x r ⇒
+    itree_eqn n x (chor_itree_merge l r)
 Proof
-  cheat
+  Induct \\ rw[itree_eqn_def]
+  \\ Cases_on ‘x’ \\ Cases_on ‘l’ \\ Cases_on ‘r’
+  \\ gvs[itree_eqn_def,chor_itree_merge_def]
+  \\ Cases_on ‘x’ \\ rw[itree_eqn_def,chor_itree_merge_def]
 QED
 
-Theorem consumes_path_self:
-  ∀p q c1 s.
-    p ≠ q ⇒ consumes_sel_path p q c1 s (chor_itree q s c1)
+Theorem itree_eqn_chor_itree_merge_eq:
+  ∀n l1 l2 r1 r2.
+    itree_eqn n l1 l2 ∧
+    itree_eqn n r1 r2 ⇒
+    itree_eqn n (chor_itree_merge l1 r1) (chor_itree_merge l2 r2)
 Proof
-  ntac 2 strip_tac >>
-  Induct_on ‘c1’ >> rw[consumes_sel_path_def] >>
-  gvs[chor_itree_def]
+  Induct \\ rw[itree_eqn_def]
+  \\ Cases_on ‘l1’ \\ Cases_on ‘r1’
+  \\ Cases_on ‘l2’ \\ Cases_on ‘r2’
+  \\ gvs[itree_eqn_def,chor_itree_merge_def]
+  \\ TRY (Cases_on ‘x’)
+  \\ TRY (Cases_on ‘x'’)
+  \\ rw[itree_eqn_def,chor_itree_merge_def,itree_eqn_refl]
 QED
+
+Theorem itree_eqn_chor_itree_merge_id:
+  ∀n l1 l2 r.
+    itree_eqn n l1 l2 ∧
+    itree_eqn n l1 r ⇒
+    itree_eqn n (chor_itree_merge l1 l2) r
+Proof
+  Induct \\ rw[itree_eqn_def]
+  \\ Cases_on ‘l1’
+  \\ Cases_on ‘r’
+  \\ Cases_on ‘l2’
+  \\ gvs[itree_eqn_def,chor_itree_merge_def]
+  \\ Cases_on ‘x’
+  \\ rw[itree_eqn_def,chor_itree_merge_def,itree_eqn_refl]
+QED
+
+Theorem project_eq:
+  project_ok p lv l ∧
+  project_ok p rv r ∧
+  project' p lv l = project' p rv r ⇒
+  project p lv l = project p rv r
+Proof
+  rw[]
+  \\ qmatch_goalsub_abbrev_tac ‘a = b’
+  \\ PairCases_on ‘a’
+  \\ PairCases_on ‘b’
+  \\ rw[] \\ gs[]
+QED
+
+fun project_tac l = (first_x_assum (qspecl_then l
+                                    (assume_tac o SIMP_RULE std_ss [chor_itree_def]))
+                     \\ (NOT_EVERY |> SPEC_ALL
+                       |> EQ_IMP_RULE
+                       |> snd
+                       |> drule_then assume_tac
+                       |> TRY)
+                     \\ gvs[] \\ pop_assum irule \\ itree_simp
+                     \\ gvs[dprocsOf_MEM_eq])
+
+val project_full_tac = (TRY (qmatch_asmsub_rename_tac ‘(Send pp2 vv2 (project' _ [] next_c))’
+                                \\ project_tac [‘Com p vv2 pp2 vv next_c’,‘s’] \\ NO_TAC)
+                        \\ TRY (qmatch_asmsub_rename_tac ‘(Receive pp2 vv2 (project' _ [] next_c))’
+                                \\ project_tac [‘Com pp2 vv p vv2 next_c’,‘s’] \\ NO_TAC)
+                        \\ TRY (qmatch_asmsub_rename_tac ‘(Let vv2 ff2 vss2 (project' _ [] next_c))’
+                                \\ project_tac [‘Let vv2 p ff2 vss2 next_c’,‘s’] \\ NO_TAC)
+                        \\ TRY (qmatch_asmsub_rename_tac
+                                ‘(IfThen vv2 (project' _ [] next_c1) (project' _ [] next_c2))’
+                                \\ project_tac [‘IfThen vv2 p next_c1 next_c2’,‘s’] \\ NO_TAC)
+                        \\ TRY (qmatch_asmsub_rename_tac
+                                ‘(ExtChoice pp2 (project' _ [] next_r1) (project' _ [] next_r2))’
+                                \\ qmatch_asmsub_rename_tac ‘split_sel p pp2 next_c2 = SOME (_,next_r2)’
+                                \\ qmatch_asmsub_rename_tac ‘split_sel p pp2 next_c1 = SOME (_,next_r1)’
+                                \\ project_tac [‘IfThen vv pp2 next_c1 next_c2’,‘s’] \\ NO_TAC)
+                        \\ TRY (qmatch_asmsub_rename_tac ‘(IntChoice bb pp2 (project' _ [] next_c))’
+                                \\ project_tac [‘Sel p bb pp2 next_c’,‘s’] \\ NO_TAC)
+                        \\ TRY (qmatch_asmsub_rename_tac ‘(ExtChoice pp2 (project' _ [] next_c) Nil)’
+                                \\ project_tac [‘Sel pp2 T p next_c’,‘s’] \\ NO_TAC)
+                        \\ TRY (qmatch_asmsub_rename_tac ‘(ExtChoice pp2 Nil (project' _ [] next_c))’
+                                \\ project_tac [‘Sel pp2 F p next_c’,‘s’] \\ NO_TAC)
+                        \\ TRY (qmatch_asmsub_rename_tac ‘(Fix ddn (project' _ _ next_c))’
+                                \\ project_tac [‘Fix ddn next_c’,‘s’] \\ NO_TAC)
+                        \\ TRY (project_tac [‘Nil’,‘s’] \\ NO_TAC))
+
+fun project_merge_tac l = (irule itree_eqn_sym
+                           \\ gvs[PULL_FORALL]
+                           \\ first_x_assum
+                              (qspecl_then l (mp_tac o SIMP_RULE std_ss [chor_itree_def]))
+                           \\ first_x_assum
+                              (qspecl_then l (mp_tac o SIMP_RULE std_ss [chor_itree_def]))
+                           \\ (NOT_EVERY |> SPEC_ALL
+                                         |> EQ_IMP_RULE
+                                         |> snd
+                                         |> drule_then assume_tac
+                                         |> TRY)
+                           \\ rw []
+                           \\ irule itree_eqn_chor_itree_merge
+                           \\ simp[project_def,itree_eqn_sym]
+                           \\ itree_simp
+                           \\ gvs[dprocsOf_MEM_eq,itree_eqn_sym])
+
 
 Theorem chor_itree_merge_split_sel:
   ∀p q c1 b r.
@@ -1159,6 +1249,179 @@ Theorem chor_itree_merge_split_sel:
 Proof
   recInduct split_sel_ind >>
   rw[split_sel_def] >>
+  gvs[chor_itree_def]
+QED
+
+Theorem chor_itree_project_eq:
+  ∀p c1 c2 s.
+    project_ok p [] c2 ∧
+    project p [] c1 = project p [] c2 ⇒
+    chor_itree p s c1 = chor_itree p s c2
+Proof
+  simp[GSYM itree_depth_eqv_eq,itree_depth_eqv_def]
+  \\ simp[PULL_FORALL]
+  \\ Induct_on ‘n’
+  >- rw[itree_eqn_def]
+  \\ rpt(GEN_TAC)
+  \\ qmatch_goalsub_abbrev_tac ‘project_ok p dvars _’
+  \\ ‘dvars = []’ by simp[Abbr‘dvars’]
+  \\ pop_assum mp_tac
+  \\ MAP_EVERY qid_spec_tac [‘s’,‘c2’,‘c1’,‘dvars’,‘p’]
+  \\ ho_match_mp_tac project_ind
+  \\ rpt(conj_tac)
+  \\ rpt(GEN_TAC)
+  \\ simp[PULL_FORALL]
+  >- (MAP_EVERY qid_spec_tac [‘c2’,‘dvars'’,‘p’]
+      \\ ho_match_mp_tac project_ind
+      \\ rw[Abbr‘dvars’] \\ itree_simp
+      \\ EVERY_CASE_TAC
+      \\ gvs[dprocsOf_MEM_eq]
+      \\ rw [itree_eqn_chor_itree_merge,itree_eqn_sym,itree_eqn_def])
+  >- (GEN_TAC \\ GEN_TAC
+      \\ MAP_EVERY qid_spec_tac [‘c2’,‘dvars'’,‘p’]
+      \\ ho_match_mp_tac project_ind
+      \\ rw[Abbr‘dvars’] \\ itree_simp
+      \\ EVERY_CASE_TAC
+      \\ gvs[dprocsOf_MEM_eq]
+      \\ rw [itree_eqn_chor_itree_merge,itree_eqn_sym,itree_eqn_def]
+      \\ project_full_tac
+      >- (Cases_on ‘a’ \\ simp[itree_eqn_refl]
+          \\ first_x_assum irule \\ simp[]
+          \\ simp[project_eq])
+      >- (Cases_on ‘a’ \\ simp[itree_eqn_refl]
+          \\ first_x_assum irule \\ simp[]
+          \\ simp[project_eq]))
+  >- (GEN_TAC \\ GEN_TAC
+      \\ MAP_EVERY qid_spec_tac [‘c2’,‘dvars'’,‘p’]
+      \\ ho_match_mp_tac project_ind
+      \\ rw[Abbr‘dvars’] \\ itree_simp
+      \\ EVERY_CASE_TAC
+      \\ gvs[dprocsOf_MEM_eq]
+      \\ rw [itree_eqn_chor_itree_merge,itree_eqn_sym,itree_eqn_def]
+      \\ project_full_tac
+      \\ first_x_assum irule \\ simp[project_eq])
+  >- (GEN_TAC \\ GEN_TAC
+      \\ MAP_EVERY qid_spec_tac [‘c2’,‘dvars'’,‘p’]
+      \\ ho_match_mp_tac project_ind
+      \\ rw[Abbr‘dvars’] \\ itree_simp
+      \\ EVERY_CASE_TAC
+      \\ gvs[dprocsOf_MEM_eq,GSYM PULL_FORALL]
+      \\ rw [itree_eqn_chor_itree_merge,itree_eqn_sym,itree_eqn_def]
+      >- project_merge_tac [‘Nil’,‘s’]
+      >- project_merge_tac [‘Com p dvars'' p2 vv c2'’,‘s’]
+      >- project_merge_tac [‘Com p dvars'' p2 vv c2'’,‘s’]
+      >- project_merge_tac [‘Com p1' vv  p c2 c2'’,‘s’]
+      >- project_merge_tac [‘Let p'' p f vs c2’,‘s’]
+      >- project_merge_tac [‘Let p'' p f vs c2’,‘s’]
+      >- (first_x_assum irule \\ simp[project_eq])
+      >- (first_x_assum irule \\ simp[project_eq])
+      >- project_merge_tac [‘IfThen p'' p c2 c2'’,‘s’]
+      >- project_merge_tac [‘IfThen p'' p c2 c2'’,‘s’]
+      >- project_merge_tac [‘IfThen p'' p c2 c2'’,‘s’]
+      >- project_merge_tac [‘IfThen vv p1' c2 c2'’,‘s’]
+      >- (imp_res_tac chor_itree_merge_split_sel \\ gvs[]
+          \\ itree_simp
+          \\ Cases_on ‘a’
+          \\ itree_simp
+          >- (first_x_assum irule \\ simp[project_eq])
+          >- (first_x_assum irule \\ simp[project_eq]))
+      >- (imp_res_tac chor_itree_merge_split_sel \\ gvs[]
+          \\ itree_simp
+          \\ Cases_on ‘a’
+          \\ itree_simp
+          >- (first_x_assum irule \\ simp[project_eq])
+          >- (first_x_assum irule \\ simp[project_eq]))
+      >- (first_assum (first_assum o mp_then Any (qspec_then ‘s’ mp_tac) o GSYM)
+          \\ impl_tac >- simp[]
+          \\ rw[]
+          \\ irule itree_eqn_chor_itree_merge_id
+          \\ gs[PULL_FORALL,itree_eqn_refl]
+          \\ first_x_assum
+             (qspecl_then [‘IfThen vv p1' c2 c2'’,‘s’]
+              (mp_tac o SIMP_RULE std_ss [chor_itree_def,project_def]))
+          \\ simp[]
+          \\ first_x_assum
+             (qspecl_then [‘IfThen vv p1' c2 c2'’,‘s’]
+              (mp_tac o SIMP_RULE std_ss [chor_itree_def,project_def]))
+          \\ simp[])
+      >- (imp_res_tac chor_itree_merge_split_sel \\ gvs[]
+          \\ itree_simp
+          \\ Cases_on ‘a’
+          \\ itree_simp
+          >- (first_x_assum irule \\ simp[project_eq])
+          >- (first_x_assum irule \\ simp[project_eq]))
+      >- (imp_res_tac chor_itree_merge_split_sel \\ gvs[]
+          \\ itree_simp
+          \\ Cases_on ‘a’
+          \\ itree_simp
+          >- (first_x_assum irule \\ simp[project_eq])
+          >- (first_x_assum irule \\ simp[project_eq]))
+      >- project_merge_tac [‘Sel p b p2 c2’,‘s’]
+      >- project_merge_tac [‘Sel p1' T p c2’,‘s’]
+      >- project_merge_tac [‘Sel p1' F p c2’,‘s’]
+      >- (imp_res_tac chor_itree_merge_split_sel
+          \\ gvs []
+          \\ itree_simp
+          \\ Cases_on ‘a’
+          \\ itree_simp
+          >- (first_x_assum irule \\ simp[project_eq])
+          >- cheat) (* Not true *)
+      >- (imp_res_tac chor_itree_merge_split_sel
+          \\ gvs []
+          \\ itree_simp
+          \\ Cases_on ‘a’
+          \\ itree_simp
+          >- cheat (* Not true *)
+          >- (first_x_assum irule \\ simp[project_eq]))
+      >- (imp_res_tac chor_itree_merge_split_sel
+          \\ gvs []
+          \\ itree_simp
+          \\ Cases_on ‘a’
+          \\ itree_simp
+          >- (first_x_assum irule \\ simp[project_eq])
+          >- cheat) (* Not true *)
+      >- (imp_res_tac chor_itree_merge_split_sel
+          \\ gvs []
+          \\ itree_simp
+          \\ Cases_on ‘a’
+          \\ itree_simp
+          >- cheat (* Not true *)
+          >- (first_x_assum irule \\ simp[project_eq]))
+      >- project_merge_tac [‘Fix dn c2’,‘s’]
+      >- project_merge_tac [‘Nil’,‘s’])
+  >- (GEN_TAC \\ GEN_TAC
+      \\ MAP_EVERY qid_spec_tac [‘c2’,‘dvars'’,‘p’]
+      \\ ho_match_mp_tac project_ind
+      \\ rw[Abbr‘dvars’] \\ itree_simp
+      \\ EVERY_CASE_TAC
+      \\ gvs[dprocsOf_MEM_eq]
+      \\ rw [itree_eqn_chor_itree_merge,itree_eqn_sym,itree_eqn_def]
+      \\ project_full_tac
+      \\ cheat)
+  >- (GEN_TAC \\ GEN_TAC
+      \\ MAP_EVERY qid_spec_tac [‘c2’,‘dvars'’,‘p’]
+      \\ ho_match_mp_tac project_ind
+      \\ rw[Abbr‘dvars’] \\ itree_simp
+      \\ EVERY_CASE_TAC
+      \\ gvs[dprocsOf_MEM_eq]
+      \\ rw [itree_eqn_chor_itree_merge,itree_eqn_sym,itree_eqn_def]
+      \\ first_x_assum irule
+      \\ simp[dsubst_def]
+      \\ cheat)
+  >- (MAP_EVERY qid_spec_tac [‘c2’,‘dvars'’,‘p’]
+      \\ ho_match_mp_tac project_ind
+      \\ rw[Abbr‘dvars’] \\ itree_simp
+      \\ EVERY_CASE_TAC
+      \\ gvs[dprocsOf_MEM_eq]
+      \\ rw [itree_eqn_chor_itree_merge,itree_eqn_sym,itree_eqn_def])
+QED
+
+Theorem consumes_path_self:
+  ∀p q c1 s.
+    p ≠ q ⇒ consumes_sel_path p q c1 s (chor_itree q s c1)
+Proof
+  ntac 2 strip_tac >>
+  Induct_on ‘c1’ >> rw[consumes_sel_path_def] >>
   gvs[chor_itree_def]
 QED
 
