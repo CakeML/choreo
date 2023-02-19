@@ -1436,6 +1436,31 @@ Proof
   gvs[consumes_sel_path_def]
 QED
 
+Theorem split_sel_project_sel:
+  ∀p q c b r dvars.
+     p ≠ q ∧
+    split_sel p q c = SOME (b,r) ⇒
+    project p dvars c = project p dvars (Sel q b p r)
+Proof
+  ho_match_mp_tac split_sel_ind
+  \\ itree_simp
+QED
+
+Theorem split_sel_project_neq:
+  ∀p q c1 c2 dvars r1 r2.
+    p ≠ q ∧ r1 ≠ Nil ∧ r2 ≠ Nil ∧
+    no_self_comunication c1 ∧
+    no_self_comunication c2 ∧
+    split_sel p q c2 = SOME (F,r1) ∧
+    split_sel p q c1 = SOME (T,r2) ⇒
+    project p dvars c1 ≠ project p dvars c2
+Proof
+  rw[]
+  \\ imp_res_tac split_sel_project_sel
+  \\ simp[project_def]
+  \\ cheat
+QED
+
 Theorem consumes_sel_path_true:
   compile_network_ok s (IfThen v q c1 c2) (procsOf (IfThen v q c1 c2)) ∧
   p ≠ q ∧
