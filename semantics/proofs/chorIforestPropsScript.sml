@@ -1649,11 +1649,29 @@ End
 
 Overload "↑" = “up_forest”;
 
+(* TODO: move *)
+Theorem done_lift_Ret[simp]:
+  ∀x. ↑(Ret x) = Ret x
+Proof
+  Cases >> rw[]
+QED
+
 Theorem up_iforests:
-  iforest_step ψ p = ψ'
+  (iforest_step ψ p = ψ')
   ⇒ iforest_step (↑ψ) p = (↑ψ')
 Proof
-  cheat
+  rw[] >>
+  rw[iforest_component_equality] >>
+  iforest_simp >>
+  rw[up_forest_def,FLOOKUP_FMAP_MAP2] >>
+  Cases_on ‘FLOOKUP ψ.forest p’ >>
+  gvs[] >>
+  rename1 ‘↑ t’ >>
+  Cases_on ‘t’ >> gvs[done_lift_def] >>
+  rw[fmap_eq_flookup] >>
+  rw[DOMSUB_FLOOKUP_THM,FLOOKUP_FMAP_MAP2,FLOOKUP_UPDATE] >>
+  TOP_CASE_TAC >> gvs[] >>
+  rw[FLOOKUP_FMAP_MAP2,FLOOKUP_UPDATE]
 QED
 
 Theorem chor_steps_chor':
