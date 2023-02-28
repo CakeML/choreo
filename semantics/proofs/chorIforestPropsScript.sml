@@ -1674,6 +1674,12 @@ Proof
   rw[FLOOKUP_FMAP_MAP2,FLOOKUP_UPDATE]
 QED
 
+Theorem up_iforests_alt:
+  iforest_step (↑ψ) p = ↑ $ iforest_step ψ p
+Proof
+  metis_tac[up_iforests]
+QED
+
 Theorem chor_steps_chor':
   ∀c s ψ p p0.
     dvarsOf c = [] ∧
