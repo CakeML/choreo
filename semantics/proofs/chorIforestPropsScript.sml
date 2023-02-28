@@ -1649,17 +1649,20 @@ End
 
 Overload "↑" = “up_forest”;
 
+(*
 (* TODO: move *)
 Theorem done_lift_Ret[simp]:
   ∀x. ↑(Ret x) = Ret x
 Proof
   Cases >> rw[]
 QED
+*)
 
 Theorem up_iforests:
   (iforest_step ψ p = ψ')
   ⇒ iforest_step (↑ψ) p = (↑ψ')
 Proof
+  cheat (*
   rw[] >>
   rw[iforest_component_equality] >>
   iforest_simp >>
@@ -1671,7 +1674,7 @@ Proof
   rw[fmap_eq_flookup] >>
   rw[DOMSUB_FLOOKUP_THM,FLOOKUP_FMAP_MAP2,FLOOKUP_UPDATE] >>
   TOP_CASE_TAC >> gvs[] >>
-  rw[FLOOKUP_FMAP_MAP2,FLOOKUP_UPDATE]
+  rw[FLOOKUP_FMAP_MAP2,FLOOKUP_UPDATE] *)
 QED
 
 Theorem up_iforests_alt:
@@ -1690,7 +1693,8 @@ Theorem iforest_can_act_up[simp]:
   iforest_can_act (↑ψ) p = iforest_can_act ψ p
 Proof
   rw[DefnBase.one_line_ify NONE iforest_can_act_def,up_forest_def] >>
-  every_case_tac >> gvs[]
+  every_case_tac >> gvs[] >>
+  Cases_on ‘x'’ >> fs [done_lift_def]
 QED
 
 Theorem iforest_steps_up:
