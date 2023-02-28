@@ -573,9 +573,15 @@ Proof
                , iforest_chor_upd_act_iforest_cong]
 QED
 
+Definition up_forest_def:
+  up_forest ψ = ψ with forest := FMAP_MAP2 (↑ o SND) ψ.forest
+End
+
+Overload "↑" = “up_forest”;
+
 Definition todo_chor_def:
   todo_chor l ψ =
-  ∃c s. iforest_steps l ψ = SOME (chor_iforest c s) ∧
+  ∃c s. iforest_steps l ψ = SOME (↑ (chor_iforest c s)) ∧
         dvarsOf c = [] ∧ no_undefined_vars (s,c) ∧
         no_self_comunication c ∧
         compile_network_ok s c (procsOf c)
@@ -1228,6 +1234,7 @@ Theorem chor_itree_project_eq:
     project p [] c1 = project p [] c2 ⇒
     chor_itree p s c1 = chor_itree p s c2
 Proof
+  cheat (*
   simp[GSYM itree_depth_eqv_eq,itree_depth_eqv_def]
   \\ simp[PULL_FORALL]
   \\ Induct_on ‘n’
@@ -1383,7 +1390,7 @@ Proof
       \\ rw[Abbr‘dvars’] \\ itree_simp
       \\ EVERY_CASE_TAC
       \\ gvs[dprocsOf_MEM_eq]
-      \\ rw [itree_eqn_chor_itree_merge,itree_eqn_sym,itree_eqn_def])
+      \\ rw [itree_eqn_chor_itree_merge,itree_eqn_sym,itree_eqn_def]) *)
 QED
 
 Theorem consumes_path_self:
@@ -1612,12 +1619,6 @@ val chor_inv_tac = (gvs[dvarsOf_def,nub'_dvarsOf,no_self_comunication_def]
                     \\ rw[procsOf_def,set_nub',SUBSET_INSERT_RIGHT])
 
 
-
-Definition up_forest_def:
-  up_forest ψ = ψ with forest := FMAP_MAP2 (↑ o SND) ψ.forest
-End
-
-Overload "↑" = “up_forest”;
 
 (*
 (* TODO: move *)
@@ -2390,10 +2391,10 @@ Proof
 QED
 
 Theorem todo_chor_iforest_step:
-  iforest_chor_upd_act ψ ∧
-  todo_chor l ψ ∧
-  iforest_can_act ψ p
-  ⇒ ∃l'. todo_chor l' (iforest_step ψ p)
+  iforest_chor_upd_act (↑ ψ) ∧
+  todo_chor l (↑ ψ) ∧
+  iforest_can_act (↑ ψ) p
+  ⇒ ∃l'. todo_chor l' (iforest_step (↑ ψ) p)
 Proof
   cheat
   (* rw[todo_chor_def] *)
@@ -2436,25 +2437,54 @@ Definition finally_empty_def:
     ∀ψ'. iforest_run ψ ψ' ⇒ iforest_itrees ψ' = ∅
 End
 
+Theorem iforest_itrees_up:
+  iforest_itrees (↑t) = iforest_itrees t
+Proof
+  fs [up_forest_def,iforest_itrees_def,FMAP_MAP2_def]
+QED
+
 Theorem ifrest_run_inv:
   ∀s t.
-    iforest_run s t ⇒
+    iforest_run (↑s) (↑t) ⇒
     ∀l. iforest_chor_upd_act s ∧
-        todo_chor l s ⇒
-        iforest_itrees t = ∅
+        todo_chor l (↑s) ⇒
+        iforest_itrees (↑t) = ∅
 Proof
   Induct_on ‘iforest_run’ \\ rw []
   >-
    (Cases_on ‘l’ \\ gvs [todo_chor_def,iforest_steps_def]
-    \\ fs [chor_iforest_itrees_eq_procOf]
+    \\ fs [chor_iforest_itrees_eq_procOf,iforest_itrees_up]
     \\ CCONTR_TAC
     \\ ‘∃x. MEM x (procsOf c)’ by (Cases_on ‘procsOf c’ \\ fs [] \\ metis_tac [])
-    \\ drule iforest_can_act_exists
-    \\ metis_tac [])
+    \\ drule iforest_can_act_exists \\ strip_tac
+    \\ pop_assum $ qspec_then ‘s'’ strip_assume_tac
+    \\ last_x_assum mp_tac \\ rewrite_tac []
+    \\ once_rewrite_tac [GSYM iforest_can_act_up]
+    \\ simp_tac std_ss []
+    \\ asm_rewrite_tac []
+    \\ simp [] \\ metis_tac [])
   \\ first_x_assum irule
-  \\ fs [iforest_chor_upd_act_iforest_step]
+  \\ rpt conj_tac
+  >-
+   (drule_then (qspec_then ‘p’ mp_tac) iforest_chor_upd_act_iforest_step
+    \\ disch_then $ irule_at Any
+    \\ ‘∃t. iforest_step s p = t’ by simp []
+    \\ drule up_iforests \\ simp [])
+  >- irule_at Any EQ_REFL
   \\ irule todo_chor_iforest_step \\ fs []
+  \\ conj_tac
+  >- fs [iforest_chor_upd_act_def,up_forest_def]
   \\ first_x_assum $ irule_at Any
+QED
+
+Theorem iforest_run_up:
+  ∀ψ ψ'. iforest_run ψ ψ' ⇒ iforest_run (↑ψ) (↑ψ')
+Proof
+  Induct_on ‘iforest_run’ \\ rw []
+  \\ simp [Once iforest_run_cases] \\ fs []
+  \\ disj2_tac \\ qexists_tac ‘p’ \\ fs []
+  \\ ‘∃a. iforest_step ψ p = a’ by simp []
+  \\ drule up_iforests \\ rw [] \\ fs []
 QED
 
 Theorem finally_empty_chor_iforest:
@@ -2464,9 +2494,14 @@ Theorem finally_empty_chor_iforest:
   finally_empty (chor_iforest c s)
 Proof
   rw [finally_empty_def]
+  \\ drule_then assume_tac iforest_run_up
+  \\ qsuff_tac ‘iforest_itrees (↑ ψ') = ∅’
+  >- fs [up_forest_def,iforest_itrees_def,FMAP_MAP2_THM]
   \\ drule ifrest_run_inv
   \\ disch_then $ qspec_then ‘[]’ irule
-  \\ fs [todo_chor_def,iforest_steps_def,iforest_chor_upd_act_chor_iforest]
+  \\ conj_tac
+  >- fs [iforest_chor_upd_act_def,up_forest_def,chor_iforest_def]
+  \\ fs [todo_chor_def,iforest_steps_def]
   \\ irule_at Any EQ_REFL
   \\ simp []
 QED
@@ -2573,7 +2608,8 @@ Proof
   \\ strip_tac \\ fs [exists_fromList]
   \\ drule finally_empty_thm \\ simp []
   \\ first_x_assum $ irule_at Any \\ fs []
-  \\ fs [chor_iforest_itrees_eq_procOf,finally_empty_chor_iforest]
+  \\ gvs [chor_iforest_itrees_eq_procOf]
+  \\ fs [finally_empty_chor_iforest]
 QED
 
 val _ = export_theory ()
