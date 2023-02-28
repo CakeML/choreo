@@ -1,4 +1,4 @@
-open preamble chorLangTheory itreeTauTheory itreeCommonTheory
+open preamble chorLangTheory itreeTauTheory itreeCommonTheory itreePropsTheory
 
 val _ = new_theory "chorItreeSem";
 
@@ -370,5 +370,24 @@ Proof
 QED
 
 val _ = Parse.overload_on("↑",``done_lift``);
+
+Theorem itree_eqn_merge:
+  ∀n l r.
+    itree_eqn n (↑ l) (↑ r)
+    ⇒ itree_eqn n (↑ (chor_itree_merge l r)) (↑ l)
+Proof
+  let val itree_thms = [ itree_eqn_def
+                 , itree_eqn_refl
+                 , itree_eqn_sym
+                 , chor_itree_merge_def]
+      val itree_simp = rw itree_thms \\ gs itree_thms
+  in
+  Induct_on ‘n’ \\ rw[itree_eqn_def]
+  \\ Cases_on ‘l’ \\ Cases_on ‘r’
+  \\ itree_simp
+  \\ TRY (Cases_on ‘x’) \\ itree_simp
+  \\ TRY (Cases_on ‘x'’) \\ itree_simp
+  end
+QED
 
 val _ = export_theory ()

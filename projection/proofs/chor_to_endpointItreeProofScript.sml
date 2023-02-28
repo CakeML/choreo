@@ -40,17 +40,6 @@ Proof
   >- (gs[dprocsOf_dvarsOf_empty_cons,dvarsOf_def,nub'_dvarsOf,dprocsOf_empty])
 QED
 
-Theorem itree_eqn_merge:
-  ∀n l r.
-    itree_eqn n (↑ l) (↑ r)
-    ⇒ itree_eqn n (↑ (chor_itree_merge l r)) (↑ l)
-Proof
-  Induct_on ‘n’ \\ rw[itree_eqn_def]
-  \\ Cases_on ‘l’ \\ Cases_on ‘r’ \\ itree_simp
-  \\ TRY (Cases_on ‘x’) \\ itree_simp
-  \\ TRY (Cases_on ‘x'’) \\ itree_simp
-QED
-
 Definition closed_dvars:
   closed_dvars dvars c =
     (∀dn procs.

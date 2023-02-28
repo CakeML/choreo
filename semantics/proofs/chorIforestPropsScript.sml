@@ -1172,8 +1172,11 @@ fun project_tac l = (first_x_assum (qspecl_then l
                        |> snd
                        |> drule_then assume_tac
                        |> TRY)
-                     \\ gvs[] \\ pop_assum irule \\ itree_simp
-                     \\ gvs[dprocsOf_MEM_eq])
+                     \\ gvs[]
+                     \\ (pop_assum irule \\ itree_simp
+                         \\ gvs[dprocsOf_MEM_eq])
+                        ORELSE (MAP_EVERY imp_res_tac [itree_eqn_trans,itree_eqn_sym,itree_eqn_merge]
+                                \\ gvs[itree_eqn_trans,itree_eqn_sym,itree_eqn_merge]))
 
 val project_full_tac = (TRY (qmatch_asmsub_rename_tac ‘(Send pp2 vv2 (project' _ [] next_c))’
                                 \\ project_tac [‘Com p vv2 pp2 vv next_c’,‘s’] \\ NO_TAC)
@@ -1218,7 +1221,7 @@ fun project_merge_tac l = (irule itree_eqn_sym
 
 
 Theorem chor_itree_merge_split_sel:
-  ∀p q c1 b r.
+  ∀p q c1 s b r.
     p ≠ q ∧
     split_sel p q c1 = SOME (b,r) ⇒
     chor_itree p s c1 = chor_itree p s (Sel q b p r)
@@ -1232,7 +1235,7 @@ Theorem chor_itree_project_eq:
   ∀p c1 c2 s.
     project_ok p [] c2 ∧
     project p [] c1 = project p [] c2 ⇒
-    chor_itree p s c1 = chor_itree p s c2
+    ↑ (chor_itree p s c1) = ↑(chor_itree p s c2)
 Proof
   cheat (*
   simp[GSYM itree_depth_eqv_eq,itree_depth_eqv_def]
