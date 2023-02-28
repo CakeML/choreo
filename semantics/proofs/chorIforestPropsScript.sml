@@ -2396,29 +2396,30 @@ Theorem todo_chor_iforest_step:
   iforest_can_act (↑ ψ) p
   ⇒ ∃l'. todo_chor l' (iforest_step (↑ ψ) p)
 Proof
-  cheat
-  (* rw[todo_chor_def] *)
-  (* \\ qsuff_tac ‘∃l' c s. iforest_steps (p::l') ψ = SOME (chor_iforest c s) ∧ *)
-  (*                        dvarsOf c = [] ∧ no_undefined_vars (s,c) ∧ no_self_comunication c ∧ *)
-  (*                        compile_network_ok s c (procsOf c)’ *)
-  (* >- fs[iforest_steps_def] *)
-  (* \\ reverse (Cases_on ‘MEM p l’) *)
-  (* >- (drule_all iforest_steps_chor_swap \\ rw[] *)
-  (*     \\ ‘∃y. iforest_step (chor_iforest c s) p = y’ by simp[] *)
-  (*     \\ drule_all chor_steps_chor *)
-  (*     \\ fs[] \\ strip_tac *)
-  (*     \\ qexists_tac ‘l ++ l'’ *)
-  (*     \\ metis_tac [GSYM APPEND,iforest_steps_APPEND]) *)
-  (* >- (pop_assum (mp_tac o ONCE_REWRITE_RULE [MEM_SPLIT_APPEND_first]) *)
-  (*     \\ rw[] *)
-  (*     \\ qexists_tac ‘pfx++sfx’ *)
-  (*     \\ qexistsl_tac [‘c’,‘s’] *)
-  (*     \\ ONCE_REWRITE_TAC [GSYM APPEND] *)
-  (*     \\ REWRITE_TAC [iforest_steps_APPEND] *)
-  (*     \\ gs[iforest_steps_APPEND] *)
-  (*     \\ drule_all iforest_steps_chor_swap *)
-  (*     \\ strip_tac \\ fs[] *)
-  (*     \\ gvs[iforest_steps_def]) *)
+  rw[todo_chor_def]
+  \\ qsuff_tac ‘∃l' c s. iforest_steps (p::l') (↑ ψ) = SOME (↑ $ chor_iforest c s) ∧
+                         dvarsOf c = [] ∧ no_undefined_vars (s,c) ∧ no_self_comunication c ∧
+                         compile_network_ok s c (procsOf c)’
+  >- fs[iforest_steps_def]
+  \\ reverse (Cases_on ‘MEM p l’)
+  >- (‘iforest_can_act (↑ ψ) p’ by fs []
+      \\ drule_all iforest_steps_chor_swap \\ rw[]
+      \\ ‘∃y. iforest_step (↑ $ chor_iforest c s) p = y’ by simp[]
+      \\ drule_all chor_steps_chor
+      \\ fs[] \\ strip_tac
+      \\ qexists_tac ‘l ++ l'’
+      \\ metis_tac [GSYM APPEND,iforest_steps_APPEND])
+  >- (pop_assum (mp_tac o ONCE_REWRITE_RULE [MEM_SPLIT_APPEND_first])
+      \\ rw[]
+      \\ qexists_tac ‘pfx++sfx’
+      \\ qexistsl_tac [‘c’,‘s’]
+      \\ ONCE_REWRITE_TAC [GSYM APPEND]
+      \\ REWRITE_TAC [iforest_steps_APPEND]
+      \\ gs[iforest_steps_APPEND]
+      \\ ‘iforest_can_act (↑ ψ) p’ by fs []
+      \\ drule_all iforest_steps_chor_swap
+      \\ strip_tac \\ fs[]
+      \\ gvs[iforest_steps_def])
 QED
 
 Inductive iforest_run:
