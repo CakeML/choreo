@@ -573,36 +573,6 @@ Proof
                , iforest_chor_upd_act_iforest_cong]
 QED
 
-Inductive from_chor_forest:
-[~init:]
-  (∀c s. from_chor_forest c (chor_iforest c s)) ∧
-[~step:]
-  (∀c p.
-      from_chor_forest c ψ ⇒
-      from_chor_forest c (iforest_step ψ p))
-End
-
-Inductive to_chor_forest:
-[~init:]
-  (∀c s.
-     to_chor_forest (chor_iforest c s)) ∧
-[~step:]
-  (∀p ψ.
-     iforest_can_act ψ p ∧
-     (∀p. iforest_can_act ψ p ⇒ to_chor_forest (iforest_step ψ p)) ⇒
-     to_chor_forest ψ)
-End
-
-Inductive todo_for_chor:
-[~init:]
-  (∀c s.
-     todo_for_chor [] (chor_iforest c s)) ∧
-[~todo:]
-  (∀ψ p l.
-     todo_for_chor l (iforest_step ψ p) ∧ iforest_can_act ψ p ⇒
-           todo_for_chor (p::l) ψ)
-End
-
 Definition todo_chor_def:
   todo_chor l ψ =
   ∃c s. iforest_steps l ψ = SOME (chor_iforest c s) ∧
@@ -2498,7 +2468,7 @@ Proof
   \\ disch_then $ qspec_then ‘[]’ irule
   \\ fs [todo_chor_def,iforest_steps_def,iforest_chor_upd_act_chor_iforest]
   \\ irule_at Any EQ_REFL
-  \\ simp[]
+  \\ simp []
 QED
 
 Inductive iforest_steps:
