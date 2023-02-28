@@ -1680,6 +1680,38 @@ Proof
   metis_tac[up_iforests]
 QED
 
+Theorem iforest_get_up[simp]:
+  iforest_get (↑ψ) p = OPTION_MAP ↑ (iforest_get ψ p)
+Proof
+  rw[iforest_get_def,AllCaseEqs(),up_forest_def,FLOOKUP_FMAP_MAP2,ETA_AX]
+QED
+
+Theorem iforest_can_act_up[simp]:
+  iforest_can_act (↑ψ) p = iforest_can_act ψ p
+Proof
+  rw[DefnBase.one_line_ify NONE iforest_can_act_def,up_forest_def] >>
+  every_case_tac >> gvs[]
+QED
+
+Theorem iforest_steps_up:
+  ∀ps ψ ψ'.
+    iforest_steps ps (↑ψ) = SOME ψ'
+    ⇒ ∃ψ''. iforest_steps ps ψ = SOME ψ'' ∧ (↑ψ'') = ψ'
+Proof
+  Induct >>
+  rw[iforest_steps_def,up_iforests_alt] >>
+  res_tac >>
+  rw[]
+QED
+
+Theorem iforest_up_steps:
+  ∀ps ψ ψ'.
+    iforest_steps ps ψ = SOME ψ'
+    ⇒ iforest_steps ps (↑ψ) = SOME (↑ψ')
+Proof
+  Induct >> rw[iforest_steps_def,up_iforests_alt]
+QED
+
 Theorem chor_steps_chor':
   ∀c s ψ p p0.
     dvarsOf c = [] ∧
