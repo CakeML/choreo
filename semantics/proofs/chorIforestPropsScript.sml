@@ -1618,22 +1618,10 @@ val chor_inv_tac = (gvs[dvarsOf_def,nub'_dvarsOf,no_self_comunication_def]
                     \\ first_x_assum (irule_at Any)
                     \\ rw[procsOf_def,set_nub',SUBSET_INSERT_RIGHT])
 
-
-
-(*
-(* TODO: move *)
-Theorem done_lift_Ret[simp]:
-  ∀x. ↑(Ret x) = Ret x
-Proof
-  Cases >> rw[]
-QED
-*)
-
 Theorem up_iforests:
   (iforest_step ψ p = ψ')
   ⇒ iforest_step (↑ψ) p = (↑ψ')
 Proof
-  cheat (*
   rw[] >>
   rw[iforest_component_equality] >>
   iforest_simp >>
@@ -1641,11 +1629,13 @@ Proof
   Cases_on ‘FLOOKUP ψ.forest p’ >>
   gvs[] >>
   rename1 ‘↑ t’ >>
-  Cases_on ‘t’ >> gvs[done_lift_def] >>
+  Cases_on ‘t’ >> gvs[] >>
   rw[fmap_eq_flookup] >>
   rw[DOMSUB_FLOOKUP_THM,FLOOKUP_FMAP_MAP2,FLOOKUP_UPDATE] >>
   TOP_CASE_TAC >> gvs[] >>
-  rw[FLOOKUP_FMAP_MAP2,FLOOKUP_UPDATE] *)
+  rw[FLOOKUP_FMAP_MAP2,FLOOKUP_UPDATE]>>
+  Cases_on‘x’ >> gvs[] >>
+  rw[DOMSUB_FLOOKUP_NEQ,FLOOKUP_FMAP_MAP2]
 QED
 
 Theorem up_iforests_alt:
