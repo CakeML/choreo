@@ -1272,6 +1272,17 @@ fun project_merge_tac l = (irule itree_eqn_sym
                            \\ itree_simp
                            \\ gvs[dprocsOf_MEM_eq,itree_eqn_sym])
 
+Theorem chor_itree_merge_split_sel:
+  ∀p q c1 s b r.
+    p ≠ q ∧
+    split_sel p q c1 = SOME (b,r) ⇒
+    chor_itree p s c1 = chor_itree p s (Sel q b p r)
+Proof
+  recInduct split_sel_ind >>
+  rw[split_sel_def] >>
+  gvs[chor_itree_def]
+QED
+
 val lone_sel_tac = (imp_res_tac chor_itree_merge_split_sel \\ gvs[]
                     \\ itree_simp
                     \\ Cases_on ‘a’
@@ -1288,18 +1299,6 @@ val lone_sel_tac = (imp_res_tac chor_itree_merge_split_sel \\ gvs[]
                             \\ imp_res_tac split_sel_dvars_nil
                             \\ simp []
                             \\ NO_TAC))
-
-
-Theorem chor_itree_merge_split_sel:
-  ∀p q c1 s b r.
-    p ≠ q ∧
-    split_sel p q c1 = SOME (b,r) ⇒
-    chor_itree p s c1 = chor_itree p s (Sel q b p r)
-Proof
-  recInduct split_sel_ind >>
-  rw[split_sel_def] >>
-  gvs[chor_itree_def]
-QED
 
 Theorem chor_itree_project_eq:
   ∀p c1 c2 s.
