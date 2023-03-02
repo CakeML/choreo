@@ -1046,9 +1046,9 @@ Definition consumes_sel_path_def:
    else if p1 = p then
      consumes_sel_path p q c1 s it
    else
-     it = chor_itree q s (Sel p1 b p2 c1)
+     it = ↑ (chor_itree q s (Sel p1 b p2 c1))
     ) ∧
-  consumes_sel_path p q c1 s it = (it = chor_itree q s c1)
+  consumes_sel_path p q c1 s it = (it = ↑ (chor_itree q s c1))
 End
 
 Theorem iforest_steps_chor_true_lemma:
@@ -1056,7 +1056,7 @@ Theorem iforest_steps_chor_true_lemma:
     iforest_chor_upd_act ψ ∧
     ψ.st = FEMPTY ∧
     compile_network_ok s c1 procs ∧
-    iforest_get ψ q = SOME(chor_itree q (projectS q s) c1) ∧
+    iforest_get ψ q = SOME(↑ (chor_itree q (projectS q s) c1)) ∧
     todo_list = FILTER ($≠ q) (sel_path q c1) ∧
     set(procsOf c1) ⊆ set procs ∧
     ALL_DISTINCT procs ∧
@@ -1065,7 +1065,7 @@ Theorem iforest_steps_chor_true_lemma:
     ∃ψ'. iforest_steps (sel_path q c1) ψ = SOME ψ' ∧
          iforest_chor_upd_act ψ' ∧ ψ'.st = FEMPTY ∧
          FDOM(ψ'.forest) = set procs ∧
-         ∀p. MEM p procs ⇒ iforest_get ψ' p = SOME(chor_itree p (projectS p s) (cut_sel_upto q c1))
+         ∀p. MEM p procs ⇒ iforest_get ψ' p = SOME(↑ (chor_itree p (projectS p s) (cut_sel_upto q c1)))
 Proof
   strip_tac >>
   simp[iforest_get_def] >>
@@ -1473,7 +1473,7 @@ QED
 
 Theorem consumes_path_self:
   ∀p q c1 s.
-    p ≠ q ⇒ consumes_sel_path p q c1 s (chor_itree q s c1)
+    p ≠ q ⇒ consumes_sel_path p q c1 s (↑(chor_itree q s c1))
 Proof
   ntac 2 strip_tac >>
   Induct_on ‘c1’ >> rw[consumes_sel_path_def] >>
@@ -1501,19 +1501,11 @@ Proof
   \\ itree_simp
 QED
 
-Theorem split_sel_project_neq:
-  ∀p q c1 c2 dvars r1 r2.
-    p ≠ q ∧ r1 ≠ Nil ∧ r2 ≠ Nil ∧
-    no_self_comunication c1 ∧
-    no_self_comunication c2 ∧
-    split_sel p q c2 = SOME (F,r1) ∧
-    split_sel p q c1 = SOME (T,r2) ⇒
-    project p dvars c1 ≠ project p dvars c2
+Theorem itree_eqn_merge_eq:
+ ∀l r. ↑ l = ↑ r ⇒ ↑(chor_itree_merge l r) =  (↑ l)
 Proof
-  rw[]
-  \\ imp_res_tac split_sel_project_sel
-  \\ simp[project_def]
-  \\ cheat
+  rw[GSYM itree_depth_eqv_eq,itree_depth_eqv_def]
+  \\ rw[itree_eqn_merge]
 QED
 
 Theorem consumes_sel_path_true:
@@ -1521,7 +1513,7 @@ Theorem consumes_sel_path_true:
   p ≠ q ∧
   dvarsOf (IfThen v q c1 c2) = [] ∧
   FLOOKUP s (v,q) = SOME [1w] ⇒
-  consumes_sel_path q p c1 (projectS p s) (chor_itree p (projectS p s) (IfThen v q c1 c2))
+  consumes_sel_path q p c1 (projectS p s) (↑(chor_itree p (projectS p s) (IfThen v q c1 c2)))
 Proof
   rw[compile_network_ok_project_ok] >>
   ‘project_ok p [] (IfThen v q c1 c2)’
@@ -1533,21 +1525,25 @@ Proof
   gvs[project_def] >>
   rpt(PURE_FULL_CASE_TAC >> gvs[]) >>
   simp[chor_itree_def]
-  >- (imp_res_tac chor_itree_project_eq >>
-      pop_assum $ assume_tac o GSYM >>
+  >- (gvs[dvarsOf_def,nub'_APPEND,nub'_dvarsOf] >>
+      drule_all chor_itree_project_eq >>
+      disch_then $ qspec_then ‘projectS p s’ assume_tac >>
+      dxrule_all itree_eqn_merge_eq >>
+      rw[chor_itree_merge_id] >>
+      Cases_on ‘c1’ >> gvs[consumes_sel_path_def,split_sel_def] >>
+      rw[] >>
+      gvs[chor_itree_def] >>
+      simp[consumes_path_self])
+  >- (gvs[dvarsOf_def,nub'_APPEND,nub'_dvarsOf] >>
+      imp_res_tac split_sel_project_ok >>
+      drule_all chor_itree_project_eq >>
+      disch_then $ qspec_then ‘projectS p s’ assume_tac >>
+      dxrule_all itree_eqn_merge_eq >>
       simp[chor_itree_merge_id] >>
       Cases_on ‘c1’ >> gvs[consumes_sel_path_def,split_sel_def] >>
       rw[] >>
       gvs[chor_itree_def] >>
       simp[consumes_path_self])
-  >- (imp_res_tac chor_itree_project_eq >>
-      pop_assum $ assume_tac o GSYM >>
-      simp[chor_itree_merge_id] >>
-      Cases_on ‘c1’ >> gvs[consumes_sel_path_def,split_sel_def] >>
-      rw[] >>
-      gvs[chor_itree_def] >>
-      simp[consumes_path_self] >>
-      cheat)
   >- (imp_res_tac chor_itree_merge_split_sel >>
       simp[chor_itree_def,chor_itree_merge_def] >>
       drule_all consumes_sel_merge_split_sel >>
