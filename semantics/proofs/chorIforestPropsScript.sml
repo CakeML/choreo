@@ -1596,102 +1596,6 @@ Proof
   gvs[SET_EQ_SUBSET,SUBSET_DEF]
 QED
 
-Theorem iforest_steps_chor_true:
-  ∀c1 c2.
-    FLOOKUP s (v,q) = SOME [1w] ∧
-    dvarsOf (IfThen v q c1 c2) = [] ∧
-    compile_network_ok s (IfThen v q c1 c2) (procsOf (IfThen v q c1 c2))
-    ⇒ ∃l. iforest_steps (q::sel_path q c1++l) (chor_iforest (IfThen v q c1 c2) s) =
-      SOME (chor_iforest (cut_sel_upto q c1) s) ∧ (∀x. MEM x l ⇒ MEM x (q::sel_path q c1))
-Proof
-  rpt strip_tac >>
-  simp[iforest_steps_def,iforest_can_act_def,iforest_get_def] >>
-  simp[Once chor_iforest_def] >>
-  simp[FLOOKUP_chor_forest,procsOf_def,MEM_nub',chor_itree_def,IS_SOME_EXISTS,
-       GSYM lookup_projectS',
-       iforest_step_def,iforest_get_def] >>
-  simp[Once chor_iforest_def] >>
-  simp[Once chor_iforest_def] >>
-  simp[FLOOKUP_chor_forest,procsOf_def,MEM_nub',chor_itree_def,IS_SOME_EXISTS,
-       GSYM lookup_projectS',iforest_step_def,iforest_get_def] >>
-  simp[iforest_set_def] >>
-  simp[iforest_steps_APPEND,PULL_EXISTS] >>
-  qmatch_goalsub_abbrev_tac ‘iforest_steps _ ψ’ >>
-  qspecl_then [‘procsOf(IfThen v q c1 c2)’,‘q’,‘c1’,‘ψ’] mp_tac iforest_steps_chor_true_lemma >>
-  simp[] >>
-  impl_tac >-
-   (simp[Abbr ‘ψ’,iforest_chor_upd_act_def,chor_iforest_def] >>
-    conj_tac
-    >- (gvs[compile_network_ok_project_ok] >> rw[] >> res_tac >> imp_res_tac project_ok_ifL) >>
-    simp[iforest_get_def,FLOOKUP_chor_forest,FLOOKUP_UPDATE,procsOf_def,set_nub',
-         all_distinct_nub',SUBSET_DEF,SF DNF_ss] >>
-    conj_tac >- rw[SET_EQ_SUBSET,SUBSET_DEF,chor_forest_FDOM,MEM_nub'] >>
-    rpt strip_tac >>
-    match_mp_tac consumes_sel_path_true >> simp[]) >>
-  strip_tac >>
-  simp[] >>
-  qexists_tac ‘FILTER (λx. ¬MEM x (procsOf(cut_sel_upto q c1))) (nub'(q::sel_path q c1))’ >>
-  reverse conj_tac >- simp[MEM_FILTER,MEM_nub'] >>
-  qmatch_goalsub_abbrev_tac ‘FILTER _ a1’ >>
-  dep_rewrite.DEP_ONCE_REWRITE_TAC[iforest_steps_cleanup_DRESTRICT] >>
-  conj_tac
-  >- (simp[Abbr ‘a1’,FILTER_ALL_DISTINCT,all_distinct_nub'] >>
-      rw[MEM_FILTER,MEM_nub'] >>
-      gvs[procsOf_def,MEM_nub',SF DNF_ss] >>
-      gvs[dvarsOf_def,nub'_nil] >>
-      metis_tac[MEM_procsOf_chor_itree,dvarsOf_cut_sel_upto,procsOf_cut,IN_UNION]) >>
-  simp[chor_iforest_def,iforest_component_equality] >>
-  gvs[iforest_chor_upd_act_def,iforest_get_def] >>
-  rw[fmap_eq_flookup,FLOOKUP_DRESTRICT,chor_forest_def,Abbr ‘a1’] >>
-  simp[MEM_FILTER,MEM_nub',FLOOKUP_chor_forest] >>
-  ‘∀x. MEM x (procsOf(cut_sel_upto q c1)) ⇒ MEM x (procsOf (IfThen v q c1 c2))’
-    by(rpt strip_tac >>
-       simp[procsOf_def,MEM_nub'] >>
-       metis_tac[procsOf_cut,IN_UNION]) >>
-  rw[] >>
-  simp[flookup_thm] >>
-  gvs[] >>
-  simp[procsOf_def,MEM_nub'] >>
-  reverse conj_asm1_tac
-  >- (drule_all compile_network_ok_procsOf_if >>
-      rw[SET_EQ_SUBSET,SUBSET_DEF] >>
-      metis_tac[]) >>
-  metis_tac[procsOf_cut,IN_UNION]
-QED
-
-Theorem iforest_steps_chor_false:
-  ∀c1 c2.
-    FLOOKUP s (v,q) = SOME x ∧ x ≠ [1w] ∧
-    compile_network_ok s (IfThen v q c1 c2) (procsOf (IfThen v q c1 c2))
-    ⇒ ∃l. iforest_steps (q::sel_path q c2++l) (chor_iforest (IfThen v q c1 c2) s) =
-      SOME (chor_iforest (cut_sel_upto q c2) s) ∧ (∀x. MEM x l ⇒ MEM x (q::sel_path q c2))
-Proof
-  Induct \\ rw[cut_sel_upto_def,sel_path_def]
-  \\ cheat
-QED
-
-Theorem cut_sel_upto_idem:
-  ∀c. cut_sel_upto (@p. ¬MEM p (procsOf c)) c = c
-Proof
-  strip_tac \\ SELECT_ELIM_TAC \\ conj_tac
-  >- metis_tac[IN_INFINITE_NOT_FINITE,FINITE_LIST_TO_SET,INFINITE_LIST_UNIV] \\
-  strip_tac \\
-  Induct_on ‘c’ \\
-  rw[cut_sel_upto_def,procsOf_def,MEM_nub']
-QED
-
-val chor_inv_tac = (gvs[dvarsOf_def,nub'_dvarsOf,no_self_comunication_def]
-                    \\ TRY (drule compile_network_ok_dest_com' \\ strip_tac)
-                    \\ TRY (drule compile_network_ok_dest_let \\ strip_tac)
-                    \\ TRY (drule compile_network_ok_dest_sel \\ strip_tac)
-                    \\ TRY (drule no_undefined_vars_com \\ strip_tac)
-                    \\ TRY (drule no_undefined_vars_Let \\ strip_tac)
-                    \\ TRY (drule no_undefined_vars_sel \\ strip_tac)
-                    \\ gvs[lookup_projectS']
-                    \\ irule compile_network_ok_subset
-                    \\ first_x_assum (irule_at Any)
-                    \\ rw[procsOf_def,set_nub',SUBSET_INSERT_RIGHT])
-
 Theorem up_iforests:
   (iforest_step ψ p = ψ')
   ⇒ iforest_step (↑ψ) p = (↑ψ')
@@ -1731,6 +1635,118 @@ Proof
   every_case_tac >> gvs[] >>
   Cases_on ‘x'’ >> fs [done_lift_def]
 QED
+
+Theorem MEM_procsOf_chor_lift_itree:
+  ∀c p s. ¬ MEM p (procsOf c) ∧ dvarsOf c = [] ⇒ ↑ (chor_itree p s c) = Ret End
+Proof
+  rw[] \\ Induct_on ‘c’ \\ itree_simp \\ gs[MEM_FILTER,chor_itree_merge_def]
+  \\ gvs[GSYM itree_depth_eqv_eq,itree_depth_eqv_def] \\ rw[]
+  \\ metis_tac [itree_eqn_sym,itree_eqn_lift_chor_itree_merge]
+QED
+
+Theorem iforest_steps_chor_true:
+  ∀c1 c2.
+    FLOOKUP s (v,q) = SOME [1w] ∧
+    dvarsOf (IfThen v q c1 c2) = [] ∧
+    compile_network_ok s (IfThen v q c1 c2) (procsOf (IfThen v q c1 c2))
+    ⇒ ∃l. iforest_steps (q::sel_path q c1++l) (↑(chor_iforest (IfThen v q c1 c2) s)) =
+      SOME (↑ (chor_iforest (cut_sel_upto q c1) s)) ∧ (∀x. MEM x l ⇒ MEM x (q::sel_path q c1))
+Proof
+  rpt strip_tac >>
+  simp[iforest_steps_def,iforest_can_act_def,iforest_get_def] >>
+  simp[Once chor_iforest_def] >>
+  simp[FLOOKUP_chor_forest,procsOf_def,MEM_nub',chor_itree_def,IS_SOME_EXISTS,
+       GSYM lookup_projectS',
+       iforest_step_def,iforest_get_def] >>
+  simp[Once chor_iforest_def] >>
+  simp[Once chor_iforest_def] >>
+  simp[FLOOKUP_chor_forest,procsOf_def,MEM_nub',chor_itree_def,IS_SOME_EXISTS,
+       GSYM lookup_projectS',iforest_step_def,iforest_get_def] >>
+  simp[iforest_set_def] >>
+  simp[iforest_steps_APPEND,PULL_EXISTS] >>
+  qmatch_goalsub_abbrev_tac ‘iforest_steps _ ψ’ >>
+  qspecl_then [‘procsOf(IfThen v q c1 c2)’,‘q’,‘c1’,‘ψ’] mp_tac iforest_steps_chor_true_lemma >>
+  simp[] >>
+  impl_tac >-
+   (simp[Abbr ‘ψ’,iforest_chor_upd_act_def,chor_iforest_def] >>
+    conj_tac >- simp[up_forest_def] >>
+    conj_tac >- simp[up_forest_def] >>
+    conj_tac
+    >- (gvs[compile_network_ok_project_ok,up_forest_def] >>
+        rw[] >> res_tac >> imp_res_tac project_ok_ifL) >>
+    simp[iforest_get_def,FLOOKUP_chor_forest,FLOOKUP_UPDATE,procsOf_def,set_nub',
+         all_distinct_nub',SUBSET_DEF,SF DNF_ss,up_forest_def,FLOOKUP_FMAP_MAP2] >>
+    conj_tac
+    >- rw[SET_EQ_SUBSET,SUBSET_DEF,chor_forest_FDOM,MEM_nub',up_forest_def,FMAP_MAP2_THM] >>
+    rpt strip_tac >>
+    irule_at Any consumes_sel_path_true >>
+    asm_exists_tac >> simp[]) >>
+  strip_tac >>
+  simp[] >>
+  qexists_tac ‘FILTER (λx. ¬MEM x (procsOf(cut_sel_upto q c1))) (nub'(q::sel_path q c1))’ >>
+  reverse conj_tac >- simp[MEM_FILTER,MEM_nub'] >>
+  qmatch_goalsub_abbrev_tac ‘FILTER _ a1’ >>
+  dep_rewrite.DEP_ONCE_REWRITE_TAC[iforest_steps_cleanup_DRESTRICT] >>
+  conj_tac
+  >- (simp[Abbr ‘a1’,FILTER_ALL_DISTINCT,all_distinct_nub'] >>
+      rw[MEM_FILTER,MEM_nub'] >>
+      gvs[procsOf_def,MEM_nub',SF DNF_ss] >>
+      gvs[dvarsOf_def,nub'_nil] >>
+      metis_tac[MEM_procsOf_chor_lift_itree,dvarsOf_cut_sel_upto,procsOf_cut,IN_UNION]) >>
+  simp[chor_iforest_def,iforest_component_equality,up_forest_def] >>
+  gvs[iforest_chor_upd_act_def,iforest_get_def] >>
+  rw[fmap_eq_flookup,FLOOKUP_DRESTRICT,chor_forest_def,Abbr ‘a1’] >>
+  simp[MEM_FILTER,MEM_nub',FLOOKUP_chor_forest] >>
+  ‘∀x. MEM x (procsOf(cut_sel_upto q c1)) ⇒ MEM x (procsOf (IfThen v q c1 c2))’
+    by(rpt strip_tac >>
+       simp[procsOf_def,MEM_nub'] >>
+       metis_tac[procsOf_cut,IN_UNION]) >>
+  rw[FLOOKUP_FMAP_MAP2] >>
+  cheat
+  (* Goes wrong from here *)
+  (* simp[flookup_thm] >> *)
+  (* gvs[] >> *)
+  (* simp[procsOf_def,MEM_nub'] >> *)
+  (* reverse conj_asm1_tac *)
+  (* >- (drule_all compile_network_ok_procsOf_if >> *)
+  (*     rw[SET_EQ_SUBSET,SUBSET_DEF] >> *)
+  (*     metis_tac[]) >> *)
+  (* metis_tac[procsOf_cut,IN_UNION] *)
+QED
+
+Theorem iforest_steps_chor_false:
+  ∀c1 c2.
+    FLOOKUP s (v,q) = SOME x ∧ x ≠ [1w] ∧
+    compile_network_ok s (IfThen v q c1 c2) (procsOf (IfThen v q c1 c2))
+    ⇒ ∃l. iforest_steps (q::sel_path q c2++l) (chor_iforest (IfThen v q c1 c2) s) =
+      SOME (chor_iforest (cut_sel_upto q c2) s) ∧ (∀x. MEM x l ⇒ MEM x (q::sel_path q c2))
+Proof
+  Induct \\ rw[cut_sel_upto_def,sel_path_def]
+  \\ cheat
+QED
+
+Theorem cut_sel_upto_idem:
+  ∀c. cut_sel_upto (@p. ¬MEM p (procsOf c)) c = c
+Proof
+  strip_tac \\ SELECT_ELIM_TAC \\ conj_tac
+  >- metis_tac[IN_INFINITE_NOT_FINITE,FINITE_LIST_TO_SET,INFINITE_LIST_UNIV] \\
+  strip_tac \\
+  Induct_on ‘c’ \\
+  rw[cut_sel_upto_def,procsOf_def,MEM_nub']
+QED
+
+val chor_inv_tac = (gvs[dvarsOf_def,nub'_dvarsOf,no_self_comunication_def]
+                    \\ TRY (drule compile_network_ok_dest_com' \\ strip_tac)
+                    \\ TRY (drule compile_network_ok_dest_let \\ strip_tac)
+                    \\ TRY (drule compile_network_ok_dest_sel \\ strip_tac)
+                    \\ TRY (drule no_undefined_vars_com \\ strip_tac)
+                    \\ TRY (drule no_undefined_vars_Let \\ strip_tac)
+                    \\ TRY (drule no_undefined_vars_sel \\ strip_tac)
+                    \\ gvs[lookup_projectS']
+                    \\ irule compile_network_ok_subset
+                    \\ first_x_assum (irule_at Any)
+                    \\ rw[procsOf_def,set_nub',SUBSET_INSERT_RIGHT])
+
 
 Theorem iforest_steps_up:
   ∀ps ψ ψ'.
