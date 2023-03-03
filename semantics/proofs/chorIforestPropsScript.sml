@@ -1701,17 +1701,25 @@ Proof
     by(rpt strip_tac >>
        simp[procsOf_def,MEM_nub'] >>
        metis_tac[procsOf_cut,IN_UNION]) >>
-  rw[FLOOKUP_FMAP_MAP2] >>
-  cheat
-  (* Goes wrong from here *)
-  (* simp[flookup_thm] >> *)
-  (* gvs[] >> *)
-  (* simp[procsOf_def,MEM_nub'] >> *)
-  (* reverse conj_asm1_tac *)
-  (* >- (drule_all compile_network_ok_procsOf_if >> *)
-  (*     rw[SET_EQ_SUBSET,SUBSET_DEF] >> *)
-  (*     metis_tac[]) >> *)
-  (* metis_tac[procsOf_cut,IN_UNION] *)
+  rw[FLOOKUP_FMAP_MAP2]
+  >- (res_tac >>
+      simp[] >>
+      rw[FLOOKUP_chor_forest])
+  >- (res_tac >>
+      simp[] >>
+      rw[FLOOKUP_chor_forest] >>
+      rw[flookup_thm] >>
+      simp[procsOf_def,MEM_nub'] >>
+      conj_asm1_tac >-
+       (spose_not_then strip_assume_tac >>
+        drule(procsOf_cut |> SIMP_RULE std_ss [EXTENSION,EQ_IMP_THM,GSYM PULL_FORALL] |> cj 1) >>
+        simp[] >>
+        metis_tac[]) >>
+       imp_res_tac compile_network_ok_procsOf_if >>
+      gvs[EXTENSION,EQ_IMP_THM,FORALL_AND_THM] >>
+      metis_tac[]) >>
+  gvs[] >>
+  rw[FLOOKUP_chor_forest]
 QED
 
 Theorem iforest_steps_chor_false:
