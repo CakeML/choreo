@@ -1911,6 +1911,102 @@ Proof
   rw[up_forest_def,iforest_component_equality]
 QED
 
+Theorem MEM_sel_path_no_act:
+  ∀q c1.
+  MEM p (sel_path q c1) ∧ iforest_can_act(chor_iforest c1 s) p ∧ p ≠ q ⇒ F
+Proof
+  recInduct sel_path_ind >>
+  rw[sel_path_def,chor_iforest_def] >>
+  iforest_simp >>
+  gvs[FLOOKUP_chor_forest,MEM_FILTER] >>
+  rw[] >>
+  gvs[chor_itree_def]
+QED
+
+Theorem MEM_sel_path_IMP_split_sel:
+  ∀q c1. MEM p (sel_path q c1) ∧ p ≠ q ⇒
+  ∃a b. split_sel p q c1 = SOME(a,b)
+Proof
+  recInduct sel_path_ind >>
+  rw[sel_path_def,split_sel_def] >>
+  metis_tac[]
+QED
+
+Theorem split_sel_IMP_MEM_sel_path:
+  ∀p q c1. split_sel p q c1 = SOME(a,b) ⇒
+         MEM p (sel_path q c1)
+Proof
+  recInduct split_sel_ind >>
+  rw[sel_path_def,split_sel_def]
+QED
+
+Theorem MEM_sel_path_both:
+  MEM p (sel_path q c1) ∧ compile_network_ok s (IfThen v q c1 c2) procs ∧
+  MEM p procs ∧ p ≠ q ⇒ MEM p (sel_path q c2)
+Proof
+  rw[compile_network_ok_project_ok] >>
+  first_x_assum $ drule_then assume_tac >>
+  gvs[project_def] >>
+  imp_res_tac MEM_sel_path_IMP_split_sel >>
+  gvs[] >>
+  rpt(PURE_FULL_CASE_TAC >> gvs[]) >>
+  imp_res_tac split_sel_IMP_MEM_sel_path
+QED
+
+Theorem MEM_sel_path_both':
+  MEM p (sel_path q c2) ∧ compile_network_ok s (IfThen v q c1 c2) procs ∧
+  MEM p procs ∧ p ≠ q ⇒ MEM p (sel_path q c1)
+Proof
+  rw[compile_network_ok_project_ok] >>
+  first_x_assum $ drule_then assume_tac >>
+  gvs[project_def] >>
+  imp_res_tac MEM_sel_path_IMP_split_sel >>
+  gvs[] >>
+  rpt(PURE_FULL_CASE_TAC >> gvs[]) >>
+  imp_res_tac split_sel_IMP_MEM_sel_path
+QED
+
+(* Conclusion can be strengthen but no need for now *)
+Theorem MEM_sel_path_project:
+  ∀q c s. MEM p (sel_path q c) ∧ p ≠ q ⇒
+  ∃kt b. chor_itree p s c = Vis (Select q) kt
+Proof
+  recInduct sel_path_ind >>
+  rw[sel_path_def,chor_itree_def] >>
+  rw[]
+QED
+
+Theorem iforest_can_act_if:
+  iforest_can_act (chor_iforest (IfThen v q c1 c2) s) p ∧ p ≠ q ∧
+(*  MEM p (procsOf (IfThen v q c1 c2)) ∧*)
+  MEM p (sel_path q c1)
+  ⇒
+  F
+Proof
+  rpt strip_tac >>
+  iforest_simp >>
+  gvs[FLOOKUP_chor_forest,MEM_FILTER] >>
+
+
+  gvs[chor_iforest_def,chor_forest_def] >>
+  rw[chor_iforest_def] >>
+
+
+  iforest_simp >> gvs[FLOOKUP_chor_forest,MEM_FILTER,chor_itree_def,compile_network_ok_project_ok, SF DNF_ss] >>
+  ntac 2 $ last_x_assum $ qspec_then ‘p’ mp_tac >>
+  rw[]
+  >- (
+     )
+
+  res_tac >>
+  fs[]
+  rw[] >> gvs[]
+  >- (TOP_CASE_TAC >> gvs[] >>
+      qmatch_asmsub_abbrev_tac ‘chor_itree_merge _ a1’ >>
+      Cases_on ‘a1’ >> gvs[chor_itree_merge_def]
+      gvs[chor_iforest_act_def]
+QED
+
 Theorem chor_steps_chor':
   ∀c s ψ p p0.
     dvarsOf c = [] ∧
@@ -1957,10 +2053,15 @@ Proof
               \\ disch_then drule \\ rw[]
               \\ first_x_assum (irule_at Any)
               \\ first_x_assum (irule_at Any)
-              (* Should be true from something along the lines of: *)
-  (*                ‘split_sel p q c = NONE ⇒ ¬MEM sel_path q c’ *)
-  (*              *)
-              \\ cheat)
+              \\ simp[]
+              \\ reverse conj_asm1_tac >- metis_tac[]
+              \\ spose_not_then strip_assume_tac
+              \\ drule_all_then assume_tac MEM_sel_path_both
+              \\ imp_res_tac MEM_sel_path_project
+              \\ ntac 2 $ first_x_assum(qspec_then ‘projectS p s’ strip_assume_tac)
+              \\ last_x_assum kall_tac
+              \\ iforest_simp
+              \\ gvs[FLOOKUP_chor_forest,chor_itree_def,chor_itree_merge_def])
           >- (first_x_assum (qspecl_then [‘q’,‘p’,‘s’] mp_tac)
               \\ impl_tac
               >- (gvs[dvarsOf_def,nub'_dvarsOf,no_self_comunication_def,nub'_APPEND,nub'_def]
@@ -1976,10 +2077,15 @@ Proof
               \\ drule_all iforest_steps_chor_false \\ rw[]
               \\ first_x_assum (irule_at Any)
               \\ first_x_assum (irule_at Any)
-              (* Should be true from something along the lines of: *)
-  (*                ‘split_sel p q c = NONE ⇒ ¬MEM sel_path q c’ *)
-  (*              *)
-              \\ cheat))
+              \\ simp[]
+              \\ reverse conj_asm1_tac >- metis_tac[]
+              \\ spose_not_then strip_assume_tac
+              \\ drule_all_then assume_tac MEM_sel_path_both'
+              \\ imp_res_tac MEM_sel_path_project
+              \\ ntac 2 $ first_x_assum(qspec_then ‘projectS p s’ strip_assume_tac)
+              \\ last_x_assum kall_tac
+              \\ iforest_simp
+              \\ gvs[FLOOKUP_chor_forest,chor_itree_def,chor_itree_merge_def]))
       >- (Cases_on ‘x = [1w]’ \\ gvs[]
           >- (drule_all iforest_steps_chor_true \\ rw[]
               \\ gvs[Once iforest_steps_def]
