@@ -2727,6 +2727,7 @@ Proof
   >- fs[iforest_steps_def]
   \\ reverse (Cases_on ‘MEM p l’)
   >- (‘iforest_can_act (↑ ψ) p’ by fs []
+      \\ drule_then strip_assume_tac (iforest_chor_upd_act_up |> REWRITE_RULE[EQ_IMP_THM] |> cj 2)
       \\ drule_all iforest_steps_chor_swap \\ rw[]
       \\ ‘∃y. iforest_step (↑ $ chor_iforest c s) p = y’ by simp[]
       \\ drule_all chor_steps_chor
@@ -2741,6 +2742,7 @@ Proof
       \\ REWRITE_TAC [iforest_steps_APPEND]
       \\ gs[iforest_steps_APPEND]
       \\ ‘iforest_can_act (↑ ψ) p’ by fs []
+      \\ drule_then strip_assume_tac (iforest_chor_upd_act_up |> REWRITE_RULE[EQ_IMP_THM] |> cj 2)
       \\ drule_all iforest_steps_chor_swap
       \\ strip_tac \\ fs[]
       \\ gvs[iforest_steps_def])
@@ -2797,8 +2799,6 @@ Proof
     \\ drule up_iforests \\ simp [])
   >- irule_at Any EQ_REFL
   \\ irule todo_chor_iforest_step \\ fs []
-  \\ conj_tac
-  >- fs [iforest_chor_upd_act_def,up_forest_def]
   \\ first_x_assum $ irule_at Any
 QED
 
