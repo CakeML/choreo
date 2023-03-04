@@ -1976,37 +1976,6 @@ Proof
   rw[]
 QED
 
-Theorem iforest_can_act_if:
-  iforest_can_act (chor_iforest (IfThen v q c1 c2) s) p ∧ p ≠ q ∧
-(*  MEM p (procsOf (IfThen v q c1 c2)) ∧*)
-  MEM p (sel_path q c1)
-  ⇒
-  F
-Proof
-  rpt strip_tac >>
-  iforest_simp >>
-  gvs[FLOOKUP_chor_forest,MEM_FILTER] >>
-
-
-  gvs[chor_iforest_def,chor_forest_def] >>
-  rw[chor_iforest_def] >>
-
-
-  iforest_simp >> gvs[FLOOKUP_chor_forest,MEM_FILTER,chor_itree_def,compile_network_ok_project_ok, SF DNF_ss] >>
-  ntac 2 $ last_x_assum $ qspec_then ‘p’ mp_tac >>
-  rw[]
-  >- (
-     )
-
-  res_tac >>
-  fs[]
-  rw[] >> gvs[]
-  >- (TOP_CASE_TAC >> gvs[] >>
-      qmatch_asmsub_abbrev_tac ‘chor_itree_merge _ a1’ >>
-      Cases_on ‘a1’ >> gvs[chor_itree_merge_def]
-      gvs[chor_iforest_act_def]
-QED
-
 Theorem chor_steps_chor':
   ∀c s ψ p p0.
     dvarsOf c = [] ∧
