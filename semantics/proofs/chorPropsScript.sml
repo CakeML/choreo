@@ -791,7 +791,7 @@ QED
 
 Theorem dprocsOf_ALOOKUP_EQ_set_opt:
   ∀dvars dvars' c.
-    (∀dn. MEM dn (dvarsOf c) ⇒ OPTION_REL (λx y. set x = set y) (ALOOKUP dvars dn) (ALOOKUP dvars' dn)) ⇒
+    (∀dn. MEM dn (dvarsOf c) ⇒ OPTREL (λx y. set x = set y) (ALOOKUP dvars dn) (ALOOKUP dvars' dn)) ⇒
     set(dprocsOf dvars c) = set(dprocsOf dvars' c)
 Proof
   Induct_on ‘c’ >>
