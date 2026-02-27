@@ -24,7 +24,7 @@ Inductive chorTypecheckOK:
 End
 
 Definition chorEnvtype_def:
-  chorEnvtype Γ Δ = (∀ p. envtype (localise Γ p) (localise Δ p))
+  chorEnvtype Γ s = (∀ p. envtype (localise Γ p) (localise s p))
 End
 
         

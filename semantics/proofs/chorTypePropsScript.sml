@@ -15,11 +15,11 @@ Proof
 QED
 
 Theorem chortype_update:
-  chorEnvtype Γ Δ ∧ value_type v ty ⇒
-  ∀ vn p. chorEnvtype (Γ |+ ((vn,p), ty)) (Δ |+ ((vn,p), v))
+  chorEnvtype Γ s ∧ value_type v t ⇒
+  ∀ vn p. chorEnvtype (Γ |+ ((vn,p), t)) (s |+ ((vn,p), v))
 Proof
   rw[chorEnvtype_def] >>
-  ‘envtype (localise Γ p' |+ (vn, ty)) (localise Δ p' |+ (vn, v))’ by metis_tac[envtype_update] >> Cases_on ‘p' = p’
+  ‘envtype (localise Γ p' |+ (vn, t)) (localise s p' |+ (vn, v))’ by metis_tac[envtype_update] >> Cases_on ‘p' = p’
   >- gvs[localise_update_eqn]
   >> metis_tac[localise_update_neq]
 QED

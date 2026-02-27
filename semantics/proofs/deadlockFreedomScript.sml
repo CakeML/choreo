@@ -6,7 +6,7 @@ val _ = new_theory "deadlockFreedom";
 
 
 Definition chorEnvsn_def:
-  chorEnvsn Γ Δ = (∀ p. envsn (localise Γ p) (localise Δ p))
+  chorEnvsn Γ s = (∀ p. envsn (localise Γ p) (localise s p))
 End
 
 Theorem chorEnvsn_localise_fdom:
@@ -76,8 +76,8 @@ Proof
   gvs[FLOOKUP_SIMP] >> metis_tac[]
 QED
 Theorem chorEnvsn_update:
-  chorEnvsn Γ s ∧ sn_v ty v ⇒
-  ∀vn p. chorEnvsn (Γ |+ ((vn,p),ty)) (s |+ ((vn,p),v))
+  chorEnvsn Γ s ∧ sn_v t v ⇒
+  ∀vn p. chorEnvsn (Γ |+ ((vn,p),t)) (s |+ ((vn,p),v))
 Proof
   rw[chorEnvsn_def] >> metis_tac[envsn_localise_update]
 QED

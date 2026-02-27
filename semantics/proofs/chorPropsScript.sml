@@ -319,7 +319,7 @@ Definition free_variables_def:
   (free_variables (Com p1 v1 p2 v2 c) = {(v1,p1)} ∪ (free_variables c DELETE (v2,p2))) /\
   (free_variables (Let v p e c) = {(s, p) | s ∈ free_vars e} ∪ (free_variables c DELETE (v,p))) /\
   (free_variables (Sel p b q c) = free_variables c) /\
-  (free_variables (Fix x c) = free_variables c)
+  (free_variables (Fix X c) = free_variables c)
 End
 
 Definition defined_vars_def:
