@@ -8,6 +8,7 @@
 *.o
 .HOLMK
 .hollogs
+.holobjs
 
 # Generated assembly
 *.S
@@ -27,3 +28,7 @@ tutorial/solutions/make_ex
 
 # Emacs backup files
 *~
+
+#git
+.DS_Store
+*/.DS_Store

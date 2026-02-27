@@ -1,4 +1,4 @@
-open preamble chorLangTheory
+open preamble chorLangTheory envSemTheory
 
 (* Semantics with build-in congruence *)
 val _ = new_theory "chorCongSem";
@@ -50,7 +50,7 @@ val (scong_rules, scong_ind, scong_cases) = Hol_reln `
 (* Swapping rules *)
 
 (* Swapping communications and selections is only posible if the
-   processes involved in each operations are diferent (all of them)
+   processes involved in each operations are different (all of them)
 *)
 
 ∧ (∀p1 p2 p3 p4 v1 v2 v3 v4 c.
@@ -80,30 +80,30 @@ val (scong_rules, scong_ind, scong_cases) = Hol_reln `
    shared betwen operations (this includes the arguments to the let
    function)
 *)
-∧ (∀v v' p p' f f' vl vl' c.
+∧ (∀v v' p p' e e' c.
     p ≠ p'
-    ⇒ scong (Let v p f vl (Let v' p' f' vl' c))
-           (Let v' p' f' vl' (Let v p f vl c)))
+    ⇒ scong (Let v p e (Let v' p' e' c))
+           (Let v' p' e' (Let v p e c)))
 
 (* L to R *)
-∧ (∀p1 p2 p3 v1 v2 v3 f vl c.
+∧ (∀p1 p2 p3 v1 v2 v3 e c.
     p1 ≠ p3 ∧ p2 ≠ p3
-    ⇒ scong (Com p1 v1 p2 v2 (Let v3 p3 f vl c))
-            (Let v3 p3 f vl (Com p1 v1 p2 v2 c)))
-∧ (∀p1 p2 p3 b v vl f c.
+    ⇒ scong (Com p1 v1 p2 v2 (Let v3 p3 e c))
+            (Let v3 p3 e (Com p1 v1 p2 v2 c)))
+∧ (∀p1 p2 p3 b v e c.
     p1 ≠ p3 ∧ p2 ≠ p3
-    ⇒ scong (Sel p1 b p2 (Let v p3 f vl c))
-            (Let v p3 f vl (Sel p1 b p2 c)))
+    ⇒ scong (Sel p1 b p2 (Let v p3 e c))
+            (Let v p3 e (Sel p1 b p2 c)))
 
 (* R to L *)
-∧ (∀p1 p2 p3 v1 v2 v3 f vl c.
+∧ (∀p1 p2 p3 v1 v2 v3 e c.
     p1 ≠ p3 ∧ p2 ≠ p3
-    ⇒ scong (Let v3 p3 f vl (Com p1 v1 p2 v2 c))
-            (Com p1 v1 p2 v2 (Let v3 p3 f vl c)))
-∧ (∀p1 p2 p3 b v vl f c.
+    ⇒ scong (Let v3 p3 e (Com p1 v1 p2 v2 c))
+            (Com p1 v1 p2 v2 (Let v3 p3 e c)))
+∧ (∀p1 p2 p3 b v e c.
     p1 ≠ p3 ∧ p2 ≠ p3
-    ⇒ scong (Let v p3 f vl (Sel p1 b p2 c))
-            (Sel p1 b p2 (Let v p3 f vl c)))
+    ⇒ scong (Let v p3 e (Sel p1 b p2 c))
+            (Sel p1 b p2 (Let v p3 e c)))
 
 (* If Rules *)
 ∧ (∀p q e1 e2 c1 c2 c1' c2'.
@@ -120,10 +120,10 @@ val (scong_rules, scong_ind, scong_cases) = Hol_reln `
     p ∉ {p1;p2}
     ⇒ scong (Sel p1 b p2 (IfThen e p c1 c2))
             (IfThen e p (Sel p1 b p2 c1) (Sel p1 b p2 c2)))
-∧ (∀p1 p2 v f vl e c1 c2.
+∧ (∀p1 p2 v e ep c1 c2.
     p1 ≠ p2
-    ⇒ scong (Let v p1 f vl (IfThen e p2 c1 c2))
-            (IfThen e p2 (Let v p1 f vl c1) (Let v p1 f vl c2)))
+    ⇒ scong (Let v p1 ep (IfThen e p2 c1 c2))
+            (IfThen e p2 (Let v p1 ep c1) (Let v p1 ep c2)))
 
 (* R to L *)
 ∧ (∀p1 p2 p v1 v2 c1 c2 e.
@@ -134,19 +134,19 @@ val (scong_rules, scong_ind, scong_cases) = Hol_reln `
     p ∉ {p1;p2}
     ⇒ scong (IfThen e p (Sel p1 b p2 c1) (Sel p1 b p2 c2))
             (Sel p1 b p2 (IfThen e p c1 c2)))
-∧ (∀p1 p2 v f vl e c1 c2.
+∧ (∀p1 p2 v e ep c1 c2.
     p1 ≠ p2
-    ⇒ scong (IfThen e p2 (Let v p1 f vl c1) (Let v p1 f vl c2))
-            (Let v p1 f vl (IfThen e p2 c1 c2)))
+    ⇒ scong (IfThen e p2 (Let v p1 ep c1) (Let v p1 ep c2))
+            (Let v p1 ep (IfThen e p2 c1 c2)))
 
   (* Structural rules *)
 ∧ (∀p e c1 c1' c2 c2'.
     scong c1 c1'
     ∧ scong c2 c2'
     ⇒ scong (IfThen e p c1 c2) (IfThen e p c1' c2'))
-∧ (∀p v f vl c c'.
+∧ (∀p v e c c'.
     scong c c'
-    ⇒ scong (Let v p f vl c) (Let v p f vl c'))
+    ⇒ scong (Let v p e c) (Let v p e c'))
 ∧ (∀p1 v1 p2 v2 c c'.
     scong c c'
     ⇒ scong (Com p1 v1 p2 v2 c) (Com p1 v1 p2 v2 c'))
@@ -174,61 +174,63 @@ val _ = zip ["scong_refl", "scong_trans"
             , "scong_fix"]
             (CONJUNCTS scong_rules) |> map save_thm;
 
-val (transCong_rules,transCong_ind,transCong_cases) = Hol_reln `
+Inductive transCong:
   (* Communication *)
-  (∀s v1 p1 v2 p2 d c.
+[~com:]  (∀s v1 p1 v2 p2 d c.
     FLOOKUP s (v1,p1) = SOME d
     ∧ p1 ≠ p2
     ⇒ transCong (s,Com p1 v1 p2 v2 c) (LCom p1 v1 p2 v2) (s |+ ((v2,p2),d),c))
 
   (* Selection *)
-∧ (∀s p1 b p2 c.
+[~sel:] (∀s p1 b p2 c.
     p1 ≠ p2
     ⇒ transCong (s,Sel p1 b p2 c) (LSel p1 b p2) (s,c))
 
-  (* Let *)
-∧ (∀s v p f vl c.
-    EVERY IS_SOME (MAP (FLOOKUP s) (MAP (λv. (v,p)) vl))
-    ⇒ transCong (s,Let v p f vl c)
+  (* Letval *)
+[~let:] (∀s v p e c cl ev.
+    eval_exp cl (localise s p) e = Value ev
+    ⇒ transCong (s,Let v p e c)
                 (LTau p (SOME v))
-                (s |+ ((v,p),f(MAP (THE o FLOOKUP s) (MAP (λv. (v,p)) vl))),c))
+                (s |+ ((v,p), ev),c))
+
+(* Letexn *)
+[~letexn:] (∀s v p e c cl exn.
+    eval_exp cl (localise s p) e = Exn exn
+    ⇒ transCong (s,Let v p e c)
+                (LTau p (SOME v))
+                (s, Nil))
+                
   (* If (True) *)
-∧ (∀s v p c1 c2.
-    FLOOKUP s (v,p) = SOME [1w]
+[~if_true:] (∀s v p c1 c2.
+    FLOOKUP s (v,p) = SOME (BoolV T)
     ⇒ transCong (s,IfThen v p c1 c2) (LTau p NONE) (s,c1))
 
   (* If (False) *)
-∧ (∀s v p c1 c2.
-    FLOOKUP s (v,p) = SOME w ∧ w ≠ [1w]
+[~if_false:] (∀s v p c1 c2.
+    FLOOKUP s (v,p) = SOME (BoolV F)
     ⇒ transCong (s,IfThen v p c1 c2) (LTau p NONE) (s,c2))
 
   (* Asynchrony *)
-∧ (∀s c s' c' p1 v1 p2 v2 alpha.
+[~com_asynch:] (∀s c s' c' p1 v1 p2 v2 alpha.
     transCong (s,c) alpha (s',c')
     ∧ p1 ∈ freeprocs alpha
     ∧ written alpha ≠ SOME (v1,p1)
     ∧ p2 ∉ freeprocs alpha
     ⇒ transCong (s,Com p1 v1 p2 v2 c) alpha (s',Com p1 v1 p2 v2 c'))
 
-∧ (∀s c s' c' p1 b p2 alpha.
+[~sel_async:] (∀s c s' c' p1 b p2 alpha.
     transCong (s,c) alpha (s',c')
     ∧ p1 ∈ freeprocs alpha
     ∧ p2 ∉ freeprocs alpha
     ⇒ transCong (s,Sel p1 b p2 c) alpha (s',Sel p1 b p2 c'))
 
   (* Congruence *)
-∧ (∀c1 c2 c1' c2' alpha.
+[~cong:] (∀c1 c2 c1' c2' alpha.
     c1 ≲ c1'
     ∧ transCong (s,c1') alpha (s',c2')
     ∧ c2' ≲ c2
     ⇒ transCong (s,c1) alpha (s',c2))
-`;
-
-val _ = zip ["transCong_com", "transCong_sel", "transCong_let"
-             , "transCong_if_true", "transCong_if_false"
-             , "transCong_com_asynch", "transCong_sel_async"
-             , "transCong_cong"]
-            (CONJUNCTS transCong_rules) |> map save_thm;
+End
 
 val transCong_pairind = save_thm("transCong_pairind",
   theorem"transCong_strongind"
@@ -276,18 +278,18 @@ val (lncong_rules, lncong_ind, lncong_cases) = Hol_reln `
    shared betwen operations (this includes the arguments to the let
    function)
 *)
-∧ (∀p1 p2 p3 v1 v2 v3 f vl c.
+∧ (∀p1 p2 p3 v1 v2 v3 e c.
     p1 ≠ p3 ∧ p2 ≠ p3
-    ⇒ lncong (Com p1 v1 p2 v2 (Let v3 p3 f vl c))
-            (Let v3 p3 f vl (Com p1 v1 p2 v2 c)))
-∧ (∀v v' p p' f f' vl vl' c.
+    ⇒ lncong (Com p1 v1 p2 v2 (Let v3 p3 e c))
+            (Let v3 p3 e (Com p1 v1 p2 v2 c)))
+∧ (∀v v' p p' e e' c.
     p ≠ p'
-    ⇒ lncong (Let v p f vl (Let v' p' f' vl' c))
-           (Let v' p' f' vl' (Let v p f vl c)))
-∧ (∀p1 p2 p3 b v vl f c.
+    ⇒ lncong (Let v p e (Let v' p' e' c))
+           (Let v' p' e' (Let v p e c)))
+∧ (∀p1 p2 p3 b v e c.
     p1 ≠ p3 ∧ p2 ≠ p3
-    ⇒ lncong (Sel p1 b p2 (Let v p3 f vl c))
-            (Let v p3 f vl (Sel p1 b p2 c)))
+    ⇒ lncong (Sel p1 b p2 (Let v p3 e c))
+            (Let v p3 e (Sel p1 b p2 c)))
 
 (* If Rules *)
 ∧ (∀p q e1 e2 c1 c2 c1' c2'.
@@ -302,19 +304,19 @@ val (lncong_rules, lncong_ind, lncong_cases) = Hol_reln `
     p ∉ {p1;p2}
     ⇒ lncong (Sel p1 b p2 (IfThen e p c1 c2))
             (IfThen e p (Sel p1 b p2 c1) (Sel p1 b p2 c2)))
-∧ (∀p1 p2 v f vl e c1 c2.
+∧ (∀p1 p2 v e ep c1 c2.
     p1 ≠ p2
-    ⇒ lncong (Let v p1 f vl (IfThen e p2 c1 c2))
-            (IfThen e p2 (Let v p1 f vl c1) (Let v p1 f vl c2)))
+    ⇒ lncong (Let v p1 ep (IfThen e p2 c1 c2))
+            (IfThen e p2 (Let v p1 ep c1) (Let v p1 ep c2)))
 
   (* Structural rules *)
 ∧ (∀p e c1 c1' c2 c2'.
     lncong c1 c1'
     ∧ lncong c2 c2'
     ⇒ lncong (IfThen e p c1 c2) (IfThen e p c1' c2'))
-∧ (∀p v f vl c c'.
+∧ (∀p v e c c'.
     lncong c c'
-    ⇒ lncong (Let v p f vl c) (Let v p f vl c'))
+    ⇒ lncong (Let v p e c) (Let v p e c'))
 ∧ (∀p1 v1 p2 v2 c c'.
     lncong c c'
     ⇒ lncong (Com p1 v1 p2 v2 c) (Com p1 v1 p2 v2 c'))
@@ -353,9 +355,9 @@ val (flcong_rules, flcong_ind, flcong_cases) = Hol_reln `
     flcong c1 c1'
     ∧ flcong c2 c2'
     ⇒ flcong (IfThen e p c1 c2) (IfThen e p c1' c2'))
-∧ (∀p v f vl c c'.
+∧ (∀p v e c c'.
     flcong c c'
-    ⇒ flcong (Let v p f vl c) (Let v p f vl c'))
+    ⇒ flcong (Let v p e c) (Let v p e c'))
 ∧ (∀p1 v1 p2 v2 c c'.
     flcong c c'
     ⇒ flcong (Com p1 v1 p2 v2 c) (Com p1 v1 p2 v2 c'))

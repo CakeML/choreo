@@ -1,8 +1,10 @@
 ifndef CAKEDIR
-CAKEDIR = ../../../cakeml
+CAKEDIR = ../../../cakeml-2274
 endif
 
-INCLUDES = $(CAKEDIR)/misc ../ ../../utils
+INCLUDES = $(CAKEDIR)/misc ../ ../../utils \
+	   ../../richerlang \
+	   ../../semantics
 OPTIONS = QUIT_ON_FAILURE
 
 THYFILES = $(patsubst %Script.sml,%Theory.uo,$(wildcard *.sml))
