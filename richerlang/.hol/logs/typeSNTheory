@@ -1,0 +1,33 @@
+<<HOL message: Created theory "typeSN">>
+<<HOL message: mk_functional: 
+  pattern completion has added 34 clauses to the original specification.>>
+Saved definition ____ "sn_v_def"
+Saved induction _____ "sn_v_ind"
+Saved definition ____ "envsn_def"
+Saved definition ____ "sn_exec_def"
+Saved definition ____ "sn_e_def"
+Saved theorem _______ "envsn_fdom"
+Saved theorem _______ "envsn_g_domsub_update"
+Saved theorem _______ "envsn_fdom_subset"
+Saved theorem _______ "flookup_submap_rev"
+Saved theorem _______ "envsn_e_submap"
+Saved theorem _______ "envsn_e_submap2"
+Saved theorem _______ "subset_inter_same"
+Saved theorem _______ "subset_inter_same2"
+Saved theorem _______ "envsn_g_submap"
+Saved theorem _______ "envsn_update"
+Saved theorem _______ "envsn_g_domsub"
+Saved theorem _______ "drestrict_not_in"
+Saved theorem _______ "sn_v_intT"
+Saved theorem _______ "sn_v_strT"
+Saved theorem _______ "sn_v_boolT"
+Saved theorem _______ "sn_v_pairT"
+Saved theorem _______ "sn_v_fnT"
+Saved theorem _______ "sn_v_sumT"
+Saved theorem _______ "bop_sn_lemma"
+Saved theorem _______ "uop_sn_lemma"
+Saved theorem _______ "drestrict_diff_update"
+Saved theorem _______ "sn_lemma"
+Saved theorem _______ "richerLang_sn"
+Exporting theory "typeSN" ... done.
+Theory "typeSN" took 2.8s to build

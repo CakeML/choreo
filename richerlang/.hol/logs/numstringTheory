@@ -1,0 +1,17 @@
+<<HOL message: Created theory "numstring">>
+Saved definition ____ "int_to_stringHelper_def"
+Saved induction _____ "int_to_stringHelper_ind"
+Saved definition ____ "int_to_string_def"
+Saved definition ____ "string_to_intHelper2_def"
+Saved definition ____ "string_to_int2_def"
+Saved theorem _______ "i2sHelper_EQ_NIL"
+Saved theorem _______ "s2i_inverse"
+Saved definition ____ "hnlz_def"
+Saved theorem _______ "hnlz_reverse"
+Saved theorem _______ "s2iHelper_empty"
+Saved theorem _______ "s2iHelper_nonzero"
+Saved theorem _______ "i2sHelper_inverse"
+Saved theorem _______ "reverse_zero"
+Saved theorem _______ "i2s_inverse"
+Exporting theory "numstring" ... done.
+Theory "numstring" took 0.82631s to build

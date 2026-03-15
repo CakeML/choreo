@@ -1,7 +1,6 @@
-open HolKernel Parse boolLib bossLib
-open fmaptreeTheory stringTheory finite_mapTheory;
+Theory value
+Ancestors fmaptree string finite_map
 
-val _ = new_theory "value";
 
 Type value0 = “:(string, (num + string) + (bool + (string#α))) fmaptree”
 
@@ -47,16 +46,12 @@ Proof
   qexists ‘IntV0 0’>>simp[is_value_int]
 QED
 
-(*
 val r = newtypeTools.rich_new_type {
   exthm = is_value_exists,
   tyname = "value",
   ABS = "value_ABS",
   REP = "value_REP"
   };
-*)
-
-val r = newtypeTools.rich_new_type ("value", is_value_exists);
 
 Theorem is_value_Clos0[simp,local]:
   is_value (Clos0 s e (value_REP o_f E))
@@ -192,5 +187,3 @@ Definition is_BoolV_def[simp]:
   is_BoolV (BoolV _) = T ∧
   is_BoolV _ = F
 End
-
-val _ = export_theory();

@@ -1,0 +1,21 @@
+<<HOL message: Created theory "pchorLang">>
+Saved theorem _______ "datatype_term"
+Saved theorem _______ "term_11"
+Saved theorem _______ "term_distinct"
+Saved theorem _______ "term_nchotomy"
+Saved theorem _______ "term_Axiom"
+Saved theorem _______ "term_induction"
+Saved theorem _______ "term_case_cong"
+Saved theorem _______ "term_case_eq"
+<<HOL message: Defined type: "term">>
+Saved theorem _______ "datatype_pchor"
+Saved theorem _______ "pchor_11"
+Saved theorem _______ "pchor_distinct"
+Saved theorem _______ "pchor_nchotomy"
+Saved theorem _______ "pchor_Axiom"
+Saved theorem _______ "pchor_induction"
+Saved theorem _______ "pchor_case_cong"
+Saved theorem _______ "pchor_case_eq"
+<<HOL message: Defined type: "pchor">>
+Exporting theory "pchorLang" ... done.
+Theory "pchorLang" took 0.06574s to build

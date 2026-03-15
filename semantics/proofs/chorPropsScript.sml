@@ -916,7 +916,7 @@ Proof
   Induct_on ‘c’ >>
   rw[dprocsOf_def,procsOf_def,dvarsOf_def,MEM_nub',MEM_FILTER,PULL_EXISTS] >>
   res_tac >> gs[CaseEq "bool"] >>
-  TRY(rpt(PURE_FULL_CASE_TAC >> fs[libTheory.the_def]) >> NO_TAC) >>
+  TRY(rpt(PURE_FULL_CASE_TAC >> fs[miscTheory.the_def]) >> NO_TAC) >>
   TRY(AP_TERM_TAC >>
       first_x_assum match_mp_tac >>
       rw[] >> NO_TAC) >>
@@ -934,7 +934,7 @@ Proof
   rw[] >>
   res_tac >> gs[CaseEq "bool"] >>
   TRY(last_x_assum match_mp_tac >> rw[] >> NO_TAC) >>
-  TRY(rpt(PURE_FULL_CASE_TAC >> fs[libTheory.the_def]) >> NO_TAC) >>
+  TRY(rpt(PURE_FULL_CASE_TAC >> fs[miscTheory.the_def]) >> NO_TAC) >>
   metis_tac[]
 QED
 
@@ -949,7 +949,7 @@ Proof
   rw[] >>
   res_tac >> gs[CaseEq "bool"] >>
   TRY(last_x_assum match_mp_tac >> rw[] >> NO_TAC) >>
-  TRY(rpt(PURE_FULL_CASE_TAC >> fs[libTheory.the_def]) >> NO_TAC) >>
+  TRY(rpt(PURE_FULL_CASE_TAC >> fs[miscTheory.the_def]) >> NO_TAC) >>
   metis_tac[]
 QED
 
@@ -989,7 +989,7 @@ Theorem dprocsOf_dvarsOf_empty_cons:
 Proof
   rpt strip_tac >>
   match_mp_tac dprocsOf_ALOOKUP_EQ' >>
-  rw[] >> fs[dvarsOf_def,FILTER_EQ_NIL,EVERY_MEM,MEM_nub',libTheory.the_def] >>
+  rw[] >> fs[dvarsOf_def,FILTER_EQ_NIL,EVERY_MEM,MEM_nub',miscTheory.the_def] >>
   res_tac >> fs[]
 QED
 
@@ -1005,7 +1005,7 @@ QED
 Theorem dprocsOf_nil:
   dprocsOf ((dn,[])::dvars) c = dprocsOf (FILTER ($<> dn o FST) dvars) c
 Proof
-  match_mp_tac dprocsOf_ALOOKUP_EQ' >> rw[ALOOKUP_FILTER',o_DEF,libTheory.the_def]
+  match_mp_tac dprocsOf_ALOOKUP_EQ' >> rw[ALOOKUP_FILTER',o_DEF,miscTheory.the_def]
 QED
 
 (* TODO: move to choreoUtils *)

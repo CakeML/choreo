@@ -1,0 +1,1 @@
+chorItreeSemScript.uo: /Users/mac/honors/HOL/sigobj/DB_dtype.uo /Users/mac/honors/HOL/sigobj/Q.uo /Users/mac/honors/HOL/sigobj/TotalDefn.uo chorLangTheory.uo itreeCommonTheory.uo /Users/mac/honors/HOL/src/coalgebras/itreeTauTheory.uo /Users/mac/honors/cakeml/misc/preamble.uo 

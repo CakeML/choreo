@@ -1,0 +1,30 @@
+<<HOL message: Created theory "chorItreeSem">>
+Saved definition ____ "CERROR"
+Saved definition ____ "CDONE"
+<<HOL message: mk_functional: 
+  pattern completion has added 13 clauses to the original specification.>>
+Saved definition ____ "chor_itree_list_merge_def"
+Saved induction _____ "chor_itree_list_merge_ind"
+<<HOL message: mk_functional: 
+  pattern completion has added 1 clause to the original specification.>>
+Saved definition ____ "chor_itree_send_aux_def"
+Saved induction _____ "chor_itree_send_aux_ind"
+<<HOL message: mk_functional: 
+  pattern completion has added 1 clause to the original specification.>>
+Saved definition ____ "chor_itree_recv_aux_def"
+Saved induction _____ "chor_itree_recv_aux_ind"
+<<HOL message: mk_functional: 
+  pattern completion has added 1 clause to the original specification.>>
+Saved definition ____ "chor_itree_select_aux_def"
+Saved induction _____ "chor_itree_select_aux_ind"
+
+Exception raised at TotalDefn.tDefine:
+at Defn.Hol_defn: between line 70, character 2 and line 104, character 55:
+at Defn.parse_quote:
+at Preterm.type-analysis: on line 78, characters 31-54:
+  
+Type error in function application.
+  Function: f :exp
+  Argument: MAP (THE ∘ FLOOKUP s) vl :β list
+  Reason: Attempt to unify different type operators: richerLang$exp and min$fun
+

@@ -1,6 +1,6 @@
-open HolKernel Parse boolLib bossLib richerLangTheory finite_mapTheory valueTheory pred_setTheory optionTheory
+Theory envSem
+Ancestors richerLang finite_map value pred_set option
 
-val _ = new_theory "envSem";
 
 Definition eval_exp_def:
   (eval_exp c E (Var str) =
@@ -614,6 +614,3 @@ Proof
   rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >>
   metis_tac[subset_diff_same, FDOM_FUPDATE, INSERT_SING_UNION, UNION_COMM, DIFF_SAME_UNION, DIFF_SUBSET, SUBSET_TRANS]
 QED
-        
-val _ = export_theory();
-

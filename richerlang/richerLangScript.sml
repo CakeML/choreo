@@ -1,6 +1,6 @@
-open HolKernel Parse boolLib bossLib stringTheory listTheory numposrepTheory arithmeticTheory finite_mapTheory numstringTheory valueTheory; 
+Theory richerLang
+Ancestors string list numposrep arithmetic finite_map numstring value
 
-val _ = new_theory "richerLang";
 
 val _ = hide "STRING";
 
@@ -348,5 +348,3 @@ Proof
   >- ( (* NumOf *) gvs[valuetype_EQ_strT, PULL_EXISTS, eval_uop_def, result_bind_def]>> Cases_on ‘string_to_int2 s’ >> simp[])
   >> gvs[valuetype_EQ_intT, valuetype_EQ_pairT, PULL_EXISTS, eval_uop_def, result_bind_def]
 QED
-
-val _ = export_theory();
