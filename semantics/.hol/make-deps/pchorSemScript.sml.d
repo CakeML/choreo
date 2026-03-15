@@ -1,1 +1,0 @@
-pchorSemScript.uo: /Users/mac/honors/HOL/sigobj/DB_dtype.uo /Users/mac/honors/HOL/sigobj/IndDefLib.uo /Users/mac/honors/HOL/sigobj/Q.uo /Users/mac/honors/HOL/sigobj/TotalDefn.uo /Users/mac/honors/HOL/sigobj/bossLib.uo /Users/mac/honors/choreo/utils/choreoUtilsTheory.uo pchorLangTheory.uo /Users/mac/honors/cakeml/misc/preamble.uo 

@@ -6,6 +6,7 @@
 *.uo
 *.ui
 *.o
+**/.hol/
 .HOLMK
 .hollogs
 .holobjs

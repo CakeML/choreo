@@ -1,6 +1,0 @@
-<<HOL message: Created theory "iforest">>
-
-Exception raised at TotalDefn.xDefine:
-at Defn.Hol_defn: between line 33, character 2 and line 56, character 73:
-at Defn.parse_quote:
-at Pmatch.mk_case: Pattern Tau t is not a constructor or variable

@@ -1,1 +1,0 @@
-choreoUtilsScript.uo: /Users/mac/honors/HOL/sigobj/BasicProvers.uo /Users/mac/honors/HOL/sigobj/DB_dtype.uo /Users/mac/honors/HOL/sigobj/Q.uo /Users/mac/honors/HOL/sigobj/TotalDefn.uo /Users/mac/honors/HOL/sigobj/boolLib.uo /Users/mac/honors/cakeml/misc/preamble.uo /Users/mac/honors/HOL/sigobj/simpLib.uo 

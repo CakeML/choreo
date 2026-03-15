@@ -1,5 +1,0 @@
-/Users/mac/honors/choreo/semantics/proofs/deadlockFreedomScript.sml:2: error: Structure (chorPropschorTypePropsTheory) has not been declared
-Found near open HolKernel boolLib bossLib Parse holTheory ...
-error in quse /Users/mac/honors/choreo/semantics/proofs/deadlockFreedomScript.sml : Fail "Static Errors"
-error in load /Users/mac/honors/choreo/semantics/proofs/deadlockFreedomScript : Fail "Static Errors"
-Uncaught exception at ./basis/FinalPolyML.sml:492: Fail "Static Errors"

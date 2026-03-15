@@ -1,1 +1,0 @@
-chorCongSemScript.uo: /Users/mac/honors/HOL/sigobj/Drule.uo /Users/mac/honors/HOL/sigobj/IndDefLib.uo /Users/mac/honors/HOL/sigobj/Parse.uo /Users/mac/honors/HOL/sigobj/Q.uo /Users/mac/honors/HOL/sigobj/boolLib.uo /Users/mac/honors/HOL/sigobj/boolTheory.uo chorLangTheory.uo /Users/mac/honors/choreo/richerlang/envSemTheory.uo /Users/mac/honors/cakeml/misc/preamble.uo 
