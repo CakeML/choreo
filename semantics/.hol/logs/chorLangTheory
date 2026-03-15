@@ -1,0 +1,23 @@
+<<HOL message: Created theory "chorLang">>
+Saved theorem _______ "datatype_term"
+Saved theorem _______ "term_11"
+Saved theorem _______ "term_distinct"
+Saved theorem _______ "term_nchotomy"
+Saved theorem _______ "term_Axiom"
+Saved theorem _______ "term_induction"
+Saved theorem _______ "term_case_cong"
+Saved theorem _______ "term_case_eq"
+<<HOL message: Defined type: "term">>
+Saved theorem _______ "datatype_chor"
+Saved theorem _______ "chor_11"
+Saved theorem _______ "chor_distinct"
+Saved theorem _______ "chor_nchotomy"
+Saved theorem _______ "chor_Axiom"
+Saved theorem _______ "chor_induction"
+Saved theorem _______ "chor_case_cong"
+Saved theorem _______ "chor_case_eq"
+<<HOL message: Defined type: "chor">>
+Saved definition ____ "dsubst_def"
+Saved definition ____ "size_chor_def"
+Exporting theory "chorLang" ... done.
+Theory "chorLang" took 0.57463s to build

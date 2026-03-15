@@ -1,0 +1,1 @@
+itreeCommonTheory.uo: itreeCommonTheory.ui /Users/mac/honors/HOL/sigobj/Globals.uo /Users/mac/honors/HOL/sigobj/Symtab.uo /Users/mac/honors/HOL/sigobj/Term.uo /Users/mac/honors/HOL/sigobj/Theory.uo /Users/mac/honors/HOL/sigobj/TheoryReader.uo /Users/mac/honors/HOL/sigobj/Thm.uo /Users/mac/honors/HOL/sigobj/Type.uo chorLangTheory.uo 

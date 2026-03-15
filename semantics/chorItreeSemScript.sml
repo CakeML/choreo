@@ -1,6 +1,6 @@
-open preamble chorLangTheory itreeTheory itreeCommonTheory
+Theory chorItreeSem
+Ancestors chorLang itreeTau itreeCommon
 
-val _ = new_theory "chorItreeSem";
 
 (* The error choreography:
 
@@ -66,6 +66,7 @@ Definition chor_itree_select_aux_def[simp]:
 ∧ chor_itree_select_aux s _ _ _ = [(s,CERROR)]
 End
 
+(* fix let*)
 Definition chor_itree_list_def:
   chor_itree_list p [] = Ret' Done
 ∧ chor_itree_list p [(s,Nil)]      = Ret' (Res ())
@@ -347,5 +348,3 @@ Proof
   >- (irule EQ_SYM \\ simp[Once itree_unfold,chor_itree_list_def])
   \\ simp[chor_itree_list_def,CDONE]
 QED
-
-val _ = export_theory ()

@@ -1,0 +1,1 @@
+chorLangScript.uo: /Users/mac/honors/HOL/sigobj/DB_dtype.uo /Users/mac/honors/HOL/sigobj/Parse.uo /Users/mac/honors/HOL/sigobj/TotalDefn.uo /Users/mac/honors/choreo/richerlang/envSemTheory.uo /Users/mac/honors/cakeml/misc/preamble.uo /Users/mac/honors/choreo/richerlang/richerLangTheory.uo 

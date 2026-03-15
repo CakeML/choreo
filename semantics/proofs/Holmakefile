@@ -1,5 +1,5 @@
 ifndef CAKEDIR
-CAKEDIR = ../../../cakeml-2274
+CAKEDIR = /Users/mac/honors/cakeml
 endif
 
 INCLUDES = $(CAKEDIR)/misc ../ ../../utils \

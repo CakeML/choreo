@@ -1,6 +1,6 @@
-open HolKernel Parse boolLib bossLib stringTheory listTheory numposrepTheory arithmeticTheory;
+Theory numstring
+Ancestors string list numposrep arithmetic;
 
-val _ = new_theory "numstring";
 
 val _ = hide "STRING";
 
@@ -146,6 +146,3 @@ Proof
   ‘int_to_stringHelper x = REVERSE s’ by simp[i2sHelper_inverse]>>
   simp[]
 QED
-        
-
-val _ = export_theory();

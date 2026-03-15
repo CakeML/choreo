@@ -1,8 +1,5 @@
-open HolKernel Parse boolLib bossLib;
-
-open richerLangTheory envSemTheory optionTheory finite_mapTheory pred_setTheory;
-
-val _ = new_theory "typeSN";
+Theory typeSN
+Ancestors richerLang envSem option finite_map pred_set
 
 
 Definition sn_v_def:
@@ -311,7 +308,3 @@ Proof
   fs[sn_v_def, sn_e_def, sn_exec_def, envsn_def] >>
   metis_tac[]
 QED
-
-        
-val _ = export_theory();
-

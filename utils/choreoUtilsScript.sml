@@ -61,7 +61,7 @@ QED
 
 Theorem FIND_o_MEM:
   !e f l. FIND ($= e o f) l <> NONE <=> MEM e (MAP f l)
-Proof
+Proof[exclude_simps=lift_disj_eq lift_imp_disj]
   Induct_on `l` >> rw[FIND_def,INDEX_FIND_def] >> fs[FIND_def,INDEX_FIND_normalize']
 QED
 

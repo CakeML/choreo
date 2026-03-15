@@ -1,0 +1,16 @@
+<<HOL message: Created theory "chorTypeProps">>
+Saved theorem _______ "chortype_localise_fdom"
+Saved theorem _______ "chortype_fdom_subset"
+Saved theorem _______ "chortype_update"
+Saved theorem _______ "type_has_exp"
+Saved theorem _______ "type_has_value"
+Saved theorem _______ "chorTypecheckOK_env_fv"
+Saved theorem _______ "chortype_no_undefined_vars"
+Saved theorem _______ "chortype_no_self_communication"
+Saved theorem _______ "chorTypecheckOK_let_thm"
+Saved theorem _______ "chorTypecheckOK_if_thm"
+Saved theorem _______ "chorTypecheckOK_com_thm"
+Saved theorem _______ "chorTypecheckOK_sel_thm"
+Saved theorem _______ "chorTypecheckOK_fix_thm"
+Exporting theory "chorTypeProps" ... done.
+Theory "chorTypeProps" took 0.92152s to build
