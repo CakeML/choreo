@@ -40,4 +40,4 @@ Saved theorem _______ "ptrans_let_swap"
 Saved theorem _______ "ptrans_pairind"
 Saved definition ____ "ptrans_s_def"
 Exporting theory "pchorSem" ... done.
-Theory "pchorSem" took 3.2s to build
+Theory "pchorSem" took 2.9s to build

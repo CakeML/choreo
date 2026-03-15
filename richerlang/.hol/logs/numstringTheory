@@ -14,4 +14,4 @@ Saved theorem _______ "i2sHelper_inverse"
 Saved theorem _______ "reverse_zero"
 Saved theorem _______ "i2s_inverse"
 Exporting theory "numstring" ... done.
-Theory "numstring" took 0.82631s to build
+Theory "numstring" took 1.0s to build

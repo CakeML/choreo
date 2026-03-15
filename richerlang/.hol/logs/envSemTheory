@@ -60,4 +60,4 @@ Saved theorem _______ "eval_bigger_state_exn"
 Saved theorem _______ "eval_val_neq"
 Saved theorem _______ "typecheck_no_undefined_vars"
 Exporting theory "envSem" ... done.
-Theory "envSem" took 9.3s to build
+Theory "envSem" took 10.9s to build

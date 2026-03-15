@@ -112,4 +112,4 @@ Saved theorem _______ "trans_variables_mono"
 Saved theorem _______ "trans_s_variables_mono"
 Saved theorem _______ "free_variables_variables"
 Exporting theory "chorProps" ... done.
-Theory "chorProps" took 14.3s to build
+Theory "chorProps" took 15.1s to build

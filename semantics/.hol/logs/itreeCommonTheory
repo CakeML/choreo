@@ -1,0 +1,30 @@
+<<HOL message: Created theory "itreeCommon">>
+Saved theorem _______ "datatype_event"
+Saved theorem _______ "event_11"
+Saved theorem _______ "event_distinct"
+Saved theorem _______ "event_nchotomy"
+Saved theorem _______ "event_Axiom"
+Saved theorem _______ "event_induction"
+Saved theorem _______ "event_case_cong"
+Saved theorem _______ "event_case_eq"
+<<HOL message: Defined type: "event">>
+Saved theorem _______ "datatype_action"
+Saved theorem _______ "action_11"
+Saved theorem _______ "action_distinct"
+Saved theorem _______ "action_nchotomy"
+Saved theorem _______ "action_Axiom"
+Saved theorem _______ "action_induction"
+Saved theorem _______ "action_case_cong"
+Saved theorem _______ "action_case_eq"
+<<HOL message: Defined type: "action">>
+Saved theorem _______ "datatype_result"
+Saved theorem _______ "result_11"
+Saved theorem _______ "result_distinct"
+Saved theorem _______ "result_nchotomy"
+Saved theorem _______ "result_Axiom"
+Saved theorem _______ "result_induction"
+Saved theorem _______ "result_case_cong"
+Saved theorem _______ "result_case_eq"
+<<HOL message: Defined type: "result">>
+Exporting theory "itreeCommon" ... done.
+Theory "itreeCommon" took 0.90437s to build

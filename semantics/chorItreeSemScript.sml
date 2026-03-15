@@ -1,6 +1,6 @@
 Theory chorItreeSem
-Ancestors chorLang itreeTau itreeCommon
-
+Ancestors chorLang itreeTau itreeCommon richerLang envSem itree
+          
 
 (* The error choreography:
 
@@ -54,8 +54,8 @@ Definition chor_itree_send_aux_def[simp]:
 End
 
 Definition chor_itree_recv_aux_def[simp]:
-  chor_itree_recv_aux s v c (Msg x) = [(s |+ (v,x),c)]
-∧ chor_itree_recv_aux s _ _ _       = [(s,CERROR)]
+  chor_itree_recv_aux s vp c (Msg x) = [(s |+ (vp,x),c)]
+∧ chor_itree_recv_aux s _ _ _        = [(s,CERROR)]
 End
 
 Definition chor_itree_select_aux_def[simp]:
@@ -65,35 +65,34 @@ Definition chor_itree_select_aux_def[simp]:
    else [(s,CDONE)])
 ∧ chor_itree_select_aux s _ _ _ = [(s,CERROR)]
 End
-
-(* fix let*)
+        
 Definition chor_itree_list_def:
   chor_itree_list p [] = Ret' Done
 ∧ chor_itree_list p [(s,Nil)]      = Ret' (Res ())
 ∧ chor_itree_list p [(s,(Call f))] = (if f = "DONE"
                                       then Ret' Done
                                       else Ret' Error)
-∧ chor_itree_list p [(s,Let v q f vl c)] =
+∧ chor_itree_list p [(s,Let v q e c)] =
   (if p = q
-   then if EVERY IS_SOME (MAP (FLOOKUP s) vl)
-        then Tau' [(s |+ (v,f (MAP (THE o FLOOKUP s) vl)), c)]
-        else Ret' Error
+   then case some r. ∃ cl. eval_exp cl (localise s q) e = r of
+          SOME (Value ev) => Tau' [(s |+ ((v,q), ev), c)]
+        | _ => Ret' Error
    else chor_itree_list p [(s,c)])
 ∧ chor_itree_list p [(s,Fix f c)] = Tau' [(s,dsubst c f (Fix f c))]
 ∧ chor_itree_list p [(s,IfThen v q l r)] =
   (if p = q
-   then if FLOOKUP s v = SOME [1w]
+   then if FLOOKUP s (v,q) = SOME (BoolV T)
         then Tau' [(s,l)]
         else Tau' [(s,r)]
    else chor_itree_list p [(s,l);(s,r)])
 ∧ chor_itree_list p [(s,Com q1 v1 q2 v2 c)] =
   (if p = q1 then
-     if IS_SOME (FLOOKUP s v1)
-     then Vis' (Send q2 (THE (FLOOKUP s v1))) (chor_itree_send_aux s c)
+     if IS_SOME (FLOOKUP s (v1,q1))
+     then Vis' (Send q2 (THE (FLOOKUP s (v1,q1)))) (chor_itree_send_aux s c)
      else Ret' Error
    else if p = q2
-        then Vis' (Receive q1) (chor_itree_recv_aux s v2 c)
-        else chor_itree_list p [(s,c)])
+   then Vis' (Receive q1) (chor_itree_recv_aux s (v2,q2) c)
+   else chor_itree_list p [(s,c)])
 ∧ chor_itree_list p [(s,Sel q1 b q2 c)] =
   (if p = q1
      then Vis' (Choose q2 b) (chor_itree_send_aux s c)
@@ -102,7 +101,7 @@ Definition chor_itree_list_def:
           else chor_itree_list p [(s,c)])
 ∧ chor_itree_list p (c1::c2::cs) =
     chor_itree_list_merge ((chor_itree_list p [c1]),
-                           (chor_itree_list p (c2::cs)))
+                           (chor_itree_list p (c2::cs)))                      
 Termination
   WF_REL_TAC ‘inv_image $<  (list$SUM o (MAP (size_chor o SND)) o SND)’
   \\ rw[] \\ simp[size_chor_def]
@@ -132,7 +131,7 @@ End
 Definition chor_itree_merge_aux_def:
   chor_itree_merge l r = itree_unfold chor_itree_merge_aux (l,r)
 End
-
+        
 Theorem chor_itree_merge_def:
 ∀t l r e1 f1 e2 f2 e f.
   (* Ret cases *)

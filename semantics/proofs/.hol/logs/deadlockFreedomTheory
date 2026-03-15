@@ -1,16 +1,5 @@
-<<HOL message: Created theory "deadlockFreedom">>
-Saved definition ____ "chorEnvsn_def"
-Saved theorem _______ "chorEnvsn_localise_fdom"
-Saved theorem _______ "richerLang_localise_sn"
-Saved theorem _______ "chor_progress_lemma"
-Saved theorem _______ "chor_progress"
-Saved theorem _______ "envsn_localise_update"
-Saved theorem _______ "chorEnvsn_update"
-Saved theorem _______ "fmap_update_duplicate"
-Saved theorem _______ "chorEnvsn_state_update"
-Saved theorem _______ "chorEnvtype_state_update"
-Saved CHEAT _________ "trans_not_finish"
-Saved theorem _______ "typecheck_eval_value_type_and_sn"
-Saved CHEAT _________ "chor_preservation_lemma"
-Exporting theory "deadlockFreedom" ... done.
-Theory "deadlockFreedom" took 2.3s to build
+/Users/mac/honors/choreo/semantics/proofs/deadlockFreedomScript.sml:2: error: Structure (chorPropschorTypePropsTheory) has not been declared
+Found near open HolKernel boolLib bossLib Parse holTheory ...
+error in quse /Users/mac/honors/choreo/semantics/proofs/deadlockFreedomScript.sml : Fail "Static Errors"
+error in load /Users/mac/honors/choreo/semantics/proofs/deadlockFreedomScript : Fail "Static Errors"
+Uncaught exception at ./basis/FinalPolyML.sml:492: Fail "Static Errors"

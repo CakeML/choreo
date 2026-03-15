@@ -13,4 +13,4 @@ Saved theorem _______ "chorTypecheckOK_com_thm"
 Saved theorem _______ "chorTypecheckOK_sel_thm"
 Saved theorem _______ "chorTypecheckOK_fix_thm"
 Exporting theory "chorTypeProps" ... done.
-Theory "chorTypeProps" took 0.92152s to build
+Theory "chorTypeProps" took 1.4s to build

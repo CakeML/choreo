@@ -34,4 +34,4 @@ Saved theorem _______ "value_size_thm"
 Saved definition ____ "is_BoolV_def"
 Saved induction _____ "is_BoolV_ind"
 Exporting theory "value" ... done.
-Theory "value" took 2.2s to build
+Theory "value" took 2.7s to build

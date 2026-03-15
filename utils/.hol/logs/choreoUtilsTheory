@@ -24,4 +24,4 @@ Saved theorem _______ "PAIR_MAP_app"
 Saved theorem _______ "ALOOKUP_LIST_REL_lemma"
 Saved theorem _______ "ALOOKUP_LIST_REL_lemma'"
 Exporting theory "choreoUtils" ... done.
-Theory "choreoUtils" took 1.3s to build
+Theory "choreoUtils" took 1.5s to build

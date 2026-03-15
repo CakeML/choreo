@@ -1,8 +1,5 @@
-open preamble choreoUtilsTheory chorSemTheory chorPropsTheory chorTypePropsTheory chorTypeTheory chorLangTheory
-
-open typeSNTheory envSemTheory richerLangTheory
-
-val _ = new_theory "deadlockFreedom";
+Theory deadlockFreedom
+Ancestors choreoUtils chorSem chorProps chorTypeProps chorType chorLang typeSN envSem richerLang
 
 
 Definition chorEnvsn_def:

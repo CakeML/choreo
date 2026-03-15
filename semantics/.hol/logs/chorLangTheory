@@ -20,4 +20,4 @@ Saved theorem _______ "chor_case_eq"
 Saved definition ____ "dsubst_def"
 Saved definition ____ "size_chor_def"
 Exporting theory "chorLang" ... done.
-Theory "chorLang" took 0.57463s to build
+Theory "chorLang" took 0.61735s to build

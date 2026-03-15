@@ -176,4 +176,4 @@ Saved theorem _______ "valuetype_EQ_sumT"
 Saved theorem _______ "bop_type_soundness"
 Saved theorem _______ "uop_type_soundness"
 Exporting theory "richerLang" ... done.
-Theory "richerLang" took 2.6s to build
+Theory "richerLang" took 2.8s to build

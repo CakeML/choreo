@@ -1,0 +1,15 @@
+<<HOL message: Created theory "chorType">>
+Saved theorem _______ "chorTypecheckOK_rules"
+Saved theorem _______ "chorTypecheckOK_ind"
+Saved theorem _______ "chorTypecheckOK_strongind"
+Saved theorem _______ "chorTypecheckOK_cases"
+Saved theorem _______ "chorTypecheckOK_nil"
+Saved theorem _______ "chorTypecheckOK_com"
+Saved theorem _______ "chorTypecheckOK_sel"
+Saved theorem _______ "chorTypecheckOK_if"
+Saved theorem _______ "chorTypecheckOK_let"
+Saved theorem _______ "chorTypecheckOK_fix"
+Saved theorem _______ "chorTypecheckOK_call"
+Saved definition ____ "chorEnvtype_def"
+Exporting theory "chorType" ... done.
+Theory "chorType" took 0.80582s to build

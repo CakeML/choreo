@@ -30,4 +30,4 @@ Saved theorem _______ "drestrict_diff_update"
 Saved theorem _______ "sn_lemma"
 Saved theorem _______ "richerLang_sn"
 Exporting theory "typeSN" ... done.
-Theory "typeSN" took 2.8s to build
+Theory "typeSN" took 3.2s to build
